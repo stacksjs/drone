@@ -141,10 +141,17 @@ export function createVisionLocalizer(calibration: VisionCalibration, heldOut: V
       const positionM = rotated.map((n, index) => n + pose.positionM[index]!) as SensorVector
       tuple(positionM, 3, 5000, 'localized position')
       const opticalRay = ray(depth.pixel, c), opticalRangeM = depth.opticalDepthM * Math.hypot(...opticalRay), u = c.uncertainty
-      const pixelSigmaM = depth.opticalDepthM * u.pixelSigmaPx * Math.hypot(c.output.crop[2] / c.output.width / c.intrinsics.fx, c.output.crop[3] / c.output.height / c.intrinsics.fy) / jacobianLowerBound(c)
+      const pixelRaySigma = u.pixelSigmaPx * Math.hypot(c.output.crop[2] / c.output.width / c.intrinsics.fx, c.output.crop[3] / c.output.height / c.intrinsics.fy) / jacobianLowerBound(c)
+      if (Math.hypot(opticalRay[0], opticalRay[1]) + pixelRaySigma > 2) fail('pixel uncertainty leaves certified lens domain')
+      // Add finite depth/pixel and transform cross terms instead of assuming independent errors.
+      const opticalPointSigmaM = Math.hypot(...opticalRay) * depth.sigmaM + (depth.opticalDepthM + depth.sigmaM) * pixelRaySigma
+      const cameraTransformSigmaM = opticalPointSigmaM + u.translationSigmaM + (opticalRangeM + opticalPointSigmaM) * u.rotationSigmaRad
       const vehicleTimingMotionSigmaM = 3 * (poseSkewMs + clockUncertaintyMs) / 1000
       const targetTimingMotionSigmaM = 2 * (depthSkewMs + clockUncertaintyMs) / 1000
-      const sigmaM = pose.positionSigmaM + u.translationSigmaM + opticalRangeM * u.rotationSigmaRad + Math.hypot(...body) * pose.attitudeSigmaRad + Math.hypot(...opticalRay) * depth.sigmaM + pixelSigmaM + u.modelSigmaM + vehicleTimingMotionSigmaM + targetTimingMotionSigmaM
+      // The estimator rejects rates above 35rad/s. Even a stationary vehicle may
+      // rotate through the full synchronization interval, including depth skew.
+      const angularTimingMotionSigmaM = Math.max(opticalRangeM, Math.hypot(...body)) * 35 * (poseSkewMs + depthSkewMs + clockUncertaintyMs) / 1000
+      const sigmaM = pose.positionSigmaM + cameraTransformSigmaM + (Math.hypot(...body) + cameraTransformSigmaM) * pose.attitudeSigmaRad + u.modelSigmaM + vehicleTimingMotionSigmaM + targetTimingMotionSigmaM + angularTimingMotionSigmaM
       number(sigmaM, 0.0001, 10, 'localization uncertainty')
       return { evidence: c.evidence, calibrationId: c.id, cameraSessionId: camera.sessionId, lockId: selected.id, candidateId: association.candidateId, frameSequence: camera.frameSequence, depthSourceId: depth.sourceId, depthSequence: depth.sequence, reference: pose.reference, capturedAtMs: camera.capturedAtMs, receivedAtMs: camera.receivedAtMs, positionM, sigmaM, physicalFlightEnabled: false }
     },
