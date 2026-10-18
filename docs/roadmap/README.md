@@ -14,6 +14,8 @@ companion application and simulator, not a native board autopilot.
   Physical capture, measured calibration and clock alignment remain open in [#3](https://github.com/stacksjs/drone/issues/3).
 - Owned tilt/relative-yaw, GNSS local-position filter and pressure-relative height with replay/health.
   Absolute heading, tightly coupled inertial EKF and physical validation remain open in [#4](https://github.com/stacksjs/drone/issues/4).
+- Owned simulated position/velocity/attitude/rate loops, quad-X allocation and rigid-body feedback through the estimator.
+  Native disabled-prop tests, measured tuning and authority validation remain open in [#5](https://github.com/stacksjs/drone/issues/5).
 - TypeScript follow/behavior library, kinematic simulator, controller leases and envelope checks.
 - Pi AI Camera acquisition bridge and explicit image-space target selection/loss policy, pending Pi hardware validation.
 - An optional visual guard that holds metric follow logic on lost, unconfirmed, stale or changed visual selection.

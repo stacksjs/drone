@@ -1,5 +1,27 @@
 # Validation evidence
 
+## Simulated multirotor control slice
+
+- 131 Bun tests pass with 16,326 assertions, including 15 control/physics tests. The two native
+  CTest contracts and five Python bridge tests also pass. Lint, application/runtime/view typechecks
+  and roadmap validation passed. CPU-heavy physics tests have explicit wall-clock budgets.
+- Independent quad-X force/moment, mass*g hover, NED demand signs, free-fall, rigid-body roll,
+  motor time-constant and PID derivative/anti-windup cases verify equations independently of tuning.
+- The owned closed loop passes 20-second hover, position-step, wind/torque-disturbance and additional
+  sensor-delay scenarios without floor contact. Raw synthetic frames pass through the existing
+  sensor pipeline/estimator; the controller receives no plant truth. Physics-step convergence is
+  checked at 2 ms versus 4 ms. See [the reproducible report](controls-evidence.json).
+- The IMU-loss run latches zero commands at 3060 ms, within 80 ms of capture loss, and stays inhibited
+  after packets resume. The simulated vehicle falls; this verifies inhibition, not a landing controller.
+- Estimator reset/origin/boot changes, mismatched rate epochs, clock/schedule faults, stale targets
+  and invalid values inhibit commands. A real sensor-pipeline uncertainty regression verifies that
+  an earlier healthy estimator snapshot cannot authorize a later control tick.
+- Buddy and the standalone CLI use the same native Stacks command. Report regeneration matches the
+  retained evidence. This is an invented vehicle model with initial heading assumed, 600 ms supported
+  startup and gyro-only attitude propagation after initialization. No measured airframe, physical
+  control, disabled-prop bench or #6 authority validation is implied.
+
+
 ## Owned estimator software slice
 
 - 116 Bun tests pass with 14,892 assertions, including 19 estimator tests. The two native CTest

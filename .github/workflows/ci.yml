@@ -33,6 +33,8 @@ jobs:
         working-directory: ${{ runner.temp }}
       - run: $GITHUB_WORKSPACE/storage/runtime-build/cli/drone estimator:replay "$GITHUB_WORKSPACE/tests/fixtures/estimation/motion-v1.json" --at-ms 6040
         working-directory: ${{ runner.temp }}
+      - run: $GITHUB_WORKSPACE/storage/runtime-build/cli/drone controls:simulate --scenario hover --seconds 3
+        working-directory: ${{ runner.temp }}
   firmware:
     runs-on: ubuntu-latest
     steps:

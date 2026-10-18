@@ -1,0 +1,158 @@
+{
+  "evidence": "owned-rigid-body-simulation-only",
+  "hardwareValidated": false,
+  "physicalFlightEnabled": false,
+  "boardOutputsInhibited": true,
+  "assumptions": [
+    "invented fixed vehicle parameters",
+    "declared initial north alignment",
+    "stationary supported startup for 600 ms",
+    "gravity correction at initialization only, then gyro propagation",
+    "deterministic dither and quantization, no measured noise or bias",
+    "250 Hz semi-implicit rigid body and 50 Hz controller/IMU, 10 Hz GNSS",
+    "4 ms base sensor delivery plus configured delay, no UART serialization",
+    "zero commands on faults are not a landing controller"
+  ],
+  "scenarios": [
+    {
+      "scenario": "hover",
+      "seconds": 20,
+      "additionalSensorDelayMs": 0,
+      "response": {
+        "targetStepAtMs": null,
+        "positionSettledAtMs": 2000,
+        "peakPositionErrorAfterStepM": 0.19759964964354818
+      },
+      "metrics": {
+        "active": true,
+        "firstInhibitMs": null,
+        "finalPositionErrorM": 0.0065015983910828535,
+        "tailPositionRmsM": 0.005975294297888393,
+        "maxTiltRad": 0.0003564401875378638,
+        "maxRateRadS": 0.0009995061576216944,
+        "maxCommandSlewNPerS": 40.000000000000014,
+        "limitedTicks": 4,
+        "groundContacts": 0,
+        "maxControlImuAgeMs": 20
+      },
+      "finalPositionM": [
+        -0.005494800996547362,
+        2.3832680264345404e-13,
+        -1.0034753336022997
+      ],
+      "finalReason": "simulation-feedback"
+    },
+    {
+      "scenario": "step",
+      "seconds": 20,
+      "additionalSensorDelayMs": 0,
+      "response": {
+        "targetStepAtMs": 2000,
+        "positionSettledAtMs": 3800,
+        "peakPositionErrorAfterStepM": 2.3420392711347886
+      },
+      "metrics": {
+        "active": true,
+        "firstInhibitMs": null,
+        "finalPositionErrorM": 0.011531726167509825,
+        "tailPositionRmsM": 0.012992851906228033,
+        "maxTiltRad": 0.34891940362278995,
+        "maxRateRadS": 1.0193608981182147,
+        "maxCommandSlewNPerS": 40.000000000000014,
+        "limitedTicks": 4,
+        "groundContacts": 0,
+        "maxControlImuAgeMs": 20
+      },
+      "finalPositionM": [
+        1.9901910370108846,
+        0.9970540619704139,
+        -1.505299660612382
+      ],
+      "finalReason": "simulation-feedback"
+    },
+    {
+      "scenario": "wind",
+      "seconds": 20,
+      "additionalSensorDelayMs": 0,
+      "response": {
+        "targetStepAtMs": 2000,
+        "positionSettledAtMs": 13800,
+        "peakPositionErrorAfterStepM": 2.3420392711347886
+      },
+      "metrics": {
+        "active": true,
+        "firstInhibitMs": null,
+        "finalPositionErrorM": 0.07390680286707517,
+        "tailPositionRmsM": 0.08683054784083814,
+        "maxTiltRad": 0.34891940362278995,
+        "maxRateRadS": 1.0193608981182147,
+        "maxCommandSlewNPerS": 40.000000000000014,
+        "limitedTicks": 4,
+        "groundContacts": 0,
+        "maxControlImuAgeMs": 20
+      },
+      "finalPositionM": [
+        2.063762157427649,
+        0.9631175999786528,
+        -1.5060242309774583
+      ],
+      "finalReason": "simulation-feedback"
+    },
+    {
+      "scenario": "delay",
+      "seconds": 20,
+      "additionalSensorDelayMs": 20,
+      "response": {
+        "targetStepAtMs": 2000,
+        "positionSettledAtMs": 4800,
+        "peakPositionErrorAfterStepM": 2.3412239698285857
+      },
+      "metrics": {
+        "active": true,
+        "firstInhibitMs": null,
+        "finalPositionErrorM": 0.012651088759214713,
+        "tailPositionRmsM": 0.013904685584099614,
+        "maxTiltRad": 0.36668000499767534,
+        "maxRateRadS": 1.1396425007780357,
+        "maxCommandSlewNPerS": 40.000000000000014,
+        "limitedTicks": 4,
+        "groundContacts": 0,
+        "maxControlImuAgeMs": 40
+      },
+      "finalPositionM": [
+        1.989268050318482,
+        0.9973678573598791,
+        -1.5061601240205822
+      ],
+      "finalReason": "simulation-feedback"
+    },
+    {
+      "scenario": "imu-loss",
+      "seconds": 20,
+      "additionalSensorDelayMs": 0,
+      "response": {
+        "targetStepAtMs": 2000,
+        "positionSettledAtMs": null,
+        "peakPositionErrorAfterStepM": 6.421910345885322
+      },
+      "metrics": {
+        "active": true,
+        "firstInhibitMs": 3060,
+        "finalPositionErrorM": 6.421910345885322,
+        "tailPositionRmsM": 6.395605060282827,
+        "maxTiltRad": 2.77444603014317,
+        "maxRateRadS": 0.957315511040257,
+        "maxCommandSlewNPerS": 40.000000000000014,
+        "limitedTicks": 4,
+        "groundContacts": 4089,
+        "maxControlImuAgeMs": 60
+      },
+      "finalPositionM": [
+        7.504727825132547,
+        3.947694702950159,
+        0
+      ],
+      "finalReason": "estimator-unhealthy"
+    }
+  ]
+}

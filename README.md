@@ -85,6 +85,19 @@ Read the [estimator guide and remaining work](docs/estimation.md). Replay uses e
 this Pi-side bench estimator is separate from ideal simulator control telemetry. Physical estimator
 validation and a tightly coupled inertial EKF remain open.
 
+## Simulated owned multirotor controls
+
+Issue #5 adds bounded position, velocity, attitude and rate loops with quad-X allocation in a
+rigid-body physics harness. It uses raw modeled sensors and our estimator, with an explicitly
+assumed initial heading. Physical commands remain disabled.
+
+```sh
+./buddy controls:simulate --scenario step --seconds 20
+./buddy controls:simulate --scenario wind --seconds 20
+```
+
+See the [control equations, simulation assumptions and remaining work](docs/controls.md).
+
 ## Owned autopilot and roadmap
 
 The [dependency-linked roadmap](docs/roadmap/README.md) and [feature matrix](docs/roadmap/feature-coverage.md)
@@ -101,6 +114,7 @@ See [the ownership decision](docs/adr/0001-owned-autonomy.md) and [driver contra
 | `resources/functions/drone/mavlink.ts` | Small verified MAVLink v1/v2 common-message codec |
 | `resources/functions/drone/udp.ts` | Bun UDP adapter, imported explicitly on the server only |
 | `resources/functions/drone/camera/` | TypeScript tracker, session, API and a small Picamera2 acquisition helper |
+| `resources/functions/drone/controls/` | Simulated cascaded multirotor control, quad-X allocation, physics and modeled sensors |
 | `resources/functions/drone/estimation/` | Owned tilt, GNSS local-position filter, pressure height, health and replay |
 | `resources/functions/drone/sensors/` | Typed sensor stream, calibration, clocks, health and capture/replay |
 | `resources/functions/drone/drivers/` | Explicit ArduPilot/PX4 factories and mode profiles |

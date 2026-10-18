@@ -91,3 +91,8 @@ The [owned estimator](estimation.md), recorded in [ADR 4](adr/0004-owned-estimat
 qualified sensor events on their capture epochs. It exposes tilt/relative-yaw, GNSS local NED and
 separate pressure height with health/reset counters. It is independent of both external autopilots
 and remains separate from control telemetry until heading, fusion and hardware validation exist.
+
+The [owned control physics harness](controls.md), recorded in [ADR 5](adr/0005-simulated-multirotor-controls.md),
+feeds modeled raw sensor records through the existing sensor pipeline and estimator into bounded
+quad-X control. It declares initial simulation heading alignment and has no physical transport.
+Plant truth is retained only for sensor synthesis and independent response evaluation.

@@ -11,7 +11,9 @@ const vector = (v: unknown): v is SensorVector => Array.isArray(v) && v.length =
 const variance = (v: unknown): v is SensorVector => vector(v) && v.every(n => n > 0)
 interface Source { sequence: number, capturedUs: bigint, deviceId: string, calibrationId: string | null }
 /** Bench estimator, consuming qualified sensor snapshots. Never produces control Telemetry. */
-export function createEstimator(options: { origin?: GeodeticOrigin } = {}) {
+export function createEstimator(options: { origin?: GeodeticOrigin, gravityCorrection?: 'norm-gated' | 'initialization-only' } = {}) {
+  const gravityMode = options.gravityCorrection ?? 'norm-gated'
+  if (!['norm-gated', 'initialization-only'].includes(gravityMode)) throw new TypeError('Invalid gravity correction mode')
   let origin = options.origin ? structuredClone(options.origin) : null
   if (origin) geodeticToEcef(origin)
   let boot: bigint | null = null, evidence: SensorSnapshot['evidence'] | null = null, now = -Infinity
@@ -70,7 +72,7 @@ export function createEstimator(options: { origin?: GeodeticOrigin } = {}) {
     }
     else {
       let rates = [...value.angularRateRadS] as SensorVector
-      gravityCorrection = Math.abs(magnitude - gravity) < 0.15 * gravity
+      gravityCorrection = gravityMode === 'norm-gated' && Math.abs(magnitude - gravity) < 0.15 * gravity
       if (gravityCorrection) {
         const [w, x, y, z] = q
         const down = [2 * (x * z - w * y), 2 * (y * z + w * x), 1 - 2 * (x * x + y * y)]

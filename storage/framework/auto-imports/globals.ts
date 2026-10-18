@@ -25,6 +25,19 @@ declare global {
   const validBox: typeof autoImports.validBox
   const createVisualTracker: typeof autoImports.createVisualTracker
   const createController: typeof autoImports.createController
+  const quadXWrench: typeof autoImports.quadXWrench
+  const allocateQuadX: typeof autoImports.allocateQuadX
+  const createSimulatedMultirotorController: typeof autoImports.createSimulatedMultirotorController
+  const multirotorModel: typeof autoImports.multirotorModel
+  const validVector: typeof autoImports.validVector
+  const clampControl: typeof autoImports.clampControl
+  const rotateBodyToNed: typeof autoImports.rotateBodyToNed
+  const createRigidBody: typeof autoImports.createRigidBody
+  const rotateNedToBody: typeof autoImports.rotateNedToBody
+  const createBoundedPid: typeof autoImports.createBoundedPid
+  const createPhysicsSensorFeed: typeof autoImports.createPhysicsSensorFeed
+  const simulateMultirotor: typeof autoImports.simulateMultirotor
+  const controlScenarios: typeof autoImports.controlScenarios
   const createArduPilotDriver: typeof autoImports.createArduPilotDriver
   const createPx4Driver: typeof autoImports.createPx4Driver
   const decodeAutopilotMode: typeof autoImports.decodeAutopilotMode

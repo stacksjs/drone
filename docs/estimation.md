@@ -58,7 +58,10 @@ of standard gravity. Outside that range, gravity correction is suppressed and fl
 There is no compass or other heading observation in the sensor profile. Absolute yaw and its
 covariance cannot be inferred from gravity or assumed from GNSS course. `absoluteHeading` and
 `navigation` stay false. Relative yaw drifts with residual gyro bias; a 0.02 rad/s bias gives 0.08 rad
-drift over four seconds in the test. Attitude covariance is null. No gyro bias learning, coning
+drift over four seconds in the test. Attitude covariance is null. An optional `gravityCorrection: 'initialization-only'` disables post-alignment gravity feedback
+for the explicitly assumed-heading [control physics experiment](controls.md). The default remains
+`norm-gated`. This mode is gyro propagation, not a remedy for physical observability or bias drift.
+No gyro bias learning, coning
 correction, accelerometer dynamic rejection beyond the norm heuristic, Earth-rate or lever-arm
 model is claimed.
 

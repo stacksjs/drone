@@ -114,6 +114,20 @@
     "url": "https://github.com/stacksjs/drone/issues/5",
     "nativeDependencies": [
       4
+    ],
+    "implementationStatus": "in-progress",
+    "evidence": [
+      "resources/functions/drone/controls/",
+      "app/Commands/ControlsSimulate.ts",
+      "docs/controls.md",
+      "docs/controls-evidence.json",
+      "tests/unit/controls.test.ts"
+    ],
+    "remaining": [
+      "Measured estimator/heading/timing prerequisites in #2/#3/#4",
+      "Higher-fidelity models, noisy/biased sensors, parameter and delay sweeps, and stability margins",
+      "Native scheduler port and disabled-prop harness with #6 authority gating",
+      "Measured tuning, autotune, helicopter/autorotation and advanced controller variants"
     ]
   },
   {

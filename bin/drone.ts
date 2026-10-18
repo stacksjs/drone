@@ -7,6 +7,7 @@ import RuntimeInspect from '../app/Commands/RuntimeInspect'
 import SensorsReplay from '../app/Commands/SensorsReplay'
 import SensorsInspect from '../app/Commands/SensorsInspect'
 import EstimatorReplay from '../app/Commands/EstimatorReplay'
+import ControlsSimulate from '../app/Commands/ControlsSimulate'
 
 const app = cli('drone')
 RuntimeBuild(app)
@@ -15,6 +16,7 @@ RuntimeInspect(app)
 SensorsReplay(app)
 SensorsInspect(app)
 EstimatorReplay(app)
+ControlsSimulate(app)
 app.help()
 app.version('0.1.0')
 try { await app.parse(process.argv) }
