@@ -2,11 +2,9 @@ import type { Quaternion } from '../estimation/frames'
 import type { SensorVector } from '../sensors/types'
 import type { InspectionAsset, InspectionPlan } from './types'
 import { createCalibratedCamera } from '../camera/calibrated'
+import { rotateBodyToNed } from '../controls/physics'
 
-export function inspectionRotate(q: Quaternion, v: SensorVector): SensorVector {
-  const [w, x, y, z] = q, [a, b, c] = v
-  return [(1 - 2 * (y * y + z * z)) * a + 2 * (x * y - z * w) * b + 2 * (x * z + y * w) * c, 2 * (x * y + z * w) * a + (1 - 2 * (x * x + z * z)) * b + 2 * (y * z - x * w) * c, 2 * (x * z - y * w) * a + 2 * (y * z + x * w) * b + (1 - 2 * (x * x + y * y)) * c]
-}
+export function inspectionRotate(q: Quaternion, v: SensorVector): SensorVector { return rotateBodyToNed(q, v) }
 export function inspectionAssetPoint(asset: InspectionAsset, uM: number, vM: number): SensorVector {
   return [asset.centerM[0], asset.centerM[1] + uM, asset.centerM[2] - vM]
 }
@@ -36,7 +34,7 @@ export function inspectionSegmentSeparation(asset: InspectionAsset, from: Sensor
   return Math.sqrt(minimum)
 }
 export function inspectionProjector(plan: InspectionPlan, pose: { positionM: SensorVector, quaternionWxyz: Quaternion }, centerM: SensorVector = plan.config.asset.centerM) {
-  if (!Array.isArray(pose.positionM) || pose.positionM.length !== 3 || pose.positionM.some(n => !Number.isFinite(n)) || !Array.isArray(pose.quaternionWxyz) || pose.quaternionWxyz.length !== 4 || pose.quaternionWxyz.some(n => !Number.isFinite(n)) || Math.abs(Math.hypot(...pose.quaternionWxyz) - 1) > 1e-6 || !Array.isArray(centerM) || centerM.length !== 3 || centerM.some(n => !Number.isFinite(n))) throw new RangeError('Invalid inspection projection pose')
+  if (!Array.isArray(pose.positionM) || pose.positionM.length !== 3 || pose.positionM.some(n => !Number.isFinite(n) || Math.abs(n) > 1000) || !Array.isArray(pose.quaternionWxyz) || pose.quaternionWxyz.length !== 4 || pose.quaternionWxyz.some(n => !Number.isFinite(n)) || Math.abs(Math.hypot(...pose.quaternionWxyz) - 1) > 1e-6 || !Array.isArray(centerM) || centerM.length !== 3 || centerM.some(n => !Number.isFinite(n) || Math.abs(n) > 1000)) throw new RangeError('Invalid inspection projection pose')
   const camera = createCalibratedCamera(plan.config.calibration, plan.config.heldOut)
   const lever = inspectionRotate(pose.quaternionWxyz, camera.originBodyM)
   const origin = pose.positionM.map((n, i) => n + lever[i]!) as SensorVector

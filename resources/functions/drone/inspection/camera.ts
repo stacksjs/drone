@@ -6,6 +6,7 @@ import { inspectionProjector, inspectionRotate } from './geometry'
 /** Pure synthetic face texture sampled by ray intersection, not a defect detector. */
 export function renderInspectionImage(plan: InspectionPlan, body: RigidBodyState, centerM?: SensorVector): InspectionImage {
   const { width, height } = plan.config.calibration.output
+  if (!Number.isInteger(width) || !Number.isInteger(height) || width < 16 || height < 16 || width * height > 65536) throw new RangeError('Invalid inspection raster dimensions')
   const rgba = new Uint8Array(width * height * 4), thermalCentiKelvin = new Uint16Array(width * height)
   const camera = inspectionProjector(plan, body, centerM)
   for (let y = 0; y < height; y++) for (let x = 0; x < width; x++) {
@@ -27,6 +28,8 @@ export function renderInspectionImage(plan: InspectionPlan, body: RigidBodyState
 export function renderInspectionRange(plan: InspectionPlan, body: RigidBodyState, nowMs: number, sequence: number, centerM: SensorVector = plan.config.asset.centerM): InspectionRangePacket {
   if (!Number.isFinite(nowMs) || nowMs < 0 || !Number.isSafeInteger(sequence) || sequence < 0) throw new RangeError('Invalid inspection range epoch')
   const asset = plan.config.asset
+  // Validate producer pose and face bounds through the same camera geometry boundary.
+  inspectionProjector(plan, body, centerM)
   const inverse = [body.quaternionWxyz[0], -body.quaternionWxyz[1], -body.quaternionWxyz[2], -body.quaternionWxyz[3]] as typeof body.quaternionWxyz
   const pointsBodyM = ([[-asset.widthM / 2, -asset.heightM / 2], [asset.widthM / 2, -asset.heightM / 2], [-asset.widthM / 2, asset.heightM / 2]] as [number, number][]).map(([u, v]) => inspectionRotate(inverse, [centerM[0] - body.positionM[0], centerM[1] + u - body.positionM[1], centerM[2] - v - body.positionM[2]])) as [SensorVector, SensorVector, SensorVector]
   return { version: 1, evidence: 'modeled-asset-range', assetId: asset.id, revision: asset.revision, sequence, capturedAtMs: nowMs, receivedAtMs: nowMs, rangeSigmaM: .005, clockUncertaintyMs: 1, pointsBodyM }
@@ -34,7 +37,7 @@ export function renderInspectionRange(plan: InspectionPlan, body: RigidBodyState
 /** Recomputable pixel geometry, translational/rotational blur and declared pose qualification. */
 export function inspectCaptureQuality(plan: InspectionPlan, capture: Omit<InspectionCapture, 'quality'>, motion: { velocityMps: number, angularRateRadS: number }): InspectionCaptureQuality {
   const { image } = capture, output = plan.config.calibration.output
-  if (image.width !== output.width || image.height !== output.height || !(image.rgba instanceof Uint8Array) || image.rgba.length !== output.width * output.height * 4 || !(image.thermalCentiKelvin instanceof Uint16Array) || image.thermalCentiKelvin.length !== output.width * output.height || ![motion.velocityMps, motion.angularRateRadS, capture.positionSigmaM, capture.attitudeSigmaRad].every(n => Number.isFinite(n) && n >= 0)) throw new RangeError('Invalid inspection quality input')
+  if (!Number.isInteger(output.width) || !Number.isInteger(output.height) || output.width < 16 || output.height < 16 || output.width * output.height > 65536 || !Number.isFinite(capture.exposureTimeUs) || capture.exposureTimeUs < 10 || capture.exposureTimeUs > 10000 || motion.velocityMps > 100 || motion.angularRateRadS > 100 || image.width !== output.width || image.height !== output.height || !(image.rgba instanceof Uint8Array) || image.rgba.length !== output.width * output.height * 4 || !(image.thermalCentiKelvin instanceof Uint16Array) || image.thermalCentiKelvin.length !== output.width * output.height || ![motion.velocityMps, motion.angularRateRadS, capture.positionSigmaM, capture.attitudeSigmaRad].every(n => Number.isFinite(n) && n >= 0)) throw new RangeError('Invalid inspection quality input')
   const station = plan.stations.find(s => s.id === capture.stationId)
   if (!station) throw new RangeError('Unknown inspection capture station')
   const camera = inspectionProjector(plan, capture.pose, capture.assetObservation.centerM), reasons: string[] = []

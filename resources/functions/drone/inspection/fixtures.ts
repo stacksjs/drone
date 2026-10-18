@@ -8,7 +8,7 @@ export function exampleInspectionConfig(): InspectionConfig {
     stations: [{ id: 'left', uM: -.5, vM: 0 }, { id: 'center', uM: 0, vM: 0 }, { id: 'right', uM: .5, vM: 0 }],
     standOffM: 2, speedMps: .4,
     clearance: { minSeparationM: .5, bodyRadiusM: .22, positionBoundM: .15, assetMotionBoundM: .15, brakingAccelerationMps2: 1, reactionMs: 100 },
-    quality: { maxGsdM: .05, maxBlurPx: 1, minAssetFraction: .25, maxPoseSigmaM: .15, maxAttitudeSigmaRad: .1, maxStationOffsetM: .35 },
+    quality: { maxGsdM: .05, maxBlurPx: 1, minAssetFraction: .2, maxPoseSigmaM: .15, maxAttitudeSigmaRad: .1, maxStationOffsetM: .35 },
     exposureTimeUs: 1000, power: { availableWh: 30, hoverW: 240, reservePercent: 30 },
     calibration: {
       version: 1, id: 'synthetic-inspection-pinhole', cameraId: 'inspection-fixture', modeId: '640x480-to-96x72', evidence: 'synthetic',
