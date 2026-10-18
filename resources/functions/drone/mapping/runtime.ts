@@ -11,6 +11,7 @@ import { createSurveyPlan } from './planner'
 import { projectSurveyFootprint } from './geometry'
 import { exampleSurveyConfig } from './fixtures'
 import { createSurveyCamera } from './camera'
+import { surveyDatasetLimits } from './quality'
 
 export const surveyScenarios = ['nominal', 'crosshatch', 'terrain', 'camera-loss', 'wrong-ack', 'imu-loss', 'position-loss', 'rc-override', 'abort'] as const
 export type SurveyScenario = typeof surveyScenarios[number]
@@ -21,7 +22,7 @@ export function compileSurveyMission(input: SurveyPlan): MissionPlan {
   if (JSON.stringify(plan) !== JSON.stringify(input)) throw new TypeError('Survey plan differs from validated configuration')
   const first = plan.lanes[0]!.fromM
   const timeout = (a: SensorVector, b: SensorVector) => Math.max(2500, Math.ceil((Math.hypot(...a.map((n, i) => n - b[i]!)) / config.speedMps + 2) * 1000))
-  const tasks: MissionTask[] = [{ id: 'takeoff', kind: 'takeoff', positionM: [0, 0, first[2]], timeoutMs: 10000, next: `${plan.lanes[0]!.id}-start` }]
+  const tasks: MissionTask[] = [{ id: 'takeoff', kind: 'takeoff', positionM: [0, 0, first[2]], timeoutMs: timeout([0, 0, 0], [0, 0, first[2]]), next: `${plan.lanes[0]!.id}-start` }]
   let previous: SensorVector = [0, 0, first[2]]
   for (const [index, lane] of plan.lanes.entries()) {
     tasks.push({ id: `${lane.id}-start`, kind: 'waypoint', positionM: lane.fromM, timeoutMs: timeout(previous, lane.fromM), next: `${lane.id}-end` })
@@ -29,7 +30,7 @@ export function compileSurveyMission(input: SurveyPlan): MissionPlan {
     previous = lane.toM
   }
   const rallyM: SensorVector = [0, 0, first[2]]
-  tasks.push({ id: 'return', kind: 'return', timeoutMs: timeout(previous, rallyM), next: 'land' }, { id: 'land', kind: 'land', positionM: [0, 0, 0], timeoutMs: 10000 })
+  tasks.push({ id: 'return', kind: 'return', timeoutMs: timeout(previous, rallyM), next: 'land' }, { id: 'land', kind: 'land', positionM: [0, 0, 0], timeoutMs: timeout(rallyM, [0, 0, 0]) })
   return validateMission({ version: 1, id: config.id, frame: 'LOCAL_NED', altitude: 'ORIGIN_RELATIVE_DOWN', terrain: 'FLAT_ORIGIN_PLANE', origin: config.origin, fence: { radiusM: 12, minDownM: -5 }, rallyM, power: config.power, speedMps: config.speedMps, start: 'takeoff', tasks }).plan
 }
 
@@ -42,6 +43,7 @@ export function simulateSurvey(options: { config?: unknown, scenario?: SurveySce
   if (options.config === undefined && scenario === 'terrain') (config as ReturnType<typeof exampleSurveyConfig>).terrain.gradient = [0.04, -0.03]
   const plan = createSurveyPlan(config), mission = compileSurveyMission(plan)
   if (plan.config.calibration.evidence !== 'synthetic' || plan.config.calibration.output.width * plan.config.calibration.output.height > 65536) throw new RangeError('Owned mapping fixture requires synthetic calibration and at most 65536 pixels')
+  if (plan.config.calibration.timing.clockUncertaintyMs > surveyDatasetLimits.clockUncertaintyMs) throw new RangeError('Owned mapping fixture clock uncertainty exceeds 5 ms')
   const camera = createSurveyCamera(plan, scenario === 'camera-loss' ? 'loss' : scenario === 'wrong-ack' ? 'wrong-ack' : 'none')
   const captures: SurveyCapture[] = []
   let pending: Omit<SurveyCapture, 'rgba' | 'acknowledgedAtMs'> | null = null
@@ -79,7 +81,10 @@ export function simulateSurvey(options: { config?: unknown, scenario?: SurveySce
         const lever = rotateBodyToNed(pose.quaternionWxyz, plan.config.calibration.extrinsics.translationM)
         const cameraPositionM = pose.positionM.map((n, i) => n + lever[i]!) as SensorVector
         const p = estimate.localPosition!
-        const surveyPose: SurveyPose = { capturedAtMs: nowMs, reference: pose.reference, positionM: pose.positionM, quaternionWxyz: pose.quaternionWxyz, cameraPositionM, geodetic: nedToGeodetic(cameraPositionM, plan.config.origin), positionSigmaM: Math.sqrt(Math.max(...p.covarianceBlocks.map(block => block.positionM2))) + plan.config.calibration.uncertainty.translationSigmaM + 0.001, attitudeSigmaRad: 0.003 + nowMs / 1000000, headingAlignment: 'initial-simulation-north', positionCapturedAtMs: pose.positionCapturedAtMs, attitudeCapturedAtMs: pose.attitudeCapturedAtMs, attitudePrediction: 'qualified-gyro-hold' }
+        const clockSeconds = plan.config.calibration.timing.clockUncertaintyMs / 1000
+        const attitudeSigmaRad = 0.003 + nowMs / 1000000 + 35 * clockSeconds
+        const positionSigmaM = Math.sqrt(Math.max(...p.covarianceBlocks.map(block => block.positionM2))) + plan.config.calibration.uncertainty.translationSigmaM + Math.hypot(...p.velocityMps) * clockSeconds + Math.hypot(...plan.config.calibration.extrinsics.translationM) * attitudeSigmaRad
+        const surveyPose: SurveyPose = { capturedAtMs: nowMs, reference: pose.reference, positionM: pose.positionM, quaternionWxyz: pose.quaternionWxyz, cameraPositionM, geodetic: nedToGeodetic(cameraPositionM, plan.config.origin), positionSigmaM, attitudeSigmaRad, headingAlignment: 'initial-simulation-north', positionCapturedAtMs: pose.positionCapturedAtMs, attitudeCapturedAtMs: pose.attitudeCapturedAtMs, attitudePrediction: 'qualified-gyro-hold' }
         const id = `photo-${String(++sequence).padStart(4, '0')}`
         pending = { id, filename: `${id}.png`, laneId: lane.id, sessionId: 'mapping-session-1', sequence, issuedAtMs: nowMs, capturedAtMs: nowMs, exposureTimeUs: plan.config.exposureTimeUs, timestampReference: 'synthetic-exposure-midpoint', clockDomain: 'fixture-monotonic-ms', clockUncertaintyMs: plan.config.calibration.timing.clockUncertaintyMs, calibrationId: plan.config.calibration.id, pose: surveyPose, width, height, footprintM: projectSurveyFootprint(plan, pose.positionM, pose.quaternionWxyz), rtk: { status: 'unavailable', reason: 'Synthetic GNSS has no RTK correction solution' }, ppk: { status: 'unavailable', reason: 'No raw carrier-phase observations or base station' }, gcps: { status: 'unavailable', reason: 'No independently surveyed ground control observations' } }
         camera.request({ sessionId: pending.sessionId, sequence, issuedAtMs: nowMs, reference: pose.reference })

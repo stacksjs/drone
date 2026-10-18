@@ -42,7 +42,7 @@ function collection(): SurveyRun {
     plan, mission, trace: engine.trace(), status: 'incomplete', reason: 'export-fixture', boardNeutral: true, path: [],
     captures: [{ id: 'photo-0001', filename: 'photo-0001.png', laneId: lane.id, sessionId: 'mapping-session-1', sequence: 1,
       issuedAtMs: 520, capturedAtMs: 520, acknowledgedAtMs: 540, exposureTimeUs: config.exposureTimeUs, timestampReference: 'synthetic-exposure-midpoint', clockDomain: 'fixture-monotonic-ms', clockUncertaintyMs: 1, calibrationId: config.calibration.id,
-      pose: { capturedAtMs: 520, reference: '55:0,0,0,0,0', positionM, quaternionWxyz: [1, 0, 0, 0], cameraPositionM, geodetic: nedToGeodetic(cameraPositionM, config.origin), positionSigmaM: 0.1, attitudeSigmaRad: 0.004, headingAlignment: 'initial-simulation-north', positionCapturedAtMs: 500, attitudeCapturedAtMs: 520, attitudePrediction: 'qualified-gyro-hold' },
+      pose: { capturedAtMs: 520, reference: '55:0,0,0,0,0', positionM, quaternionWxyz: [1, 0, 0, 0], cameraPositionM, geodetic: nedToGeodetic(cameraPositionM, config.origin), positionSigmaM: 0.1, attitudeSigmaRad: 0.04, headingAlignment: 'initial-simulation-north', positionCapturedAtMs: 500, attitudeCapturedAtMs: 520, attitudePrediction: 'qualified-gyro-hold' },
       width, height, rgba, footprintM: projectSurveyFootprint(plan, positionM, [1, 0, 0, 0]),
       rtk: { status: 'unavailable', reason: 'No measured RTK input' }, ppk: { status: 'unavailable', reason: 'No PPK processing' }, gcps: { status: 'unavailable', reason: 'No measured control points' },
     }],
@@ -73,6 +73,7 @@ test('exports independently decodable RGBA imagery, optical-center ellipsoid pos
   expect(manifest.images[0].rtk.status).toBe('unavailable')
   expect(manifest.images[0].rgba).toBeUndefined()
   expect(await readdir(target)).not.toContain('gcp_list.txt')
+  expect(await readdir(target)).not.toContain('manifest.pending.json')
   expect((await stat(target)).mode & 0o777).toBe(0o700)
   expect((await stat(result.manifest)).mode & 0o777).toBe(0o600)
 })
@@ -83,6 +84,7 @@ test('quality exposes incomplete lanes and sampled coverage without inventing ac
   expect(report.status).toBe('partial-collection')
   expect(report.planned.images).toBeGreaterThan(report.observed.images)
   expect(report.observed.images).toBe(1)
+  expect(report.observed.maximumTranslationMotionAtPlannedGsdPx).toBe(0)
   expect(report.observed.lanes.some(l => l.captures === 0)).toBe(true)
   expect(report.observed.coverage.areaSamples).toBeGreaterThan(0)
   expect(report.observed.coverage.coveredFraction).toBeGreaterThan(0)
@@ -114,7 +116,9 @@ test('rejects tampered metadata, unsafe filenames, mixed evidence and malformed 
     run => { run.captures[0]!.pose.cameraPositionM[2] = 1.46 },
     run => { run.captures[0]!.pose.positionSigmaM = 0 },
     run => { run.captures[0]!.pose.positionSigmaM = 0.0001 },
+    run => { run.captures[0]!.pose.positionSigmaM = 0.006 },
     run => { run.captures[0]!.pose.attitudeSigmaRad = 0.0001 },
+    run => { run.captures[0]!.pose.attitudeSigmaRad = 0.004 },
     run => { run.captures[0]!.clockUncertaintyMs = 0 },
     run => { run.captures[0]!.pose.positionM[0] += 0.01 },
     run => { run.captures[0]!.pose.quaternionWxyz = [0, 0, 0, 0] },
@@ -152,4 +156,21 @@ test('existing destinations are never overwritten, and an asynchronous export sn
   expect(Array.from((await decode(await readFile(join(target, 'images', 'photo-0001.png')))).data)).toEqual(Array.from(original))
   await expect(writeSurveyDataset(target, collection())).rejects.toThrow('EEXIST')
   expect(await readFile(join(target, 'manifest.json'), 'utf8')).toBe(manifest)
+})
+
+test('owned collection export rejects bench calibration even when its generic survey plan is valid', async () => {
+  const run = collection(), target = await destination()
+  run.plan.config.calibration.evidence = 'declared-bench'
+  run.plan = createSurveyPlan(run.plan.config)
+  await expect(writeSurveyDataset(target, run)).rejects.toThrow('synthetic calibration')
+  await expect(stat(target)).rejects.toThrow('ENOENT')
+})
+
+test('even an empty owned collection retains the producer clock qualification contract', async () => {
+  const run = collection(), target = await destination()
+  run.captures = []
+  run.plan.config.calibration.timing.clockUncertaintyMs = 6
+  run.plan = createSurveyPlan(run.plan.config)
+  await expect(writeSurveyDataset(target, run)).rejects.toThrow('clock uncertainty')
+  await expect(stat(target)).rejects.toThrow('ENOENT')
 })

@@ -7,7 +7,7 @@ import { createSurveyPlan } from './planner'
 import { projectSurveyFootprint } from './geometry'
 
 /** Export and browser work share the same bounded, simulation-only contract. */
-export const surveyDatasetLimits = Object.freeze({ images: 512, imageBytes: 4 * 1024 * 1024, rawBytes: 64 * 1024 * 1024, metadataBytes: 16 * 1024 * 1024, traceRows: missionLimits.rows, acknowledgementMs: 80, coverageGrid: 64 })
+export const surveyDatasetLimits = Object.freeze({ images: 512, imageBytes: 4 * 1024 * 1024, rawBytes: 64 * 1024 * 1024, metadataBytes: 16 * 1024 * 1024, traceRows: missionLimits.rows, acknowledgementMs: 80, clockUncertaintyMs: 5, coverageGrid: 64 })
 function fail(message: string): never { throw new TypeError(`Invalid survey dataset: ${message}`) }
 function record(value: unknown): value is Record<string, unknown> {
   return !!value && typeof value === 'object' && !Array.isArray(value) && Object.getPrototypeOf(value) === Object.prototype
@@ -70,6 +70,8 @@ export function validateSurveyDataset(input: unknown): asserts input is SurveyRu
   const run = input as SurveyRun
   if (run.version !== 1 || run.evidence !== 'owned-mapping-physics-simulation' || run.physicalFlightEnabled !== false || run.collectionOnly !== true || run.reconstructionPerformed !== false || !['completed', 'aborted', 'blocked', 'incomplete'].includes(run.status) || !text(run.reason) || typeof run.boardNeutral !== 'boolean') fail('unsupported collection evidence')
   if (!record(run.plan) || !same(createSurveyPlan(run.plan.config), run.plan)) fail('plan differs from its validated configuration')
+  if (run.plan.config.calibration.evidence !== 'synthetic') fail('owned simulation collection requires synthetic calibration')
+  if (run.plan.config.calibration.timing.clockUncertaintyMs > surveyDatasetLimits.clockUncertaintyMs) fail('owned simulation clock uncertainty exceeds 5 ms')
   if (!record(run.trace) || !Array.isArray(run.trace.rows) || run.trace.rows.length === 0 || run.trace.rows.length > surveyDatasetLimits.traceRows || !same(run.trace.plan, run.mission) || !same(run.mission.origin, run.plan.config.origin)) fail('mission or trace reference mismatch')
   fields(run.trace, ['version', 'evidence', 'plan', 'rows'])
   for (const row of run.trace.rows) {
@@ -93,7 +95,7 @@ export function validateSurveyDataset(input: unknown): asserts input is SurveyRu
     if (!identifier(capture.id) || ids.has(capture.id) || typeof capture.filename !== 'string' || !/^[a-z][a-z0-9-]{0,63}\.png$/.test(capture.filename) || names.has(capture.filename) || capture.filename !== `${capture.id}.png` || !identifier(capture.sessionId) || (session !== null && capture.sessionId !== session) || capture.sequence !== ids.size + 1) fail('duplicate or invalid capture identity')
     ids.add(capture.id); names.add(capture.filename); session = capture.sessionId
     const lane = run.plan.lanes.find(l => l.id === capture.laneId)
-    if (!lane || !Number.isSafeInteger(capture.capturedAtMs) || capture.capturedAtMs <= previousMs || capture.capturedAtMs < 0 || capture.capturedAtMs > 120000 || capture.issuedAtMs !== capture.capturedAtMs || !Number.isSafeInteger(capture.acknowledgedAtMs) || capture.acknowledgedAtMs <= capture.capturedAtMs || capture.acknowledgedAtMs - capture.issuedAtMs > surveyDatasetLimits.acknowledgementMs || !finite(capture.clockUncertaintyMs, 0, 5) || capture.clockUncertaintyMs !== calibration.timing.clockUncertaintyMs || capture.exposureTimeUs !== run.plan.config.exposureTimeUs || capture.timestampReference !== 'synthetic-exposure-midpoint' || capture.clockDomain !== 'fixture-monotonic-ms' || capture.calibrationId !== calibration.id) fail('capture timing or calibration mismatch')
+    if (!lane || !Number.isSafeInteger(capture.capturedAtMs) || capture.capturedAtMs <= previousMs || capture.capturedAtMs < 0 || capture.capturedAtMs > 120000 || capture.issuedAtMs !== capture.capturedAtMs || !Number.isSafeInteger(capture.acknowledgedAtMs) || capture.acknowledgedAtMs <= capture.capturedAtMs || capture.acknowledgedAtMs - capture.issuedAtMs > surveyDatasetLimits.acknowledgementMs || !finite(capture.clockUncertaintyMs, 0, surveyDatasetLimits.clockUncertaintyMs) || capture.clockUncertaintyMs !== calibration.timing.clockUncertaintyMs || capture.exposureTimeUs !== run.plan.config.exposureTimeUs || capture.timestampReference !== 'synthetic-exposure-midpoint' || capture.clockDomain !== 'fixture-monotonic-ms' || capture.calibrationId !== calibration.id) fail('capture timing or calibration mismatch')
     previousMs = capture.capturedAtMs
     const associated = observations.get(capture.capturedAtMs)
     const previous = associated?.previous?.result, observation = associated?.row.observation
@@ -102,7 +104,10 @@ export function validateSurveyDataset(input: unknown): asserts input is SurveyRu
     fields(capture.pose, ['capturedAtMs', 'reference', 'positionM', 'quaternionWxyz', 'cameraPositionM', 'geodetic', 'positionSigmaM', 'attitudeSigmaRad', 'headingAlignment', 'positionCapturedAtMs', 'attitudeCapturedAtMs', 'attitudePrediction'])
     const pose = capture.pose
     if (pose.capturedAtMs !== capture.capturedAtMs || pose.reference !== observation.reference || !vector(pose.positionM, 3) || !vector(pose.cameraPositionM, 3) || !vector(pose.quaternionWxyz, 4) || Math.abs(Math.hypot(...pose.quaternionWxyz) - 1) > 1e-6 || !finite(pose.positionSigmaM, Number.MIN_VALUE, 100) || !finite(pose.attitudeSigmaRad, Number.MIN_VALUE, 0.5) || pose.headingAlignment !== 'initial-simulation-north' || pose.attitudePrediction !== 'qualified-gyro-hold' || !Number.isSafeInteger(pose.positionCapturedAtMs) || !Number.isSafeInteger(pose.attitudeCapturedAtMs) || pose.positionCapturedAtMs < 0 || pose.attitudeCapturedAtMs < 0 || pose.positionCapturedAtMs > pose.capturedAtMs || pose.attitudeCapturedAtMs > pose.capturedAtMs || pose.capturedAtMs - pose.positionCapturedAtMs > 200 || pose.capturedAtMs - pose.attitudeCapturedAtMs > 80 || !near(pose.positionM, observation.positionM)) fail('capture pose is stale, unqualified or in another reference')
-    if (pose.positionSigmaM < calibration.uncertainty.translationSigmaM + 0.001 || pose.attitudeSigmaRad < 0.003 + pose.capturedAtMs / 1000000) fail('uncertainty undercuts declared fixture bounds')
+    const clockSeconds = capture.clockUncertaintyMs / 1000
+    const minimumAttitudeSigma = 0.003 + pose.capturedAtMs / 1000000 + 35 * clockSeconds
+    const minimumPositionSigma = calibration.uncertainty.translationSigmaM + Math.hypot(...observation.velocityMps) * clockSeconds + Math.hypot(...calibration.extrinsics.translationM) * pose.attitudeSigmaRad
+    if (pose.positionSigmaM < minimumPositionSigma || pose.attitudeSigmaRad < minimumAttitudeSigma) fail('uncertainty undercuts declared fixture bounds')
     fields(pose.geodetic, ['latitudeDeg', 'longitudeDeg', 'ellipsoidHeightM'])
     const offset = rotateBodyToNed(pose.quaternionWxyz, calibration.extrinsics.translationM)
     const expectedCamera = pose.positionM.map((n, i) => n + offset[i]!)
@@ -146,7 +151,7 @@ export function surveyQuality(input: SurveyRun) {
     return { laneId: lane.id, captures: selected.length, maximumGapM: maxGapM, startGapM: distances[0] ?? lane.lengthM, endGapM: distances.length ? lane.lengthM - distances.at(-1)! : lane.lengthM, plannedSpacingExceeded: maxGapM !== null && maxGapM > plan.captureSpacingM + 0.05 }
   })
   const rows = new Map(input.trace.rows.map(row => [row.observation.nowMs, row.observation]))
-  const blurPx = captures.map(c => Math.hypot(...rows.get(c.capturedAtMs)!.velocityMps) * c.exposureTimeUs / 1000000 / plan.gsdM)
+  const translationMotionPx = captures.map(c => Math.hypot(...rows.get(c.capturedAtMs)!.velocityMps) * c.exposureTimeUs / 1000000 / plan.gsdM)
   const coveredFraction = areaSamples ? coveredSamples / areaSamples : null
   const issues: string[] = []
   if (input.status !== 'completed') issues.push(`Mission collection ended ${input.status}: ${input.reason}`)
@@ -156,7 +161,7 @@ export function surveyQuality(input: SurveyRun) {
   if (lanes.some(l => l.plannedSpacingExceeded)) issues.push('Observed along-lane image spacing exceeds the requested bound')
   if (coveredFraction === null) issues.push('Coverage grid resolves no area samples')
   else if (coveredFraction < 0.99) issues.push('Estimated image footprints leave sampled boundary gaps')
-  if (blurPx.some(n => n > 1)) issues.push('Estimated exposure motion exceeds one planned ground pixel')
+  if (translationMotionPx.some(n => n > 1)) issues.push('Translation at the planned GSD bound exceeds one pixel')
   return {
     version: 1 as const, evidence: input.evidence, status: captures.length === 0 ? 'no-collection' : issues.length ? 'partial-collection' : 'complete-collection',
     collectionOnly: true as const, reconstructionPerformed: false as const, physicalAccuracyVerified: false as const,
@@ -164,7 +169,7 @@ export function surveyQuality(input: SurveyRun) {
     observed: {
       images: captures.length, missingFromEstimate: Math.max(0, plan.estimatedPhotos - captures.length), lanes,
       coverage: { method: 'estimated-footprint-cell-centers-on-declared-plane' as const, grid: [grid, grid], cellSizeM: [stepN, stepE], areaSamples, coveredSamples, overlappingSamples, coveredFraction, multiplyCoveredFraction: areaSamples ? overlappingSamples / areaSamples : null, sampledAreaM2: areaSamples * stepN * stepE, sampledCoveredAreaM2: coveredSamples * stepN * stepE },
-      maximumPlannedPixelMotionDuringExposure: blurPx.length ? Math.max(...blurPx) : null,
+      maximumTranslationMotionAtPlannedGsdPx: translationMotionPx.length ? Math.max(...translationMotionPx) : null,
       positionSigmaRangeM: captures.length ? [Math.min(...captures.map(c => c.pose.positionSigmaM)), Math.max(...captures.map(c => c.pose.positionSigmaM))] : null,
       attitudeSigmaRangeRad: captures.length ? [Math.min(...captures.map(c => c.pose.attitudeSigmaRad)), Math.max(...captures.map(c => c.pose.attitudeSigmaRad))] : null,
       gsdMeasuredM: null, reconstructionErrorM: null, surveyAccuracyM: null,
@@ -174,8 +179,8 @@ export function surveyQuality(input: SurveyRun) {
       'Synthetic image collection only. No photogrammetric reconstruction, orthomosaic, stockpile volume or measured survey accuracy.',
       'Coverage samples four-corner footprint polygons at cell centers on a declared planar terrain model. Lens-curved image edges, sub-cell gaps and unmodeled terrain are unresolved.',
       'Multiple footprint coverage does not certify front or side overlap, tie points, texture quality or reconstruction success.',
-      'GSD and exposure motion use the planning model. Image scale and blur have not been measured from reconstructed imagery.',
-      'Rasters represent an instantaneous exposure midpoint. Exposure duration is a declared synthetic setting; integrated motion blur and rolling shutter are not modeled.',
+      'Translation motion divides modeled linear travel during the declared exposure by the planned upper GSD bound. A small value at that bound does not certify sharpness; actual raster GSD, angular motion and image blur are unmeasured.',
+      'Rasters represent an instantaneous exposure midpoint. Exposure duration is a declared synthetic setting; angular blur, integrated motion blur and rolling shutter are not modeled.',
       'Position and attitude uncertainty are declared fixture bounds, not empirically calibrated measurement accuracy.',
       'Capture clocks are fixture monotonic milliseconds, with no UTC conversion or calibrated physical shutter timing.',
       'Heading uses the unobserved initial simulation north assumption. Physical camera calibration and absolute heading are unverified.',

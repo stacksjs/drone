@@ -1,14 +1,27 @@
 import type { SurveyRun } from './types'
 import { createHash } from 'node:crypto'
-import { mkdir, writeFile } from 'node:fs/promises'
-import { join, resolve } from 'node:path'
+import { link, mkdir, open, unlink } from 'node:fs/promises'
+import { dirname, join, resolve } from 'node:path'
 import { createImageData, encode } from 'ts-images'
 import { surveyDatasetLimits, surveyQuality, validateSurveyDataset } from './quality'
 
 function sha256(bytes: string | Uint8Array) { return createHash('sha256').update(bytes).digest('hex') }
+async function writeSynced(path: string, data: string | Uint8Array) {
+  const file = await open(path, 'wx', 0o600)
+  try { await file.writeFile(data); await file.sync() }
+  finally { await file.close() }
+}
+async function syncDirectory(path: string) {
+  const directory = await open(path, 'r')
+  try { await directory.sync() }
+  finally { await directory.close() }
+}
 /**
  * Server-only local export. A new private directory and wx writes prevent
- * replacement. manifest.json is written last as the completion marker.
+ * replacement. Files and directory entries receive fsync barriers before a
+ * synced pending manifest receives the exclusive manifest.json name. Requires
+ * a local filesystem supporting hard links and directory fsync. Parent
+ * directories are operator controlled; this is not hardware power-loss proof.
  * Incomplete directories are retained for diagnosis; hashes are not signatures.
  */
 export async function writeSurveyDataset(directory: string, input: SurveyRun) {
@@ -35,6 +48,7 @@ export async function writeSurveyDataset(directory: string, input: SurveyRun) {
   const manifest = {
     version: 1, evidence: run.evidence, physicalFlightEnabled: false, collectionOnly: true, reconstructionPerformed: false,
     physicalAccuracyVerified: false, contentAuthentication: 'unsigned-content-hashes',
+    persistence: { protocol: 'exclusive-files-and-directory-fsync-before-manifest-link', hardwarePowerLossTested: false },
     renderer: { id: 'ned-checker-landmarks', version: 1, seed: null, exposureModel: 'instantaneous-midpoint', rollingShutterModeled: false },
     absoluteHeadingObserved: false, uncertaintyEvidence: 'declared-fixture-bounds',
     horizontalCrs: 'EPSG:4326', axisOrder: 'longitude-latitude', angleUnit: 'degree', heightUnit: 'metre', heightDatum: 'WGS84_ELLIPSOID',
@@ -54,6 +68,8 @@ export async function writeSurveyDataset(directory: string, input: SurveyRun) {
     '',
     'This is synthetic collection evidence from the owned runtime. No photogrammetric reconstruction has been performed.',
     'manifest.json is the completion marker. Its SHA-256 digests identify bytes but are unsigned and do not authenticate their producer.',
+    'Local files and directory entries receive fsync barriers before a synced pending manifest receives the exclusive completion name.',
+    'This requires local hard-link and directory-fsync support. Storage hardware power-loss durability has not been tested.',
     'images/ contains original exported RGBA PNG rasters. geo.txt is an ODM-style image geolocation input with four columns:',
     'filename longitude_degrees latitude_degrees ellipsoid_height_metres',
     'The EPSG:4326 header describes horizontal coordinates. The third coordinate is explicitly WGS84 ellipsoid height, not AGL or MSL.',
@@ -70,11 +86,19 @@ export async function writeSurveyDataset(directory: string, input: SurveyRun) {
   const target = resolve(directory)
   await mkdir(target, { mode: 0o700 })
   await mkdir(join(target, 'images'), { mode: 0o700 })
-  for (const image of encoded) await writeFile(join(target, 'images', image.filename), image.bytes, { flag: 'wx', mode: 0o600 })
-  await writeFile(join(target, 'geo.txt'), geo, { flag: 'wx', mode: 0o600 })
-  await writeFile(join(target, 'quality.json'), qualityJson, { flag: 'wx', mode: 0o600 })
-  await writeFile(join(target, 'README.txt'), readme, { flag: 'wx', mode: 0o600 })
+  for (const image of encoded) await writeSynced(join(target, 'images', image.filename), image.bytes)
+  await writeSynced(join(target, 'geo.txt'), geo)
+  await writeSynced(join(target, 'quality.json'), qualityJson)
+  await writeSynced(join(target, 'README.txt'), readme)
+  await syncDirectory(join(target, 'images'))
+  await syncDirectory(target)
+  await syncDirectory(dirname(target))
   const manifestPath = join(target, 'manifest.json')
-  await writeFile(manifestPath, manifestJson, { flag: 'wx', mode: 0o600 })
+  const pendingManifest = join(target, 'manifest.pending.json')
+  await writeSynced(pendingManifest, manifestJson)
+  await link(pendingManifest, manifestPath)
+  await syncDirectory(target)
+  await unlink(pendingManifest)
+  await syncDirectory(target)
   return { directory: target, manifest: manifestPath, quality: join(target, 'quality.json'), images: images.length, manifestSha256: sha256(manifestJson) }
 }

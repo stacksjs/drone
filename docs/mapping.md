@@ -54,6 +54,10 @@ Every collection uses the existing raw wire-like IMU/GNSS feed, owned estimator,
 multirotor controls, authority leases and separately ticking modeled board watchdog. The explicit
 fixture operator arms and engages; the mapping policy cannot arm. Optional mission speed is bounded
 to 0.05..0.6 m/s and recorded in the plan for exact decision replay. Older plans preserve 0.6 m/s.
+Launch and landing deadlines cover their commanded distance divided by speed plus two seconds for
+tracking and settling. A vertical task needing more than the existing 20-second limit is rejected
+before execution. Owned collection requires synthetic calibration and clock uncertainty at most 5 ms;
+the generic planner retains its separate calibration capabilities.
 
 Camera triggering uses current estimated travel, a minimum shutter interval and active imaging-lane
 scope. One request is pending at a time. A scoped ACK must arrive within 80 ms; no ambiguous shutter
@@ -66,9 +70,13 @@ The deterministic `ned-checker-landmarks` renderer, version 1, has no random see
 pixel-center rays against a textured ground plane with fixed red and blue landmarks. Only rendering
 consumes plant truth. Geotags use the owned estimator with qualified raw-gyro capture-time prediction,
 calibrated lever arm and an explicit initial-simulation-north assumption. The estimator does not
-observe absolute heading. Position and attitude uncertainty are retained assumptions, not calibrated
-field accuracy. Rendering is instantaneous at the midpoint: it does not integrate motion blur or
-model rolling shutter. Blur estimates describe the configured shutter and speed, not measured images.
+observe absolute heading. Declared attitude uncertainty includes the fixture drift assumption and
+35 rad/s times clock error, using the qualified raw-gyro ceiling. Optical-center position uncertainty
+sums estimated body covariance sigma, mount translation sigma, speed times clock error, and lever
+length times attitude uncertainty. These are retained bounds, not calibrated field accuracy.
+Rendering is instantaneous at the midpoint: it does not integrate motion blur or model rolling
+shutter. The translation metric divides modeled travel by the planned upper GSD bound. It excludes
+angular blur; a small value at that bound does not certify actual image sharpness.
 
 Camera loss, mismatched ACKs, raw IMU/position loss and manual takeover stop collection. Healthy data
 returning does not restart it. Cancellation and faults release modeled thrust; this is not an
@@ -91,9 +99,12 @@ manifest.json
 
 The exporter checks bounded memory, unique identities, raster/metadata consistency, calibration,
 pose/lever/geodetic transforms, capture/ACK timing and trace decisions before IO. It writes images
-using the `ts-images` PNG codec, hashes the encoded bytes, uses exclusive files and writes the manifest
-last as the completion marker. Existing directories are never overwritten. A partial directory
-without a manifest is not a complete export. Parent directories must be operator-controlled.
+using the `ts-images` PNG codec and hashes the encoded bytes. Every exclusive image and metadata file
+receives an fsync barrier, followed by image/root/parent directory barriers. A synced pending manifest
+then receives the exclusive `manifest.json` hard link, and the root directory is synced before return.
+Existing directories are never overwritten. A partial directory without a complete manifest is not
+a complete export. Parent directories must be operator-controlled. Local hard links and directory
+fsync are required; storage hardware power-loss durability has not been tested.
 
 ODM expects an `images/` directory and accepts PNG inputs. `geo.txt` begins with `EPSG:4326`; rows are
 `filename longitude latitude ellipsoidHeight`. The manifest separately declares the horizontal CRS,

@@ -2,6 +2,7 @@ import { expect, test } from 'bun:test'
 import { compileSurveyMission, simulateSurvey } from '../../resources/functions/drone/mapping/runtime'
 import { exampleSurveyConfig } from '../../resources/functions/drone/mapping/fixtures'
 import { createSurveyPlan } from '../../resources/functions/drone/mapping/planner'
+import { surveyQuality } from '../../resources/functions/drone/mapping/quality'
 import { replayMission } from '../../resources/functions/drone/missions/engine'
 
 test('survey imagery comes from a completed owned mission with correlated capture poses and distinct pixels', () => {
@@ -88,3 +89,54 @@ test('native survey commands validate constraints, collect PNG imagery and rejec
   }
   finally { await rm(root, { recursive: true, force: true }) }
 }, 240000)
+
+test('owned capture runtime rejects unsupported clock uncertainty before executing a valid generic plan', () => {
+  const config = exampleSurveyConfig()
+  config.calibration.timing.clockUncertaintyMs = 6
+  expect(createSurveyPlan(config).config.calibration.timing.clockUncertaintyMs).toBe(6)
+  expect(() => { simulateSurvey({ config, seconds: 8 }) }).toThrow('clock uncertainty')
+})
+
+test('survey compilation budgets vertical ramp travel and rejects unsupported slow climbs before execution', () => {
+  const config = exampleSurveyConfig()
+  config.boundary = [[-0.05, -0.05], [0.05, -0.05], [0.05, 0.05], [-0.05, 0.05]]
+  config.speedMps = 0.05
+  const plan = createSurveyPlan(config)
+  expect(plan.estimatedSeconds).toBeLessThan(120)
+  expect(() => { compileSurveyMission(plan) }).toThrow('mission')
+  expect(() => { simulateSurvey({ config }) }).toThrow('mission')
+})
+
+test('supported slow vertical ramps land and produce exportable collection at the owned clock boundary', () => {
+  const config = exampleSurveyConfig()
+  config.boundary = [[-0.05, -0.05], [0.05, -0.05], [0.05, 0.05], [-0.05, 0.05]]
+  config.speedMps = 0.1
+  config.calibration.timing.clockUncertaintyMs = 5
+  const mission = compileSurveyMission(createSurveyPlan(config))
+  for (const task of [mission.tasks[0]!, mission.tasks.at(-1)!]) {
+    expect('timeoutMs' in task && task.timeoutMs >= 15500 && task.timeoutMs <= 20000).toBe(true)
+  }
+  const run = simulateSurvey({ config })
+  expect(run.status).toBe('completed')
+  expect(run.boardNeutral).toBe(true)
+  expect(run.captures.length).toBeGreaterThan(0)
+  expect(surveyQuality(run).observed.images).toBe(run.captures.length)
+})
+
+test('capture uncertainty retains the declared clock error through optical-center position and attitude', () => {
+  const config = exampleSurveyConfig()
+  config.boundary = [[-0.05, -0.05], [0.05, -0.05], [0.05, 0.05], [-0.05, 0.05]]
+  config.speedMps = 0.1
+  const precise = simulateSurvey({ config })
+  config.calibration.timing.clockUncertaintyMs = 5
+  const uncertain = simulateSurvey({ config })
+  const low = precise.captures[0]!, high = uncertain.captures[0]!
+  expect(precise.status).toBe('completed')
+  expect(uncertain.status).toBe('completed')
+  expect(high.capturedAtMs).toBe(low.capturedAtMs)
+  // Four extra milliseconds at the certified 35 rad/s gyro ceiling add .14 rad.
+  expect(high.pose.attitudeSigmaRad - low.pose.attitudeSigmaRad).toBeCloseTo(0.14, 12)
+  // The 4 cm lever alone contributes at least .04 * .14 = .0056 m.
+  expect(high.pose.positionSigmaM - low.pose.positionSigmaM).toBeGreaterThanOrEqual(0.0056)
+  expect(surveyQuality(uncertain).observed.images).toBe(uncertain.captures.length)
+})
