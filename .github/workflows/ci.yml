@@ -51,6 +51,12 @@ jobs:
         working-directory: ${{ runner.temp }}
       - run: $GITHUB_WORKSPACE/storage/runtime-build/cli/drone diagnostics:export "$RUNNER_TEMP/runtime-recording/journal.ndjson" --output "$RUNNER_TEMP/runtime-export"
         working-directory: ${{ runner.temp }}
+      - run: $GITHUB_WORKSPACE/storage/runtime-build/cli/drone missions:validate "$GITHUB_WORKSPACE/examples/local-mission.json"
+        working-directory: ${{ runner.temp }}
+      - run: $GITHUB_WORKSPACE/storage/runtime-build/cli/drone missions:simulate --scenario recovery --output "$RUNNER_TEMP/mission-recording"
+        working-directory: ${{ runner.temp }}
+      - run: $GITHUB_WORKSPACE/storage/runtime-build/cli/drone missions:replay "$RUNNER_TEMP/mission-recording/mission.json" --at-ms 6000
+        working-directory: ${{ runner.temp }}
   firmware:
     runs-on: ubuntu-latest
     steps:

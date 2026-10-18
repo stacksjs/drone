@@ -19,6 +19,10 @@ import DiagnosticsReplay from '../app/Commands/DiagnosticsReplay'
 import DiagnosticsInspect from '../app/Commands/DiagnosticsInspect'
 import DiagnosticsExport from '../app/Commands/DiagnosticsExport'
 
+import MissionsSimulate from '../app/Commands/MissionsSimulate'
+import MissionsValidate from '../app/Commands/MissionsValidate'
+import MissionsReplay from '../app/Commands/MissionsReplay'
+
 const app = cli('drone')
 RuntimeBuild(app)
 RuntimeBench(app)
@@ -35,6 +39,9 @@ DiagnosticsRecord(app)
 DiagnosticsReplay(app)
 DiagnosticsInspect(app)
 DiagnosticsExport(app)
+MissionsSimulate(app)
+MissionsValidate(app)
+MissionsReplay(app)
 app.help()
 app.version('0.1.0')
 try { await app.parse(process.argv) }

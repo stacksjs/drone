@@ -1,0 +1,92 @@
+{
+  "version": 1,
+  "id": "local-survey-demo",
+  "frame": "LOCAL_NED",
+  "altitude": "ORIGIN_RELATIVE_DOWN",
+  "terrain": "FLAT_ORIGIN_PLANE",
+  "origin": {
+    "latitudeDeg": 0,
+    "longitudeDeg": 0,
+    "ellipsoidHeightM": 100
+  },
+  "fence": {
+    "radiusM": 12,
+    "minDownM": -5
+  },
+  "rallyM": [
+    0,
+    0,
+    -1
+  ],
+  "power": {
+    "availableWh": 20,
+    "hoverW": 200,
+    "reservePercent": 30
+  },
+  "start": "takeoff",
+  "tasks": [
+    {
+      "id": "takeoff",
+      "kind": "takeoff",
+      "positionM": [
+        0,
+        0,
+        -1
+      ],
+      "timeoutMs": 12000,
+      "next": "survey-point"
+    },
+    {
+      "id": "survey-point",
+      "kind": "waypoint",
+      "positionM": [
+        2,
+        1,
+        -1.5
+      ],
+      "timeoutMs": 12000,
+      "next": "dwell"
+    },
+    {
+      "id": "dwell",
+      "kind": "loiter",
+      "positionM": [
+        2,
+        1,
+        -1.5
+      ],
+      "durationMs": 1000,
+      "timeoutMs": 12000,
+      "next": "budget-check"
+    },
+    {
+      "id": "budget-check",
+      "kind": "branch",
+      "batteryAtLeast": 80,
+      "then": "photo",
+      "otherwise": "return"
+    },
+    {
+      "id": "photo",
+      "kind": "payload",
+      "channel": "camera-still",
+      "next": "return"
+    },
+    {
+      "id": "return",
+      "kind": "return",
+      "timeoutMs": 12000,
+      "next": "land"
+    },
+    {
+      "id": "land",
+      "kind": "land",
+      "positionM": [
+        0,
+        0,
+        0
+      ],
+      "timeoutMs": 12000
+    }
+  ]
+}

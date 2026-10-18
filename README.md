@@ -141,6 +141,21 @@ and an independent modeled output watchdog on the owned control harness.
 See the [state machine, failure policies and hardware completion gates](docs/authority.md).
 Physical kill/RC wiring and HIL validation remain open. Zero simulated thrust is not a landing.
 
+## Owned mission engine
+
+Issue #10 adds versioned mission graphs on the owned sensor, estimator, control and authority
+physics stack, with validation, pause/resume, checkpoint verification, conditional branches and
+a native stx scenario viewer at `/missions`. Physical outputs remain inhibited.
+
+```sh
+./buddy missions:validate examples/local-mission.json
+./buddy missions:simulate --scenario recovery --output /tmp/new-mission-recording
+./buddy missions:replay /tmp/new-mission-recording/mission.json --at-ms 6000
+```
+
+Read the [mission semantics, evidence and remaining work](docs/missions.md). Camera tasks emit
+simulated events. Recovery requires retained supervised authority and explicit operator resume.
+
 ## External-driver protocol services
 
 Issue #7 adds shared acknowledged commands, parameter read/write, mission upload/download/resume

@@ -1,0 +1,44 @@
+<script client>
+import type { MissionScenario } from '../functions/drone/missions/simulation'
+import { missionScenarios, simulateMission } from '../functions/drone/missions/simulation'
+import { exampleMission, validateMission, missionEdges } from '../functions/drone/missions/plan'
+const plan = exampleMission()
+const budget = validateMission(plan)
+const scenario = state<MissionScenario>('nominal')
+const run = state<ReturnType<typeof simulateMission> | null>(null)
+const offset = state(600)
+const error = state('')
+const rows = derived(() => run()?.trace.rows.filter(row => row.observation.nowMs <= offset()) ?? [])
+const current = derived(() => rows().at(-1) ?? null)
+const events = derived(() => run()?.transitions.filter(row => row.atMs <= offset()) ?? [])
+const payloads = derived(() => rows().filter(row => row.result.payload).length)
+async function execute() {
+  error.set(''); run.set(null); offset.set(600)
+  try { const result = simulateMission({ scenario: scenario() }); run.set(result); await nextTick(); offset.set(result.trace.rows.at(-1)?.observation.nowMs ?? 600) }
+  catch (failure) { error.set(failure instanceof Error ? failure.message : 'Mission simulation failed') }
+}
+</script>
+<template>
+  <section aria-labelledby="mission-title">
+    <p class="font-mono text-emerald-200 text-xs">OWNED MISSION ENGINE / SIMULATION</p>
+    <h1 id="mission-title" class="mt-3 font-semibold text-3xl tracking-tight">Plan a route. Inspect every decision.</h1>
+    <p class="mt-3 max-w-3xl leading-relaxed text-neutral-400">A local survey through our sensor, estimator, authority and multirotor control stack. Each scenario is an explicit operator script. Move through its recording to inspect the mission state.</p>
+    <div class="grid gap-8 lg:grid-cols-[1fr_1.5fr] mt-9">
+      <aside class="min-w-0"><h2 class="font-semibold text-lg">Version 1 mission</h2><p class="mt-2 font-mono text-neutral-400 text-xs">LOCAL_NED / origin 0,0,100 / ellipsoid</p>
+        <dl class="grid gap-5 grid-cols-2 mt-5 text-sm"><div><dt class="text-neutral-400">Fence radius</dt><dd class="mt-1">12 m</dd></div><div><dt class="text-neutral-400">Height ceiling</dt><dd class="mt-1">5 m above origin</dd></div><div><dt class="text-neutral-400">Worst case time</dt><dd class="mt-1">{{ budget.worstCaseMs / 1000 }} s</dd></div><div><dt class="text-neutral-400">Energy budget</dt><dd class="mt-1">{{ budget.requiredWh.toFixed(2) }} / 14 Wh usable</dd></div></dl>
+        <ol class="mt-6 border-neutral-700 border-t"><li :for="task in plan.tasks" class="flex flex-wrap gap-2 justify-between py-3 text-sm border-b border-neutral-800"><span class="font-mono">{{ task.id }}</span><span class="text-neutral-400">{{ task.kind }} → {{ missionEdges(task).join(' / ') || 'end' }}</span></li></ol>
+        <p class="mt-4 leading-relaxed text-neutral-400 text-xs">Flat origin terrain plane, 10 cm modeled landing gear and a fixed rally at N 0, E 0, D -1 m. The camera task records a simulated event. It does not acquire an image.</p>
+      </aside>
+      <div class="min-w-0"><div class="flex flex-wrap gap-4 items-end"><div class="min-w-0"><label for="mission-scenario" class="block mb-2 text-sm">Operator scenario</label><select id="mission-scenario" x-model="scenario" class="px-3 py-3 max-w-full text-neutral-100 bg-neutral-900 border border-neutral-600 rounded focus-visible:outline-emerald-200"><option :for="name in missionScenarios" :value="name">{{ name }}</option></select></div><button type="button" @click="execute()" class="px-4 py-3 font-medium text-neutral-950 bg-emerald-200 rounded focus-visible:outline-emerald-200 focus-visible:outline-offset-4">Run scenario</button></div>
+        <p :if="error()" role="alert" class="mt-5 p-4 text-red-200 border border-red-400 rounded">{{ error() }}</p>
+        <p :if="!run() && !error()" class="mt-8 py-8 leading-relaxed text-neutral-400 border-neutral-700 border-t">Choose a scenario to record an owned physics run. Pause/resume and recovery hold position until the scripted operator resumes. RC takeover, abort and reserve violations stop mission execution.</p>
+        <div :if="run() && current()" class="mt-8"><dl class="grid gap-5 grid-cols-2 text-sm"><div><dt class="text-neutral-400">Mission state</dt><dd class="mt-2 font-mono text-emerald-200 text-lg" data-mission-state>{{ current()?.result.state }}</dd></div><div><dt class="text-neutral-400">Current task</dt><dd class="mt-2 break-all font-mono text-lg" data-mission-task>{{ current()?.result.taskId }}</dd></div><div><dt class="text-neutral-400">Decision</dt><dd class="mt-2 break-words font-mono text-xs">{{ current()?.result.reason }}</dd></div><div><dt class="text-neutral-400">Camera events so far</dt><dd class="mt-2 font-mono" data-mission-payloads>{{ payloads() }}</dd></div></dl>
+          <label for="mission-time" class="flex flex-wrap gap-3 justify-between mt-8 text-sm">Recorded fixture time <span class="font-mono">{{ offset() }} ms</span></label><input id="mission-time" type="range" min="600" :max="run()?.trace.rows.at(-1)?.observation.nowMs || 600" step="20" x-model.number="offset" class="mt-3 w-full accent-emerald-200"><div class="flex gap-3 mt-3"><button type="button" @click="offset.set(600)" class="px-3 py-2 text-sm border border-neutral-600 rounded">Beginning</button><button type="button" @click="offset.set(run()?.trace.rows.at(-1)?.observation.nowMs || 600)" class="px-3 py-2 text-sm border border-neutral-600 rounded">End of recording</button></div>
+          <p class="mt-6 font-mono text-neutral-400 text-xs">Estimated N/E/D: {{ current()?.observation.positionM.map(n => n.toFixed(2)).join(', ') }} m</p><p class="mt-2 font-mono text-neutral-400 text-xs">Target N/E/D: {{ current()?.result.targetM?.map(n => n.toFixed(2)).join(', ') || 'released' }}</p>
+          <h3 class="mt-8 font-semibold text-sm">Recorded task and state transitions</h3><div class="overflow-x-auto mt-3"><table class="w-full text-left text-xs"><thead class="text-neutral-400"><tr class="border-b border-neutral-700"><th scope="col" class="pr-3 py-3">Time / ms</th><th scope="col" class="pr-3 py-3">Task</th><th scope="col" class="py-3">State</th></tr></thead><tbody><tr :for="row in events()" class="border-b border-neutral-800"><td class="pr-3 py-3 font-mono">{{ row.atMs }}</td><td class="pr-3 py-3 font-mono">{{ row.taskId }}</td><td class="py-3 font-mono">{{ row.state }}</td></tr></tbody></table></div>
+        </div>
+      </div>
+    </div>
+    <p class="mt-10 pt-5 leading-relaxed text-neutral-400 text-xs border-neutral-700 border-t">Simulation evidence only. Physical outputs stay inhibited. Aborting or losing authority releases the mission and zeros modeled thrust; it is not an emergency landing. Terrain following, collision avoidance, physical payload dispatch and hardware recovery remain on the roadmap.</p>
+  </section>
+</template>

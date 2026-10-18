@@ -114,3 +114,8 @@ contracts remain configuration only; payloads cannot bypass the flight authority
 provenance digests, loss accounting and crash-prefix recovery. Native Stacks commands and a local
 [stx viewer](diagnostics.md) share the pure verifier/replay projection. No replay path has a
 vehicle transport, update/flash capability or runtime authority.
+
+[ADR 10](adr/0010-owned-missions.md) adds a versioned [owned mission engine](missions.md) over
+the estimator/control/authority physics pipeline. Validated graphs emit position targets, never
+arm themselves, and recover recorded prefixes into a supervised paused state. Task events and
+local-position traces stay separate from physical payload IO and runtime-only diagnostic journals.

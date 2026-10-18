@@ -1,5 +1,25 @@
 # Validation evidence
 
+## Owned mission simulation slice
+
+- Full release suite: 211 Bun tests, 17,424 assertions, zero failures. Buddy lint, application/runtime/view
+  typechecks, roadmap validation and standalone CLI build passed.
+- Twelve mission API tests exercise plan validation, complete raw-sensor/estimator/control/authority
+  physics runs, landing contact, pause/resume, recorded recovery, battery branches, cancellation,
+  RC takeover, reserves, reference resets, schedule gaps, task timeouts and replay tampering.
+- Review regressions reject omitted movement timeouts, release targets on trace exhaustion, prevent
+  preflight waiting from advancing the target ramp, and keep repeated start/resume actions from
+  suppressing task timeouts.
+- Native Stacks validate/simulate/replay commands persist a private recovery trace and replay its
+  paused epoch. The standalone binary executes the same path outside the checkout.
+- Real browser QA verifies nominal completion, recovery paused at 6000 ms with zero camera events,
+  the return branch without a camera event, cancellation, and numeric replay-slider synchronization.
+  Mobile widths 320 and 375 px have zero horizontal overflow; console error collection is empty.
+  Desktop and phone layouts were visually inspected against the existing operator workspace design.
+- Evidence is owned physics simulation. Physical mission execution, hardware payload dispatch,
+  whole-runtime durable restart, terrain following and external driver compilation remain open in
+  [#10](https://github.com/stacksjs/drone/issues/10). See [the mission guide](missions.md).
+
 ## External-driver protocol software slice
 
 - 166 Bun tests pass with 17,002 assertions, including 20 protocol tests. Lint, application/runtime/view

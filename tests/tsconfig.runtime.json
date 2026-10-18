@@ -26,6 +26,8 @@
     "./fixtures/payloads/**/*.ts",
     "../resources/functions/drone/diagnostics/**/*.ts",
     "./unit/diagnostics.test.ts",
-    "./fixtures/diagnostics/**/*.ts"
+    "./fixtures/diagnostics/**/*.ts",
+    "../resources/functions/drone/missions/**/*.ts",
+    "./unit/missions.test.ts"
   ]
 }

@@ -18,6 +18,10 @@ companion application and simulator, not a native board autopilot.
   Native disabled-prop tests, measured tuning and authority validation remain open in [#5](https://github.com/stacksjs/drone/issues/5).
 - Versioned simulated authority, arming/override/fault latches and independent modeled output expiry.
   Native board, physical kill/RC and HIL evidence remain open in [#6](https://github.com/stacksjs/drone/issues/6).
+- Versioned owned mission graphs with frame/fence/rally/endurance validation, physics execution,
+  pause/resume, recorded checkpoint recovery, conditional branches, native CLI and stx viewer.
+  Whole-runtime checkpoint correlation, payload ACK reconciliation, driver translation and hardware
+  evidence remain open in [#10](https://github.com/stacksjs/drone/issues/10).
 - TypeScript follow/behavior library, kinematic simulator, controller leases and envelope checks.
 - Pi AI Camera acquisition bridge and explicit image-space target selection/loss policy, pending Pi hardware validation.
 - An optional visual guard that holds metric follow logic on lost, unconfirmed, stale or changed visual selection.

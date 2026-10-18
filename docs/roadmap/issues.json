@@ -296,6 +296,25 @@
     "nativeDependencies": [
       4,
       6
+    ],
+    "implementationStatus": "simulation-implemented-validation-pending",
+    "implemented": [
+      "Versioned acyclic LOCAL_NED mission graphs with takeoff, waypoint, loiter, return, land, simulated camera events, battery branches and abort",
+      "Strict frame/altitude/terrain, fence/rally and conservative endurance validation",
+      "Owned raw-sensor/estimator/control/authority/watchdog physics runs, explicit pause/resume, prefix-verified paused recovery and pure decision replay",
+      "Native Stacks validate/simulate/replay commands and stx mission scenario viewer"
+    ],
+    "evidence": [
+      "resources/functions/drone/missions/engine.ts",
+      "resources/functions/drone/missions/simulation.ts",
+      "tests/unit/missions.test.ts",
+      "resources/components/MissionWorkspace.stx",
+      "docs/missions.md"
+    ],
+    "remaining": [
+      "Durable correlated whole-runtime checkpoints, payload ACK reconciliation and measured restart/HIL evidence",
+      "External mission graph compilation and frame/capability translation behind shared drivers",
+      "Measured energy, terrain/rally planning, real landing detection and physical mission validation"
     ]
   },
   {

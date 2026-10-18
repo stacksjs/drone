@@ -113,6 +113,22 @@ declare global {
   const encodeFrameV2: typeof autoImports.encodeFrameV2
   const decodeDatagram: typeof autoImports.decodeDatagram
   const encodeVelocity: typeof autoImports.encodeVelocity
+  const observeMission: typeof autoImports.observeMission
+  const createMissionEngine: typeof autoImports.createMissionEngine
+  const replayMission: typeof autoImports.replayMission
+  const parseMissionTrace: typeof autoImports.parseMissionTrace
+  const recoverMission: typeof autoImports.recoverMission
+  const missionLimits: typeof autoImports.missionLimits
+  const readMissionFile: typeof autoImports.readMissionFile
+  const writeMissionTrace: typeof autoImports.writeMissionTrace
+  const missionContains: typeof autoImports.missionContains
+  const missionTaskTarget: typeof autoImports.missionTaskTarget
+  const missionEdges: typeof autoImports.missionEdges
+  const validateMission: typeof autoImports.validateMission
+  const exampleMission: typeof autoImports.exampleMission
+  const parseMissionPlan: typeof autoImports.parseMissionPlan
+  const simulateMission: typeof autoImports.simulateMission
+  const missionScenarios: typeof autoImports.missionScenarios
   const savePayloadCapture: typeof autoImports.savePayloadCapture
   const runPayloadBench: typeof autoImports.runPayloadBench
   const payloadJson: typeof autoImports.payloadJson
