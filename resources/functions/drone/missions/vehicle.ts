@@ -73,7 +73,13 @@ export function createVehicleMissionEngine(input: unknown) {
   const rows: VehicleMissionTrace['rows'] = []
   function snapshot(): VehicleMissionSnapshot { return { version: 2, vehicle: plan.vehicle, evidence: 'owned-vehicle-mission-simulation', physicalFlightEnabled: false, state, taskId, taskKind: tasks.get(taskId)!.kind, targetM: targetM ? [...targetM] : null, payload: pending ? structuredClone(pending) : null, reason, elapsedMs: startedAt === null || lastNow === null ? 0 : lastNow - startedAt } }
   function block(why: string) { state = 'blocked'; reason = why; targetM = null; pending = null }
-  function advance(next: string) { taskId = next; taskElapsedMs = 0; settledMs = 0; pending = null; reason = 'task-entered' }
+  function advance(next: string) {
+    taskId = next; taskElapsedMs = 0; settledMs = 0; pending = null; reason = 'task-entered'
+    const task = tasks.get(next)!
+    const goal = vehicleTaskTarget(plan, task)
+    if (goal) targetM = goal as VehicleMissionSnapshot['targetM']
+    if (task.kind === 'abort') { state = 'aborted'; targetM = null; reason = 'mission-abort-task' }
+  }
   return {
     snapshot,
     trace(): VehicleMissionTrace { return structuredClone({ version: 2, evidence: 'owned-vehicle-mission-simulation', plan, rows }) },

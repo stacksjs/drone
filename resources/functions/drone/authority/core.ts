@@ -1,14 +1,16 @@
 import type { AuthorityCommand, AuthorityObservation, AuthorityState, PositionTarget } from './supervisor'
 import { authorityPolicy, authorityTransitions, authorityVersion } from './supervisor'
+import type { SensorVector } from '../sensors/types'
 import { validVector } from '../controls/model'
 export interface AuthorityFrameMetadata { version: 1, bootId: bigint, sessionId: bigint, epoch: number, sequence: number, issuedAtMs: number, expiresAtMs: number }
 const active = (s: AuthorityState) => s === 'armed-idle' || s === 'autonomous' || s === 'manual'
 const integer = (n: number) => Number.isSafeInteger(n) && n >= 0 && n <= 0xFFFFFFFF
 const fresh = (at: number, now: number, age: number) => Number.isFinite(at) && at >= 0 && at <= now && now - at <= age
 /** Shared authority lifecycle. Wrappers own actuator units, limits and frame construction. */
-export function createAuthorityKernel<Output, Frame>(options: { sessionId: bigint, bootId: bigint, fence: { radiusM: number, minDownM: number, maxDownM: number }, validateOutput: (output: Output, atMs: number) => boolean, createFrame: (output: Output, metadata: AuthorityFrameMetadata) => Frame }) {
+export function createAuthorityKernel<Output, Frame>(options: { sessionId: bigint, bootId: bigint, fence: { radiusM: number, minDownM: number, maxDownM: number }, interlockAgeMs?: number, validateOutput: (output: Output, atMs: number) => boolean, createFrame: (output: Output, metadata: AuthorityFrameMetadata) => Frame }) {
   if (typeof options.sessionId !== 'bigint' || options.sessionId <= 0n || typeof options.bootId !== 'bigint' || options.bootId <= 0n) throw new TypeError('Positive simulation session and boot IDs required')
-  const { sessionId, bootId, validateOutput, createFrame } = options, fence = { ...options.fence }
+  const { sessionId, bootId, validateOutput, createFrame } = options, fence = { ...options.fence }, interlockAgeMs = options.interlockAgeMs ?? authorityPolicy.interlockAgeMs
+  if (![fence.radiusM, fence.minDownM, fence.maxDownM].every(Number.isFinite) || fence.radiusM <= 0 || fence.radiusM > 5000 || fence.minDownM >= fence.maxDownM || !Number.isFinite(interlockAgeMs) || interlockAgeMs < 20 || interlockAgeMs > 200) throw new TypeError('Invalid authority profile bounds')
   const insideFence = (p: unknown) => validVector(p) && Math.hypot(p[0], p[1]) <= fence.radiusM && p[2] >= fence.minDownM && p[2] <= fence.maxDownM
   let state: AuthorityState = 'disarmed', epoch = 0, sequence = -1, outputSequence = 0
   let lastNow: number | null = null, lastGatedAt: number | null = null, leaseUntilMs: number | null = null, target: PositionTarget | null = null, reference: string | null = null
@@ -33,7 +35,7 @@ export function createAuthorityKernel<Output, Frame>(options: { sessionId: bigin
     if (o.kind !== 'simulation') return 'simulation-only'
     if (o.runtime.bootId !== bootId || e?.bootId !== bootId) return 'board-boot-changed'
     if (!fresh(o.runtime.capturedAtMs, now, authorityPolicy.runtimeAgeMs) || !o.runtime.watchdogHealthy) return 'runtime-watchdog'
-    if (!fresh(o.interlocks.capturedAtMs, now, authorityPolicy.interlockAgeMs)) return 'stale-interlocks'
+    if (!fresh(o.interlocks.capturedAtMs, now, interlockAgeMs)) return 'stale-interlocks'
     if (!fresh(o.rc.capturedAtMs, now, authorityPolicy.rcAgeMs) || !o.rc.connected) return 'rc-loss'
     if (!fresh(o.link.capturedAtMs, now, authorityPolicy.linkAgeMs) || !o.link.connected) return 'link-loss'
     if (!fresh(o.battery.capturedAtMs, now, authorityPolicy.batteryAgeMs) || !Number.isFinite(o.battery.remainingPercent) || o.battery.remainingPercent < 0 || o.battery.remainingPercent > 100) return 'invalid-battery'

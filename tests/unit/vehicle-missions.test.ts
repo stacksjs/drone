@@ -11,7 +11,9 @@ test('vehicle missions require explicit operator start and emit the full profile
   const engine = createVehicleMissionEngine(input)
   input.tasks.length = 0
   expect(engine.step(observation(1000)).state).toBe('ready')
-  expect(engine.step(observation(1020), 'start').taskId).toBe('drive')
+  const started = engine.step(observation(1020), 'start')
+  expect(started.taskId).toBe('drive')
+  expect(started.targetM).toEqual([2, 0, 0])
   expect(engine.step(observation(1040)).targetM).toEqual([2, 0, 0])
   expect(engine.snapshot().physicalFlightEnabled).toBe(false)
 })
