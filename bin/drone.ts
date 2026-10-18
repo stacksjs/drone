@@ -26,6 +26,9 @@ import MissionsReplay from '../app/Commands/MissionsReplay'
 import NavigationSimulate from '../app/Commands/NavigationSimulate'
 
 import AntennaBench from '../app/Commands/AntennaBench'
+import AirSimulate from '../app/Commands/AirSimulate'
+import GroundSimulate from '../app/Commands/GroundSimulate'
+import SurfaceSimulate from '../app/Commands/SurfaceSimulate'
 
 const app = cli('drone')
 RuntimeBuild(app)
@@ -48,6 +51,9 @@ MissionsValidate(app)
 MissionsReplay(app)
 NavigationSimulate(app)
 AntennaBench(app)
+AirSimulate(app)
+GroundSimulate(app)
+SurfaceSimulate(app)
 app.help()
 app.version('0.1.0')
 try { await app.parse(process.argv) }

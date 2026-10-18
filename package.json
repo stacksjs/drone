@@ -31,13 +31,14 @@
     "parity:refresh": "bun scripts/parity-refresh.ts"
   },
   "dependencies": {
-    "stacks": "^0.75.221",
-    "@stacksjs/env": "^0.75.221",
-    "@stacksjs/path": "^0.75.221",
     "@stacksjs/actions": "^0.75.221",
     "@stacksjs/cli": "^0.75.221",
+    "@stacksjs/env": "^0.75.221",
+    "@stacksjs/path": "^0.75.221",
     "@stacksjs/router": "^0.75.221",
-    "@stacksjs/testing": "^0.75.221"
+    "@stacksjs/storage": "^0.75.221",
+    "@stacksjs/testing": "^0.75.221",
+    "stacks": "^0.75.221"
   },
   "workspaces": [
     "storage/framework",

@@ -94,3 +94,15 @@ test('checkpoint recovery is paused and payload recovery or deadline never autom
   expect(pending.snapshot().reason).toBe('payload-outcome-uncertain')
   expect(pending.step({ ...observation(1660), positionM: [2, 0, 0] }, 'resume').state).toBe('blocked')
 })
+
+
+test('uncloneable observations and oversized references release the active mission', () => {
+  for (const change of [{ extra: () => true }, { reference: `55:${'0'.repeat(121)},0,0,0,0` }]) {
+    const engine = createVehicleMissionEngine(plan())
+    engine.step(observation(1000), 'start')
+    expect(() => engine.step({ ...observation(1020), ...change })).toThrow()
+    expect(engine.snapshot().state).toBe('blocked')
+    expect(engine.snapshot().targetM).toBeNull()
+    expect(engine.snapshot().payload).toBeNull()
+  }
+})

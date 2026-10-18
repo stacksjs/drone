@@ -37,6 +37,12 @@
     "../scripts/parity*.ts",
     "./unit/parity.test.ts",
     "../resources/functions/drone/vehicles/**/*.ts",
-    "./unit/vehicle-missions.test.ts"
+    "./unit/vehicle-missions.test.ts",
+    "./unit/vehicle-authority.test.ts",
+    "./unit/vehicle-runtime.test.ts",
+    "./unit/air.test.ts",
+    "./unit/ground.test.ts",
+    "./unit/surface.test.ts",
+    "./unit/mission-workspace.test.ts"
   ]
 }

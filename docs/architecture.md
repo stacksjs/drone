@@ -119,3 +119,12 @@ vehicle transport, update/flash capability or runtime authority.
 the estimator/control/authority physics pipeline. Validated graphs emit position targets, never
 arm themselves, and recover recorded prefixes into a supervised paused state. Task events and
 local-position traces stay separate from physical payload IO and runtime-only diagnostic journals.
+
+## Shared owned vehicle execution
+
+The [vehicle runtime](vehicles.md) extends owned raw sensor and estimator execution to aerodynamic
+fixed-wing, differential ground and planar surface profiles. Explicit v2 missions share graph budgets,
+replay, payload scope and authority lifecycle while each model owns its control and actuator units.
+Fresh sessions isolate state. The common stx workspace inspects recorded estimated routes and
+acknowledgements. The v1 quadcopter contract remains compatible. All new evidence is physics
+simulation; physical endpoints remain inhibited.

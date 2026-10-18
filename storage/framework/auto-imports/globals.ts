@@ -17,6 +17,7 @@ declare global {
   const unwrapPan: typeof autoImports.unwrapPan
   const validateAntennaConfig: typeof autoImports.validateAntennaConfig
   const createAntennaTracker: typeof autoImports.createAntennaTracker
+  const createAuthorityKernel: typeof autoImports.createAuthorityKernel
   const createAuthorityHarness: typeof autoImports.createAuthorityHarness
   const authorityScenarios: typeof autoImports.authorityScenarios
   const validMotors: typeof autoImports.validMotors
@@ -25,6 +26,12 @@ declare global {
   const authorityStates: typeof autoImports.authorityStates
   const authorityTransitions: typeof autoImports.authorityTransitions
   const authorityPolicy: typeof autoImports.authorityPolicy
+  const validateVehicleActuators: typeof autoImports.validateVehicleActuators
+  const validVehicleActuatorValues: typeof autoImports.validVehicleActuatorValues
+  const createVehicleAuthoritySupervisor: typeof autoImports.createVehicleAuthoritySupervisor
+  const createVehicleOutputWatchdog: typeof autoImports.createVehicleOutputWatchdog
+  const vehicleAuthorityPolicy: typeof autoImports.vehicleAuthorityPolicy
+  const createOutputWatchdogKernel: typeof autoImports.createOutputWatchdogKernel
   const createSimulatedOutputWatchdog: typeof autoImports.createSimulatedOutputWatchdog
   const follow: typeof autoImports.follow
   const defineBehavior: typeof autoImports.defineBehavior
@@ -128,6 +135,7 @@ declare global {
   const missionLimits: typeof autoImports.missionLimits
   const readMissionFile: typeof autoImports.readMissionFile
   const writeMissionTrace: typeof autoImports.writeMissionTrace
+  const missionGraphBudget: typeof autoImports.missionGraphBudget
   const missionContains: typeof autoImports.missionContains
   const missionTaskTarget: typeof autoImports.missionTaskTarget
   const missionEdges: typeof autoImports.missionEdges
@@ -136,6 +144,14 @@ declare global {
   const parseMissionPlan: typeof autoImports.parseMissionPlan
   const simulateMission: typeof autoImports.simulateMission
   const missionScenarios: typeof autoImports.missionScenarios
+  const vehicleMissionContains: typeof autoImports.vehicleMissionContains
+  const vehicleTaskTarget: typeof autoImports.vehicleTaskTarget
+  const validateVehicleMission: typeof autoImports.validateVehicleMission
+  const createVehicleMissionEngine: typeof autoImports.createVehicleMissionEngine
+  const replayVehicleMission: typeof autoImports.replayVehicleMission
+  const parseVehicleMissionTrace: typeof autoImports.parseVehicleMissionTrace
+  const recoverVehicleMission: typeof autoImports.recoverVehicleMission
+  const vehicleMissionLimits: typeof autoImports.vehicleMissionLimits
   const navigationGoal: typeof autoImports.navigationGoal
   const createNavigator: typeof autoImports.createNavigator
   const detectNavigationMap: typeof autoImports.detectNavigationMap
@@ -199,6 +215,52 @@ declare global {
   const createSimulator: typeof autoImports.createSimulator
   const createGpsTargetSource: typeof autoImports.createGpsTargetSource
   const createUdpAdapter: typeof autoImports.createUdpAdapter
+  const createAirController: typeof autoImports.createAirController
+  const createAirProfile: typeof autoImports.createAirProfile
+  const airScenarios: typeof autoImports.airScenarios
+  const airAerodynamics: typeof autoImports.airAerodynamics
+  const airModel: typeof autoImports.airModel
+  const createAirPlant: typeof autoImports.createAirPlant
+  const createAirController: typeof autoImports.createAirController
+  const validateAirActuators: typeof autoImports.validateAirActuators
+  const airAerodynamics: typeof autoImports.airAerodynamics
+  const createAirPlant: typeof autoImports.createAirPlant
+  const airModel: typeof autoImports.airModel
+  const planGroundCoverage: typeof autoImports.planGroundCoverage
+  const createGroundOdometry: typeof autoImports.createGroundOdometry
+  const groundStoppingEnvelope: typeof autoImports.groundStoppingEnvelope
+  const createGroundPlant: typeof autoImports.createGroundPlant
+  const groundModel: typeof autoImports.groundModel
+  const groundMission: typeof autoImports.groundMission
+  const createGroundSession: typeof autoImports.createGroundSession
+  const createGroundProfile: typeof autoImports.createGroundProfile
+  const groundScenarios: typeof autoImports.groundScenarios
+  const vehicleReference: typeof autoImports.vehicleReference
+  const createVehicleMeasurementQualifier: typeof autoImports.createVehicleMeasurementQualifier
+  const predictVehicleMeasurementPose: typeof autoImports.predictVehicleMeasurementPose
+  const runVehicleSimulation: typeof autoImports.runVehicleSimulation
+  const vehicleReference: typeof autoImports.vehicleReference
+  const createSurfaceController: typeof autoImports.createSurfaceController
+  const createSurfaceProfile: typeof autoImports.createSurfaceProfile
+  const surfaceScenarios: typeof autoImports.surfaceScenarios
+  const correctSurfaceSounding: typeof autoImports.correctSurfaceSounding
+  const exportSurfaceSurvey: typeof autoImports.exportSurfaceSurvey
+  const reduceSurfaceSurvey: typeof autoImports.reduceSurfaceSurvey
+  const surfacePingFromMeasurement: typeof autoImports.surfacePingFromMeasurement
+  const createSurfaceSampler: typeof autoImports.createSurfaceSampler
+  const createSurfacePlant: typeof autoImports.createSurfacePlant
+  const surfaceHull: typeof autoImports.surfaceHull
+  const renderSurfaceMeasurement: typeof autoImports.renderSurfaceMeasurement
+  const qualifySurfaceMeasurement: typeof autoImports.qualifySurfaceMeasurement
+  const surfacePingFromMeasurement: typeof autoImports.surfacePingFromMeasurement
+  const harbourObstacle: typeof autoImports.harbourObstacle
+  const correctSurfaceSounding: typeof autoImports.correctSurfaceSounding
+  const exportSurfaceSurvey: typeof autoImports.exportSurfaceSurvey
+  const reduceSurfaceSurvey: typeof autoImports.reduceSurfaceSurvey
+  const getMissionWorkspaceDefinition: typeof autoImports.getMissionWorkspaceDefinition
+  const runMissionWorkspace: typeof autoImports.runMissionWorkspace
+  const missionWorkspacePlot: typeof autoImports.missionWorkspacePlot
+  const missionWorkspaceProfiles: typeof autoImports.missionWorkspaceProfiles
 }
 
 export {}

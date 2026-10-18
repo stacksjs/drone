@@ -5,7 +5,7 @@ import { createSurfaceProfile, reduceSurfaceSurvey } from '../../resources/funct
 import { replayVehicleMission } from '../../resources/functions/drone/missions/vehicle'
 
 test('vehicle measurement envelope permits retained identical packets and rejects changed replay or fabricated contact', () => {
-  const profile = createSurfaceProfile(), ref = '55:0,0,0,0,0', m = profile.renderMeasurement(profile.createPlant().snapshot(), 1000, ref)
+  const session = createSurfaceProfile().createSession(), ref = '55:0,0,0,0,0', m = session.renderMeasurement(session.createPlant().snapshot(), 1000, ref)
   const q = createVehicleMeasurementQualifier('surface')
   expect(q.qualify(m, 1060, ref)!.values.onSurface).toBe(true)
   expect(q.qualify(m, 1080, ref)!.sequence).toBe(m.sequence)

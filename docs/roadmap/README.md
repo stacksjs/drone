@@ -37,6 +37,15 @@ companion application and simulator, not a native board autopilot.
 - An [executable behavior audit](../parity.md) with source-backed cases, evidence selectors and upstream refresh.
   Unclassified dimensions and unsupported cases remain explicit in [#28](https://github.com/stacksjs/drone/issues/28).
 
+- Shared v2 vehicle missions on the raw sensor/estimator/authority runtime, with typed actuator leases,
+  isolated execution sessions, scoped modeled payload ACKs and one stx mission workspace.
+- Fixed-wing runway/survey/landing aerodynamic simulation. Other air families and physical evidence
+  remain in [#12](https://github.com/stacksjs/drone/issues/12).
+- Differential ground traction, braking, mowing coverage and material-drop simulation. Physical
+  chassis/implement qualification remains in [#13](https://github.com/stacksjs/drone/issues/13).
+- Surface vessel current/wind simulation, corrected single-beam survey, sample ACK and energy return.
+  Physical hull/survey/container qualification remains in [#14](https://github.com/stacksjs/drone/issues/14).
+
 ## Sequence
 
 1. Deliver one deterministic board sensor-to-neutral-output loop and versioned Pi/runtime handshake.

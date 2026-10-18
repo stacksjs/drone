@@ -79,9 +79,9 @@ test('airborne stall and excessive bank inhibit, while pause requests a flyable 
 })
 
 test('profile quantizes independent modeled measurements and returns fresh owned copies', () => {
-  const profile = createAirProfile(), state = profile.createPlant().snapshot()
+  const profile = createAirProfile(), session = profile.createSession(), state = session.createPlant().snapshot()
   state.details.airspeedMps = 12.34567
-  const packet = profile.renderMeasurement(state, 200, 'ref')
+  const packet = session.renderMeasurement(state, 200, 'ref')
   expect(packet.values.airspeedMps).toBe(12.35)
   expect(packet.receivedAtMs).toBe(260)
   expect(packet.values.onSurface).toBe(true)

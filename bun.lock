@@ -10,6 +10,7 @@
         "@stacksjs/env": "^0.75.221",
         "@stacksjs/path": "^0.75.221",
         "@stacksjs/router": "^0.75.221",
+        "@stacksjs/storage": "^0.75.221",
         "@stacksjs/testing": "^0.75.221",
         "stacks": "^0.75.221",
       },

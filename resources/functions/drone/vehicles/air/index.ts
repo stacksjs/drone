@@ -25,13 +25,15 @@ export function createAirProfile(scenario = 'nominal'): VehicleProfile {
         { id: 'land', kind: 'land', positionM: [650, 0, 0], acceptanceM: 40, maxArrivalSpeedMps: 0.2, settleMs: 200, timeoutMs: 60000 },
       ],
     },
-    scenarios: airScenarios, createPlant: createAirPlant, createController: createAirController,
+    scenarios: airScenarios,
+    createSession() { return { createPlant: createAirPlant, createController: createAirController,
     renderMeasurement(state: VehiclePlantState, atMs: number, reference: string): VehicleMeasurement {
       const quantize = (v: number, scale: number) => Math.round(v * scale) / scale
       const differentialPressurePa = quantize(0.5 * airModel.densityKgM3 * (state.details.airspeedMps as number) ** 2, 100)
       return { version: 1, evidence: 'modeled-vehicle-sensors', vehicle: 'fixed-wing', sequence: Math.floor(atMs / 20) + 1, reference, capturedAtMs: atMs, receivedAtMs: atMs + 60,
         values: { differentialPressurePa, airspeedMps: quantize(Math.sqrt(2 * differentialPressurePa / airModel.densityKgM3), 100), alphaRad: quantize(state.details.alphaRad as number, 10000), betaRad: quantize((state.details.betaRad as number) || 0, 10000), rateRadS: state.angularRateRadS.map(n => quantize(n, 10000)), onSurface: state.onSurface, stopped: Math.hypot(...state.velocityMps) <= 0.2 } }
     },
+    } },
     faults(_scenario, atMs) {
       if (_scenario === 'crosswind') return { windMps: atMs > 1000 ? [0, 2, 0] : [0, 0, 0] }
       if (atMs < 12000) return {}
