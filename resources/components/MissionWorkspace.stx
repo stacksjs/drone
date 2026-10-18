@@ -1,44 +1,108 @@
 <script client>
-import type { MissionScenario } from '../functions/drone/missions/simulation'
-import { missionScenarios, simulateMission } from '../functions/drone/missions/simulation'
-import { exampleMission, validateMission, missionEdges } from '../functions/drone/missions/plan'
-const plan = exampleMission()
-const budget = validateMission(plan)
-const scenario = state<MissionScenario>('nominal')
-const run = state<ReturnType<typeof simulateMission> | null>(null)
+import type { MissionWorkspaceProfile, MissionWorkspaceRecording } from '../functions/drone/vehicles/workspace'
+import { getMissionWorkspaceDefinition, missionWorkspaceProfiles, missionWorkspacePlot, runMissionWorkspace } from '../functions/drone/vehicles/workspace'
+const profile = state<MissionWorkspaceProfile>('quadcopter')
+const scenario = state('nominal')
+const result = state<MissionWorkspaceRecording | null>(null)
+const recording = derived(() => result()?.definition.profile === profile() && result()?.definition.scenario === scenario() ? result() : null)
 const offset = state(600)
+const busy = state(false)
 const error = state('')
-const rows = derived(() => run()?.trace.rows.filter(row => row.observation.nowMs <= offset()) ?? [])
+const definition = derived(() => {
+  const base = getMissionWorkspaceDefinition(profile(), 'nominal')
+  return base.scenarios.includes(scenario()) ? getMissionWorkspaceDefinition(profile(), scenario()) : base
+})
+const validTime = derived(() => !recording() || Number.isFinite(offset()) && Number.isInteger(offset()) && offset() >= recording()!.minimumTimeMs && offset() <= recording()!.maximumTimeMs && (offset() - recording()!.minimumTimeMs) % 20 === 0)
+const playbackTime = derived(() => validTime() ? offset() : recording()?.minimumTimeMs || 600)
+const rows = derived(() => recording()?.rows.filter(row => row.atMs <= playbackTime()) ?? [])
 const current = derived(() => rows().at(-1) ?? null)
-const events = derived(() => run()?.transitions.filter(row => row.atMs <= offset()) ?? [])
-const payloads = derived(() => rows().filter(row => row.result.payload).length)
-async function execute() {
-  error.set(''); run.set(null); offset.set(600)
-  try { const result = simulateMission({ scenario: scenario() }); run.set(result); await nextTick(); offset.set(result.trace.rows.at(-1)?.observation.nowMs ?? 600) }
+const events = derived(() => recording()?.transitions.filter(row => row.atMs <= playbackTime()) ?? [])
+const requests = derived(() => recording()?.payloads.filter(row => row.issuedAtMs <= playbackTime()) ?? [])
+const acknowledgements = derived(() => rows().filter(row => row.payloadAck).map(row => row.payloadAck!))
+const plot = derived(() => missionWorkspacePlot(definition(), rows()))
+const computation = useTimeout(() => {
+  try {
+    const completed = runMissionWorkspace(profile(), scenario())
+    result.set(completed); offset.set(completed.maximumTimeMs)
+  }
   catch (failure) { error.set(failure instanceof Error ? failure.message : 'Mission simulation failed') }
-}
+  finally { busy.set(false) }
+}, 32)
+computation.stop()
+onDestroy(() => computation.stop())
+effect(() => {
+  const selectedProfile = profile(), selectedScenario = scenario()
+  computation.stop(); busy.set(false); result.set(null); error.set(''); offset.set(600)
+  if (!getMissionWorkspaceDefinition(selectedProfile, 'nominal').scenarios.includes(selectedScenario)) scenario.set('nominal')
+})
+function execute() { error.set(''); result.set(null); offset.set(600); busy.set(true); computation.start() }
+function reset() { computation.stop(); result.set(null); error.set(''); offset.set(600); busy.set(false) }
+function vectorLabel(value: number[] | null | undefined) { return value ? value.map(n => n.toFixed(2)).join(', ') : 'released' }
 </script>
 <template>
-  <section aria-labelledby="mission-title">
-    <p class="font-mono text-emerald-200 text-xs">OWNED MISSION ENGINE / SIMULATION</p>
-    <h1 id="mission-title" class="mt-3 font-semibold text-3xl tracking-tight">Plan a route. Inspect every decision.</h1>
-    <p class="mt-3 max-w-3xl leading-relaxed text-neutral-400">A local survey through our sensor, estimator, authority and multirotor control stack. Each scenario is an explicit operator script. Move through its recording to inspect the mission state.</p>
+  <section aria-labelledby="mission-title" :aria-busy="busy()">
+    <h1 id="mission-title" class="font-semibold text-3xl tracking-tight">Owned mission workspace</h1>
+    <p class="mt-3 max-w-3xl leading-relaxed text-neutral-400">Choose a vehicle, record its modeled mission and inspect the same decision timeline. Recorded vehicle positions come from the owned estimator.</p>
+    <p class="mt-3 text-emerald-200 text-sm">Simulation only. Physical outputs remain inhibited.</p>
+    <div class="flex flex-wrap gap-4 items-end mt-8">
+      <div><label for="mission-profile" class="block mb-2 text-sm">Vehicle profile</label><select id="mission-profile" x-model="profile" class="px-3 py-3 max-w-full text-neutral-100 bg-neutral-900 border border-neutral-600 rounded focus-visible:outline-emerald-200"><option :for="name in missionWorkspaceProfiles" :value="name">{{ name }}</option></select></div>
+      <div><label for="mission-scenario" class="block mb-2 text-sm">Operator scenario</label><select id="mission-scenario" x-model="scenario" class="px-3 py-3 max-w-full text-neutral-100 bg-neutral-900 border border-neutral-600 rounded focus-visible:outline-emerald-200"><option :for="name in definition().scenarios" :value="name">{{ name }}</option></select></div>
+      <button type="button" @click="execute()" :disabled="busy()" class="px-4 py-3 font-medium text-neutral-950 whitespace-nowrap bg-emerald-200 rounded focus-visible:outline-emerald-200 focus-visible:outline-offset-4 disabled:opacity-60">{{ busy() ? 'Recording…' : 'Run scenario' }}</button>
+      <button type="button" @click="reset()" class="px-4 py-3 text-sm whitespace-nowrap border border-neutral-600 rounded focus-visible:outline-emerald-200 focus-visible:outline-offset-4">Clear recording</button>
+    </div>
+    <p :if="busy()" role="status" class="mt-5 text-emerald-200 text-sm">Computing the bounded physics recording. Controls remain simulation-only.</p>
+    <p :if="error()" role="alert" class="mt-5 p-4 text-red-200 border border-red-400 rounded">{{ error() }}</p>
     <div class="grid gap-8 lg:grid-cols-[1fr_1.5fr] mt-9">
-      <aside class="min-w-0"><h2 class="font-semibold text-lg">Version 1 mission</h2><p class="mt-2 font-mono text-neutral-400 text-xs">LOCAL_NED / origin 0,0,100 / ellipsoid</p>
-        <dl class="grid gap-5 grid-cols-2 mt-5 text-sm"><div><dt class="text-neutral-400">Fence radius</dt><dd class="mt-1">12 m</dd></div><div><dt class="text-neutral-400">Height ceiling</dt><dd class="mt-1">5 m above origin</dd></div><div><dt class="text-neutral-400">Worst case time</dt><dd class="mt-1">{{ budget.worstCaseMs / 1000 }} s</dd></div><div><dt class="text-neutral-400">Energy budget</dt><dd class="mt-1">{{ budget.requiredWh.toFixed(2) }} / 14 Wh usable</dd></div></dl>
-        <ol class="mt-6 border-neutral-700 border-t"><li :for="task in plan.tasks" class="flex flex-wrap gap-2 justify-between py-3 text-sm border-b border-neutral-800"><span class="font-mono">{{ task.id }}</span><span class="text-neutral-400">{{ task.kind }} → {{ missionEdges(task).join(' / ') || 'end' }}</span></li></ol>
-        <p class="mt-4 leading-relaxed text-neutral-400 text-xs">Flat origin terrain plane, 10 cm modeled landing gear and a fixed rally at N 0, E 0, D -1 m. The camera task records a simulated event. It does not acquire an image.</p>
+      <aside class="min-w-0">
+        <h2 class="font-semibold text-lg">{{ definition().name }}</h2>
+        <p class="mt-2 break-words font-mono text-neutral-400 text-xs">{{ definition().planId }} / mission {{ definition().version }}</p>
+        <p class="mt-2 font-mono text-neutral-400 text-xs">LOCAL_NED / origin 0, 0, 100 / WGS84 ellipsoid</p>
+        <dl class="grid gap-5 grid-cols-2 mt-5 text-sm">
+          <div><dt class="text-neutral-400">Fence radius</dt><dd class="mt-1">{{ definition().fence.radiusM }} m</dd></div>
+          <div><dt class="text-neutral-400">Down bounds</dt><dd class="mt-1">{{ definition().fence.minDownM }} to {{ definition().fence.maxDownM }} m</dd></div>
+          <div><dt class="text-neutral-400">Worst case time</dt><dd class="mt-1">{{ definition().budget.worstCaseMs / 1000 }} s</dd></div>
+          <div><dt class="text-neutral-400">Energy reserve checked</dt><dd class="mt-1">{{ definition().budget.requiredWh.toFixed(2) }} / {{ definition().budget.usableWh.toFixed(2) }} Wh usable</dd></div>
+        </dl>
+        <h3 class="mt-7 font-semibold text-sm">Tasks and graph edges</h3>
+        <div class="overflow-x-auto mt-3 max-h-96"><table class="w-full text-left text-xs"><thead class="text-neutral-400"><tr><th scope="col" class="pr-3 py-3">Task</th><th scope="col" class="py-3">Goal / next</th></tr></thead><tbody><tr :for="task in definition().tasks" class="border-b border-neutral-800"><td class="pr-3 py-3 align-top"><span class="font-mono">{{ task.id }}</span><span class="block mt-1 text-neutral-400">{{ task.kind }}</span></td><td class="py-3 break-words"><span :if="task.targetM" class="font-mono">N/E/D {{ vectorLabel(task.targetM) }} m</span><span :if="task.operation" class="block font-mono text-emerald-200">{{ task.operation }} / {{ task.containerId || 'no container' }}</span><span class="block mt-1 text-neutral-400">Next: {{ task.edges.join(' / ') || 'end' }}</span></td></tr></tbody></table></div>
+        <p class="mt-4 leading-relaxed text-neutral-400 text-xs">{{ definition().assumptions }}</p>
       </aside>
-      <div class="min-w-0"><div class="flex flex-wrap gap-4 items-end"><div class="min-w-0"><label for="mission-scenario" class="block mb-2 text-sm">Operator scenario</label><select id="mission-scenario" x-model="scenario" class="px-3 py-3 max-w-full text-neutral-100 bg-neutral-900 border border-neutral-600 rounded focus-visible:outline-emerald-200"><option :for="name in missionScenarios" :value="name">{{ name }}</option></select></div><button type="button" @click="execute()" class="px-4 py-3 font-medium text-neutral-950 bg-emerald-200 rounded focus-visible:outline-emerald-200 focus-visible:outline-offset-4">Run scenario</button></div>
-        <p :if="error()" role="alert" class="mt-5 p-4 text-red-200 border border-red-400 rounded">{{ error() }}</p>
-        <p :if="!run() && !error()" class="mt-8 py-8 leading-relaxed text-neutral-400 border-neutral-700 border-t">Choose a scenario to record an owned physics run. Pause/resume and recovery hold position until the scripted operator resumes. RC takeover, abort and reserve violations stop mission execution.</p>
-        <div :if="run() && current()" class="mt-8"><dl class="grid gap-5 grid-cols-2 text-sm"><div><dt class="text-neutral-400">Mission state</dt><dd class="mt-2 font-mono text-emerald-200 text-lg" data-mission-state>{{ current()?.result.state }}</dd></div><div><dt class="text-neutral-400">Current task</dt><dd class="mt-2 break-all font-mono text-lg" data-mission-task>{{ current()?.result.taskId }}</dd></div><div><dt class="text-neutral-400">Decision</dt><dd class="mt-2 break-words font-mono text-xs">{{ current()?.result.reason }}</dd></div><div><dt class="text-neutral-400">Camera events so far</dt><dd class="mt-2 font-mono" data-mission-payloads>{{ payloads() }}</dd></div></dl>
-          <label for="mission-time" class="flex flex-wrap gap-3 justify-between mt-8 text-sm">Recorded fixture time <span class="font-mono">{{ offset() }} ms</span></label><input id="mission-time" type="range" min="600" :max="run()?.trace.rows.at(-1)?.observation.nowMs || 600" step="20" x-model.number="offset" class="mt-3 w-full accent-emerald-200"><div class="flex gap-3 mt-3"><button type="button" @click="offset.set(600)" class="px-3 py-2 text-sm border border-neutral-600 rounded">Beginning</button><button type="button" @click="offset.set(run()?.trace.rows.at(-1)?.observation.nowMs || 600)" class="px-3 py-2 text-sm border border-neutral-600 rounded">End of recording</button></div>
-          <p class="mt-6 font-mono text-neutral-400 text-xs">Estimated N/E/D: {{ current()?.observation.positionM.map(n => n.toFixed(2)).join(', ') }} m</p><p class="mt-2 font-mono text-neutral-400 text-xs">Target N/E/D: {{ current()?.result.targetM?.map(n => n.toFixed(2)).join(', ') || 'released' }}</p>
-          <h3 class="mt-8 font-semibold text-sm">Recorded task and state transitions</h3><div class="overflow-x-auto mt-3"><table class="w-full text-left text-xs"><thead class="text-neutral-400"><tr class="border-b border-neutral-700"><th scope="col" class="pr-3 py-3">Time / ms</th><th scope="col" class="pr-3 py-3">Task</th><th scope="col" class="py-3">State</th></tr></thead><tbody><tr :for="row in events()" class="border-b border-neutral-800"><td class="pr-3 py-3 font-mono">{{ row.atMs }}</td><td class="pr-3 py-3 font-mono">{{ row.taskId }}</td><td class="py-3 font-mono">{{ row.state }}</td></tr></tbody></table></div>
+      <div class="min-w-0">
+        <h2 class="font-semibold text-lg">Estimated route, north up</h2>
+        <svg width="360" height="360" viewBox="0 0 360 360" role="img" aria-label="North-up estimated route with planned task goals, east increasing to the right" class="mt-4 max-h-96 w-full bg-neutral-900 border border-neutral-700 rounded">
+          <text x="180" y="18" text-anchor="middle" fill="#a3a3a3" font-size="11">North</text><text x="340" y="184" text-anchor="middle" fill="#a3a3a3" font-size="11">East</text>
+          <line x1="40" y1="180" x2="320" y2="180" stroke="#404040" stroke-width="1" /><line x1="180" y1="40" x2="180" y2="320" stroke="#404040" stroke-width="1" />
+          <polyline :points="plot().estimated" fill="none" stroke="#a7f3d0" stroke-width="2" />
+          <g :for="goal in plot().tasks"><rect :x="goal.x - 3" :y="goal.y - 3" width="6" height="6" fill="none" stroke="#a3a3a3" /><title>{{ goal.id }}</title></g>
+          <circle :if="plot().current" :cx="plot().current?.x" :cy="plot().current?.y" r="4" fill="#a7f3d0" />
+        </svg>
+        <p class="mt-2 text-neutral-400 text-xs">{{ plot().spanM.toFixed(1) }} m square extent. Squares mark task goals; emerald shows the recorded estimate. This is a local route, not a geographic map.</p>
+        <p :if="!recording() && !busy() && !error()" class="mt-7 py-5 leading-relaxed text-neutral-400 border-neutral-700 border-t">No recording for this selection. Run a scenario to inspect decisions, payload outcomes and the independent modeled board.</p>
+        <div :if="recording() && current()" class="mt-7">
+          <dl class="grid gap-5 grid-cols-2 text-sm">
+            <div><dt class="text-neutral-400">Run outcome</dt><dd class="mt-2 font-mono text-emerald-200 text-lg" data-mission-outcome>{{ recording()?.status }}</dd></div>
+            <div><dt class="text-neutral-400">Recorded mission state</dt><dd class="mt-2 font-mono text-lg" data-mission-state>{{ current()?.state }}</dd></div>
+            <div><dt class="text-neutral-400">Current task</dt><dd class="mt-2 break-all font-mono" data-mission-task>{{ current()?.taskId }}</dd></div>
+            <div><dt class="text-neutral-400">Decision</dt><dd class="mt-2 break-words font-mono text-xs">{{ current()?.reason }}</dd></div>
+          </dl>
+          <p :if="recording()?.snapshotsStale" role="status" class="mt-5 p-3 text-amber-200 border border-amber-400 rounded">Host lost. The mission and authority snapshots are stale. The independent modeled board continued and expired its output lease.</p>
+          <p class="mt-4 text-neutral-400 text-xs">Final modeled board: {{ recording()?.boardNeutral ? 'neutral output' : 'active output' }}. Board fault: {{ recording()?.boardFault || 'none' }}. {{ recording()?.snapshotsStale ? 'Last host authority snapshot' : 'Final authority snapshot' }}: {{ recording()?.authorityState }}.</p>
+          <p :if="recording()?.fault" class="mt-2 break-words font-mono text-neutral-400 text-xs">Outcome reason: {{ recording()?.fault }}</p>
+          <label for="mission-time" class="flex flex-wrap gap-3 justify-between mt-7 text-sm">Recorded fixture time <span class="font-mono">{{ offset() }} ms</span></label>
+          <input id="mission-time" type="range" :min="recording()?.minimumTimeMs || 600" :max="recording()?.maximumTimeMs || 600" step="20" x-model.number="offset" class="mt-3 w-full accent-emerald-200">
+          <div class="flex flex-wrap gap-3 items-end mt-3"><div><label for="mission-time-number" class="block mb-1 text-neutral-400 text-xs">Recorded time / ms</label><input id="mission-time-number" type="number" :min="recording()?.minimumTimeMs || 600" :max="recording()?.maximumTimeMs || 600" step="20" x-model.number="offset" class="px-3 py-2 w-36 bg-neutral-900 border border-neutral-600 rounded focus-visible:outline-emerald-200"></div><button type="button" @click="offset.set(recording()?.minimumTimeMs || 600)" class="px-3 py-2 text-sm border border-neutral-600 rounded focus-visible:outline-emerald-200">Beginning</button><button type="button" @click="offset.set(recording()?.maximumTimeMs || 600)" class="px-3 py-2 text-sm border border-neutral-600 rounded focus-visible:outline-emerald-200">End of recording</button></div>
+          <p :if="!validTime()" role="alert" class="mt-3 text-amber-200 text-sm">Enter a recorded time from {{ recording()?.minimumTimeMs }} to {{ recording()?.maximumTimeMs }} ms in 20 ms steps. Showing the beginning until the time is valid.</p>
+          <p class="mt-5 break-words font-mono text-neutral-400 text-xs">Estimated N/E/D: {{ vectorLabel(current()?.positionM) }} m</p><p class="mt-2 break-words font-mono text-neutral-400 text-xs">Estimated velocity N/E/D: {{ vectorLabel(current()?.velocityMps) }} m/s</p><p class="mt-2 break-words font-mono text-neutral-400 text-xs">Target N/E/D: {{ vectorLabel(current()?.targetM) }}</p>
+          <h3 class="mt-7 font-semibold text-sm">Payload events <span class="font-mono text-neutral-400" data-mission-payloads>{{ requests().length }}</span></h3>
+          <p :if="!requests().length" class="mt-2 text-neutral-400 text-xs">No payload request at this time.</p>
+          <div :for="payload in requests()" class="mt-3 py-3 border-neutral-800 border-t"><p class="break-words font-mono text-xs">{{ payload.operation }} / {{ payload.containerId || 'no container' }} / {{ payload.taskId }}</p><p class="mt-1 break-all text-neutral-400 text-xs">{{ payload.eventId }} / {{ payload.evidence }}</p></div>
+          <div :for="ack in acknowledgements()" class="mt-3 py-3 border-neutral-800 border-t"><p class="break-words font-mono text-xs" :class="ack.outcome === 'confirmed' && ack.correlated ? 'text-emerald-200' : 'text-amber-200'">ACK {{ ack.operation }} / {{ ack.containerId || 'no container' }} / {{ ack.outcome }}</p><p class="mt-1 break-all text-neutral-400 text-xs">{{ ack.eventId }} / {{ ack.correlated ? 'correlated request' : 'uncorrelated acknowledgement' }}</p></div>
+          <p :if="profile() === 'quadcopter' && requests().length" class="mt-3 text-neutral-400 text-xs">Version 1 camera events have no hardware acknowledgement and acquire no image.</p>
+          <h3 class="mt-7 font-semibold text-sm">Recorded transitions</h3><div class="overflow-x-auto mt-3"><table class="w-full text-left text-xs"><thead class="text-neutral-400"><tr><th scope="col" class="pr-3 py-3">Time / ms</th><th scope="col" class="pr-3 py-3">Task</th><th scope="col" class="py-3">State / reason</th></tr></thead><tbody><tr :for="row in events()" class="border-b border-neutral-800"><td class="pr-3 py-3 font-mono">{{ row.atMs }}</td><td class="pr-3 py-3 font-mono">{{ row.taskId }}</td><td class="py-3 break-words font-mono">{{ row.state }} / {{ row.reason }}</td></tr></tbody></table></div>
         </div>
       </div>
     </div>
-    <p class="mt-10 pt-5 leading-relaxed text-neutral-400 text-xs border-neutral-700 border-t">Simulation evidence only. Physical outputs stay inhibited. Aborting or losing authority releases the mission and zeros modeled thrust; it is not an emergency landing. Terrain following, collision avoidance, physical payload dispatch and hardware recovery remain on the roadmap.</p>
+    <section :if="recording()?.survey" class="mt-9 pt-5 border-neutral-700 border-t" aria-labelledby="survey-summary-title"><h2 id="survey-summary-title" class="font-semibold text-lg">Modeled single-beam survey</h2><dl class="grid gap-5 sm:grid-cols-2 lg:grid-cols-4 mt-4 text-sm"><div><dt class="text-neutral-400">Distinct soundings</dt><dd class="mt-1 font-mono">{{ recording()?.survey?.count }}</dd></div><div><dt class="text-neutral-400">Depth below declared datum</dt><dd class="mt-1 font-mono">{{ recording()?.survey?.minimumDepthM.toFixed(2) }} to {{ recording()?.survey?.maximumDepthM.toFixed(2) }} m</dd></div><div><dt class="text-neutral-400">Maximum vertical sigma</dt><dd class="mt-1 font-mono">{{ recording()?.survey?.maximumVerticalSigmaM.toFixed(3) }} m</dd></div><div><dt class="text-neutral-400">Maximum horizontal sigma</dt><dd class="mt-1 font-mono">{{ recording()?.survey?.maximumHorizontalSigmaM.toFixed(3) }} m</dd></div></dl><p class="mt-3 break-words font-mono text-neutral-400 text-xs">{{ recording()?.survey?.datum }}</p><p class="mt-2 leading-relaxed text-neutral-400 text-xs">{{ recording()?.survey?.assumptions }}</p></section>
+    <p class="mt-10 pt-5 leading-relaxed text-neutral-400 text-xs border-neutral-700 border-t">Neutral output does not prove stopping, braking or emergency landing. Vehicle models, recorded acknowledgements and survey corrections require separate hardware validation.</p>
   </section>
 </template>
