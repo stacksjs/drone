@@ -5,7 +5,7 @@ import { multiplyQuaternion, normalizeQuaternion } from '../../estimation/frames
 import { rotateBodyToNed, rotateNedToBody } from '../../controls/physics'
 
 /** Fictional 2 kg trainer, experimentally unqualified. BODY_FRD forces and moments. */
-export const airModel = Object.freeze({ massKg: 2, gravityMps2: 9.80665, densityKgM3: 1.225, areaM2: 0.8, spanM: 2.4, chordM: 0.333, inertiaKgM2: [0.18, 0.25, 0.35] as const, maxThrustN: 14, stallAlphaRad: 0.28, cruiseMps: 13, rotationMps: 10, minimumMps: 8, maximumMps: 25 })
+export const airModel = Object.freeze({ massKg: 2, gravityMps2: 9.80665, densityKgM3: 1.225, areaM2: 0.8, spanM: 2.4, chordM: 0.333, inertiaKgM2: Object.freeze([0.18, 0.25, 0.35] as const), maxThrustN: 14, stallAlphaRad: 0.28, cruiseMps: 13, rotationMps: 10, minimumMps: 8, maximumMps: 25 })
 const clamp = (v: number, a: number, b: number) => Math.max(a, Math.min(b, v))
 const validVector = (v: unknown): v is SensorVector => Array.isArray(v) && v.length === 3 && v.every(Number.isFinite)
 export function validateAirActuators(a: number[]) {

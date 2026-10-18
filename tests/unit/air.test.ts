@@ -118,3 +118,50 @@ test('landing follows its captured runway heading through goal overshoot instead
   context.estimate.localPosition!.positionM = [655, 0, -1]
   expect(Math.abs(controller.step(context).actuators[1]!)).toBeLessThan(0.01)
 })
+
+// Common runtime seam: catches raw IMU/GNSS integration and complete vehicle mission behavior, not physical airworthiness.
+test('owned aerodynamic trainer takes off, navigates and lands through raw sensors in still air and crosswind', async () => {
+  const { runVehicleSimulation } = await import('../../resources/functions/drone/vehicles/runtime')
+  for (const scenario of ['nominal', 'crosswind']) {
+    const report = runVehicleSimulation(createAirProfile(scenario), { scenario, seconds: 120 })
+    expect(report.status).toBe('completed')
+    expect(report.mission.state).toBe('completed')
+    expect(report.path.some(row => row.truthPositionM[2] < -10)).toBe(true)
+    expect(report.path.some(row => row.truthPositionM[0] > 330)).toBe(true)
+    expect(report.mission.physicalFlightEnabled).toBe(false)
+    expect(report.path.at(-1)!.measurement!.values.onSurface).toBe(true)
+    expect(report.path.at(-1)!.measurement!.values.stopped).toBe(true)
+    expect(report.finalTruthPositionM[2]).toBe(0)
+    expect(Math.abs(report.finalTruthPositionM[0] - 650)).toBeLessThan(10)
+  }
+}, 60000)
+
+test('air sensor, position, manual and kill losses release propulsion while independent board expires a lost host', async () => {
+  const { runVehicleSimulation } = await import('../../resources/functions/drone/vehicles/runtime')
+  for (const scenario of ['airspeed-loss', 'position-loss', 'host-loss', 'rc-override', 'kill']) {
+    const report = runVehicleSimulation(createAirProfile(scenario), { scenario, seconds: 30 })
+    expect(report.status).toBe(scenario === 'host-loss' ? 'host-lost' : 'blocked')
+    expect(report.board.actuators).toEqual([0, 0, 0, 0, 1])
+    expect(report.board.expiresAtMs).toBeNull()
+    expect(report.path.some(row => row.truthPositionM[2] < -10)).toBe(true)
+    if (scenario === 'host-loss') expect(report.board.fault).toBe('output-lease-expired')
+    else expect(report.mission.state).toBe('blocked')
+  }
+}, 60000)
+
+import { join } from 'node:path'
+
+// Native CLI seam: catches command parsing and report visibility, not packaging or flight qualification.
+test('native air command executes the owned runway mission and rejects invalid inputs', async () => {
+  const command = (args: string[]) => Bun.spawn([process.execPath, '--no-env-file', `--config=${join(import.meta.dir, '../fixtures/process/bunfig.toml')}`, join(import.meta.dir, '../fixtures/air/cli.ts'), 'air:simulate', ...args], { stdout: 'pipe', stderr: 'pipe' })
+  const child = command(['--seconds', '120'])
+  const [output, errors, status] = await Promise.all([new Response(child.stdout).text(), new Response(child.stderr).text(), child.exited])
+  expect(status).toBe(0); expect(errors).toBe('')
+  const report = JSON.parse(output)
+  expect(report.status).toBe('completed'); expect(report.physicalFlightEnabled).toBe(false)
+  for (const args of [['--seconds', 'NaN'], ['--seconds', '181'], ['--seconds', '1.5'], ['--scenario', 'unmodeled-vtol']]) {
+    const invalid = command(args)
+    const [text, error, code] = await Promise.all([new Response(invalid.stdout).text(), new Response(invalid.stderr).text(), invalid.exited])
+    expect(text).toBe(''); expect(code).toBe(1); expect(error.length).toBeGreaterThan(0)
+  }
+}, 180000)

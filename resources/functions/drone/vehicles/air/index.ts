@@ -22,7 +22,7 @@ export function createAirProfile(scenario = 'nominal'): VehicleProfile {
         { id: 'start', kind: 'start', next: 'depart' },
         { id: 'depart', kind: 'takeoff', positionM: [120, 0, -15], acceptanceM: 15, maxArrivalSpeedMps: 20, settleMs: 0, timeoutMs: 25000, next: 'survey' },
         { id: 'survey', kind: 'waypoint', positionM: [350, 0, -20], acceptanceM: 20, maxArrivalSpeedMps: 20, settleMs: 0, timeoutMs: 30000, next: 'land' },
-        { id: 'land', kind: 'land', positionM: [650, 0, 0], acceptanceM: 40, maxArrivalSpeedMps: 2, settleMs: 200, timeoutMs: 60000 },
+        { id: 'land', kind: 'land', positionM: [650, 0, 0], acceptanceM: 40, maxArrivalSpeedMps: 0.2, settleMs: 200, timeoutMs: 60000 },
       ],
     },
     scenarios: airScenarios, createPlant: createAirPlant, createController: createAirController,

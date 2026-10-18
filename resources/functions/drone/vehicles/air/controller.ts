@@ -1,5 +1,6 @@
 import type { VehicleController, VehicleControllerContext, VehicleControlOutput, VehicleMeasurement } from '../types'
 import { airModel } from './plant'
+import { vehicleReference } from '../measurements'
 const clamp = (v: number, a: number, b: number) => Math.max(a, Math.min(b, v))
 const wrap = (a: number) => Math.atan2(Math.sin(a), Math.cos(a))
 const vector = (v: unknown): v is number[] => Array.isArray(v) && v.length === 3 && v.every(Number.isFinite)
@@ -10,7 +11,7 @@ export function createAirController(): VehicleController {
   function output(c: VehicleControllerContext, a: number[], reason: string, inhibited = false): VehicleControlOutput { return { kind: 'simulated-vehicle-control', vehicle: 'fixed-wing', atMs: c.nowMs, actuators: [...a], inhibited, reason, physicalFlightEnabled: false, boardOutputsInhibited: true } }
   function qualify(c: VehicleControllerContext, m: VehicleMeasurement | null) {
     if (!m || m.version !== 1 || m.evidence !== 'modeled-vehicle-sensors' || m.vehicle !== 'fixed-wing' || !Number.isSafeInteger(m.sequence) || m.sequence < 1 || !Number.isFinite(m.capturedAtMs) || !Number.isFinite(m.receivedAtMs) || m.capturedAtMs > m.receivedAtMs || m.receivedAtMs > c.nowMs || c.nowMs - m.capturedAtMs > 160 || m.receivedAtMs - m.capturedAtMs !== 60) return false
-    const expectedReference = `${c.estimate.bootId}:${Object.values(c.estimate.resets).join(',')}`
+    const expectedReference = vehicleReference(c.estimate)
     if (m.reference !== expectedReference || (reference !== null && m.reference !== reference)) return false
     const v = m.values
     if (typeof v.differentialPressurePa !== 'number' || !Number.isFinite(v.differentialPressurePa) || v.differentialPressurePa < 0 || Math.abs(Math.sqrt(2 * v.differentialPressurePa / airModel.densityKgM3) - (v.airspeedMps as number)) > 0.02 || typeof v.airspeedMps !== 'number' || !Number.isFinite(v.airspeedMps) || v.airspeedMps < 0 || v.airspeedMps > 60 || typeof v.alphaRad !== 'number' || !Number.isFinite(v.alphaRad) || Math.abs(v.alphaRad) > Math.PI || typeof v.betaRad !== 'number' || !Number.isFinite(v.betaRad) || Math.abs(v.betaRad) > Math.PI || typeof v.onSurface !== 'boolean' || typeof v.stopped !== 'boolean' || !Array.isArray(v.rateRadS) || v.rateRadS.length !== 3 || !v.rateRadS.every(n => Number.isFinite(n) && Math.abs(n) < 40)) return false
@@ -69,8 +70,10 @@ export function createAirController(): VehicleController {
       const energyError = airModel.gravityMps2 * (position[2]! - desiredDown) + (targetSpeed ** 2 - speed ** 2) / 2
       const throttle = contact ? 1 : clamp(0.25 + energyError * 0.012, 0, 1)
       if (!contact) pitchTarget -= clamp((targetSpeed - speed) * 0.025, 0, 0.08)
-      const aileron = clamp((bankTarget - roll!) * 1.4 - rates[0]! * 0.28, -0.4, 0.4)
-      const elevator = clamp((pitchTarget - pitch!) * 1.8 - rates[1]! * 0.35 + 0.1875 * alpha, -0.4, 0.4)
+      const pressureArea = Math.max(1, 0.5 * airModel.densityKgM3 * speed ** 2 * airModel.areaM2)
+      const rollRateTarget = clamp((bankTarget - roll!) * 2, -0.5, 0.5), pitchRateTarget = clamp((pitchTarget - pitch!) * 2, -0.35, 0.35)
+      const aileron = clamp(airModel.inertiaKgM2[0] * (rollRateTarget - rates[0]!) * 4 / (pressureArea * airModel.spanM * 0.12), -0.4, 0.4)
+      const elevator = clamp(airModel.inertiaKgM2[1] * (pitchRateTarget - rates[1]!) * 4 / (pressureArea * airModel.chordM * 0.8) + 0.1875 * alpha, -0.4, 0.4)
       const rudder = clamp(-(values.betaRad as number) * 0.6 - rates[2]! * 0.08, -0.4, 0.4)
       return output(c, [throttle, aileron, elevator, rudder, 0], paused ? 'bounded-air-loiter' : landing ? 'energy-managed-approach' : contact ? 'runway-takeoff' : 'energy-managed-flight')
     },
