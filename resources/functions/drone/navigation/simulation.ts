@@ -24,7 +24,9 @@ export function simulateNavigation(options: { scenario?: NavigationScenario, sec
   const missionPlan = exampleMission()
   missionPlan.tasks = [
     { id: 'takeoff', kind: 'takeoff', positionM: [0, 0, -1.2], timeoutMs: 12000, next: 'survey' },
-    { id: 'survey', kind: 'waypoint', positionM: [5, 0, -1.2], timeoutMs: 20000, next: 'return' },
+    // Author the fixed-origin waypoint at the same height as the declared 1.2 m clearance
+    // over the fixture's D=-0.03N plane. Acceptance must not chase a different altitude.
+    { id: 'survey', kind: 'waypoint', positionM: [5, 0, -1.35], timeoutMs: 20000, next: 'return' },
     { id: 'return', kind: 'return', timeoutMs: 20000, next: 'land' },
     { id: 'land', kind: 'land', positionM: [0, 0, 0], timeoutMs: 12000 },
   ]

@@ -60,6 +60,8 @@ jobs:
         working-directory: ${{ runner.temp }}
       - run: $GITHUB_WORKSPACE/storage/runtime-build/cli/drone navigation:simulate --scenario avoid-land
         working-directory: ${{ runner.temp }}
+      - run: $GITHUB_WORKSPACE/storage/runtime-build/cli/drone navigation:simulate --scenario replan
+        working-directory: ${{ runner.temp }}
       - run: $GITHUB_WORKSPACE/storage/runtime-build/cli/drone antenna:bench --scenario nominal --seconds 10
         working-directory: ${{ runner.temp }}
   firmware:

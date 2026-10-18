@@ -34,8 +34,9 @@ The public function returns mission and navigation traces; CLI output summarizes
 
 The mission remains a fixed-origin v1 reference. Navigation explicitly interprets its airborne goal
 as a horizontal goal plus a declared terrain clearance. The fixture uses a shallow plane D=-0.03N,
-1.2 m clearance and a landing site near the planned origin. These changes stay inside the mission's
-acceptance tolerance. This is not general terrain-aware mission graph compilation.
+1.2 m clearance and a landing site near the planned origin. The authored origin-relative survey
+waypoint is [5,0,-1.35], so mission acceptance and navigation agree on altitude. This is not general
+terrain-aware graph compilation.
 
 ## Constraints and planning
 

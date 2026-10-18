@@ -53,6 +53,14 @@ test('metric follow and orbit keep explicit identity and landing refuses unselec
   expect(() => navigationGoal({ mode: 'land', siteId: 'pad', expectedM: [2, 0, 0] }, o, map)).toThrow('site')
 })
 
+test('mission waypoint acceptance and terrain-clearance navigation share the same origin-relative goal', () => {
+  const run = simulateNavigation({ scenario: 'range-delay' })
+  const survey = run.trace.plan.tasks.find(t => t.kind === 'waypoint')!
+  if (survey.kind !== 'waypoint') throw new Error('Missing survey waypoint')
+  const goal = navigationGoal({ mode: 'route', goalM: survey.positionM, clearanceM: 1.2 }, observation(1100), map)
+  expect(Math.hypot(...goal.map((n, i) => n - survey.positionM[i]!))).toBeLessThan(0.001)
+})
+
 test('navigation faults latch on range loss, replay, authority takeover, origin changes and clock gaps', () => {
   const intent = { mode: 'route' as const, goalM: [5, 0, -1.2] as [number, number, number], clearanceM: 1.2 }
   for (const mutation of ['missing', 'replay', 'origin', 'clock', 'authority', 'stale'] as const) {
