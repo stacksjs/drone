@@ -13,8 +13,12 @@ function validatePose(pose: VehicleMeasurementPose, measurement: VehicleMeasurem
 /** Join acknowledged captures to recorded packets and owned capture poses. No physical image or global survey claim. */
 export function reduceSubseaInspection(pathInput: SubseaInspectionPathRow[], traceInput: VehicleMissionTrace, uncertaintyInput: SubseaInspectionUncertainty = subseaInspectionUncertainty) {
   if (!Array.isArray(pathInput) || pathInput.length > 9001) throw new RangeError('Inspection path exceeds recording bounds')
-  const trace = replayVehicleMission(traceInput).trace(), path = structuredClone(pathInput), uncertainty = structuredClone(uncertaintyInput)
-  if (trace.plan.vehicle !== 'subsea' || Object.keys(uncertainty).length !== 4 || !Object.values(uncertainty).every(n => Number.isFinite(n) && n >= 0) || uncertainty.positionSigmaM > 10 || uncertainty.attitudeSigmaRad > 0.5 || uncertainty.timeSigmaMs < 1 || uncertainty.timeSigmaMs > 100 || uncertainty.rangeSigmaM > 10) throw new RangeError('Invalid subsea inspection uncertainty or mission context')
+  const fields = ['positionSigmaM', 'attitudeSigmaRad', 'timeSigmaMs', 'rangeSigmaM']
+  if (!uncertaintyInput || typeof uncertaintyInput !== 'object' || Array.isArray(uncertaintyInput) || ![Object.prototype, null].includes(Object.getPrototypeOf(uncertaintyInput)) || Reflect.ownKeys(uncertaintyInput).length !== fields.length || Object.keys(uncertaintyInput).length !== fields.length || !fields.every(key => Object.prototype.hasOwnProperty.call(uncertaintyInput, key))) throw new RangeError('Invalid subsea inspection uncertainty declaration')
+  const uncertainty = structuredClone(uncertaintyInput)
+  if (!fields.every(key => { const value = uncertainty[key as keyof SubseaInspectionUncertainty]; return typeof value === 'number' && Number.isFinite(value) && value >= 0 }) || uncertainty.positionSigmaM > 10 || uncertainty.attitudeSigmaRad > 0.5 || uncertainty.timeSigmaMs < 1 || uncertainty.timeSigmaMs > 100 || uncertainty.rangeSigmaM > 10) throw new RangeError('Invalid subsea inspection uncertainty declaration')
+  const trace = replayVehicleMission(traceInput).trace(), path = structuredClone(pathInput)
+  if (trace.plan.vehicle !== 'subsea') throw new RangeError('Invalid subsea inspection mission context')
   const pending = new Map<string, VehiclePayloadCommand>(), used = new Set<string>()
   const captures = []
   for (const row of trace.rows) {

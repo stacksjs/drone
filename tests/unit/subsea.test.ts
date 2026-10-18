@@ -195,3 +195,18 @@ test('inspection cannot recover an intervening sensor or navigation loss into a 
     port.observe!(captureContext(command, 1060)); expect(port.poll(1060)!.outcome).toBe('uncertain')
   }
 })
+
+test('inspection export requires every named uncertainty bound on an owned nominal recording', () => {
+  const run = runVehicleSimulation(createSubseaProfile(), { seconds: 120 })
+  expect(run.status).toBe('completed')
+  const valid = { positionSigmaM: 0.1, attitudeSigmaRad: 0.02, timeSigmaMs: 2, rangeSigmaM: 0.05 }
+  const malformed: unknown[] = [null, [], [0.1, 0.02, 2, 0.05], 0, 'fixture', true, { a: 0, b: 0, c: 0, d: 0 }, { positionSigmaM: 0.1, attitudeSigmaRad: 0.02, timeSigmaMs: 2, wrongRange: 0.05 }, { ...valid, extra: 1 }]
+  for (const field of Object.keys(valid)) {
+    const missing = { ...valid } as Record<string, unknown>; delete missing[field]; malformed.push(missing)
+    for (const value of [undefined, null, '0.1', true, NaN, Infinity, -Infinity, -0.1]) malformed.push({ ...valid, [field]: value })
+  }
+  malformed.push({ ...valid, positionSigmaM: 10.1 }, { ...valid, attitudeSigmaRad: 0.51 }, { ...valid, timeSigmaMs: 0.9 }, { ...valid, timeSigmaMs: 101 }, { ...valid, rangeSigmaM: 10.1 })
+  for (const declaration of malformed) expect(() => reduceSubseaInspection(run.path, run.trace, declaration as typeof valid)).toThrow()
+  const artifact = reduceSubseaInspection(run.path, run.trace, valid)
+  expect(artifact.frames[0]!.uncertainty).toMatchObject(valid)
+})
