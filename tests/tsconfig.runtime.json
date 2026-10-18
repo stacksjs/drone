@@ -43,6 +43,9 @@
     "./unit/air.test.ts",
     "./unit/ground.test.ts",
     "./unit/surface.test.ts",
-    "./unit/mission-workspace.test.ts"
+    "./unit/mission-workspace.test.ts",
+    "./unit/subsea-controls.test.ts",
+    "./unit/subsea-navigation.test.ts",
+    "./unit/subsea.test.ts"
   ]
 }

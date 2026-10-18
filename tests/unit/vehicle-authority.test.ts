@@ -20,3 +20,17 @@ test('vehicle authority gates signed channels and independent expiry applies dec
   expect(board.snapshot().fault).toBe('output-lease-expired')
   expect(board.accept(frame, 1060)).toBe(false)
 })
+
+test('subsea authority explicitly accepts its water-surface datum and preserves the legacy datum gate', () => {
+  const water = observation()
+  water.estimate.localPosition!.altitudeDatum = 'LOCAL_WATER_SURFACE'
+  water.estimate.localPosition!.positionM = [0, 0, 0]
+  const fence = { radiusM: 8, minDownM: -0.1, maxDownM: 8 }
+  function arm(vehicle: 'subsea' | 'surface') {
+    const supervisor = createVehicleAuthoritySupervisor({ sessionId: 123n, bootId: 55n, vehicle, actuators, fence })
+    return supervisor.update(water, { version: 1, sessionId: 123n, bootId: 55n, epoch: 0, sequence: 0, issuedAtMs: 1000, action: 'arm' })
+  }
+  expect(arm('subsea').state).toBe('armed-idle')
+  expect(arm('surface').state).toBe('disarmed')
+  expect(arm('surface').reason).toBe('invalid-estimator-frame')
+})

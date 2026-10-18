@@ -21,6 +21,7 @@ export function runVehicleSimulation(profileInput: VehicleProfile, options: { sc
   const board = createVehicleOutputWatchdog({ bootId: 55n, sessionId: 123n, vehicle: profileInput.vehicle, actuators })
   const feed = createPhysicsSensorFeed(0), estimator = createEstimator({ origin: plan.origin, gravityCorrection: 'initialization-only' })
   const qualifier = createVehicleMeasurementQualifier(profileInput.vehicle)
+  const observedSensors = { imu: 0, gnss: 0 }, sensorSequences = { imu: 0, gnss: 0 }
   let truth = plant.snapshot(), mission = engine.snapshot()
   let estimate: EstimatorSnapshot = estimator.snapshot(0)
   let measurement: VehicleMeasurement | null = null, measurementPose: VehicleMeasurementPose | null = null
@@ -42,6 +43,10 @@ export function runVehicleSimulation(profileInput: VehicleProfile, options: { sc
       }
       feed.capture(truth, nowMs, faults.dropImu, profileInput.vehicle === 'subsea' || faults.dropPosition)
       const sensors = feed.advanceTo(nowMs)
+      for (const kind of ['imu', 'gnss'] as const) {
+        const sequence = sensors.sensors.find(sensor => sensor.kind === kind)?.observation?.sequence ?? 0
+        if (sequence > sensorSequences[kind]) { observedSensors[kind]++; sensorSequences[kind] = sequence }
+      }
       const baseEstimate = estimator.update(sensors)
       estimate = navigation ? navigation.update(baseEstimate, measurement, nowMs) : baseEstimate
       if (nowMs % 20 !== 0) continue
@@ -96,5 +101,5 @@ export function runVehicleSimulation(profileInput: VehicleProfile, options: { sc
     }
   }
   finally { payload?.close(); if (status !== 'host-lost') board.revoke() }
-  return { version: 1, evidence: 'owned-vehicle-physics-simulation' as const, physicalFlightEnabled: false as const, boardOutputsInhibited: true as const, vehicle: profileInput.vehicle, scenario, status, fault, mission, trace: engine.trace(), path, transitions, budget: { worstCaseMs, requiredWh }, authority: supervisor.snapshot(), board: board.snapshot(), finalTruthPositionM: [...truth.positionM] as SensorVector }
+  return { version: 1, evidence: 'owned-vehicle-physics-simulation' as const, physicalFlightEnabled: false as const, boardOutputsInhibited: true as const, vehicle: profileInput.vehicle, scenario, status, fault, navigationEvidence: { observedSensors, datum: estimate.localPosition?.altitudeDatum ?? null, quality: [...estimate.quality], localPositionHealthy: estimate.health.localPosition }, mission, trace: engine.trace(), path, transitions, budget: { worstCaseMs, requiredWh }, authority: supervisor.snapshot(), board: board.snapshot(), finalTruthPositionM: [...truth.positionM] as SensorVector }
 }
