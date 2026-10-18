@@ -37,6 +37,10 @@ import MappingSimulate from '../app/Commands/MappingSimulate'
 import VolumesDemo from '../app/Commands/VolumesDemo'
 import VolumesProcess from '../app/Commands/VolumesProcess'
 import VolumesImport from '../app/Commands/VolumesImport'
+import InspectionPlan from '../app/Commands/InspectionPlan'
+import InspectionSimulate from '../app/Commands/InspectionSimulate'
+import InspectionReview from '../app/Commands/InspectionReview'
+import InspectionCompare from '../app/Commands/InspectionCompare'
 
 const app = cli('drone')
 RuntimeBuild(app)
@@ -70,6 +74,10 @@ MappingSimulate(app)
 VolumesDemo(app)
 VolumesProcess(app)
 VolumesImport(app)
+InspectionPlan(app)
+InspectionSimulate(app)
+InspectionReview(app)
+InspectionCompare(app)
 app.help()
 app.version('0.1.0')
 try { await app.parse(process.argv) }

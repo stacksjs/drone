@@ -54,6 +54,9 @@
     "../resources/functions/drone/volumes/**/*.ts",
     "../resources/functions/artifacts/**/*.ts",
     "./unit/volumes-*.test.ts",
-    "./unit/completed-artifact.test.ts"
+    "./unit/completed-artifact.test.ts",
+    "../resources/functions/drone/inspection/**/*.ts",
+    "./unit/inspection-*.test.ts",
+    "./unit/modeled-camera.test.ts"
   ]
 }

@@ -1,0 +1,156 @@
+<script client>
+import type { InspectionCapture, InspectionComparison, InspectionReview, InspectionReviewInput, InspectionRun, InspectionScenario } from '../functions/drone/inspection/types'
+import { inspectionScenarios, simulateInspection } from '../functions/drone/inspection/runtime'
+import { compareInspectionVisits, createInspectionReview } from '../functions/drone/inspection/evidence'
+import { inspectionImagePreview } from '../functions/drone/inspection/presentation'
+const scenario = state<InspectionScenario>('nominal')
+const current = state<InspectionRun | null>(null)
+const baseline = state<InspectionRun | null>(null)
+const comparison = state<InspectionComparison | null>(null)
+const captureId = state('')
+const modality = state<'visible' | 'thermal'>('visible')
+const busy = state(false)
+const reviewBusy = state(false)
+const error = state('')
+const epoch = state(0)
+const reviews = state<InspectionReview[]>([])
+const reviewer = state('')
+const note = state('')
+const decision = state<InspectionReviewInput['decision']>('needs-follow-up')
+const pixelX = state(48)
+const pixelY = state(36)
+const frame = derived(() => current()?.captures.find(c => c.id === captureId()) ?? null)
+const beforeFrame = derived(() => baseline()?.captures.find(c => c.stationId === frame()?.stationId) ?? null)
+const preview = derived(() => frame() ? inspectionImagePreview(frame()!, modality()) : '')
+const beforePreview = derived(() => beforeFrame() ? inspectionImagePreview(beforeFrame()!, modality()) : '')
+const selectedReviews = derived(() => reviews().filter(review => review.visitId === current()?.visitId && review.captureId === frame()?.id))
+const baselineReviews = derived(() => reviews().filter(review => review.visitId === baseline()?.visitId && review.captureId === beforeFrame()?.id))
+const plot = derived(() => {
+  const run = current()
+  const point = (p: number[]) => `${180 + p[1]! * 65},${280 - p[0]! * 65}`
+  return { path: run?.path.filter(row => row.positionM !== null).map(row => point(row.positionM!)).join(' ') ?? '', stations: run?.plan.stations.map(station => ({ id: station.id, point: point(station.vehiclePositionM) })) ?? [], face: run ? `${point([run.plan.config.asset.centerM[0], run.plan.config.asset.centerM[1] - run.plan.config.asset.widthM / 2, 0])} ${point([run.plan.config.asset.centerM[0], run.plan.config.asset.centerM[1] + run.plan.config.asset.widthM / 2, 0])}` : '' }
+})
+function quantity(n: number | null | undefined, suffix = 'm') { return n === null || n === undefined ? 'unavailable' : `${n.toFixed(3)} ${suffix}` }
+function vector(values: number[]) { return values.map(n => n.toFixed(3)).join(', ') }
+function clear() { pending.stop(); epoch.update(n => n + 1); current.set(null); baseline.set(null); comparison.set(null); captureId.set(''); busy.set(false); reviewBusy.set(false); error.set(''); reviews.set([]); reviewer.set(''); note.set('') }
+const repeating = state(false)
+const pending = useTimeout(() => {
+  try {
+    const previous = current()
+    const run = simulateInspection({ scenario: repeating() ? 'wind' : scenario(), visitId: repeating() ? 'visit-repeat' : 'visit-baseline' })
+    if (repeating() && previous) { baseline.set(previous); comparison.set(compareInspectionVisits(previous, run)) }
+    current.set(run)
+    captureId.set(run.captures[0]?.id ?? '')
+  }
+  catch (failure) { error.set(failure instanceof Error ? failure.message : 'Inspection failed') }
+  finally { busy.set(false) }
+}, 32)
+pending.stop()
+onDestroy(() => { pending.stop(); epoch.update(n => n + 1) })
+effect(() => { scenario(); clear() })
+effect(() => { const selected = frame(); if (selected) { pixelX.set(selected.image.width / 2); pixelY.set(selected.image.height / 2) } })
+function execute() { clear(); repeating.set(false); busy.set(true); pending.start() }
+function repeatVisit() { if (!current() || baseline()) return; epoch.update(n => n + 1); error.set(''); repeating.set(true); busy.set(true); pending.start() }
+async function recordReview() {
+  const run = current(), selected = frame(), context = epoch()
+  if (!run || !selected || reviewBusy()) return
+  if (reviews().length >= 64) { error.set('This session has reached its 64 review limit'); return }
+  reviewBusy.set(true); error.set('')
+  try {
+    const review = await createInspectionReview(run, { id: `review-${reviews().length + 1}`, captureId: selected.id, reviewerId: reviewer(), reviewedAt: new Date().toISOString(), decision: decision(), modality: modality(), pixel: [Number(pixelX()), Number(pixelY())], note: note() })
+    if (epoch() === context && captureId() === selected.id) { reviews.update(records => [...records, review]); note.set('') }
+  }
+  catch (failure) { if (epoch() === context) error.set(failure instanceof Error ? failure.message : 'Review failed') }
+  finally { if (epoch() === context) reviewBusy.set(false) }
+}
+function temperature(capture: InspectionCapture | null) {
+  if (!capture || !Number.isInteger(Number(pixelX())) || !Number.isInteger(Number(pixelY()))) return 'unavailable'
+  const x = Number(pixelX()), y = Number(pixelY())
+  if (x < 0 || y < 0 || x >= capture.image.width || y >= capture.image.height) return 'unavailable'
+  const value = capture.image.thermalCentiKelvin[y * capture.image.width + x]
+  return value ? `${(value / 100 - 273.15).toFixed(2)} C (synthetic)` : 'background / nodata'
+}
+</script>
+<template>
+  <section aria-labelledby="inspection-title" :aria-busy="busy()">
+    <h1 id="inspection-title" class="font-semibold text-3xl tracking-tight">Asset inspection</h1>
+    <p class="mt-3 max-w-3xl leading-relaxed text-neutral-400">Repeat a bridge-face route, inspect capture geometry and attach an operator observation to the asset.</p>
+    <p class="mt-3 text-emerald-200 text-sm">Owned physics and synthetic images. Physical inspection, thermal calibration and defect verification remain unqualified.</p>
+    <div class="flex flex-wrap gap-4 items-end mt-8">
+      <div class="min-w-0"><label for="inspection-scenario" class="block mb-2 text-sm">Inspection scenario</label><select id="inspection-scenario" x-model="scenario" class="px-3 py-3 max-w-full text-neutral-100 bg-neutral-900 border border-neutral-600 rounded focus-visible:outline-emerald-200"><option :for="name in inspectionScenarios" :value="name">{{ name }}</option></select></div>
+      <button type="button" @click="execute()" :disabled="busy()" class="px-4 py-3 font-medium text-neutral-950 bg-emerald-200 rounded focus-visible:outline-emerald-200 focus-visible:outline-offset-4 disabled:opacity-50">{{ busy() ? 'Running…' : 'Run inspection' }}</button>
+      <button type="button" @click="clear()" class="px-4 py-3 text-sm border border-neutral-600 rounded focus-visible:outline-emerald-200 focus-visible:outline-offset-4">Clear inspection</button>
+    </div>
+    <p :if="busy()" role="status" class="mt-5 text-emerald-200 text-sm">Running the owned sensor, estimator, mission, authority and capture sequence.</p>
+    <p :if="error()" role="alert" class="mt-5 p-4 break-words text-red-200 border border-red-400 rounded">{{ error() }}</p>
+    <p :if="!current() && !busy()" class="mt-7 py-5 text-neutral-400 border-neutral-700 border-t">No inspection yet. Choose a scenario to inspect its route and capture evidence.</p>
+    <div :if="current()" class="mt-9">
+      <div class="grid gap-8 lg:grid-cols-2">
+        <div class="min-w-0">
+          <h2 class="font-semibold text-lg">Visit and clearance</h2>
+          <p class="mt-3 break-words font-mono text-emerald-200 text-sm" data-inspection-status>{{ current()?.status }} / {{ current()?.reason }}</p>
+          <dl class="grid gap-5 grid-cols-2 mt-5 text-sm">
+            <div><dt class="text-neutral-400">Visit</dt><dd class="mt-2 break-words">{{ current()?.visitId }}</dd></div>
+            <div><dt class="text-neutral-400">Confirmed captures</dt><dd class="mt-2 font-mono" data-inspection-captures>{{ current()?.captures.length }}</dd></div>
+            <div><dt class="text-neutral-400">Modeled body-to-face clearance</dt><dd class="mt-2 font-mono">{{ quantity(current()?.minimumObservedSeparationM) }}</dd></div>
+            <div><dt class="text-neutral-400">Inflated planned clearance</dt><dd class="mt-2 font-mono">{{ quantity(current()?.plan.inflatedClearanceM) }}</dd></div>
+            <div><dt class="text-neutral-400">Independent modeled board</dt><dd class="mt-2">{{ current()?.boardNeutral ? 'neutral' : 'not neutral' }}</dd></div>
+            <div><dt class="text-neutral-400">Asset revision</dt><dd class="mt-2 break-words">{{ current()?.plan.config.asset.revision }}</dd></div>
+          </dl>
+          <p class="mt-4 leading-relaxed text-neutral-400 text-xs">A south-facing vertical bridge face uses U=east and V=up in a fixed LOCAL_NED frame. The route remains outside its inflated clearance. Abort releases modeled thrust; it is not an emergency landing.</p>
+          <details class="mt-6"><summary class="text-sm focus-visible:outline-emerald-200 cursor-pointer">Planning and registration assumptions</summary><ul class="mt-3 space-y-2 text-neutral-400 text-xs"><li :for="assumption in current()?.plan.assumptions ?? []">{{ assumption }}</li></ul></details>
+        </div>
+        <div class="min-w-0">
+          <h2 class="font-semibold text-lg">Estimated route and asset stations</h2>
+          <svg width="360" height="320" viewBox="0 0 360 320" role="img" aria-label="North-up route map showing estimated vehicle positions, asset face and planned inspection stations" class="mt-4 w-full bg-neutral-900 border border-neutral-700 rounded"><text x="180" y="20" text-anchor="middle" fill="#a3a3a3" font-size="11">North</text><text x="338" y="280" fill="#a3a3a3" font-size="11">East</text><polyline :points="plot().face" fill="none" stroke="#e5e5e5" stroke-width="5"/><polyline :points="plot().path" fill="none" stroke="#6ee7b7" stroke-width="1.5"/><g :for="station in plot().stations"><circle :cx="station.point.split(',')[0]" :cy="station.point.split(',')[1]" r="4" fill="#a7f3d0"/><title>{{ station.id }}</title></g></svg>
+          <p class="mt-2 leading-relaxed text-neutral-400 text-xs">The white line is the bridge face. Green follows estimated positions; station marks show planned vehicle positions. Clearance decisions use fresh range observations and qualified estimator pose.</p>
+        </div>
+      </div>
+      <section :if="current()?.captures.length" aria-labelledby="inspection-images" class="mt-9 pt-6 border-neutral-700 border-t">
+        <h2 id="inspection-images" class="font-semibold text-lg">Capture evidence</h2>
+        <div class="flex flex-wrap gap-4 items-end mt-5">
+          <div class="min-w-0"><label for="inspection-capture" class="block mb-2 text-sm">Confirmed capture</label><select id="inspection-capture" x-model="captureId" class="px-3 py-3 max-w-full text-neutral-100 bg-neutral-900 border border-neutral-600 rounded focus-visible:outline-emerald-200"><option :for="capture in current()?.captures ?? []" :value="capture.id">{{ capture.stationId }} / {{ capture.id }}</option></select></div>
+          <div><label for="inspection-modality" class="block mb-2 text-sm">Image modality</label><select id="inspection-modality" x-model="modality" class="px-3 py-3 text-neutral-100 bg-neutral-900 border border-neutral-600 rounded focus-visible:outline-emerald-200"><option value="visible">Visible</option><option value="thermal">Synthetic thermal</option></select></div>
+        </div>
+        <div class="grid gap-6 mt-5" :class="beforeFrame() ? 'lg:grid-cols-2' : ''">
+          <figure :if="beforeFrame()" class="min-w-0"><figcaption class="mb-3 text-sm">Baseline visit / {{ beforeFrame()?.stationId }}</figcaption><img :src="beforePreview()" :width="beforeFrame()?.image.width" :height="beforeFrame()?.image.height" alt="Actual baseline pixels from the selected synthetic inspection capture" class="w-full bg-neutral-900 border border-neutral-700 rounded [image-rendering:pixelated]"><p :for="review in baselineReviews()" class="mt-3 break-words text-neutral-300 text-sm">Baseline observation: {{ review.decision }} / {{ review.note }}</p></figure>
+          <figure class="min-w-0"><figcaption class="mb-3 text-sm">{{ current()?.visitId }} / {{ frame()?.stationId }}</figcaption><svg :width="frame()?.image.width" :height="frame()?.image.height" :viewBox="'0 0 ' + frame()?.image.width + ' ' + frame()?.image.height" role="img" aria-label="Actual selected inspection capture with the proposed annotation pixel" class="w-full bg-neutral-900 border border-neutral-700 rounded [image-rendering:pixelated]"><image :href="preview()" :width="frame()?.image.width" :height="frame()?.image.height"/><circle :cx="Number(pixelX()) + 0.5" :cy="Number(pixelY()) + 0.5" r="1.6" fill="none" stroke="#ffffff" stroke-width="0.4"/></svg></figure>
+        </div>
+        <p class="mt-3 leading-relaxed text-neutral-400 text-xs">Visible pixels and ideal synthetic temperatures come from ray intersections with the modeled face. Thermal colour uses a fixed 20..40 C scale; grey is background/nodata. Emissivity, reflections, atmosphere and instrument calibration are unmodeled.</p>
+        <dl class="grid gap-5 sm:grid-cols-3 mt-5 text-sm">
+          <div><dt class="text-neutral-400">Capture / ACK time</dt><dd class="mt-1 font-mono">{{ frame()?.capturedAtMs }} / {{ frame()?.acknowledgedAtMs }} ms</dd></div>
+          <div><dt class="text-neutral-400">Capture qualification</dt><dd class="mt-1" data-inspection-quality>{{ frame()?.quality.qualified ? 'qualified simulation capture' : 'unqualified capture' }}</dd></div>
+          <div><dt class="text-neutral-400">GSD / motion blur</dt><dd class="mt-1">{{ quantity(frame()?.quality.gsdM, 'm/px') }} / {{ quantity(frame()?.quality.blurPx, 'px') }}</dd></div>
+          <div><dt class="text-neutral-400">Position sigma</dt><dd class="mt-1">{{ quantity(frame()?.positionSigmaM) }}</dd></div>
+          <div><dt class="text-neutral-400">View incidence</dt><dd class="mt-1">{{ quantity(frame()?.quality.viewIncidenceRad, 'rad') }}</dd></div>
+          <div><dt class="text-neutral-400">Selected model temperature</dt><dd class="mt-1" data-inspection-temperature>{{ temperature(frame()) }}</dd></div>
+        </dl>
+        <p class="mt-4 break-all font-mono text-neutral-400 text-xs">Capture reference: {{ frame()?.pose.reference }}. Position source {{ frame()?.pose.positionCapturedAtMs }} ms; attitude/gyro source {{ frame()?.pose.attitudeCapturedAtMs }} / {{ frame()?.pose.gyroCapturedAtMs }} ms.</p>
+      </section>
+      <section :if="frame()" aria-labelledby="inspection-review" class="mt-9 pt-6 border-neutral-700 border-t">
+        <h2 id="inspection-review" class="font-semibold text-lg">Operator observation</h2>
+        <p class="mt-3 max-w-3xl leading-relaxed text-neutral-400 text-sm">Choose a pixel on the bridge face and record your observation. Reviews bind the source bytes, capture pose and asset point. Identity and physical defects are not authenticated.</p>
+        <form @submit.prevent="recordReview()" class="grid gap-5 sm:grid-cols-2 mt-5">
+          <div class="min-w-0"><label for="inspection-reviewer" class="block mb-2 text-sm">Reviewer identity</label><input id="inspection-reviewer" x-model="reviewer" required maxlength="80" class="px-3 py-3 w-full bg-neutral-900 border border-neutral-600 rounded focus-visible:outline-emerald-200"></div>
+          <div><label for="inspection-decision" class="block mb-2 text-sm">Observation</label><select id="inspection-decision" x-model="decision" class="px-3 py-3 w-full text-neutral-100 bg-neutral-900 border border-neutral-600 rounded focus-visible:outline-emerald-200"><option value="needs-follow-up">Needs follow-up</option><option value="suspected-defect">Suspected defect</option><option value="no-defect-observed">No defect observed</option></select></div>
+          <div><label for="inspection-pixel-x" class="block mb-2 text-sm">Output pixel x</label><input id="inspection-pixel-x" x-model="pixelX" type="number" min="0" :max="(frame()?.image.width ?? 1) - 1" step="1" required class="px-3 py-3 w-full bg-neutral-900 border border-neutral-600 rounded focus-visible:outline-emerald-200"></div>
+          <div><label for="inspection-pixel-y" class="block mb-2 text-sm">Output pixel y</label><input id="inspection-pixel-y" x-model="pixelY" type="number" min="0" :max="(frame()?.image.height ?? 1) - 1" step="1" required class="px-3 py-3 w-full bg-neutral-900 border border-neutral-600 rounded focus-visible:outline-emerald-200"></div>
+          <div class="sm:col-span-2"><label for="inspection-note" class="block mb-2 text-sm">Observation note</label><textarea id="inspection-note" x-model="note" required maxlength="1000" rows="3" class="px-3 py-3 w-full bg-neutral-900 border border-neutral-600 rounded focus-visible:outline-emerald-200"></textarea></div>
+          <button type="submit" :disabled="busy() || reviewBusy()" class="justify-self-start px-4 py-3 font-medium text-neutral-950 bg-emerald-200 rounded focus-visible:outline-emerald-200 focus-visible:outline-offset-4 disabled:opacity-50">{{ reviewBusy() ? 'Binding review…' : 'Record operator review' }}</button>
+        </form>
+        <p :if="!selectedReviews().length" class="mt-5 text-neutral-400 text-sm">No operator review recorded for this capture.</p>
+        <ol class="mt-5 space-y-5"><li :for="review in selectedReviews()" class="pl-4 border-l border-neutral-600"><p class="break-words text-sm" data-inspection-review>{{ review.decision }} / {{ review.reviewerId }}</p><p class="mt-2 break-words text-neutral-300 text-sm">{{ review.note }}</p><p class="mt-2 text-neutral-400 text-xs">Asset U/V: {{ vector(review.assetUvM) }} m. {{ review.modality }} pixel {{ review.pixel.join(', ') }}.</p><p class="mt-2 break-all font-mono text-neutral-400 text-xs">{{ review.captureSha256 }}</p></li></ol>
+        <p class="mt-4 leading-relaxed text-neutral-400 text-xs">Workspace reviews stay in this analysis session. Use native inspection:review for a new private dataset with retained review records.</p>
+      </section>
+      <section aria-labelledby="inspection-repeat" class="mt-9 pt-6 border-neutral-700 border-t">
+        <h2 id="inspection-repeat" class="font-semibold text-lg">Repeat-visit comparability</h2>
+        <p class="mt-3 max-w-3xl leading-relaxed text-neutral-400 text-sm">Run a second visit with modeled wind and compare the same asset stations. Pose, view angle, uncertainty and GSD determine comparability. Image differences do not establish deterioration.</p>
+        <button type="button" @click="repeatVisit()" :disabled="busy() || !!baseline() || current()?.status !== 'completed'" class="mt-5 px-4 py-3 text-sm border border-neutral-600 rounded focus-visible:outline-emerald-200 focus-visible:outline-offset-4 disabled:opacity-40">Run repeat visit</button>
+        <p :if="comparison()" class="mt-4 text-emerald-200 text-sm" data-inspection-comparison>{{ comparison()?.status }} / {{ comparison()?.pairs.filter(pair => pair.comparable).length }} comparable station pairs</p>
+        <div :if="comparison()" class="overflow-x-auto mt-5 max-w-full border border-neutral-700 rounded" tabindex="0" role="region" aria-label="Scrollable repeat-visit comparison"><table class="w-full text-left text-xs whitespace-nowrap"><caption class="sr-only">Asset station capture geometry and declared uncertainty between visits</caption><thead class="bg-neutral-900"><tr><th scope="col" class="p-3">Station</th><th scope="col" class="p-3">Comparable</th><th scope="col" class="p-3">Offset upper m</th><th scope="col" class="p-3">View angle upper rad</th><th scope="col" class="p-3">GSD ratio</th></tr></thead><tbody><tr :for="pair in comparison()?.pairs ?? []" class="border-neutral-800 border-t"><th scope="row" class="p-3 font-normal">{{ pair.stationId }}</th><td class="p-3">{{ pair.comparable ? 'yes' : pair.reasons.join(', ') }}</td><td class="p-3 font-mono">{{ pair.cameraOffsetUpperM.toFixed(3) }}</td><td class="p-3 font-mono">{{ pair.viewAngleUpperRad.toFixed(3) }}</td><td class="p-3 font-mono">{{ pair.gsdRatio.toFixed(3) }}</td></tr></tbody></table></div>
+        <p :if="comparison()?.missingStations.length" class="mt-3 break-words text-neutral-400 text-sm">Missing station captures: {{ comparison()?.missingStations.join(', ') }}</p>
+      </section>
+      <a href="https://github.com/stacksjs/drone/issues/20" class="inline-block mt-8 text-emerald-200 text-sm underline underline-offset-4">Inspection scope and remaining acceptance</a>
+    </div>
+  </section>
+</template>

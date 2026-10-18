@@ -101,6 +101,20 @@ it keeps acquisition, reconstruction and measurement separate.
 Read the [numeric import, integration and audit contract](docs/volumes.md). Examples are synthetic;
 physical surveyed accuracy, raw-point meshing and richer format adapters remain unverified.
 
+## Asset-relative inspection
+
+Open `/inspection` for a bridge-face route with capture-bound visible/synthetic thermal images,
+camera quality, explicit operator observations and repeat-visit geometry comparison.
+
+```sh
+./buddy inspection:plan examples/inspection.json
+./buddy inspection:simulate --scenario nominal --visit before --output /tmp/new-inspection
+```
+
+The [inspection contract](docs/inspection.md) separates owned simulation, declared review and
+physical defect evidence. Measured asset registration and visible/thermal hardware acceptance
+remain open.
+
 ## Camera and payload adapters
 
 Issue #8 adds an owned Pi AI Camera still adapter, bounded command/ACK and clock synchronization,

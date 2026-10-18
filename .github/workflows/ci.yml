@@ -94,6 +94,18 @@ jobs:
         working-directory: ${{ runner.temp }}
       - run: $GITHUB_WORKSPACE/storage/runtime-build/cli/drone volumes:import "$GITHUB_WORKSPACE/examples/stockpile/surface.asc" --format asc --metadata "$GITHUB_WORKSPACE/examples/stockpile/metadata.json" --measurement "$GITHUB_WORKSPACE/examples/stockpile/measurement.json" --output "$RUNNER_TEMP/volume-grid"
         working-directory: ${{ runner.temp }}
+      - run: $GITHUB_WORKSPACE/storage/runtime-build/cli/drone inspection:plan "$GITHUB_WORKSPACE/examples/inspection.json"
+        working-directory: ${{ runner.temp }}
+      - run: $GITHUB_WORKSPACE/storage/runtime-build/cli/drone inspection:simulate --visit before --output "$RUNNER_TEMP/inspection-before"
+        working-directory: ${{ runner.temp }}
+      - run: $GITHUB_WORKSPACE/storage/runtime-build/cli/drone inspection:simulate --scenario wind --visit after --output "$RUNNER_TEMP/inspection-after"
+        working-directory: ${{ runner.temp }}
+      - run: $GITHUB_WORKSPACE/storage/runtime-build/cli/drone inspection:compare "$RUNNER_TEMP/inspection-before/recording.json" "$RUNNER_TEMP/inspection-after/recording.json"
+        working-directory: ${{ runner.temp }}
+      - run: $GITHUB_WORKSPACE/storage/runtime-build/cli/drone inspection:review "$RUNNER_TEMP/inspection-before/recording.json" --id ci-review --capture capture-0001 --reviewer ci-operator --reviewed-at 2026-10-18T12:00:00.000Z --decision needs-follow-up --modality thermal --x 48 --y 36 --note "Synthetic CI declaration, no human defect verification" --output "$RUNNER_TEMP/inspection-reviewed"
+        working-directory: ${{ runner.temp }}
+      - run: $GITHUB_WORKSPACE/storage/runtime-build/cli/drone inspection:simulate --scenario structure-motion
+        working-directory: ${{ runner.temp }}
   firmware:
     runs-on: ubuntu-latest
     steps:

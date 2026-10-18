@@ -127,6 +127,28 @@ declare global {
   const zero: typeof autoImports.zero
   const finiteVector: typeof autoImports.finiteVector
   const horizontalDistance: typeof autoImports.horizontalDistance
+  const renderInspectionImage: typeof autoImports.renderInspectionImage
+  const renderInspectionRange: typeof autoImports.renderInspectionRange
+  const inspectCaptureQuality: typeof autoImports.inspectCaptureQuality
+  const createInspectionReview: typeof autoImports.createInspectionReview
+  const validateInspectionReview: typeof autoImports.validateInspectionReview
+  const validateInspectionReviews: typeof autoImports.validateInspectionReviews
+  const validateInspectionRun: typeof autoImports.validateInspectionRun
+  const inspectionRecordingJson: typeof autoImports.inspectionRecordingJson
+  const parseInspectionRecording: typeof autoImports.parseInspectionRecording
+  const compareInspectionVisits: typeof autoImports.compareInspectionVisits
+  const inspectionEvidenceLimits: typeof autoImports.inspectionEvidenceLimits
+  const writeInspectionDataset: typeof autoImports.writeInspectionDataset
+  const exampleInspectionConfig: typeof autoImports.exampleInspectionConfig
+  const inspectionRotate: typeof autoImports.inspectionRotate
+  const inspectionAssetPoint: typeof autoImports.inspectionAssetPoint
+  const inspectionSegmentSeparation: typeof autoImports.inspectionSegmentSeparation
+  const inspectionProjector: typeof autoImports.inspectionProjector
+  const projectInspectionPixel: typeof autoImports.projectInspectionPixel
+  const createInspectionPlan: typeof autoImports.createInspectionPlan
+  const inspectionImagePreview: typeof autoImports.inspectionImagePreview
+  const simulateInspection: typeof autoImports.simulateInspection
+  const inspectionScenarios: typeof autoImports.inspectionScenarios
   const surveyWorldColour: typeof autoImports.surveyWorldColour
   const renderSurveyImage: typeof autoImports.renderSurveyImage
   const createSurveyCamera: typeof autoImports.createSurveyCamera
@@ -192,6 +214,7 @@ declare global {
   const createPayloadCaptureSession: typeof autoImports.createPayloadCaptureSession
   const validatePayloadBus: typeof autoImports.validatePayloadBus
   const payloadInventory: typeof autoImports.payloadInventory
+  const createModeledCamera: typeof autoImports.createModeledCamera
   const openPiAiCameraPayload: typeof autoImports.openPiAiCameraPayload
   const createPayloadPoseTimeline: typeof autoImports.createPayloadPoseTimeline
   const openCameraPayloadProcess: typeof autoImports.openCameraPayloadProcess

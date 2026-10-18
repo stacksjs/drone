@@ -55,6 +55,11 @@ companion application and simulator, not a native board autopilot.
 
 ## Sequence
 
+Asset-relative bridge inspection now uses the owned mission/control loop, measured modeled range
+registration, visible/synthetic thermal pixels, explicit operator reviews and repeat-visit geometry.
+Physical asset/camera/thermal qualification and richer assets remain in
+[#20](https://github.com/stacksjs/drone/issues/20).
+
 Known-surface processing now integrates numeric TIN and cell-grid products with explicit boundary,
 base, coverage, cut/fill, provenance and conditional uncertainty. Native import/export and a stx
 audit workspace are implemented. Independent physical survey qualification, raw-point meshing and

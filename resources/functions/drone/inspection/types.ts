@@ -121,6 +121,7 @@ export interface InspectionRun {
   reason: string
   captures: InspectionCapture[]
   boardNeutral: boolean
+  /** Independent modeled plant body-to-face normal clearance after subtracting body radius; not policy range. */
   minimumObservedSeparationM: number | null
   path: { atMs: number, positionM: SensorVector | null, targetM: SensorVector | null, taskId: string, state: string }[]
 }
