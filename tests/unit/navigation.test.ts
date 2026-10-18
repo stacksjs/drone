@@ -53,6 +53,24 @@ test('metric follow and orbit keep explicit identity and landing refuses unselec
   expect(() => navigationGoal({ mode: 'land', siteId: 'pad', expectedM: [2, 0, 0] }, o, map)).toThrow('site')
 })
 
+test('metric follow and orbit preserve an upstream target expiry through retained navigation calls', () => {
+  const target = { id: 'selected', reference: map.reference, positionM: [4, 2, -1] as [number, number, number], capturedAtMs: 1000, validUntilMs: 1197 }
+  const intents = [
+    { mode: 'follow' as const, targetId: 'selected', offsetM: [-2, 0, 0] as [number, number, number], clearanceM: 1.2 },
+    { mode: 'orbit' as const, targetId: 'selected', radiusM: 2, radiansPerSecond: 0.2, phaseRad: 0, startedAtMs: 1100, clearanceM: 1.2 },
+  ]
+  for (const intent of intents) {
+    expect(() => navigationGoal(intent, observation(1197), map, target)).not.toThrow()
+    expect(() => navigationGoal(intent, observation(1198), map, target)).toThrow('lost')
+    for (const validUntilMs of [NaN, Infinity, 999, 1201, null])
+      expect(() => navigationGoal(intent, observation(1100), map, { ...target, validUntilMs: validUntilMs as number })).toThrow('lost')
+    const { validUntilMs, ...legacy } = target
+    expect(validUntilMs).toBe(1197)
+    expect(() => navigationGoal(intent, observation(1200), map, legacy)).not.toThrow()
+    expect(() => navigationGoal(intent, observation(1201), map, legacy)).toThrow('lost')
+  }
+})
+
 test('mission waypoint acceptance and terrain-clearance navigation share the same origin-relative goal', () => {
   const run = simulateNavigation({ scenario: 'range-delay' })
   const waypoints = run.trace.plan.tasks.filter(t => t.kind === 'waypoint')

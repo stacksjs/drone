@@ -90,6 +90,8 @@ export interface VisionMetricObservation {
   reference: string
   capturedAtMs: number
   receivedAtMs: number
+  /** Inclusive local monotonic expiry preserving all capture clocks and the calibration age budget. */
+  validUntilMs: number
   positionM: SensorVector
   /** Isotropic covariance upper bound, including shared pose/calibration and timing assumptions. */
   sigmaM: number
@@ -125,7 +127,7 @@ export interface VisionFusionSnapshot {
   state: 'unpaired' | 'paired' | 'tracking' | 'lost'
   reason: string
   pairing: VisionPairing | null
-  target: { id: string, reference: string, positionM: SensorVector, capturedAtMs: number, sigmaM: number } | null
+  target: { id: string, reference: string, positionM: SensorVector, capturedAtMs: number, validUntilMs: number, sigmaM: number } | null
   innovationM: number | null
   physicalFlightEnabled: false
 }

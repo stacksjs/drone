@@ -2,6 +2,11 @@ import type { VisionMetricObservation, VisionPairing, VisionTargetFix } from '..
 import { expect, test } from 'bun:test'
 import { createVisualTracker } from '../../resources/functions/drone/camera/tracker'
 import { createVisionTargetFusion } from '../../resources/functions/drone/vision/fusion'
+import { createVisionLocalizer } from '../../resources/functions/drone/vision/geometry'
+import { exampleVisionCalibration, exampleVisionValidation } from '../../resources/functions/drone/vision/fixtures'
+import { navigationGoal } from '../../resources/functions/drone/navigation/navigator'
+import type { NavigationMap } from '../../resources/functions/drone/navigation/perception'
+import type { MissionObservation } from '../../resources/functions/drone/missions/engine'
 
 function person(x = 0.3) {
   return { label: 'person' as const, confidence: 0.95, box: { x, y: 0.2, width: 0.2, height: 0.5 } }
@@ -20,7 +25,7 @@ function selected() {
   const vision: VisionMetricObservation = {
     evidence: 'synthetic', calibrationId: pairing.calibrationId, cameraSessionId: pairing.cameraSessionId, lockId: pairing.lockId,
     candidateId: tracking.association!.candidateId, frameSequence: 3, depthSourceId: pairing.depthSourceId, depthSequence: 10,
-    reference: pairing.reference, capturedAtMs: 120, receivedAtMs: 120, positionM: [10, 0, 0], sigmaM: 0.1, physicalFlightEnabled: false,
+    reference: pairing.reference, capturedAtMs: 120, receivedAtMs: 120, validUntilMs: 320, positionM: [10, 0, 0], sigmaM: 0.1, physicalFlightEnabled: false,
   }
   const fix: VisionTargetFix = {
     evidence: 'synthetic', sourceId: pairing.targetSourceId, sessionId: pairing.targetSessionId, targetId: pairing.targetId,
@@ -115,6 +120,9 @@ test('a paired output requires exact scope, evidence, detection, reference and f
     f => { f.vision.depthSourceId = 'nearest-obstacle' }, f => { f.vision.lockId = 'other-lock' },
     f => { f.vision.candidateId = 'other-person' }, f => { f.vision.frameSequence = 2 },
     f => { f.vision.capturedAtMs = 119 }, f => { f.vision.receivedAtMs = 121 },
+    f => { f.vision.validUntilMs = NaN }, f => { f.vision.validUntilMs = Infinity },
+    f => { f.vision.validUntilMs = 119 }, f => { f.vision.validUntilMs = 321 },
+    f => { delete (f.vision as Partial<VisionMetricObservation>).validUntilMs },
     f => { f.vision.reference = 'other-origin' }, f => { f.fix.reference = 'other-origin' },
     f => { f.fix.sourceId = 'other-gnss' }, f => { f.fix.sessionId = 'restarted-gnss' },
     f => { f.fix.targetId = 'other-person' }, f => { f.fix.capturedAtMs = 121 },
@@ -148,7 +156,7 @@ test('a paired output requires exact scope, evidence, detection, reference and f
 
 function advance(f: ReturnType<typeof selected>, capturedAtMs = 130) {
   f.tracking = f.tracker.update({ sequence: 4, capturedAtMs, receivedAtMs: capturedAtMs, detections: [person()] }, capturedAtMs)
-  f.vision = { ...f.vision, frameSequence: 4, candidateId: '4:0', depthSequence: 11, capturedAtMs, receivedAtMs: capturedAtMs }
+  f.vision = { ...f.vision, frameSequence: 4, candidateId: '4:0', depthSequence: 11, capturedAtMs, receivedAtMs: capturedAtMs, validUntilMs: capturedAtMs + 200 }
   f.fix = { ...f.fix, sequence: 21, capturedAtMs, receivedAtMs: capturedAtMs }
 }
 
@@ -163,6 +171,43 @@ test('retained packets are idempotent and never refresh capture time or shrink u
   expect(f.fusion.step({ nowMs: 321, tracking: f.tracking, vision: f.vision, fix: f.fix }).target).toBeNull()
 })
 
+test('retained localized observations expire at the full calibration budget and never revive', () => {
+  for (const fixture of [
+    { maxAgeMs: 200, depthCaptureMs: 1000, poseCaptureMs: 1000, expiryMs: 1197 },
+    { maxAgeMs: 80, depthCaptureMs: 999, poseCaptureMs: 998, expiryMs: 1075 },
+  ]) {
+    const tracker = createVisualTracker()
+    tracker.update({ sequence: 1, capturedAtMs: 980, receivedAtMs: 980, detections: [person()] }, 980)
+    tracker.select('1:0', 1, 980)
+    tracker.update({ sequence: 2, capturedAtMs: 990, receivedAtMs: 990, detections: [person()] }, 990)
+    const tracking = tracker.update({ sequence: 3, capturedAtMs: 1000, receivedAtMs: 1005, detections: [person()] }, 1010)
+    const calibration = exampleVisionCalibration(); calibration.timing.maxAgeMs = fixture.maxAgeMs
+    const vision = createVisionLocalizer(calibration, exampleVisionValidation()).localize({
+      nowMs: 1010, tracking,
+      camera: { cameraId: calibration.cameraId, sessionId: 'camera-session', modeId: calibration.modeId, frameSequence: 3, capturedAtMs: 1000, receivedAtMs: 1005 },
+      depth: { evidence: 'synthetic', sourceId: 'registered-depth', sequence: 8, calibrationId: calibration.id, cameraSessionId: 'camera-session', frameSequence: 3, candidateId: '3:0', capturedAtMs: fixture.depthCaptureMs, receivedAtMs: 1006, pixel: [256, 216], opticalDepthM: 4, sigmaM: 0.03, clockUncertaintyMs: 1 },
+      pose: { evidence: 'synthetic', reference: 'fixed-ned-origin', capturedAtMs: fixture.poseCaptureMs, positionM: [0, 0, -1.2], quaternionWxyz: [1, 0, 0, 0], positionSigmaM: 0.03, attitudeSigmaRad: 0.002, clockUncertaintyMs: 1, headingAlignment: 'initial-simulation-north' },
+    })
+    const f = selected()
+    const pairing = { ...f.pairing, lockId: tracking.selected!.id, calibrationId: calibration.id, visualToTargetOffsetM: [0, 0, 0] as [number, number, number] }
+    const fix = { ...f.fix, capturedAtMs: 1000, receivedAtMs: 1006, positionM: [...vision.positionM] as [number, number, number] }
+    f.fusion.pair(pairing, tracking, 1010)
+    expect(f.fusion.step({ nowMs: 1010, tracking, vision, fix }).state).toBe('tracking')
+    const boundary = f.fusion.step({ nowMs: fixture.expiryMs, tracking, vision, fix })
+    expect(boundary.state).toBe('tracking')
+    expect(boundary.target!.validUntilMs).toBe(fixture.expiryMs)
+    const map: NavigationMap = { version: 1, evidence: 'modeled-range', sequence: 1, reference: pairing.reference, capturedAtMs: 1000, receivedAtMs: 1006, latencyMs: 6, clockUncertaintyMs: 1, uncertaintyM: 0.045, coverage: { centerM: [0, 0, -1.2], radiusM: 8 }, obstacles: [], terrain: { northSlope: 0, eastSlope: 0, downAtOriginM: 0 }, landing: null }
+    const mission: MissionObservation = { kind: 'simulation', nowMs: fixture.expiryMs, reference: pairing.reference, origin: { latitudeDeg: 0, longitudeDeg: 0, ellipsoidHeightM: 100 }, healthy: true, positionM: [0, 0, -1.2], velocityMps: [0, 0, 0], authority: 'autonomous', batteryPercent: 90, onGround: false }
+    const intent = { mode: 'follow' as const, targetId: pairing.targetId, offsetM: [-2, 0, 0] as [number, number, number], clearanceM: 1.2 }
+    expect(() => navigationGoal(intent, mission, map, boundary.target!)).not.toThrow()
+    expect(() => navigationGoal(intent, { ...mission, nowMs: fixture.expiryMs + 1 }, map, boundary.target!)).toThrow('lost')
+    const lost = f.fusion.step({ nowMs: fixture.expiryMs + 1, tracking, vision, fix })
+    expect(lost.state).toBe('lost')
+    expect(lost.target).toBeNull()
+    expect(f.fusion.step({ nowMs: fixture.expiryMs + 1, tracking, vision: { ...vision, validUntilMs: fixture.expiryMs + 1 }, fix }).target).toBeNull()
+  }
+})
+
 test('altered retained packets, replay and changed evidence latch loss', () => {
   const changes: ((f: ReturnType<typeof selected>) => void)[] = [
     f => { f.fix.positionM[0] += 0.01 },
@@ -170,6 +215,7 @@ test('altered retained packets, replay and changed evidence latch loss', () => {
     f => { f.vision.positionM[0] += 0.01 },
     f => { f.vision.receivedAtMs = 121 },
     f => { f.vision.depthSequence++ },
+    f => { f.vision.validUntilMs-- },
     f => { f.tracking.selected!.box.x += 0.001; f.tracking.candidates[0]!.box.x += 0.001; f.tracking.observation!.horizontalError += 0.002 },
     f => { advance(f); f.vision.depthSequence = 10 },
     f => { advance(f); f.vision.depthSequence = 9 },
@@ -221,7 +267,7 @@ test('camera crossings, occlusion and spatial identity drift never silently swit
     expect(f.tracking.confirmed).toBe(true)
     expect(f.tracking.selected!.id).not.toBe(f.pairing.lockId)
     f.pairing.lockId = f.tracking.selected!.id
-    f.vision = { ...f.vision, lockId: f.pairing.lockId, frameSequence: 7, candidateId: '7:0', depthSequence: 14, capturedAtMs: 160, receivedAtMs: 160 }
+    f.vision = { ...f.vision, lockId: f.pairing.lockId, frameSequence: 7, candidateId: '7:0', depthSequence: 14, capturedAtMs: 160, receivedAtMs: 160, validUntilMs: 360 }
     f.fix = { ...f.fix, sequence: 24, capturedAtMs: 160, receivedAtMs: 160 }
     expect(f.fusion.step({ nowMs: 160, tracking: f.tracking, vision: f.vision, fix: f.fix }).state).toBe('lost')
     expect(f.fusion.pair(f.pairing, f.tracking, 160).state).toBe('lost')
@@ -247,6 +293,7 @@ test('skew is bounded and the later source adds target-motion uncertainty at the
     const result = f.fusion.step({ nowMs: 200, tracking: f.tracking, vision: f.vision, fix: f.fix })
     expect(result.state).toBe('tracking')
     expect(result.target!.capturedAtMs).toBe(120)
+    expect(result.target!.validUntilMs).toBe(320)
     expect(result.target!.sigmaM).toBeGreaterThan(baseline.target!.sigmaM)
   }
   const f = selected()
