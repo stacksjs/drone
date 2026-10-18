@@ -48,6 +48,7 @@ export interface SurveyPose {
   cameraPositionM: SensorVector
   geodetic: GeodeticOrigin
   positionSigmaM: number
+  attitudeSigmaRad: number
   headingAlignment: 'initial-simulation-north'
   positionCapturedAtMs: number
   attitudeCapturedAtMs: number

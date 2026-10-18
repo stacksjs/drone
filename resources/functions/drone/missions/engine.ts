@@ -114,7 +114,7 @@ export function createMissionEngine(input: unknown) {
           const goal = missionTaskTarget(plan, t)!
           const previous = targetM ?? o.positionM
           const distance = Math.hypot(...goal.map((n, i) => n - previous[i]!))
-          const scale = distance === 0 ? 1 : Math.min(1, 0.6 * executionDt / 1000 / distance)
+          const scale = distance === 0 ? 1 : Math.min(1, (plan.speedMps ?? 0.6) * executionDt / 1000 / distance)
           targetM = goal.map((n, i) => previous[i]! + (n - previous[i]!) * scale) as SensorVector
           const reached = Math.hypot(...o.positionM.map((n, i) => n - goal[i]!)) <= missionLimits.acceptanceM && Math.hypot(...o.velocityMps) < 0.3 && (t.kind !== 'land' || o.onGround)
           settledMs = reached ? settledMs + executionDt : 0

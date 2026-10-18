@@ -204,3 +204,13 @@ test('inapplicable repeated start or resume cannot suppress the task timeout', (
     expect(engine.snapshot().reason).toBe('task-timeout')
   }
 })
+
+test('an explicit slower survey speed survives validation and exact decision replay', () => {
+  const plan = { ...exampleMission(), speedMps: 0.3 }
+  const engine = createMissionEngine(plan)
+  engine.step(observation(600), 'start')
+  expect(engine.step(observation(620)).targetM![2]).toBeCloseTo(-0.006, 9)
+  expect(replayMission(engine.trace()).snapshot()).toEqual(engine.snapshot())
+  expect(() => validateMission({ ...plan, speedMps: 0 })).toThrow()
+  expect(() => validateMission({ ...plan, speedMps: 0.7 })).toThrow()
+})

@@ -22,6 +22,8 @@ export interface MissionPlan {
   rallyM: SensorVector
   power: { availableWh: number, hoverW: number, reservePercent: number }
   start: string
+  /** Optional bounded target ramp; omitted v1 plans preserve 0.6 m/s. */
+  speedMps?: number
   tasks: MissionTask[]
 }
 const object = (v: unknown): v is Record<string, unknown> => !!v && typeof v === 'object' && !Array.isArray(v)
@@ -40,7 +42,7 @@ export function missionEdges(task: MissionTask): string[] {
 /** Strict v1 simulation profile. Convex fence and flat terrain make every straight segment checkable. */
 export function validateMission(input: unknown): { plan: MissionPlan, worstCaseMs: number, requiredWh: number } {
   const invalid = () => { throw new TypeError('Invalid mission plan or unsupported mission semantics') }
-  if (!object(input) || !keys(input, ['version', 'id', 'frame', 'altitude', 'terrain', 'origin', 'fence', 'rallyM', 'power', 'start', 'tasks']) || input.version !== 1 || !identifier(input.id) || input.frame !== 'LOCAL_NED' || input.altitude !== 'ORIGIN_RELATIVE_DOWN' || input.terrain !== 'FLAT_ORIGIN_PLANE' || !identifier(input.start)) invalid()
+  if (!object(input) || !keys(input, ['version', 'id', 'frame', 'altitude', 'terrain', 'origin', 'fence', 'rallyM', 'power', 'start', 'speedMps', 'tasks']) || input.version !== 1 || !identifier(input.id) || input.frame !== 'LOCAL_NED' || input.altitude !== 'ORIGIN_RELATIVE_DOWN' || input.terrain !== 'FLAT_ORIGIN_PLANE' || !identifier(input.start) || input.speedMps !== undefined && !numberIn(input.speedMps, 0.05, 0.6)) invalid()
   const p = input as unknown as MissionPlan
   if (!object(p.origin) || !keys(p.origin, ['latitudeDeg', 'longitudeDeg', 'ellipsoidHeightM']) || !numberIn(p.origin.latitudeDeg, -90, 90) || !numberIn(p.origin.longitudeDeg, -180, 180) || !numberIn(p.origin.ellipsoidHeightM, -500, 10000)
     || !object(p.fence) || !keys(p.fence, ['radiusM', 'minDownM']) || !numberIn(p.fence.radiusM, 1, authorityPolicy.fenceRadiusM - 1) || !numberIn(p.fence.minDownM, authorityPolicy.minDownM + 0.5, -1)
