@@ -218,10 +218,6 @@ declare global {
   const createAirController: typeof autoImports.createAirController
   const createAirProfile: typeof autoImports.createAirProfile
   const airScenarios: typeof autoImports.airScenarios
-  const airAerodynamics: typeof autoImports.airAerodynamics
-  const airModel: typeof autoImports.airModel
-  const createAirPlant: typeof autoImports.createAirPlant
-  const createAirController: typeof autoImports.createAirController
   const validateAirActuators: typeof autoImports.validateAirActuators
   const airAerodynamics: typeof autoImports.airAerodynamics
   const createAirPlant: typeof autoImports.createAirPlant
@@ -239,14 +235,9 @@ declare global {
   const createVehicleMeasurementQualifier: typeof autoImports.createVehicleMeasurementQualifier
   const predictVehicleMeasurementPose: typeof autoImports.predictVehicleMeasurementPose
   const runVehicleSimulation: typeof autoImports.runVehicleSimulation
-  const vehicleReference: typeof autoImports.vehicleReference
   const createSurfaceController: typeof autoImports.createSurfaceController
   const createSurfaceProfile: typeof autoImports.createSurfaceProfile
   const surfaceScenarios: typeof autoImports.surfaceScenarios
-  const correctSurfaceSounding: typeof autoImports.correctSurfaceSounding
-  const exportSurfaceSurvey: typeof autoImports.exportSurfaceSurvey
-  const reduceSurfaceSurvey: typeof autoImports.reduceSurfaceSurvey
-  const surfacePingFromMeasurement: typeof autoImports.surfacePingFromMeasurement
   const createSurfaceSampler: typeof autoImports.createSurfaceSampler
   const createSurfacePlant: typeof autoImports.createSurfacePlant
   const surfaceHull: typeof autoImports.surfaceHull

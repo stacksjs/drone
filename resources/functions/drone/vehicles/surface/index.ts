@@ -17,7 +17,7 @@ export function createSurfaceProfile(scenario: SurfaceScenario = 'nominal'): Veh
     { id: 'stop', kind: 'stop', positionM: [0, 0, 0], ...move, timeoutMs: 10000 },
   ] }
   if (scenario === 'harbour-return') mission.tasks.push({ id: 'energy-check', kind: 'branch', batteryAtLeast: 100, then: 'survey-b', otherwise: 'return' })
-  return { vehicle: 'surface', name: 'Owned planar vector-thrust harbour vessel', evidence: 'modeled-vehicle-profile', physicalFlightEnabled: false,
+  return { scenario, vehicle: 'surface', name: 'Owned planar vector-thrust harbour vessel', evidence: 'modeled-vehicle-profile', physicalFlightEnabled: false,
     actuators: [{ name: 'body-surge', unit: 'normalized', min: -1, max: 1, neutral: 0 }, { name: 'body-sway', unit: 'normalized', min: -1, max: 1, neutral: 0 }, { name: 'body-yaw', unit: 'normalized', min: -1, max: 1, neutral: 0 }], authorityFence: { ...mission.fence }, mission,
     scenarios: surfaceScenarios,
     createSession() {
@@ -35,5 +35,5 @@ export function createSurfaceProfile(scenario: SurfaceScenario = 'nominal'): Veh
     },
   }
 }
-export { correctSurfaceSounding, exportSurfaceSurvey, reduceSurfaceSurvey } from './survey'
-export { surfacePingFromMeasurement } from './sensors'
+export * from './survey'
+export * from './sensors'

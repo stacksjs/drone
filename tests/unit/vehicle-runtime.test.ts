@@ -56,3 +56,16 @@ test('capture pose retains real estimator epochs and predicts attitude only with
   expect(predictVehicleMeasurementPose(e, { ...imu, estimatedCaptureMs: 981 }, 1000)).toBeNull()
   expect(predictVehicleMeasurementPose(e, { ...imu, quality: ['timing-unvalidated'] }, 1000)).toBeNull()
 })
+
+
+test('simulation scenario is bound to its declared profile before session resources open', () => {
+  const profile = createSurfaceProfile()
+  let opened = false
+  profile.createSession = () => { opened = true; throw new Error('Session must remain unopened') }
+  expect(() => runVehicleSimulation(profile, { scenario: 'sample-loss' })).toThrow('Invalid vehicle simulation')
+  expect(opened).toBe(false)
+  const run = runVehicleSimulation(createSurfaceProfile('sample-loss'))
+  expect(run.scenario).toBe('sample-loss')
+  expect(run.status).toBe('blocked')
+  expect(run.mission.reason).toBe('payload-outcome-uncertain')
+})

@@ -5,7 +5,7 @@ export const airScenarios = ['nominal', 'crosswind', 'airspeed-loss', 'position-
 export function createAirProfile(scenario = 'nominal'): VehicleProfile {
   if (!(airScenarios as readonly string[]).includes(scenario)) throw new RangeError('Unknown fixed-wing scenario')
   return {
-    vehicle: 'fixed-wing', name: 'Owned aerodynamic trainer', evidence: 'modeled-vehicle-profile', physicalFlightEnabled: false,
+    scenario, vehicle: 'fixed-wing', name: 'Owned aerodynamic trainer', evidence: 'modeled-vehicle-profile', physicalFlightEnabled: false,
     actuators: [
       { name: 'propeller-throttle', unit: 'normalized', min: 0, max: 1, neutral: 0 },
       { name: 'aileron', unit: 'radian', min: -0.4, max: 0.4, neutral: 0 },
@@ -46,5 +46,5 @@ export function createAirProfile(scenario = 'nominal'): VehicleProfile {
     },
   }
 }
-export { airAerodynamics, airModel, createAirPlant } from './plant'
-export { createAirController } from './controller'
+export * from './plant'
+export * from './controller'

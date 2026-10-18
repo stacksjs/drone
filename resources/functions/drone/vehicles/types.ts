@@ -101,6 +101,7 @@ export interface VehicleSession {
   renderMeasurement(state: VehiclePlantState, atMs: number, reference: string): VehicleMeasurement
 }
 export interface VehicleProfile {
+  scenario: string
   vehicle: VehicleKind
   name: string
   evidence: 'modeled-vehicle-profile'

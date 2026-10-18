@@ -108,7 +108,7 @@ export function createGroundSession(scenario: GroundScenario = 'nominal'): Vehic
 export function createGroundProfile(scenario: string = 'nominal'): VehicleProfile {
   if (!groundScenarios.includes(scenario as GroundScenario)) throw new RangeError('Unknown ground scenario')
   return {
-    vehicle: 'ground', name: 'Owned differential ground vehicle', evidence: 'modeled-vehicle-profile', physicalFlightEnabled: false,
+    scenario, vehicle: 'ground', name: 'Owned differential ground vehicle', evidence: 'modeled-vehicle-profile', physicalFlightEnabled: false,
     actuators: [{ name: 'left-wheel-torque', unit: 'normalized', min: -1, max: 1, neutral: 0 }, { name: 'right-wheel-torque', unit: 'normalized', min: -1, max: 1, neutral: 0 }, { name: 'mower-enable', unit: 'normalized', min: 0, max: 1, neutral: 0 }, { name: 'spring-brake', unit: 'normalized', min: 0, max: 1, neutral: 1 }],
     authorityFence: { radiusM: 12, minDownM: -0.3, maxDownM: 0.3 }, mission: groundMission(scenario === 'logistics' ? 'logistics' : 'mowing'), scenarios: groundScenarios,
     createSession: () => createGroundSession(scenario as GroundScenario),
