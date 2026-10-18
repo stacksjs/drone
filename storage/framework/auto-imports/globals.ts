@@ -12,12 +12,30 @@ Object.assign(globalThis, autoImports)
 declare global {
   const follow: typeof autoImports.follow
   const defineBehavior: typeof autoImports.defineBehavior
+  const cameraRequest: typeof autoImports.cameraRequest
+  const createVisualLockGuard: typeof autoImports.createVisualLockGuard
+  const cameraCommand: typeof autoImports.cameraCommand
+  const authorizeCamera: typeof autoImports.authorizeCamera
+  const cameraState: typeof autoImports.cameraState
+  const applyCameraCommand: typeof autoImports.applyCameraCommand
+  const startImx500: typeof autoImports.startImx500
+  const parseCameraPacket: typeof autoImports.parseCameraPacket
+  const createCameraSession: typeof autoImports.createCameraSession
+  const cameraSession: typeof autoImports.cameraSession
+  const validBox: typeof autoImports.validBox
+  const createVisualTracker: typeof autoImports.createVisualTracker
   const createController: typeof autoImports.createController
+  const createArduPilotDriver: typeof autoImports.createArduPilotDriver
+  const createPx4Driver: typeof autoImports.createPx4Driver
+  const decodeAutopilotMode: typeof autoImports.decodeAutopilotMode
+  const driverProfiles: typeof autoImports.driverProfiles
   const clampVelocity: typeof autoImports.clampVelocity
   const gpsToLocal: typeof autoImports.gpsToLocal
   const zero: typeof autoImports.zero
   const finiteVector: typeof autoImports.finiteVector
   const horizontalDistance: typeof autoImports.horizontalDistance
+  const createVisualTracker: typeof autoImports.createVisualTracker
+  const createVisualLockGuard: typeof autoImports.createVisualLockGuard
   const encodeFrame: typeof autoImports.encodeFrame
   const decodeDatagram: typeof autoImports.decodeDatagram
   const encodeVelocity: typeof autoImports.encodeVelocity

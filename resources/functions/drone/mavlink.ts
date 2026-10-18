@@ -1,9 +1,9 @@
 import type { Vector3 } from './types'
 
 /** Deliberately small common.xml subset. Unknown dialects are skipped, never trusted. */
-const definitions: Record<number, { crc: number, length: number }> = {
+const definitions: Record<number, { crc: number, length: number, maxLength?: number }> = {
   0: { crc: 50, length: 9 },
-  1: { crc: 124, length: 31 },
+  1: { crc: 124, length: 31, maxLength: 43 },
   32: { crc: 185, length: 28 },
   84: { crc: 143, length: 53 },
 }
@@ -49,11 +49,11 @@ export function decodeDatagram(bytes: Uint8Array): MavlinkFrame[] {
     if (offset + total > bytes.length) break
     const id = v2 ? bytes[offset + 7]! | (bytes[offset + 8]! << 8) | (bytes[offset + 9]! << 16) : bytes[offset + 5]!
     const definition = definitions[id]
-    if (definition && incompatibilityFlags === 0 && (v2 ? length <= definition.length : length === definition.length)) {
+    if (definition && incompatibilityFlags === 0 && (v2 ? length >= 1 && length <= (definition.maxLength ?? definition.length) : length === definition.length)) {
       const expected = bytes[offset + header + length]! | (bytes[offset + header + length + 1]! << 8)
       const actual = checksum(bytes.subarray(offset + 1, offset + header + length), definition.crc)
       if (expected === actual) {
-        const payload = new Uint8Array(definition.length)
+        const payload = new Uint8Array(Math.max(definition.length, length))
         payload.set(bytes.subarray(offset + header, offset + header + length))
         result.push({ id, payload, systemId: bytes[offset + (v2 ? 5 : 3)]!, componentId: bytes[offset + (v2 ? 6 : 4)]! })
       }

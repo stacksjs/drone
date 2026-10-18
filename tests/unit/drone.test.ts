@@ -176,6 +176,12 @@ test('matches independent pymavlink wire fixtures and refuses signed packets', (
     expect(new DataView(frame.payload.buffer).getFloat32(24, true)).toBe(-0.5)
   }
   expect(decodeDatagram(Buffer.from(fixtures.signedV2Velocity, 'hex'))).toEqual([])
+  // Current common.xml adds three uint32 SYS_STATUS extensions. The external encoder truncates trailing zero bytes.
+  const status = decodeDatagram(Buffer.from(fixtures.v2ExtendedSysStatus, 'hex'))[0]!
+  expect(status.id).toBe(1)
+  expect(status.payload[30]).toBe(90)
+  expect(status.payload[31]).toBe(1)
+  expect(status.payload[39]).toBe(1)
 })
 
 test('paired GPS sources reject jumps and use local monotonic time', () => {

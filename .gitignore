@@ -191,3 +191,7 @@ docs/erd.md
 # person a previous-schema plan for a dialect and a database that are not
 # theirs.
 .qb/
+
+# Python vendor-camera bridge runtime caches
+__pycache__/
+*.pyc

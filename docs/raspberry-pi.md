@@ -13,7 +13,7 @@ Keep propellers removed during bench integration. This release receives physical
    to `.env` and run `./buddy key:generate`. Run `bun run simulate` before connecting a flight controller.
 4. Validate the camera independently with Raspberry Pi's [AI Camera guide](https://www.raspberrypi.com/documentation/accessories/ai-camera.html)
    or [camera software guide](https://www.raspberrypi.com/documentation/computers/camera_software.html).
-   `rpicam-hello --list-cameras` lists detected cameras. This project does not yet consume frames or detections.
+   `rpicam-hello --list-cameras` lists detected cameras. The [camera pipeline](camera-tracking.md) now consumes IMX500 frames/detections; its on-device validation remains pending.
 5. Install the supported ArduCopter firmware for Pixhawk 6C using an appropriate ground station.
    Connect the autopilot to the Pi over USB using the exact connector on your board, then identify its
    stable `/dev/serial/by-id/...` device. Grant the service account the OS's serial-device permissions.
@@ -30,7 +30,7 @@ Keep propellers removed during bench integration. This release receives physical
    retains a missing/stale receipt timestamp, so it cannot pass a controller's freshness gate.
 7. Ensure HEARTBEAT, SYS_STATUS and LOCAL_POSITION_NED arrive at suitable rates. A bench controller
    may have no local EKF position. That is an expected unavailable estimate, not permission to invent it.
-   Confirm system/component IDs if not the default 1/1. PX4 mode decoding is not implemented.
+   Confirm system/component IDs if not the default 1/1. For PX4 select the explicit `createPx4Driver` profile instead; mode numbers differ. See `drivers.md`.
 8. After bench operation works, design and inspect the fused regulated Pi power harness and mechanical
    mounting. Measure loaded voltage, current, thermal behavior and centre of gravity. Check the Pi's
    undervoltage/throttling diagnostics under CPU and camera load before considering flight.

@@ -52,7 +52,7 @@ Do not order expensive gimbals, RTK receivers or depth cameras for the first bui
 **My first choice: the $70 AI Camera.** Its IMX500 runs compatible neural networks on the camera,
 keeping more Pi CPU available for your custom logic. It has manual/mechanical focus and about
 78-degree field of view. It is not an autofocus Camera Module 3. Models must be converted for its
-accelerator; this repo has not yet implemented the camera pipeline.
+accelerator; this repo now implements an acquisition/tracking pipeline, with on-device validation still pending.
 
 **Cheaper alternative: [Camera Module 3 Wide](https://www.raspberrypi.com/products/camera-module-3/),
 allow roughly $35-40.** It offers autofocus and a 120-degree diagonal field of view, useful for keeping

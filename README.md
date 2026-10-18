@@ -1,10 +1,11 @@
 # Drone
 
-A Stacks project for building your own drone companion software in TypeScript.
-Start with a simulator, write custom behavior, and receive telemetry on a Raspberry Pi 5.
+A Stacks project for an owned vehicle autonomy platform. Build custom TypeScript behaviors,
+track a selected person with a Pi AI Camera, and use ArduPilot or PX4 as optional drivers while
+we implement our own runtime, estimation, controls and mission engine.
 
 **Status: experimental, simulation and bench development. Physical flight commands are disabled.**
-The MAVLink command adapter is for local ArduCopter SITL only. No hardware flight test or full SITL flight has been performed for this release. This is an initial framework, not a finished autonomous aircraft.
+The MAVLink command adapters are for local ArduCopter/PX4 quadcopter SITL only. No hardware flight test or full SITL flight has been performed for this release. This is an initial framework, not a finished autonomous aircraft.
 
 ## Run it
 
@@ -31,6 +32,21 @@ bun run sitl --enable-sitl # 30-second local simulator experiment; read docs/sit
 ./buddy test
 ```
 
+## Camera tracking
+
+Open `/camera` after configuring a unique `DRONE_CAMERA_TOKEN` in your ignored `.env`. Choose
+replay for a hardware-free test, or Pi AI Camera on the Pi. Explicit selection confirms a visual
+lock; ambiguity, stale inference and lost detections invalidate it until reselection.
+See [camera setup and limits](docs/camera-tracking.md). Image-space tracking is not metric navigation.
+
+## Owned autopilot and roadmap
+
+The [dependency-linked roadmap](docs/roadmap/README.md) and [feature matrix](docs/roadmap/feature-coverage.md)
+cover the requested air, ground, surface, subsea, payload and industry workflows. A pinned inventory
+accounts for 274 top-level upstream module/driver/library entries. Native board firmware and detailed
+feature parity remain planned, with explicit issues and evidence gates.
+See [the ownership decision](docs/adr/0001-owned-autonomy.md) and [driver contract](docs/drivers.md).
+
 ## Where your code goes
 
 | Path | Responsibility |
@@ -38,6 +54,8 @@ bun run sitl --enable-sitl # 30-second local simulator experiment; read docs/sit
 | `resources/functions/drone/` | Public drone library: types, behaviors, target sources, safety, controllers, simulation |
 | `resources/functions/drone/mavlink.ts` | Small verified MAVLink v1/v2 common-message codec |
 | `resources/functions/drone/udp.ts` | Bun UDP adapter, imported explicitly on the server only |
+| `resources/functions/drone/camera/` | TypeScript tracker, session, API and a small Picamera2 acquisition helper |
+| `resources/functions/drone/drivers/` | Explicit ArduPilot/PX4 factories and mode profiles |
 | `resources/components/` | Reusable stx simulator, operating-envelope and hardware components |
 | `resources/views/index.stx` | Mission workspace |
 | `app/Commands/Simulate.ts` | Native Buddy command |
@@ -79,10 +97,11 @@ Buy the [parts list](docs/hardware.md) around the Pi you already own, then follo
 for a complete starter bench and airframe, with local Remote ID requirements budgeted separately.
 Prices are estimates except where explicitly marked as observed listings.
 
-The recommended split is your own Stacks application on the Pi plus ArduCopter on a dedicated
-Pixhawk. You own the follow logic, behavior extensions, simulation, UI and integration code.
+The current development split is the Stacks application on the Pi plus your chosen external
+autopilot on a dedicated Pixhawk. The accepted direction is to replace those firmware layers with
+our own implementation through the roadmap. You own the follow logic, behavior extensions, simulation, UI and integration code.
 This does not claim that flight-controller firmware, radio firmware, camera firmware, or board designs
-were authored here. Replacing the flight stack or designing PCBs is a separate project.
+were authored here. The owned flight stack is planned in this repository; custom PCB design is not implemented.
 
 ## Current boundaries
 
@@ -90,14 +109,16 @@ were authored here. Replacing the flight stack or designing PCBs is a separate p
   monotonic freshness and lease checks, target identity lock, GPS-fix normalization with jump
   rejection, verified MAVLink subset, local UDP receive/transmit tests, receive-only Pi telemetry.
 - Hardware control is receive-only. No arming, takeoff, mode switching, motor output, or RTL command is implemented.
-- SITL commands require the separate explicit runner. Loopback is an accidental-use guard, not a
+- SITL commands require the separate explicit runners; `bun run sitl:px4 --enable-sitl` selects PX4. Loopback is an accidental-use guard, not a
   security boundary against another local process or a router forwarding to a physical vehicle.
-- No camera acquisition, neural-network inference, person re-identification, obstacle avoidance,
-  terrain following, automatic phone pairing, camera streaming, or flight-log persistence yet.
+- Implemented camera path: Picamera2 IMX500 acquisition/inference extraction, bounded JPEG preview,
+  TypeScript selected-person association, explicit loss/reselection and an optional visual motion guard.
+  The Pi hardware validation is pending. No metric visual localization, person re-identification,
+  obstacle avoidance, terrain following, automatic phone pairing, or flight-log persistence yet.
 - Software envelope prediction assumes immediate ideal velocity response and a stationary target over
   its horizon. It does not model braking, wind, sensor error, moving obstacles, or aircraft dynamics.
 - A camera detecting a person does not establish who that person is or their GPS distance.
-  First integrate an explicitly paired GNSS/phone target feed, then add vision as a separate source.
+  First integrate an explicitly paired GNSS/phone target feed, then add calibrated visual/range fusion. The current 2D image observation stays separate.
 
 Read [architecture and failure behavior](docs/architecture.md), [validation evidence](docs/validation.md),
 and the [flight-development checklist](docs/flight-development.md) before extending control.

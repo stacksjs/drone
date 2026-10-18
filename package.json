@@ -20,7 +20,9 @@
     "buddy": "./buddy",
     "check": "./buddy lint && ./buddy typecheck && ./buddy test",
     "sitl": "bun scripts/sitl.ts",
-    "typecheck:views": "stx typecheck 'resources/**/*.stx'"
+    "typecheck:views": "stx typecheck 'resources/**/*.stx'",
+    "sitl:px4": "bun scripts/px4-sitl.ts",
+    "roadmap:check": "bun scripts/check-roadmap.ts"
   },
   "dependencies": {
     "stacks": "^0.75.221",

@@ -23,6 +23,13 @@ This is the `stacksjs/drone` Stacks application. Read `README.md` for implemente
 - Test behavioral seams: decision input/output, controller lifecycle, real local UDP and protocol fixtures.
   Do not claim physical or SITL flight validation from unit tests.
 
+## Owned autonomy direction
+
+- The destination is our own runtime, estimation, controls and mission engine. Read `docs/adr/0001-owned-autonomy.md`.
+- ArduPilot and PX4 remain optional drivers. Do not make domain workflows depend on either firmware.
+- `docs/roadmap/` distinguishes actual support from planned work and maps pinned upstream entries to issues.
+- The only Python application exception is the small Picamera2 hardware acquisition helper. Keep tracking policy and application logic in TypeScript.
+
 ## Flight boundaries
 
 - Physical telemetry is receive-only. Do not silently add arming or actuator endpoints.

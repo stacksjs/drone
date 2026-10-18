@@ -1,0 +1,2494 @@
+{
+  "schemaVersion": 1,
+  "researchDate": "2026-10-17",
+  "scope": "Top-level PX4 module/driver and ArduPilot library directories. Deeper feature, parameter and hardware-variant audit remains an explicit issue.",
+  "upstreams": [
+    {
+      "id": "px4",
+      "repository": "PX4/PX4-Autopilot",
+      "revision": "ddcaad6601be20453ec6acd0f08e567af3a7e1bb",
+      "scope": [
+        "src/modules/",
+        "src/drivers/"
+      ],
+      "entries": [
+        {
+          "path": "src/modules/airship_att_control",
+          "treeSha": "169d3df821f1bccd29fab64f5a597b0d3a81f50a",
+          "roadmapKey": "controls",
+          "nativeStatus": "planned",
+          "driverExposure": "not exposed by current adapter",
+          "source": "https://github.com/PX4/PX4-Autopilot/tree/ddcaad6601be20453ec6acd0f08e567af3a7e1bb/src/modules/airship_att_control",
+          "issue": "https://github.com/stacksjs/drone/issues/5"
+        },
+        {
+          "path": "src/modules/airspeed_selector",
+          "treeSha": "39a501ab1bd58624215a4ebde83b72f4f944c7a2",
+          "roadmapKey": "sensors",
+          "nativeStatus": "planned",
+          "driverExposure": "not exposed by current adapter",
+          "source": "https://github.com/PX4/PX4-Autopilot/tree/ddcaad6601be20453ec6acd0f08e567af3a7e1bb/src/modules/airspeed_selector",
+          "issue": "https://github.com/stacksjs/drone/issues/3"
+        },
+        {
+          "path": "src/modules/attitude_estimator_q",
+          "treeSha": "b431054055eba586b5faa372f55bcb1576baffb7",
+          "roadmapKey": "estimation",
+          "nativeStatus": "planned",
+          "driverExposure": "not exposed by current adapter",
+          "source": "https://github.com/PX4/PX4-Autopilot/tree/ddcaad6601be20453ec6acd0f08e567af3a7e1bb/src/modules/attitude_estimator_q",
+          "issue": "https://github.com/stacksjs/drone/issues/4"
+        },
+        {
+          "path": "src/modules/battery_status",
+          "treeSha": "7dae9100bc5a726f3a8a4327de7e436bed3a5aa5",
+          "roadmapKey": "payloads",
+          "nativeStatus": "planned",
+          "driverExposure": "not exposed by current adapter",
+          "source": "https://github.com/PX4/PX4-Autopilot/tree/ddcaad6601be20453ec6acd0f08e567af3a7e1bb/src/modules/battery_status",
+          "issue": "https://github.com/stacksjs/drone/issues/8"
+        },
+        {
+          "path": "src/modules/camera_feedback",
+          "treeSha": "44661c71b986274d3576babcf02436d65c301a0b",
+          "roadmapKey": "payloads",
+          "nativeStatus": "planned",
+          "driverExposure": "not exposed by current adapter",
+          "source": "https://github.com/PX4/PX4-Autopilot/tree/ddcaad6601be20453ec6acd0f08e567af3a7e1bb/src/modules/camera_feedback",
+          "issue": "https://github.com/stacksjs/drone/issues/8"
+        },
+        {
+          "path": "src/modules/commander",
+          "treeSha": "c64a6940606e62aa175c9c8801501b5f9f2f5cca",
+          "roadmapKey": "safety",
+          "nativeStatus": "planned",
+          "driverExposure": "not exposed by current adapter",
+          "source": "https://github.com/PX4/PX4-Autopilot/tree/ddcaad6601be20453ec6acd0f08e567af3a7e1bb/src/modules/commander",
+          "issue": "https://github.com/stacksjs/drone/issues/6"
+        },
+        {
+          "path": "src/modules/control_allocator",
+          "treeSha": "5fdfd119f3f411fd966ae68ec3b08ee1c93ec655",
+          "roadmapKey": "controls",
+          "nativeStatus": "planned",
+          "driverExposure": "not exposed by current adapter",
+          "source": "https://github.com/PX4/PX4-Autopilot/tree/ddcaad6601be20453ec6acd0f08e567af3a7e1bb/src/modules/control_allocator",
+          "issue": "https://github.com/stacksjs/drone/issues/5"
+        },
+        {
+          "path": "src/modules/dataman",
+          "treeSha": "71ca094b93889c1864f2dbfd106c8b7f06fb6ce0",
+          "roadmapKey": "runtime",
+          "nativeStatus": "planned",
+          "driverExposure": "not exposed by current adapter",
+          "source": "https://github.com/PX4/PX4-Autopilot/tree/ddcaad6601be20453ec6acd0f08e567af3a7e1bb/src/modules/dataman",
+          "issue": "https://github.com/stacksjs/drone/issues/2"
+        },
+        {
+          "path": "src/modules/ekf2",
+          "treeSha": "e272f6673b695324da875d7898030d1c289117a3",
+          "roadmapKey": "estimation",
+          "nativeStatus": "planned",
+          "driverExposure": "not exposed by current adapter",
+          "source": "https://github.com/PX4/PX4-Autopilot/tree/ddcaad6601be20453ec6acd0f08e567af3a7e1bb/src/modules/ekf2",
+          "issue": "https://github.com/stacksjs/drone/issues/4"
+        },
+        {
+          "path": "src/modules/esc_battery",
+          "treeSha": "939ff6848d59169a2814d32e53083493bcc4bfcd",
+          "roadmapKey": "payloads",
+          "nativeStatus": "planned",
+          "driverExposure": "not exposed by current adapter",
+          "source": "https://github.com/PX4/PX4-Autopilot/tree/ddcaad6601be20453ec6acd0f08e567af3a7e1bb/src/modules/esc_battery",
+          "issue": "https://github.com/stacksjs/drone/issues/8"
+        },
+        {
+          "path": "src/modules/events",
+          "treeSha": "618106435b7c48e03cc311636b97752e58cfee20",
+          "roadmapKey": "observability",
+          "nativeStatus": "planned",
+          "driverExposure": "not exposed by current adapter",
+          "source": "https://github.com/PX4/PX4-Autopilot/tree/ddcaad6601be20453ec6acd0f08e567af3a7e1bb/src/modules/events",
+          "issue": "https://github.com/stacksjs/drone/issues/9"
+        },
+        {
+          "path": "src/modules/failure_injection_manager",
+          "treeSha": "3e30274ca380d1d73576e6a3628b3addd179fd38",
+          "roadmapKey": "observability",
+          "nativeStatus": "planned",
+          "driverExposure": "not exposed by current adapter",
+          "source": "https://github.com/PX4/PX4-Autopilot/tree/ddcaad6601be20453ec6acd0f08e567af3a7e1bb/src/modules/failure_injection_manager",
+          "issue": "https://github.com/stacksjs/drone/issues/9"
+        },
+        {
+          "path": "src/modules/flight_mode_manager",
+          "treeSha": "4af2605a958af250c892dd980c186a41bc08a039",
+          "roadmapKey": "missions",
+          "nativeStatus": "planned",
+          "driverExposure": "not exposed by current adapter",
+          "source": "https://github.com/PX4/PX4-Autopilot/tree/ddcaad6601be20453ec6acd0f08e567af3a7e1bb/src/modules/flight_mode_manager",
+          "issue": "https://github.com/stacksjs/drone/issues/10"
+        },
+        {
+          "path": "src/modules/fw_att_control",
+          "treeSha": "34890743a27cd98ff05b15346d737403a068dd07",
+          "roadmapKey": "controls",
+          "nativeStatus": "planned",
+          "driverExposure": "not exposed by current adapter",
+          "source": "https://github.com/PX4/PX4-Autopilot/tree/ddcaad6601be20453ec6acd0f08e567af3a7e1bb/src/modules/fw_att_control",
+          "issue": "https://github.com/stacksjs/drone/issues/5"
+        },
+        {
+          "path": "src/modules/fw_autotune_attitude_control",
+          "treeSha": "292241c15c0c4f00898268845a2e828db2c52f4b",
+          "roadmapKey": "controls",
+          "nativeStatus": "planned",
+          "driverExposure": "not exposed by current adapter",
+          "source": "https://github.com/PX4/PX4-Autopilot/tree/ddcaad6601be20453ec6acd0f08e567af3a7e1bb/src/modules/fw_autotune_attitude_control",
+          "issue": "https://github.com/stacksjs/drone/issues/5"
+        },
+        {
+          "path": "src/modules/fw_lateral_longitudinal_control",
+          "treeSha": "0def902747afec0ce6c67210823e7a2ed6975801",
+          "roadmapKey": "vehicles-air",
+          "nativeStatus": "planned",
+          "driverExposure": "not exposed by current adapter",
+          "source": "https://github.com/PX4/PX4-Autopilot/tree/ddcaad6601be20453ec6acd0f08e567af3a7e1bb/src/modules/fw_lateral_longitudinal_control",
+          "issue": "https://github.com/stacksjs/drone/issues/12"
+        },
+        {
+          "path": "src/modules/fw_mode_manager",
+          "treeSha": "ab3f36806c08eb6c5e007ad53ed022ba16894aef",
+          "roadmapKey": "vehicles-air",
+          "nativeStatus": "planned",
+          "driverExposure": "not exposed by current adapter",
+          "source": "https://github.com/PX4/PX4-Autopilot/tree/ddcaad6601be20453ec6acd0f08e567af3a7e1bb/src/modules/fw_mode_manager",
+          "issue": "https://github.com/stacksjs/drone/issues/12"
+        },
+        {
+          "path": "src/modules/fw_rate_control",
+          "treeSha": "550565977db8072e909a147bc25ca0c34ecea35f",
+          "roadmapKey": "controls",
+          "nativeStatus": "planned",
+          "driverExposure": "not exposed by current adapter",
+          "source": "https://github.com/PX4/PX4-Autopilot/tree/ddcaad6601be20453ec6acd0f08e567af3a7e1bb/src/modules/fw_rate_control",
+          "issue": "https://github.com/stacksjs/drone/issues/5"
+        },
+        {
+          "path": "src/modules/gimbal",
+          "treeSha": "1fbf16f064b23e869cb7a7933ec9f7bcdc5d851b",
+          "roadmapKey": "payloads",
+          "nativeStatus": "planned",
+          "driverExposure": "not exposed by current adapter",
+          "source": "https://github.com/PX4/PX4-Autopilot/tree/ddcaad6601be20453ec6acd0f08e567af3a7e1bb/src/modules/gimbal",
+          "issue": "https://github.com/stacksjs/drone/issues/8"
+        },
+        {
+          "path": "src/modules/gyro_calibration",
+          "treeSha": "9da8cfd99676133d8165d38ba76568fcbcb725b4",
+          "roadmapKey": "sensors",
+          "nativeStatus": "planned",
+          "driverExposure": "not exposed by current adapter",
+          "source": "https://github.com/PX4/PX4-Autopilot/tree/ddcaad6601be20453ec6acd0f08e567af3a7e1bb/src/modules/gyro_calibration",
+          "issue": "https://github.com/stacksjs/drone/issues/3"
+        },
+        {
+          "path": "src/modules/gyro_fft",
+          "treeSha": "fa0d1309b867bd36d12ede4d2334a5bd738fd136",
+          "roadmapKey": "sensors",
+          "nativeStatus": "planned",
+          "driverExposure": "not exposed by current adapter",
+          "source": "https://github.com/PX4/PX4-Autopilot/tree/ddcaad6601be20453ec6acd0f08e567af3a7e1bb/src/modules/gyro_fft",
+          "issue": "https://github.com/stacksjs/drone/issues/3"
+        },
+        {
+          "path": "src/modules/hardfault_stream",
+          "treeSha": "3755a2a449e6d67c3924fb376e7942f9ce85353a",
+          "roadmapKey": "observability",
+          "nativeStatus": "planned",
+          "driverExposure": "not exposed by current adapter",
+          "source": "https://github.com/PX4/PX4-Autopilot/tree/ddcaad6601be20453ec6acd0f08e567af3a7e1bb/src/modules/hardfault_stream",
+          "issue": "https://github.com/stacksjs/drone/issues/9"
+        },
+        {
+          "path": "src/modules/internal_combustion_engine_control",
+          "treeSha": "7a125e7f3275b97f5bf0a920cbdbc616f922090f",
+          "roadmapKey": "payloads",
+          "nativeStatus": "planned",
+          "driverExposure": "not exposed by current adapter",
+          "source": "https://github.com/PX4/PX4-Autopilot/tree/ddcaad6601be20453ec6acd0f08e567af3a7e1bb/src/modules/internal_combustion_engine_control",
+          "issue": "https://github.com/stacksjs/drone/issues/8"
+        },
+        {
+          "path": "src/modules/land_detector",
+          "treeSha": "42d5c8f825ecf5c5b3057f7014fb0817fa33868b",
+          "roadmapKey": "safety",
+          "nativeStatus": "planned",
+          "driverExposure": "not exposed by current adapter",
+          "source": "https://github.com/PX4/PX4-Autopilot/tree/ddcaad6601be20453ec6acd0f08e567af3a7e1bb/src/modules/land_detector",
+          "issue": "https://github.com/stacksjs/drone/issues/6"
+        },
+        {
+          "path": "src/modules/landing_target_estimator",
+          "treeSha": "9dc79f5b2e303ad0a3b06e9c7ec6767b91dbf002",
+          "roadmapKey": "estimation",
+          "nativeStatus": "planned",
+          "driverExposure": "not exposed by current adapter",
+          "source": "https://github.com/PX4/PX4-Autopilot/tree/ddcaad6601be20453ec6acd0f08e567af3a7e1bb/src/modules/landing_target_estimator",
+          "issue": "https://github.com/stacksjs/drone/issues/4"
+        },
+        {
+          "path": "src/modules/load_mon",
+          "treeSha": "45fc84f90eb51fc23697dbf8c8e777efd0c85e3f",
+          "roadmapKey": "runtime",
+          "nativeStatus": "planned",
+          "driverExposure": "not exposed by current adapter",
+          "source": "https://github.com/PX4/PX4-Autopilot/tree/ddcaad6601be20453ec6acd0f08e567af3a7e1bb/src/modules/load_mon",
+          "issue": "https://github.com/stacksjs/drone/issues/2"
+        },
+        {
+          "path": "src/modules/local_position_estimator",
+          "treeSha": "5238a92afff53a6f44f95e25993b60189a9a09c2",
+          "roadmapKey": "estimation",
+          "nativeStatus": "planned",
+          "driverExposure": "not exposed by current adapter",
+          "source": "https://github.com/PX4/PX4-Autopilot/tree/ddcaad6601be20453ec6acd0f08e567af3a7e1bb/src/modules/local_position_estimator",
+          "issue": "https://github.com/stacksjs/drone/issues/4"
+        },
+        {
+          "path": "src/modules/logger",
+          "treeSha": "deb64870ed73def13b60cb46571f6c5d7c59ff2e",
+          "roadmapKey": "observability",
+          "nativeStatus": "planned",
+          "driverExposure": "not exposed by current adapter",
+          "source": "https://github.com/PX4/PX4-Autopilot/tree/ddcaad6601be20453ec6acd0f08e567af3a7e1bb/src/modules/logger",
+          "issue": "https://github.com/stacksjs/drone/issues/9"
+        },
+        {
+          "path": "src/modules/mag_bias_estimator",
+          "treeSha": "657cd81af69f737cc5ec0d27a3a5b731dbc724d1",
+          "roadmapKey": "estimation",
+          "nativeStatus": "planned",
+          "driverExposure": "not exposed by current adapter",
+          "source": "https://github.com/PX4/PX4-Autopilot/tree/ddcaad6601be20453ec6acd0f08e567af3a7e1bb/src/modules/mag_bias_estimator",
+          "issue": "https://github.com/stacksjs/drone/issues/4"
+        },
+        {
+          "path": "src/modules/manual_control",
+          "treeSha": "f8e7369b0132747b55502bfbc8dfd22ef5d68026",
+          "roadmapKey": "safety",
+          "nativeStatus": "planned",
+          "driverExposure": "not exposed by current adapter",
+          "source": "https://github.com/PX4/PX4-Autopilot/tree/ddcaad6601be20453ec6acd0f08e567af3a7e1bb/src/modules/manual_control",
+          "issue": "https://github.com/stacksjs/drone/issues/6"
+        },
+        {
+          "path": "src/modules/mavlink",
+          "treeSha": "2ab9fd4f0e5fda0ce3f868085e470183b3798537",
+          "roadmapKey": "protocols",
+          "nativeStatus": "planned",
+          "driverExposure": "partial: heartbeat, SYS_STATUS, LOCAL_POSITION_NED and velocity-only local SITL",
+          "source": "https://github.com/PX4/PX4-Autopilot/tree/ddcaad6601be20453ec6acd0f08e567af3a7e1bb/src/modules/mavlink",
+          "issue": "https://github.com/stacksjs/drone/issues/7"
+        },
+        {
+          "path": "src/modules/mc_att_control",
+          "treeSha": "af2dbdcd0a5e0fcfce2931dea0ac0a0e5a6e4d88",
+          "roadmapKey": "controls",
+          "nativeStatus": "planned",
+          "driverExposure": "not exposed by current adapter",
+          "source": "https://github.com/PX4/PX4-Autopilot/tree/ddcaad6601be20453ec6acd0f08e567af3a7e1bb/src/modules/mc_att_control",
+          "issue": "https://github.com/stacksjs/drone/issues/5"
+        },
+        {
+          "path": "src/modules/mc_autotune_attitude_control",
+          "treeSha": "244812204c9dc84037ba8051fe5cf7cec11e3000",
+          "roadmapKey": "controls",
+          "nativeStatus": "planned",
+          "driverExposure": "not exposed by current adapter",
+          "source": "https://github.com/PX4/PX4-Autopilot/tree/ddcaad6601be20453ec6acd0f08e567af3a7e1bb/src/modules/mc_autotune_attitude_control",
+          "issue": "https://github.com/stacksjs/drone/issues/5"
+        },
+        {
+          "path": "src/modules/mc_hover_thrust_estimator",
+          "treeSha": "fdc5e83276141d909e36f72c8d7fc8784845f5c5",
+          "roadmapKey": "estimation",
+          "nativeStatus": "planned",
+          "driverExposure": "not exposed by current adapter",
+          "source": "https://github.com/PX4/PX4-Autopilot/tree/ddcaad6601be20453ec6acd0f08e567af3a7e1bb/src/modules/mc_hover_thrust_estimator",
+          "issue": "https://github.com/stacksjs/drone/issues/4"
+        },
+        {
+          "path": "src/modules/mc_nn_control",
+          "treeSha": "546b07bf88500993595ff9ddeff3f64560bceeb7",
+          "roadmapKey": "controls",
+          "nativeStatus": "planned",
+          "driverExposure": "not exposed by current adapter",
+          "source": "https://github.com/PX4/PX4-Autopilot/tree/ddcaad6601be20453ec6acd0f08e567af3a7e1bb/src/modules/mc_nn_control",
+          "issue": "https://github.com/stacksjs/drone/issues/5"
+        },
+        {
+          "path": "src/modules/mc_pos_control",
+          "treeSha": "95042242203179c6ee78baf7f8d878391dd38a6a",
+          "roadmapKey": "controls",
+          "nativeStatus": "planned",
+          "driverExposure": "not exposed by current adapter",
+          "source": "https://github.com/PX4/PX4-Autopilot/tree/ddcaad6601be20453ec6acd0f08e567af3a7e1bb/src/modules/mc_pos_control",
+          "issue": "https://github.com/stacksjs/drone/issues/5"
+        },
+        {
+          "path": "src/modules/mc_raptor",
+          "treeSha": "43e8da9663de1eeb40e8e12929467138b6288b41",
+          "roadmapKey": "controls",
+          "nativeStatus": "planned",
+          "driverExposure": "not exposed by current adapter",
+          "source": "https://github.com/PX4/PX4-Autopilot/tree/ddcaad6601be20453ec6acd0f08e567af3a7e1bb/src/modules/mc_raptor",
+          "issue": "https://github.com/stacksjs/drone/issues/5"
+        },
+        {
+          "path": "src/modules/mc_rate_control",
+          "treeSha": "99a7701d316e1c4584913e619a7c5bc17cc6119d",
+          "roadmapKey": "controls",
+          "nativeStatus": "planned",
+          "driverExposure": "not exposed by current adapter",
+          "source": "https://github.com/PX4/PX4-Autopilot/tree/ddcaad6601be20453ec6acd0f08e567af3a7e1bb/src/modules/mc_rate_control",
+          "issue": "https://github.com/stacksjs/drone/issues/5"
+        },
+        {
+          "path": "src/modules/muorb",
+          "treeSha": "dde898508f34ed258f61687df892178d2ebadedc",
+          "roadmapKey": "protocols",
+          "nativeStatus": "planned",
+          "driverExposure": "not exposed by current adapter",
+          "source": "https://github.com/PX4/PX4-Autopilot/tree/ddcaad6601be20453ec6acd0f08e567af3a7e1bb/src/modules/muorb",
+          "issue": "https://github.com/stacksjs/drone/issues/7"
+        },
+        {
+          "path": "src/modules/navigator",
+          "treeSha": "41bb0dcd7f9977e35c328c2c09cea6b07547d147",
+          "roadmapKey": "navigation",
+          "nativeStatus": "planned",
+          "driverExposure": "not exposed by current adapter",
+          "source": "https://github.com/PX4/PX4-Autopilot/tree/ddcaad6601be20453ec6acd0f08e567af3a7e1bb/src/modules/navigator",
+          "issue": "https://github.com/stacksjs/drone/issues/11"
+        },
+        {
+          "path": "src/modules/nfs_mount",
+          "treeSha": "d5cfcd08d5b4dfa3a87269fc2e6fd1ab92ae66a2",
+          "roadmapKey": "runtime",
+          "nativeStatus": "planned",
+          "driverExposure": "not exposed by current adapter",
+          "source": "https://github.com/PX4/PX4-Autopilot/tree/ddcaad6601be20453ec6acd0f08e567af3a7e1bb/src/modules/nfs_mount",
+          "issue": "https://github.com/stacksjs/drone/issues/2"
+        },
+        {
+          "path": "src/modules/payload_deliverer",
+          "treeSha": "0f7c05771d2dcb9a2dfffec6e2cbd5f8f644c83d",
+          "roadmapKey": "parity",
+          "nativeStatus": "planned",
+          "driverExposure": "not exposed by current adapter",
+          "source": "https://github.com/PX4/PX4-Autopilot/tree/ddcaad6601be20453ec6acd0f08e567af3a7e1bb/src/modules/payload_deliverer",
+          "issue": "https://github.com/stacksjs/drone/issues/28"
+        },
+        {
+          "path": "src/modules/px4iofirmware",
+          "treeSha": "f8c5d9e9271daa135078eac345374d8c7683ecc9",
+          "roadmapKey": "runtime",
+          "nativeStatus": "planned",
+          "driverExposure": "not exposed by current adapter",
+          "source": "https://github.com/PX4/PX4-Autopilot/tree/ddcaad6601be20453ec6acd0f08e567af3a7e1bb/src/modules/px4iofirmware",
+          "issue": "https://github.com/stacksjs/drone/issues/2"
+        },
+        {
+          "path": "src/modules/rc_update",
+          "treeSha": "ef766a954f06b8d7143d66f1194af137a3ab6373",
+          "roadmapKey": "safety",
+          "nativeStatus": "planned",
+          "driverExposure": "not exposed by current adapter",
+          "source": "https://github.com/PX4/PX4-Autopilot/tree/ddcaad6601be20453ec6acd0f08e567af3a7e1bb/src/modules/rc_update",
+          "issue": "https://github.com/stacksjs/drone/issues/6"
+        },
+        {
+          "path": "src/modules/replay",
+          "treeSha": "4c150e360b201ba25e57bd2944854884d2b3b938",
+          "roadmapKey": "observability",
+          "nativeStatus": "planned",
+          "driverExposure": "not exposed by current adapter",
+          "source": "https://github.com/PX4/PX4-Autopilot/tree/ddcaad6601be20453ec6acd0f08e567af3a7e1bb/src/modules/replay",
+          "issue": "https://github.com/stacksjs/drone/issues/9"
+        },
+        {
+          "path": "src/modules/rover_ackermann",
+          "treeSha": "b51cb8ce7d6b35f6c0541daec586d4636e5e8110",
+          "roadmapKey": "vehicles-ground",
+          "nativeStatus": "planned",
+          "driverExposure": "not exposed by current adapter",
+          "source": "https://github.com/PX4/PX4-Autopilot/tree/ddcaad6601be20453ec6acd0f08e567af3a7e1bb/src/modules/rover_ackermann",
+          "issue": "https://github.com/stacksjs/drone/issues/13"
+        },
+        {
+          "path": "src/modules/rover_differential",
+          "treeSha": "7598242788bafd6fb95903b6bb3348093e9d5245",
+          "roadmapKey": "vehicles-ground",
+          "nativeStatus": "planned",
+          "driverExposure": "not exposed by current adapter",
+          "source": "https://github.com/PX4/PX4-Autopilot/tree/ddcaad6601be20453ec6acd0f08e567af3a7e1bb/src/modules/rover_differential",
+          "issue": "https://github.com/stacksjs/drone/issues/13"
+        },
+        {
+          "path": "src/modules/rover_mecanum",
+          "treeSha": "114af7d2a84887bf87c7d4743700f502f065fe4a",
+          "roadmapKey": "vehicles-ground",
+          "nativeStatus": "planned",
+          "driverExposure": "not exposed by current adapter",
+          "source": "https://github.com/PX4/PX4-Autopilot/tree/ddcaad6601be20453ec6acd0f08e567af3a7e1bb/src/modules/rover_mecanum",
+          "issue": "https://github.com/stacksjs/drone/issues/13"
+        },
+        {
+          "path": "src/modules/sensors",
+          "treeSha": "02a67532ec106f492efdb06f083aff7d75118d2b",
+          "roadmapKey": "sensors",
+          "nativeStatus": "planned",
+          "driverExposure": "not exposed by current adapter",
+          "source": "https://github.com/PX4/PX4-Autopilot/tree/ddcaad6601be20453ec6acd0f08e567af3a7e1bb/src/modules/sensors",
+          "issue": "https://github.com/stacksjs/drone/issues/3"
+        },
+        {
+          "path": "src/modules/simulation",
+          "treeSha": "a46dc58604cb695cf14d33a5dac5f2806956e39c",
+          "roadmapKey": "controls",
+          "nativeStatus": "planned",
+          "driverExposure": "not exposed by current adapter",
+          "source": "https://github.com/PX4/PX4-Autopilot/tree/ddcaad6601be20453ec6acd0f08e567af3a7e1bb/src/modules/simulation",
+          "issue": "https://github.com/stacksjs/drone/issues/5"
+        },
+        {
+          "path": "src/modules/spacecraft",
+          "treeSha": "71afc579b691f5b4402ccabcbd7d0c8153f8cf09",
+          "roadmapKey": "vehicles-air",
+          "nativeStatus": "planned",
+          "driverExposure": "not exposed by current adapter",
+          "source": "https://github.com/PX4/PX4-Autopilot/tree/ddcaad6601be20453ec6acd0f08e567af3a7e1bb/src/modules/spacecraft",
+          "issue": "https://github.com/stacksjs/drone/issues/12"
+        },
+        {
+          "path": "src/modules/task_watchdog",
+          "treeSha": "ee43f8205cd8d3f96c609ae045a57aa519898bd6",
+          "roadmapKey": "runtime",
+          "nativeStatus": "planned",
+          "driverExposure": "not exposed by current adapter",
+          "source": "https://github.com/PX4/PX4-Autopilot/tree/ddcaad6601be20453ec6acd0f08e567af3a7e1bb/src/modules/task_watchdog",
+          "issue": "https://github.com/stacksjs/drone/issues/2"
+        },
+        {
+          "path": "src/modules/temperature_compensation",
+          "treeSha": "dbc039fcd8cf3a5979e384ca7cebcab8daec7441",
+          "roadmapKey": "sensors",
+          "nativeStatus": "planned",
+          "driverExposure": "not exposed by current adapter",
+          "source": "https://github.com/PX4/PX4-Autopilot/tree/ddcaad6601be20453ec6acd0f08e567af3a7e1bb/src/modules/temperature_compensation",
+          "issue": "https://github.com/stacksjs/drone/issues/3"
+        },
+        {
+          "path": "src/modules/time_persistor",
+          "treeSha": "2a6db03409caa3aafa40463ed02eb6fbf7110f31",
+          "roadmapKey": "runtime",
+          "nativeStatus": "planned",
+          "driverExposure": "not exposed by current adapter",
+          "source": "https://github.com/PX4/PX4-Autopilot/tree/ddcaad6601be20453ec6acd0f08e567af3a7e1bb/src/modules/time_persistor",
+          "issue": "https://github.com/stacksjs/drone/issues/2"
+        },
+        {
+          "path": "src/modules/uuv_att_control",
+          "treeSha": "c3051c3e372e454885a86fe4697f363f0f583d8d",
+          "roadmapKey": "controls",
+          "nativeStatus": "planned",
+          "driverExposure": "not exposed by current adapter",
+          "source": "https://github.com/PX4/PX4-Autopilot/tree/ddcaad6601be20453ec6acd0f08e567af3a7e1bb/src/modules/uuv_att_control",
+          "issue": "https://github.com/stacksjs/drone/issues/5"
+        },
+        {
+          "path": "src/modules/uuv_pos_control",
+          "treeSha": "8f0eb6d77f1f9a7f55d4a940f6154aa48520f123",
+          "roadmapKey": "controls",
+          "nativeStatus": "planned",
+          "driverExposure": "not exposed by current adapter",
+          "source": "https://github.com/PX4/PX4-Autopilot/tree/ddcaad6601be20453ec6acd0f08e567af3a7e1bb/src/modules/uuv_pos_control",
+          "issue": "https://github.com/stacksjs/drone/issues/5"
+        },
+        {
+          "path": "src/modules/uxrce_dds_client",
+          "treeSha": "d38a0e7330ef98e62448dcda9e02b7258f741bf1",
+          "roadmapKey": "protocols",
+          "nativeStatus": "planned",
+          "driverExposure": "not exposed by current adapter",
+          "source": "https://github.com/PX4/PX4-Autopilot/tree/ddcaad6601be20453ec6acd0f08e567af3a7e1bb/src/modules/uxrce_dds_client",
+          "issue": "https://github.com/stacksjs/drone/issues/7"
+        },
+        {
+          "path": "src/modules/vision_target_estimator",
+          "treeSha": "fa2a72aa736b62cc808d93c452b07ee0f53a77cf",
+          "roadmapKey": "estimation",
+          "nativeStatus": "planned",
+          "driverExposure": "not exposed by current adapter",
+          "source": "https://github.com/PX4/PX4-Autopilot/tree/ddcaad6601be20453ec6acd0f08e567af3a7e1bb/src/modules/vision_target_estimator",
+          "issue": "https://github.com/stacksjs/drone/issues/4"
+        },
+        {
+          "path": "src/modules/vtol_att_control",
+          "treeSha": "69a7c14962773772e2975924f5c0ed377bfc96ec",
+          "roadmapKey": "controls",
+          "nativeStatus": "planned",
+          "driverExposure": "not exposed by current adapter",
+          "source": "https://github.com/PX4/PX4-Autopilot/tree/ddcaad6601be20453ec6acd0f08e567af3a7e1bb/src/modules/vtol_att_control",
+          "issue": "https://github.com/stacksjs/drone/issues/5"
+        },
+        {
+          "path": "src/modules/zenoh",
+          "treeSha": "b1145cdcbf77fa4a0ea5b080fd7249ace6e38563",
+          "roadmapKey": "protocols",
+          "nativeStatus": "planned",
+          "driverExposure": "not exposed by current adapter",
+          "source": "https://github.com/PX4/PX4-Autopilot/tree/ddcaad6601be20453ec6acd0f08e567af3a7e1bb/src/modules/zenoh",
+          "issue": "https://github.com/stacksjs/drone/issues/7"
+        },
+        {
+          "path": "src/drivers/actuators",
+          "treeSha": "21750cb284a4232f12dd50b0184c52fbc3cd6f82",
+          "roadmapKey": "payloads",
+          "nativeStatus": "planned",
+          "driverExposure": "not exposed by current adapter",
+          "source": "https://github.com/PX4/PX4-Autopilot/tree/ddcaad6601be20453ec6acd0f08e567af3a7e1bb/src/drivers/actuators",
+          "issue": "https://github.com/stacksjs/drone/issues/8"
+        },
+        {
+          "path": "src/drivers/adc",
+          "treeSha": "5372e3c999730ea7f9dfcfff7fa950361d413619",
+          "roadmapKey": "payloads",
+          "nativeStatus": "planned",
+          "driverExposure": "not exposed by current adapter",
+          "source": "https://github.com/PX4/PX4-Autopilot/tree/ddcaad6601be20453ec6acd0f08e567af3a7e1bb/src/drivers/adc",
+          "issue": "https://github.com/stacksjs/drone/issues/8"
+        },
+        {
+          "path": "src/drivers/auterion_autostarter",
+          "treeSha": "967ef2d8464533390922dcc57ddc2ed7d77b08c0",
+          "roadmapKey": "payloads",
+          "nativeStatus": "planned",
+          "driverExposure": "not exposed by current adapter",
+          "source": "https://github.com/PX4/PX4-Autopilot/tree/ddcaad6601be20453ec6acd0f08e567af3a7e1bb/src/drivers/auterion_autostarter",
+          "issue": "https://github.com/stacksjs/drone/issues/8"
+        },
+        {
+          "path": "src/drivers/barometer",
+          "treeSha": "f5390a21cc42835e47cb05995833e6dde708e206",
+          "roadmapKey": "payloads",
+          "nativeStatus": "planned",
+          "driverExposure": "not exposed by current adapter",
+          "source": "https://github.com/PX4/PX4-Autopilot/tree/ddcaad6601be20453ec6acd0f08e567af3a7e1bb/src/drivers/barometer",
+          "issue": "https://github.com/stacksjs/drone/issues/8"
+        },
+        {
+          "path": "src/drivers/batt_smbus",
+          "treeSha": "8cf5579430fc913b9b7a08f95fd197e97761733b",
+          "roadmapKey": "payloads",
+          "nativeStatus": "planned",
+          "driverExposure": "not exposed by current adapter",
+          "source": "https://github.com/PX4/PX4-Autopilot/tree/ddcaad6601be20453ec6acd0f08e567af3a7e1bb/src/drivers/batt_smbus",
+          "issue": "https://github.com/stacksjs/drone/issues/8"
+        },
+        {
+          "path": "src/drivers/bootloaders",
+          "treeSha": "f4fbdb0080d9052657a1852f030ad2604c68de26",
+          "roadmapKey": "payloads",
+          "nativeStatus": "planned",
+          "driverExposure": "not exposed by current adapter",
+          "source": "https://github.com/PX4/PX4-Autopilot/tree/ddcaad6601be20453ec6acd0f08e567af3a7e1bb/src/drivers/bootloaders",
+          "issue": "https://github.com/stacksjs/drone/issues/8"
+        },
+        {
+          "path": "src/drivers/camera_capture",
+          "treeSha": "fd088109e2dd3efa7a3b0d748609d7bacf1b64c4",
+          "roadmapKey": "payloads",
+          "nativeStatus": "planned",
+          "driverExposure": "not exposed by current adapter",
+          "source": "https://github.com/PX4/PX4-Autopilot/tree/ddcaad6601be20453ec6acd0f08e567af3a7e1bb/src/drivers/camera_capture",
+          "issue": "https://github.com/stacksjs/drone/issues/8"
+        },
+        {
+          "path": "src/drivers/camera_trigger",
+          "treeSha": "3bc7316b48b9a72112d8e0d43296a4c316f4f9a9",
+          "roadmapKey": "payloads",
+          "nativeStatus": "planned",
+          "driverExposure": "not exposed by current adapter",
+          "source": "https://github.com/PX4/PX4-Autopilot/tree/ddcaad6601be20453ec6acd0f08e567af3a7e1bb/src/drivers/camera_trigger",
+          "issue": "https://github.com/stacksjs/drone/issues/8"
+        },
+        {
+          "path": "src/drivers/cdcacm_autostart",
+          "treeSha": "70eb6690706c4b3b43bfcd6629202fe0c9a1973f",
+          "roadmapKey": "payloads",
+          "nativeStatus": "planned",
+          "driverExposure": "not exposed by current adapter",
+          "source": "https://github.com/PX4/PX4-Autopilot/tree/ddcaad6601be20453ec6acd0f08e567af3a7e1bb/src/drivers/cdcacm_autostart",
+          "issue": "https://github.com/stacksjs/drone/issues/8"
+        },
+        {
+          "path": "src/drivers/cyphal",
+          "treeSha": "82171af7ff519a165f0782f6445d4702f723276c",
+          "roadmapKey": "payloads",
+          "nativeStatus": "planned",
+          "driverExposure": "not exposed by current adapter",
+          "source": "https://github.com/PX4/PX4-Autopilot/tree/ddcaad6601be20453ec6acd0f08e567af3a7e1bb/src/drivers/cyphal",
+          "issue": "https://github.com/stacksjs/drone/issues/8"
+        },
+        {
+          "path": "src/drivers/differential_pressure",
+          "treeSha": "6ad4aeb0a8505a441e29c4b23fa7d3dacf141bdc",
+          "roadmapKey": "payloads",
+          "nativeStatus": "planned",
+          "driverExposure": "not exposed by current adapter",
+          "source": "https://github.com/PX4/PX4-Autopilot/tree/ddcaad6601be20453ec6acd0f08e567af3a7e1bb/src/drivers/differential_pressure",
+          "issue": "https://github.com/stacksjs/drone/issues/8"
+        },
+        {
+          "path": "src/drivers/distance_sensor",
+          "treeSha": "65bf9cb533c871b63877eb17af4fd44161902d77",
+          "roadmapKey": "payloads",
+          "nativeStatus": "planned",
+          "driverExposure": "not exposed by current adapter",
+          "source": "https://github.com/PX4/PX4-Autopilot/tree/ddcaad6601be20453ec6acd0f08e567af3a7e1bb/src/drivers/distance_sensor",
+          "issue": "https://github.com/stacksjs/drone/issues/8"
+        },
+        {
+          "path": "src/drivers/dshot",
+          "treeSha": "f847c1bf3a8647d189a0baaa38f178d1ac3a0aea",
+          "roadmapKey": "payloads",
+          "nativeStatus": "planned",
+          "driverExposure": "not exposed by current adapter",
+          "source": "https://github.com/PX4/PX4-Autopilot/tree/ddcaad6601be20453ec6acd0f08e567af3a7e1bb/src/drivers/dshot",
+          "issue": "https://github.com/stacksjs/drone/issues/8"
+        },
+        {
+          "path": "src/drivers/gnss",
+          "treeSha": "044144fe91e7c85cc2cc7bb9700038b9d6552997",
+          "roadmapKey": "payloads",
+          "nativeStatus": "planned",
+          "driverExposure": "not exposed by current adapter",
+          "source": "https://github.com/PX4/PX4-Autopilot/tree/ddcaad6601be20453ec6acd0f08e567af3a7e1bb/src/drivers/gnss",
+          "issue": "https://github.com/stacksjs/drone/issues/8"
+        },
+        {
+          "path": "src/drivers/gpio",
+          "treeSha": "c377aa6f4278bb772a3a20dbfca2df1f2732007b",
+          "roadmapKey": "payloads",
+          "nativeStatus": "planned",
+          "driverExposure": "not exposed by current adapter",
+          "source": "https://github.com/PX4/PX4-Autopilot/tree/ddcaad6601be20453ec6acd0f08e567af3a7e1bb/src/drivers/gpio",
+          "issue": "https://github.com/stacksjs/drone/issues/8"
+        },
+        {
+          "path": "src/drivers/gps",
+          "treeSha": "4c63f365602633538d03abb2d33f58860d7e2999",
+          "roadmapKey": "payloads",
+          "nativeStatus": "planned",
+          "driverExposure": "not exposed by current adapter",
+          "source": "https://github.com/PX4/PX4-Autopilot/tree/ddcaad6601be20453ec6acd0f08e567af3a7e1bb/src/drivers/gps",
+          "issue": "https://github.com/stacksjs/drone/issues/8"
+        },
+        {
+          "path": "src/drivers/heater",
+          "treeSha": "95111bf69f1e6be0b14ac4cc67286aa334f8b1bc",
+          "roadmapKey": "payloads",
+          "nativeStatus": "planned",
+          "driverExposure": "not exposed by current adapter",
+          "source": "https://github.com/PX4/PX4-Autopilot/tree/ddcaad6601be20453ec6acd0f08e567af3a7e1bb/src/drivers/heater",
+          "issue": "https://github.com/stacksjs/drone/issues/8"
+        },
+        {
+          "path": "src/drivers/hiwonder_emm",
+          "treeSha": "db3a716b2f75f69f08f2695d157ee2e003eb7d55",
+          "roadmapKey": "payloads",
+          "nativeStatus": "planned",
+          "driverExposure": "not exposed by current adapter",
+          "source": "https://github.com/PX4/PX4-Autopilot/tree/ddcaad6601be20453ec6acd0f08e567af3a7e1bb/src/drivers/hiwonder_emm",
+          "issue": "https://github.com/stacksjs/drone/issues/8"
+        },
+        {
+          "path": "src/drivers/hygrometer",
+          "treeSha": "6bd931896b57a8d17156e24dd5f04aea27537015",
+          "roadmapKey": "payloads",
+          "nativeStatus": "planned",
+          "driverExposure": "not exposed by current adapter",
+          "source": "https://github.com/PX4/PX4-Autopilot/tree/ddcaad6601be20453ec6acd0f08e567af3a7e1bb/src/drivers/hygrometer",
+          "issue": "https://github.com/stacksjs/drone/issues/8"
+        },
+        {
+          "path": "src/drivers/imu",
+          "treeSha": "8e0dff8ac028f8c2f837b4c28c36d3c91abfb41a",
+          "roadmapKey": "payloads",
+          "nativeStatus": "planned",
+          "driverExposure": "not exposed by current adapter",
+          "source": "https://github.com/PX4/PX4-Autopilot/tree/ddcaad6601be20453ec6acd0f08e567af3a7e1bb/src/drivers/imu",
+          "issue": "https://github.com/stacksjs/drone/issues/8"
+        },
+        {
+          "path": "src/drivers/ins",
+          "treeSha": "acf373ab405db93ee28dfa5323d5894e12b1c8eb",
+          "roadmapKey": "payloads",
+          "nativeStatus": "planned",
+          "driverExposure": "not exposed by current adapter",
+          "source": "https://github.com/PX4/PX4-Autopilot/tree/ddcaad6601be20453ec6acd0f08e567af3a7e1bb/src/drivers/ins",
+          "issue": "https://github.com/stacksjs/drone/issues/8"
+        },
+        {
+          "path": "src/drivers/irlock",
+          "treeSha": "81daa73e0732d56091a30c0fa80f850f35c355c8",
+          "roadmapKey": "payloads",
+          "nativeStatus": "planned",
+          "driverExposure": "not exposed by current adapter",
+          "source": "https://github.com/PX4/PX4-Autopilot/tree/ddcaad6601be20453ec6acd0f08e567af3a7e1bb/src/drivers/irlock",
+          "issue": "https://github.com/stacksjs/drone/issues/8"
+        },
+        {
+          "path": "src/drivers/lights",
+          "treeSha": "604f662d5d1342d91b4788dfa09d4d0ceddc4b21",
+          "roadmapKey": "payloads",
+          "nativeStatus": "planned",
+          "driverExposure": "not exposed by current adapter",
+          "source": "https://github.com/PX4/PX4-Autopilot/tree/ddcaad6601be20453ec6acd0f08e567af3a7e1bb/src/drivers/lights",
+          "issue": "https://github.com/stacksjs/drone/issues/8"
+        },
+        {
+          "path": "src/drivers/linux_pwm_out",
+          "treeSha": "45b15368a3c758e9e9ec3c3538c9d072453ce782",
+          "roadmapKey": "payloads",
+          "nativeStatus": "planned",
+          "driverExposure": "not exposed by current adapter",
+          "source": "https://github.com/PX4/PX4-Autopilot/tree/ddcaad6601be20453ec6acd0f08e567af3a7e1bb/src/drivers/linux_pwm_out",
+          "issue": "https://github.com/stacksjs/drone/issues/8"
+        },
+        {
+          "path": "src/drivers/magnetometer",
+          "treeSha": "118e0bdaf5ae15559bdedb107f473d5be6217ac0",
+          "roadmapKey": "payloads",
+          "nativeStatus": "planned",
+          "driverExposure": "not exposed by current adapter",
+          "source": "https://github.com/PX4/PX4-Autopilot/tree/ddcaad6601be20453ec6acd0f08e567af3a7e1bb/src/drivers/magnetometer",
+          "issue": "https://github.com/stacksjs/drone/issues/8"
+        },
+        {
+          "path": "src/drivers/optical_flow",
+          "treeSha": "7af9a414c740f18d95dc5e5f5b6f66b47565a3ab",
+          "roadmapKey": "payloads",
+          "nativeStatus": "planned",
+          "driverExposure": "not exposed by current adapter",
+          "source": "https://github.com/PX4/PX4-Autopilot/tree/ddcaad6601be20453ec6acd0f08e567af3a7e1bb/src/drivers/optical_flow",
+          "issue": "https://github.com/stacksjs/drone/issues/8"
+        },
+        {
+          "path": "src/drivers/osd",
+          "treeSha": "37c9a6e4c931dc73091f2d1b5154fc202d88466b",
+          "roadmapKey": "payloads",
+          "nativeStatus": "planned",
+          "driverExposure": "not exposed by current adapter",
+          "source": "https://github.com/PX4/PX4-Autopilot/tree/ddcaad6601be20453ec6acd0f08e567af3a7e1bb/src/drivers/osd",
+          "issue": "https://github.com/stacksjs/drone/issues/8"
+        },
+        {
+          "path": "src/drivers/pca9685_pwm_out",
+          "treeSha": "d1466a90b0eec58c30c7586404647b9c6d8acbb4",
+          "roadmapKey": "payloads",
+          "nativeStatus": "planned",
+          "driverExposure": "not exposed by current adapter",
+          "source": "https://github.com/PX4/PX4-Autopilot/tree/ddcaad6601be20453ec6acd0f08e567af3a7e1bb/src/drivers/pca9685_pwm_out",
+          "issue": "https://github.com/stacksjs/drone/issues/8"
+        },
+        {
+          "path": "src/drivers/power_monitor",
+          "treeSha": "5bf24a333583c72cb7fce5458ffea40c011a13d8",
+          "roadmapKey": "payloads",
+          "nativeStatus": "planned",
+          "driverExposure": "not exposed by current adapter",
+          "source": "https://github.com/PX4/PX4-Autopilot/tree/ddcaad6601be20453ec6acd0f08e567af3a7e1bb/src/drivers/power_monitor",
+          "issue": "https://github.com/stacksjs/drone/issues/8"
+        },
+        {
+          "path": "src/drivers/pps_capture",
+          "treeSha": "f68182f6647706603e04c3c466d6b676658fb7e3",
+          "roadmapKey": "payloads",
+          "nativeStatus": "planned",
+          "driverExposure": "not exposed by current adapter",
+          "source": "https://github.com/PX4/PX4-Autopilot/tree/ddcaad6601be20453ec6acd0f08e567af3a7e1bb/src/drivers/pps_capture",
+          "issue": "https://github.com/stacksjs/drone/issues/8"
+        },
+        {
+          "path": "src/drivers/pwm_input",
+          "treeSha": "e825b72eb6ec114fe43419e2f2c38f100b7fb12c",
+          "roadmapKey": "payloads",
+          "nativeStatus": "planned",
+          "driverExposure": "not exposed by current adapter",
+          "source": "https://github.com/PX4/PX4-Autopilot/tree/ddcaad6601be20453ec6acd0f08e567af3a7e1bb/src/drivers/pwm_input",
+          "issue": "https://github.com/stacksjs/drone/issues/8"
+        },
+        {
+          "path": "src/drivers/pwm_out",
+          "treeSha": "45d0d909202526393ab03600321bd48a52f6bc75",
+          "roadmapKey": "payloads",
+          "nativeStatus": "planned",
+          "driverExposure": "not exposed by current adapter",
+          "source": "https://github.com/PX4/PX4-Autopilot/tree/ddcaad6601be20453ec6acd0f08e567af3a7e1bb/src/drivers/pwm_out",
+          "issue": "https://github.com/stacksjs/drone/issues/8"
+        },
+        {
+          "path": "src/drivers/px4io",
+          "treeSha": "ddbc8e66a3085417679bc18ea7beb22d0555a328",
+          "roadmapKey": "payloads",
+          "nativeStatus": "planned",
+          "driverExposure": "not exposed by current adapter",
+          "source": "https://github.com/PX4/PX4-Autopilot/tree/ddcaad6601be20453ec6acd0f08e567af3a7e1bb/src/drivers/px4io",
+          "issue": "https://github.com/stacksjs/drone/issues/8"
+        },
+        {
+          "path": "src/drivers/qshell",
+          "treeSha": "f9b1a35f69b3082c3e3817d5e06cbd70ffae028e",
+          "roadmapKey": "payloads",
+          "nativeStatus": "planned",
+          "driverExposure": "not exposed by current adapter",
+          "source": "https://github.com/PX4/PX4-Autopilot/tree/ddcaad6601be20453ec6acd0f08e567af3a7e1bb/src/drivers/qshell",
+          "issue": "https://github.com/stacksjs/drone/issues/8"
+        },
+        {
+          "path": "src/drivers/rc",
+          "treeSha": "bb11f6543bbf5dbc16fb2d7c8a2397503ec5062a",
+          "roadmapKey": "payloads",
+          "nativeStatus": "planned",
+          "driverExposure": "not exposed by current adapter",
+          "source": "https://github.com/PX4/PX4-Autopilot/tree/ddcaad6601be20453ec6acd0f08e567af3a7e1bb/src/drivers/rc",
+          "issue": "https://github.com/stacksjs/drone/issues/8"
+        },
+        {
+          "path": "src/drivers/rc_input",
+          "treeSha": "d4e20e3c43f3fb793668a4c58f4ac9a6bc6254d6",
+          "roadmapKey": "payloads",
+          "nativeStatus": "planned",
+          "driverExposure": "not exposed by current adapter",
+          "source": "https://github.com/PX4/PX4-Autopilot/tree/ddcaad6601be20453ec6acd0f08e567af3a7e1bb/src/drivers/rc_input",
+          "issue": "https://github.com/stacksjs/drone/issues/8"
+        },
+        {
+          "path": "src/drivers/roboclaw",
+          "treeSha": "96790721ab543b2d6adc0d949d6143ab9b71759d",
+          "roadmapKey": "payloads",
+          "nativeStatus": "planned",
+          "driverExposure": "not exposed by current adapter",
+          "source": "https://github.com/PX4/PX4-Autopilot/tree/ddcaad6601be20453ec6acd0f08e567af3a7e1bb/src/drivers/roboclaw",
+          "issue": "https://github.com/stacksjs/drone/issues/8"
+        },
+        {
+          "path": "src/drivers/rpi_rc_in",
+          "treeSha": "be600fe104bad33b541274f10b67ff862c604515",
+          "roadmapKey": "payloads",
+          "nativeStatus": "planned",
+          "driverExposure": "not exposed by current adapter",
+          "source": "https://github.com/PX4/PX4-Autopilot/tree/ddcaad6601be20453ec6acd0f08e567af3a7e1bb/src/drivers/rpi_rc_in",
+          "issue": "https://github.com/stacksjs/drone/issues/8"
+        },
+        {
+          "path": "src/drivers/rpm",
+          "treeSha": "130165e3f7b84ddad37e954a6a37064a20959323",
+          "roadmapKey": "payloads",
+          "nativeStatus": "planned",
+          "driverExposure": "not exposed by current adapter",
+          "source": "https://github.com/PX4/PX4-Autopilot/tree/ddcaad6601be20453ec6acd0f08e567af3a7e1bb/src/drivers/rpm",
+          "issue": "https://github.com/stacksjs/drone/issues/8"
+        },
+        {
+          "path": "src/drivers/rpm_capture",
+          "treeSha": "8fb4d92ba103404a4ffd71bcc59dd70e8715f1b0",
+          "roadmapKey": "payloads",
+          "nativeStatus": "planned",
+          "driverExposure": "not exposed by current adapter",
+          "source": "https://github.com/PX4/PX4-Autopilot/tree/ddcaad6601be20453ec6acd0f08e567af3a7e1bb/src/drivers/rpm_capture",
+          "issue": "https://github.com/stacksjs/drone/issues/8"
+        },
+        {
+          "path": "src/drivers/safety_button",
+          "treeSha": "d298cf2d6060586c5954fc5ddc948e28f23274d2",
+          "roadmapKey": "payloads",
+          "nativeStatus": "planned",
+          "driverExposure": "not exposed by current adapter",
+          "source": "https://github.com/PX4/PX4-Autopilot/tree/ddcaad6601be20453ec6acd0f08e567af3a7e1bb/src/drivers/safety_button",
+          "issue": "https://github.com/stacksjs/drone/issues/8"
+        },
+        {
+          "path": "src/drivers/serialpassthrough",
+          "treeSha": "a446cb5272e4073b71968c9da64f5ba653fbfb6f",
+          "roadmapKey": "payloads",
+          "nativeStatus": "planned",
+          "driverExposure": "not exposed by current adapter",
+          "source": "https://github.com/PX4/PX4-Autopilot/tree/ddcaad6601be20453ec6acd0f08e567af3a7e1bb/src/drivers/serialpassthrough",
+          "issue": "https://github.com/stacksjs/drone/issues/8"
+        },
+        {
+          "path": "src/drivers/smart_battery",
+          "treeSha": "4ab7cfdd068f5108a038fe65e782689eb0570c3c",
+          "roadmapKey": "payloads",
+          "nativeStatus": "planned",
+          "driverExposure": "not exposed by current adapter",
+          "source": "https://github.com/PX4/PX4-Autopilot/tree/ddcaad6601be20453ec6acd0f08e567af3a7e1bb/src/drivers/smart_battery",
+          "issue": "https://github.com/stacksjs/drone/issues/8"
+        },
+        {
+          "path": "src/drivers/stub_keystore",
+          "treeSha": "ad5eea36020e37c45854db129dad0f1d43915734",
+          "roadmapKey": "payloads",
+          "nativeStatus": "planned",
+          "driverExposure": "not exposed by current adapter",
+          "source": "https://github.com/PX4/PX4-Autopilot/tree/ddcaad6601be20453ec6acd0f08e567af3a7e1bb/src/drivers/stub_keystore",
+          "issue": "https://github.com/stacksjs/drone/issues/8"
+        },
+        {
+          "path": "src/drivers/sw_crypto",
+          "treeSha": "ac13b8cd39cdcdeab682ae2c100aef05c5a9fc00",
+          "roadmapKey": "payloads",
+          "nativeStatus": "planned",
+          "driverExposure": "not exposed by current adapter",
+          "source": "https://github.com/PX4/PX4-Autopilot/tree/ddcaad6601be20453ec6acd0f08e567af3a7e1bb/src/drivers/sw_crypto",
+          "issue": "https://github.com/stacksjs/drone/issues/8"
+        },
+        {
+          "path": "src/drivers/tap_esc",
+          "treeSha": "9178e0cecb8a4bd59f667a069c571109b269cdbe",
+          "roadmapKey": "payloads",
+          "nativeStatus": "planned",
+          "driverExposure": "not exposed by current adapter",
+          "source": "https://github.com/PX4/PX4-Autopilot/tree/ddcaad6601be20453ec6acd0f08e567af3a7e1bb/src/drivers/tap_esc",
+          "issue": "https://github.com/stacksjs/drone/issues/8"
+        },
+        {
+          "path": "src/drivers/tattu_can",
+          "treeSha": "7480b04d75593490010ab102e8fb5cb148eb7086",
+          "roadmapKey": "payloads",
+          "nativeStatus": "planned",
+          "driverExposure": "not exposed by current adapter",
+          "source": "https://github.com/PX4/PX4-Autopilot/tree/ddcaad6601be20453ec6acd0f08e567af3a7e1bb/src/drivers/tattu_can",
+          "issue": "https://github.com/stacksjs/drone/issues/8"
+        },
+        {
+          "path": "src/drivers/telemetry",
+          "treeSha": "8d5b21163e2498bee7d2a1f94a71b16e3a49fabe",
+          "roadmapKey": "payloads",
+          "nativeStatus": "planned",
+          "driverExposure": "not exposed by current adapter",
+          "source": "https://github.com/PX4/PX4-Autopilot/tree/ddcaad6601be20453ec6acd0f08e567af3a7e1bb/src/drivers/telemetry",
+          "issue": "https://github.com/stacksjs/drone/issues/8"
+        },
+        {
+          "path": "src/drivers/temperature_sensor",
+          "treeSha": "8869c27ed19d6ad7da47f6f2f6432b7b7b942c42",
+          "roadmapKey": "payloads",
+          "nativeStatus": "planned",
+          "driverExposure": "not exposed by current adapter",
+          "source": "https://github.com/PX4/PX4-Autopilot/tree/ddcaad6601be20453ec6acd0f08e567af3a7e1bb/src/drivers/temperature_sensor",
+          "issue": "https://github.com/stacksjs/drone/issues/8"
+        },
+        {
+          "path": "src/drivers/test_ppm",
+          "treeSha": "01f6b8cf4219c18bf356a689457964aecedf802e",
+          "roadmapKey": "payloads",
+          "nativeStatus": "planned",
+          "driverExposure": "not exposed by current adapter",
+          "source": "https://github.com/PX4/PX4-Autopilot/tree/ddcaad6601be20453ec6acd0f08e567af3a7e1bb/src/drivers/test_ppm",
+          "issue": "https://github.com/stacksjs/drone/issues/8"
+        },
+        {
+          "path": "src/drivers/tone_alarm",
+          "treeSha": "0507692352659331bc11578dbc3f0998be657f65",
+          "roadmapKey": "payloads",
+          "nativeStatus": "planned",
+          "driverExposure": "not exposed by current adapter",
+          "source": "https://github.com/PX4/PX4-Autopilot/tree/ddcaad6601be20453ec6acd0f08e567af3a7e1bb/src/drivers/tone_alarm",
+          "issue": "https://github.com/stacksjs/drone/issues/8"
+        },
+        {
+          "path": "src/drivers/transponder",
+          "treeSha": "266756998c916a5a8d863aa59f301b5daae50860",
+          "roadmapKey": "payloads",
+          "nativeStatus": "planned",
+          "driverExposure": "not exposed by current adapter",
+          "source": "https://github.com/PX4/PX4-Autopilot/tree/ddcaad6601be20453ec6acd0f08e567af3a7e1bb/src/drivers/transponder",
+          "issue": "https://github.com/stacksjs/drone/issues/8"
+        },
+        {
+          "path": "src/drivers/uavcan",
+          "treeSha": "66713082f1b681c925ea13384cd567c2716dc9d6",
+          "roadmapKey": "payloads",
+          "nativeStatus": "planned",
+          "driverExposure": "not exposed by current adapter",
+          "source": "https://github.com/PX4/PX4-Autopilot/tree/ddcaad6601be20453ec6acd0f08e567af3a7e1bb/src/drivers/uavcan",
+          "issue": "https://github.com/stacksjs/drone/issues/8"
+        },
+        {
+          "path": "src/drivers/uavcannode",
+          "treeSha": "6c7ba184eacd1e48d2facd6d1d103b9eb78bc229",
+          "roadmapKey": "payloads",
+          "nativeStatus": "planned",
+          "driverExposure": "not exposed by current adapter",
+          "source": "https://github.com/PX4/PX4-Autopilot/tree/ddcaad6601be20453ec6acd0f08e567af3a7e1bb/src/drivers/uavcannode",
+          "issue": "https://github.com/stacksjs/drone/issues/8"
+        },
+        {
+          "path": "src/drivers/uwb",
+          "treeSha": "b0b287dc0920127a610c448367f3f1159bac5645",
+          "roadmapKey": "payloads",
+          "nativeStatus": "planned",
+          "driverExposure": "not exposed by current adapter",
+          "source": "https://github.com/PX4/PX4-Autopilot/tree/ddcaad6601be20453ec6acd0f08e567af3a7e1bb/src/drivers/uwb",
+          "issue": "https://github.com/stacksjs/drone/issues/8"
+        },
+        {
+          "path": "src/drivers/voxl2_io",
+          "treeSha": "518cdc97e03be4528073edb125bf7ea5f42b9106",
+          "roadmapKey": "payloads",
+          "nativeStatus": "planned",
+          "driverExposure": "not exposed by current adapter",
+          "source": "https://github.com/PX4/PX4-Autopilot/tree/ddcaad6601be20453ec6acd0f08e567af3a7e1bb/src/drivers/voxl2_io",
+          "issue": "https://github.com/stacksjs/drone/issues/8"
+        },
+        {
+          "path": "src/drivers/vtx",
+          "treeSha": "985511e043a22bc8d8445b312891470c92eb535d",
+          "roadmapKey": "payloads",
+          "nativeStatus": "planned",
+          "driverExposure": "not exposed by current adapter",
+          "source": "https://github.com/PX4/PX4-Autopilot/tree/ddcaad6601be20453ec6acd0f08e567af3a7e1bb/src/drivers/vtx",
+          "issue": "https://github.com/stacksjs/drone/issues/8"
+        },
+        {
+          "path": "src/drivers/vtxtable",
+          "treeSha": "79e1498e57e7f2420ea1c43b48b3484a20d4ca9d",
+          "roadmapKey": "payloads",
+          "nativeStatus": "planned",
+          "driverExposure": "not exposed by current adapter",
+          "source": "https://github.com/PX4/PX4-Autopilot/tree/ddcaad6601be20453ec6acd0f08e567af3a7e1bb/src/drivers/vtxtable",
+          "issue": "https://github.com/stacksjs/drone/issues/8"
+        },
+        {
+          "path": "src/drivers/wind_sensor",
+          "treeSha": "23fa865fd03f59ce44bbff0d165c69e4a2146f0b",
+          "roadmapKey": "payloads",
+          "nativeStatus": "planned",
+          "driverExposure": "not exposed by current adapter",
+          "source": "https://github.com/PX4/PX4-Autopilot/tree/ddcaad6601be20453ec6acd0f08e567af3a7e1bb/src/drivers/wind_sensor",
+          "issue": "https://github.com/stacksjs/drone/issues/8"
+        }
+      ]
+    },
+    {
+      "id": "ardupilot",
+      "repository": "ArduPilot/ardupilot",
+      "revision": "afeb9c4941543d97f3e04fecf257b8f598f49a6a",
+      "scope": [
+        "libraries/"
+      ],
+      "entries": [
+        {
+          "path": "libraries/AC_AttitudeControl",
+          "treeSha": "adf34dacad0f773421709bafd2c3952f839fcc05",
+          "roadmapKey": "controls",
+          "nativeStatus": "planned",
+          "driverExposure": "not exposed by current adapter",
+          "source": "https://github.com/ArduPilot/ardupilot/tree/afeb9c4941543d97f3e04fecf257b8f598f49a6a/libraries/AC_AttitudeControl",
+          "issue": "https://github.com/stacksjs/drone/issues/5"
+        },
+        {
+          "path": "libraries/AC_AutoTune",
+          "treeSha": "6223cf5632f413aa499fbafa2f72372509320483",
+          "roadmapKey": "controls",
+          "nativeStatus": "planned",
+          "driverExposure": "not exposed by current adapter",
+          "source": "https://github.com/ArduPilot/ardupilot/tree/afeb9c4941543d97f3e04fecf257b8f598f49a6a/libraries/AC_AutoTune",
+          "issue": "https://github.com/stacksjs/drone/issues/5"
+        },
+        {
+          "path": "libraries/AC_Autorotation",
+          "treeSha": "66a55f78ce741313650cc7b47b586ea38b655b4c",
+          "roadmapKey": "vehicles-air",
+          "nativeStatus": "planned",
+          "driverExposure": "not exposed by current adapter",
+          "source": "https://github.com/ArduPilot/ardupilot/tree/afeb9c4941543d97f3e04fecf257b8f598f49a6a/libraries/AC_Autorotation",
+          "issue": "https://github.com/stacksjs/drone/issues/12"
+        },
+        {
+          "path": "libraries/AC_Avoidance",
+          "treeSha": "4e6bed66b7ae47fe8d7330fba8438796e56ff153",
+          "roadmapKey": "navigation",
+          "nativeStatus": "planned",
+          "driverExposure": "not exposed by current adapter",
+          "source": "https://github.com/ArduPilot/ardupilot/tree/afeb9c4941543d97f3e04fecf257b8f598f49a6a/libraries/AC_Avoidance",
+          "issue": "https://github.com/stacksjs/drone/issues/11"
+        },
+        {
+          "path": "libraries/AC_CustomControl",
+          "treeSha": "5394cb1bb761ea28efba25ae53bdb966f9599dde",
+          "roadmapKey": "controls",
+          "nativeStatus": "planned",
+          "driverExposure": "not exposed by current adapter",
+          "source": "https://github.com/ArduPilot/ardupilot/tree/afeb9c4941543d97f3e04fecf257b8f598f49a6a/libraries/AC_CustomControl",
+          "issue": "https://github.com/stacksjs/drone/issues/5"
+        },
+        {
+          "path": "libraries/AC_Fence",
+          "treeSha": "d50020b1e309f6f4e64956dc6d688d46a68f1426",
+          "roadmapKey": "safety",
+          "nativeStatus": "planned",
+          "driverExposure": "not exposed by current adapter",
+          "source": "https://github.com/ArduPilot/ardupilot/tree/afeb9c4941543d97f3e04fecf257b8f598f49a6a/libraries/AC_Fence",
+          "issue": "https://github.com/stacksjs/drone/issues/6"
+        },
+        {
+          "path": "libraries/AC_InputManager",
+          "treeSha": "23884d35b10f910f4c0689ce1a416ee312a54e26",
+          "roadmapKey": "safety",
+          "nativeStatus": "planned",
+          "driverExposure": "not exposed by current adapter",
+          "source": "https://github.com/ArduPilot/ardupilot/tree/afeb9c4941543d97f3e04fecf257b8f598f49a6a/libraries/AC_InputManager",
+          "issue": "https://github.com/stacksjs/drone/issues/6"
+        },
+        {
+          "path": "libraries/AC_PID",
+          "treeSha": "5093f69b2b7d22418955470fdd7ec5f00d2439c0",
+          "roadmapKey": "controls",
+          "nativeStatus": "planned",
+          "driverExposure": "not exposed by current adapter",
+          "source": "https://github.com/ArduPilot/ardupilot/tree/afeb9c4941543d97f3e04fecf257b8f598f49a6a/libraries/AC_PID",
+          "issue": "https://github.com/stacksjs/drone/issues/5"
+        },
+        {
+          "path": "libraries/AC_PrecLand",
+          "treeSha": "29df207fd0f8da882a8b140ff32ba2911db02bb6",
+          "roadmapKey": "navigation",
+          "nativeStatus": "planned",
+          "driverExposure": "not exposed by current adapter",
+          "source": "https://github.com/ArduPilot/ardupilot/tree/afeb9c4941543d97f3e04fecf257b8f598f49a6a/libraries/AC_PrecLand",
+          "issue": "https://github.com/stacksjs/drone/issues/11"
+        },
+        {
+          "path": "libraries/AC_Sprayer",
+          "treeSha": "86c5c01edf3c675db9ac7675759a6e0a0400337d",
+          "roadmapKey": "application",
+          "nativeStatus": "planned",
+          "driverExposure": "not exposed by current adapter",
+          "source": "https://github.com/ArduPilot/ardupilot/tree/afeb9c4941543d97f3e04fecf257b8f598f49a6a/libraries/AC_Sprayer",
+          "issue": "https://github.com/stacksjs/drone/issues/22"
+        },
+        {
+          "path": "libraries/AC_WPNav",
+          "treeSha": "d0f0640dea873592c2eb5f8bbcc1157161feef67",
+          "roadmapKey": "missions",
+          "nativeStatus": "planned",
+          "driverExposure": "not exposed by current adapter",
+          "source": "https://github.com/ArduPilot/ardupilot/tree/afeb9c4941543d97f3e04fecf257b8f598f49a6a/libraries/AC_WPNav",
+          "issue": "https://github.com/stacksjs/drone/issues/10"
+        },
+        {
+          "path": "libraries/APM_Control",
+          "treeSha": "ab08db29aa36fde2615b1928d53e746eb795f63c",
+          "roadmapKey": "parity",
+          "nativeStatus": "planned",
+          "driverExposure": "not exposed by current adapter",
+          "source": "https://github.com/ArduPilot/ardupilot/tree/afeb9c4941543d97f3e04fecf257b8f598f49a6a/libraries/APM_Control",
+          "issue": "https://github.com/stacksjs/drone/issues/28"
+        },
+        {
+          "path": "libraries/AP_ADC",
+          "treeSha": "a756844c2498d3882a1c73cc98b27c285472f5dd",
+          "roadmapKey": "payloads",
+          "nativeStatus": "planned",
+          "driverExposure": "not exposed by current adapter",
+          "source": "https://github.com/ArduPilot/ardupilot/tree/afeb9c4941543d97f3e04fecf257b8f598f49a6a/libraries/AP_ADC",
+          "issue": "https://github.com/stacksjs/drone/issues/8"
+        },
+        {
+          "path": "libraries/AP_ADSB",
+          "treeSha": "51b9adfcddf9e0fb3ffc5214595a263156f703cb",
+          "roadmapKey": "payloads",
+          "nativeStatus": "planned",
+          "driverExposure": "not exposed by current adapter",
+          "source": "https://github.com/ArduPilot/ardupilot/tree/afeb9c4941543d97f3e04fecf257b8f598f49a6a/libraries/AP_ADSB",
+          "issue": "https://github.com/stacksjs/drone/issues/8"
+        },
+        {
+          "path": "libraries/AP_AHRS",
+          "treeSha": "d148f393098fe63e9d3fce451c1269ec4745c87f",
+          "roadmapKey": "estimation",
+          "nativeStatus": "planned",
+          "driverExposure": "not exposed by current adapter",
+          "source": "https://github.com/ArduPilot/ardupilot/tree/afeb9c4941543d97f3e04fecf257b8f598f49a6a/libraries/AP_AHRS",
+          "issue": "https://github.com/stacksjs/drone/issues/4"
+        },
+        {
+          "path": "libraries/AP_AIS",
+          "treeSha": "9fa4f0f500e1f71dc2defcf8786754ea126d78e7",
+          "roadmapKey": "payloads",
+          "nativeStatus": "planned",
+          "driverExposure": "not exposed by current adapter",
+          "source": "https://github.com/ArduPilot/ardupilot/tree/afeb9c4941543d97f3e04fecf257b8f598f49a6a/libraries/AP_AIS",
+          "issue": "https://github.com/stacksjs/drone/issues/8"
+        },
+        {
+          "path": "libraries/AP_AccelCal",
+          "treeSha": "974c26efd265c38b97bed14d79f8e727f7691076",
+          "roadmapKey": "sensors",
+          "nativeStatus": "planned",
+          "driverExposure": "not exposed by current adapter",
+          "source": "https://github.com/ArduPilot/ardupilot/tree/afeb9c4941543d97f3e04fecf257b8f598f49a6a/libraries/AP_AccelCal",
+          "issue": "https://github.com/stacksjs/drone/issues/3"
+        },
+        {
+          "path": "libraries/AP_AdvancedFailsafe",
+          "treeSha": "18351dc994102518a8a53e06eefc2447ef847559",
+          "roadmapKey": "safety",
+          "nativeStatus": "planned",
+          "driverExposure": "not exposed by current adapter",
+          "source": "https://github.com/ArduPilot/ardupilot/tree/afeb9c4941543d97f3e04fecf257b8f598f49a6a/libraries/AP_AdvancedFailsafe",
+          "issue": "https://github.com/stacksjs/drone/issues/6"
+        },
+        {
+          "path": "libraries/AP_Airspeed",
+          "treeSha": "e395699c4a6e6240191afff3e2118fb8d046fe3d",
+          "roadmapKey": "sensors",
+          "nativeStatus": "planned",
+          "driverExposure": "not exposed by current adapter",
+          "source": "https://github.com/ArduPilot/ardupilot/tree/afeb9c4941543d97f3e04fecf257b8f598f49a6a/libraries/AP_Airspeed",
+          "issue": "https://github.com/stacksjs/drone/issues/3"
+        },
+        {
+          "path": "libraries/AP_Arming",
+          "treeSha": "03f800267e4e75d5770e552348997cf0aacf5930",
+          "roadmapKey": "safety",
+          "nativeStatus": "planned",
+          "driverExposure": "not exposed by current adapter",
+          "source": "https://github.com/ArduPilot/ardupilot/tree/afeb9c4941543d97f3e04fecf257b8f598f49a6a/libraries/AP_Arming",
+          "issue": "https://github.com/stacksjs/drone/issues/6"
+        },
+        {
+          "path": "libraries/AP_Avoidance",
+          "treeSha": "7370d0f35fda946f27e7ec8ef20a80e71e5693b6",
+          "roadmapKey": "navigation",
+          "nativeStatus": "planned",
+          "driverExposure": "not exposed by current adapter",
+          "source": "https://github.com/ArduPilot/ardupilot/tree/afeb9c4941543d97f3e04fecf257b8f598f49a6a/libraries/AP_Avoidance",
+          "issue": "https://github.com/stacksjs/drone/issues/11"
+        },
+        {
+          "path": "libraries/AP_BLHeli",
+          "treeSha": "bd82d03b33fbcd366ab9c31816a23d55760833ea",
+          "roadmapKey": "payloads",
+          "nativeStatus": "planned",
+          "driverExposure": "not exposed by current adapter",
+          "source": "https://github.com/ArduPilot/ardupilot/tree/afeb9c4941543d97f3e04fecf257b8f598f49a6a/libraries/AP_BLHeli",
+          "issue": "https://github.com/stacksjs/drone/issues/8"
+        },
+        {
+          "path": "libraries/AP_Baro",
+          "treeSha": "7385fabbe578f3797445d7ef16798a4494b8dfc4",
+          "roadmapKey": "sensors",
+          "nativeStatus": "planned",
+          "driverExposure": "not exposed by current adapter",
+          "source": "https://github.com/ArduPilot/ardupilot/tree/afeb9c4941543d97f3e04fecf257b8f598f49a6a/libraries/AP_Baro",
+          "issue": "https://github.com/stacksjs/drone/issues/3"
+        },
+        {
+          "path": "libraries/AP_BattMonitor",
+          "treeSha": "548fd2243366654654366e0343ed111cc24e3d4e",
+          "roadmapKey": "payloads",
+          "nativeStatus": "planned",
+          "driverExposure": "not exposed by current adapter",
+          "source": "https://github.com/ArduPilot/ardupilot/tree/afeb9c4941543d97f3e04fecf257b8f598f49a6a/libraries/AP_BattMonitor",
+          "issue": "https://github.com/stacksjs/drone/issues/8"
+        },
+        {
+          "path": "libraries/AP_Beacon",
+          "treeSha": "772b4bf42247529fc423f65037278e85e55b2a8a",
+          "roadmapKey": "sensors",
+          "nativeStatus": "planned",
+          "driverExposure": "not exposed by current adapter",
+          "source": "https://github.com/ArduPilot/ardupilot/tree/afeb9c4941543d97f3e04fecf257b8f598f49a6a/libraries/AP_Beacon",
+          "issue": "https://github.com/stacksjs/drone/issues/3"
+        },
+        {
+          "path": "libraries/AP_BoardConfig",
+          "treeSha": "1a9b88f6ee143228ff701fbbf592b2bf7ea8c884",
+          "roadmapKey": "runtime",
+          "nativeStatus": "planned",
+          "driverExposure": "not exposed by current adapter",
+          "source": "https://github.com/ArduPilot/ardupilot/tree/afeb9c4941543d97f3e04fecf257b8f598f49a6a/libraries/AP_BoardConfig",
+          "issue": "https://github.com/stacksjs/drone/issues/2"
+        },
+        {
+          "path": "libraries/AP_Button",
+          "treeSha": "79f6ea7523c8660e2a5395a19982d5f3ce7affa8",
+          "roadmapKey": "safety",
+          "nativeStatus": "planned",
+          "driverExposure": "not exposed by current adapter",
+          "source": "https://github.com/ArduPilot/ardupilot/tree/afeb9c4941543d97f3e04fecf257b8f598f49a6a/libraries/AP_Button",
+          "issue": "https://github.com/stacksjs/drone/issues/6"
+        },
+        {
+          "path": "libraries/AP_CANManager",
+          "treeSha": "ec7d23e6fad94999c3f9434a70309c45fe1725af",
+          "roadmapKey": "protocols",
+          "nativeStatus": "planned",
+          "driverExposure": "not exposed by current adapter",
+          "source": "https://github.com/ArduPilot/ardupilot/tree/afeb9c4941543d97f3e04fecf257b8f598f49a6a/libraries/AP_CANManager",
+          "issue": "https://github.com/stacksjs/drone/issues/7"
+        },
+        {
+          "path": "libraries/AP_CRSF",
+          "treeSha": "6361ad2b8a8cb5fb61570984a5e92f13b4bd0f6c",
+          "roadmapKey": "protocols",
+          "nativeStatus": "planned",
+          "driverExposure": "not exposed by current adapter",
+          "source": "https://github.com/ArduPilot/ardupilot/tree/afeb9c4941543d97f3e04fecf257b8f598f49a6a/libraries/AP_CRSF",
+          "issue": "https://github.com/stacksjs/drone/issues/7"
+        },
+        {
+          "path": "libraries/AP_CSVReader",
+          "treeSha": "d7a8369973f15eba20549be59cfd2b55f0ec632b",
+          "roadmapKey": "parity",
+          "nativeStatus": "planned",
+          "driverExposure": "not exposed by current adapter",
+          "source": "https://github.com/ArduPilot/ardupilot/tree/afeb9c4941543d97f3e04fecf257b8f598f49a6a/libraries/AP_CSVReader",
+          "issue": "https://github.com/stacksjs/drone/issues/28"
+        },
+        {
+          "path": "libraries/AP_Camera",
+          "treeSha": "5a7c53b50a4c3583fa38a3fa3f6b6e9c584e1d1f",
+          "roadmapKey": "payloads",
+          "nativeStatus": "planned",
+          "driverExposure": "not exposed by current adapter",
+          "source": "https://github.com/ArduPilot/ardupilot/tree/afeb9c4941543d97f3e04fecf257b8f598f49a6a/libraries/AP_Camera",
+          "issue": "https://github.com/stacksjs/drone/issues/8"
+        },
+        {
+          "path": "libraries/AP_CheckFirmware",
+          "treeSha": "453ab131d3204ec11a4da3ba7c2865faa45feb19",
+          "roadmapKey": "observability",
+          "nativeStatus": "planned",
+          "driverExposure": "not exposed by current adapter",
+          "source": "https://github.com/ArduPilot/ardupilot/tree/afeb9c4941543d97f3e04fecf257b8f598f49a6a/libraries/AP_CheckFirmware",
+          "issue": "https://github.com/stacksjs/drone/issues/9"
+        },
+        {
+          "path": "libraries/AP_Common",
+          "treeSha": "c69eea6ec962ddc742a48b99be34d7901cfde560",
+          "roadmapKey": "runtime",
+          "nativeStatus": "planned",
+          "driverExposure": "not exposed by current adapter",
+          "source": "https://github.com/ArduPilot/ardupilot/tree/afeb9c4941543d97f3e04fecf257b8f598f49a6a/libraries/AP_Common",
+          "issue": "https://github.com/stacksjs/drone/issues/2"
+        },
+        {
+          "path": "libraries/AP_Compass",
+          "treeSha": "2ed9c2c0c40505e1ada2cbd1fba30a50ff4f4fea",
+          "roadmapKey": "sensors",
+          "nativeStatus": "planned",
+          "driverExposure": "not exposed by current adapter",
+          "source": "https://github.com/ArduPilot/ardupilot/tree/afeb9c4941543d97f3e04fecf257b8f598f49a6a/libraries/AP_Compass",
+          "issue": "https://github.com/stacksjs/drone/issues/3"
+        },
+        {
+          "path": "libraries/AP_CustomControl",
+          "treeSha": "e2a0208c8dec4b4c1467632433d9f570eb800d61",
+          "roadmapKey": "controls",
+          "nativeStatus": "planned",
+          "driverExposure": "not exposed by current adapter",
+          "source": "https://github.com/ArduPilot/ardupilot/tree/afeb9c4941543d97f3e04fecf257b8f598f49a6a/libraries/AP_CustomControl",
+          "issue": "https://github.com/stacksjs/drone/issues/5"
+        },
+        {
+          "path": "libraries/AP_CustomRotations",
+          "treeSha": "6099f189161beeb866e66cc773e0cafa936ad441",
+          "roadmapKey": "parity",
+          "nativeStatus": "planned",
+          "driverExposure": "not exposed by current adapter",
+          "source": "https://github.com/ArduPilot/ardupilot/tree/afeb9c4941543d97f3e04fecf257b8f598f49a6a/libraries/AP_CustomRotations",
+          "issue": "https://github.com/stacksjs/drone/issues/28"
+        },
+        {
+          "path": "libraries/AP_DAC",
+          "treeSha": "bcbdb13b95b7a4899b992169ad7b926fa6df3874",
+          "roadmapKey": "payloads",
+          "nativeStatus": "planned",
+          "driverExposure": "not exposed by current adapter",
+          "source": "https://github.com/ArduPilot/ardupilot/tree/afeb9c4941543d97f3e04fecf257b8f598f49a6a/libraries/AP_DAC",
+          "issue": "https://github.com/stacksjs/drone/issues/8"
+        },
+        {
+          "path": "libraries/AP_DAL",
+          "treeSha": "ec56fb50926196eb2f5c582678082ed85633bc46",
+          "roadmapKey": "estimation",
+          "nativeStatus": "planned",
+          "driverExposure": "not exposed by current adapter",
+          "source": "https://github.com/ArduPilot/ardupilot/tree/afeb9c4941543d97f3e04fecf257b8f598f49a6a/libraries/AP_DAL",
+          "issue": "https://github.com/stacksjs/drone/issues/4"
+        },
+        {
+          "path": "libraries/AP_DDS",
+          "treeSha": "6b6270398509d2dfe5274ad723e6d5cc5d849611",
+          "roadmapKey": "protocols",
+          "nativeStatus": "planned",
+          "driverExposure": "not exposed by current adapter",
+          "source": "https://github.com/ArduPilot/ardupilot/tree/afeb9c4941543d97f3e04fecf257b8f598f49a6a/libraries/AP_DDS",
+          "issue": "https://github.com/stacksjs/drone/issues/7"
+        },
+        {
+          "path": "libraries/AP_Declination",
+          "treeSha": "9e78bee542247004dc0606f5d8fa975e95b40148",
+          "roadmapKey": "parity",
+          "nativeStatus": "planned",
+          "driverExposure": "not exposed by current adapter",
+          "source": "https://github.com/ArduPilot/ardupilot/tree/afeb9c4941543d97f3e04fecf257b8f598f49a6a/libraries/AP_Declination",
+          "issue": "https://github.com/stacksjs/drone/issues/28"
+        },
+        {
+          "path": "libraries/AP_Devo_Telem",
+          "treeSha": "876941acbc728214563b0368b4eb04ec18ef8d1f",
+          "roadmapKey": "protocols",
+          "nativeStatus": "planned",
+          "driverExposure": "not exposed by current adapter",
+          "source": "https://github.com/ArduPilot/ardupilot/tree/afeb9c4941543d97f3e04fecf257b8f598f49a6a/libraries/AP_Devo_Telem",
+          "issue": "https://github.com/stacksjs/drone/issues/7"
+        },
+        {
+          "path": "libraries/AP_DroneCAN",
+          "treeSha": "241faa11b7ae876fb7b286967adab57cda327b57",
+          "roadmapKey": "protocols",
+          "nativeStatus": "planned",
+          "driverExposure": "not exposed by current adapter",
+          "source": "https://github.com/ArduPilot/ardupilot/tree/afeb9c4941543d97f3e04fecf257b8f598f49a6a/libraries/AP_DroneCAN",
+          "issue": "https://github.com/stacksjs/drone/issues/7"
+        },
+        {
+          "path": "libraries/AP_EFI",
+          "treeSha": "a14c4fdbe6d882cd031c3109462786b2d9db0638",
+          "roadmapKey": "payloads",
+          "nativeStatus": "planned",
+          "driverExposure": "not exposed by current adapter",
+          "source": "https://github.com/ArduPilot/ardupilot/tree/afeb9c4941543d97f3e04fecf257b8f598f49a6a/libraries/AP_EFI",
+          "issue": "https://github.com/stacksjs/drone/issues/8"
+        },
+        {
+          "path": "libraries/AP_ESC_Telem",
+          "treeSha": "ee31cc6539c227790b72ae0c11757ed5f2574c5f",
+          "roadmapKey": "protocols",
+          "nativeStatus": "planned",
+          "driverExposure": "not exposed by current adapter",
+          "source": "https://github.com/ArduPilot/ardupilot/tree/afeb9c4941543d97f3e04fecf257b8f598f49a6a/libraries/AP_ESC_Telem",
+          "issue": "https://github.com/stacksjs/drone/issues/7"
+        },
+        {
+          "path": "libraries/AP_ExternalAHRS",
+          "treeSha": "0d9804c87d0827599122dc8af05b79411acaf269",
+          "roadmapKey": "estimation",
+          "nativeStatus": "planned",
+          "driverExposure": "not exposed by current adapter",
+          "source": "https://github.com/ArduPilot/ardupilot/tree/afeb9c4941543d97f3e04fecf257b8f598f49a6a/libraries/AP_ExternalAHRS",
+          "issue": "https://github.com/stacksjs/drone/issues/4"
+        },
+        {
+          "path": "libraries/AP_ExternalControl",
+          "treeSha": "84f430b1ac09a0ee25eba1fbad883333ff4e6962",
+          "roadmapKey": "parity",
+          "nativeStatus": "planned",
+          "driverExposure": "not exposed by current adapter",
+          "source": "https://github.com/ArduPilot/ardupilot/tree/afeb9c4941543d97f3e04fecf257b8f598f49a6a/libraries/AP_ExternalControl",
+          "issue": "https://github.com/stacksjs/drone/issues/28"
+        },
+        {
+          "path": "libraries/AP_FETtecOneWire",
+          "treeSha": "1b0b9b924a5fc9794a0cc8cd01b86c080ed11c94",
+          "roadmapKey": "parity",
+          "nativeStatus": "planned",
+          "driverExposure": "not exposed by current adapter",
+          "source": "https://github.com/ArduPilot/ardupilot/tree/afeb9c4941543d97f3e04fecf257b8f598f49a6a/libraries/AP_FETtecOneWire",
+          "issue": "https://github.com/stacksjs/drone/issues/28"
+        },
+        {
+          "path": "libraries/AP_Filesystem",
+          "treeSha": "0b824f44e9d71ec05f5bc011026dae5476b38af7",
+          "roadmapKey": "runtime",
+          "nativeStatus": "planned",
+          "driverExposure": "not exposed by current adapter",
+          "source": "https://github.com/ArduPilot/ardupilot/tree/afeb9c4941543d97f3e04fecf257b8f598f49a6a/libraries/AP_Filesystem",
+          "issue": "https://github.com/stacksjs/drone/issues/2"
+        },
+        {
+          "path": "libraries/AP_FlashIface",
+          "treeSha": "7e875039426cc90ad529ade2f1764ed5385663ce",
+          "roadmapKey": "runtime",
+          "nativeStatus": "planned",
+          "driverExposure": "not exposed by current adapter",
+          "source": "https://github.com/ArduPilot/ardupilot/tree/afeb9c4941543d97f3e04fecf257b8f598f49a6a/libraries/AP_FlashIface",
+          "issue": "https://github.com/stacksjs/drone/issues/2"
+        },
+        {
+          "path": "libraries/AP_FlashStorage",
+          "treeSha": "a60659552b8135cfb288e1585de9de6dfdd05448",
+          "roadmapKey": "runtime",
+          "nativeStatus": "planned",
+          "driverExposure": "not exposed by current adapter",
+          "source": "https://github.com/ArduPilot/ardupilot/tree/afeb9c4941543d97f3e04fecf257b8f598f49a6a/libraries/AP_FlashStorage",
+          "issue": "https://github.com/stacksjs/drone/issues/2"
+        },
+        {
+          "path": "libraries/AP_Follow",
+          "treeSha": "fc7427732c58aeeb1144b719941e23b00d1aff5f",
+          "roadmapKey": "navigation",
+          "nativeStatus": "planned",
+          "driverExposure": "not exposed by current adapter",
+          "source": "https://github.com/ArduPilot/ardupilot/tree/afeb9c4941543d97f3e04fecf257b8f598f49a6a/libraries/AP_Follow",
+          "issue": "https://github.com/stacksjs/drone/issues/11"
+        },
+        {
+          "path": "libraries/AP_Frsky_Telem",
+          "treeSha": "7b02fe6e1d810a4872d6daec8fdbbb158b7b5438",
+          "roadmapKey": "protocols",
+          "nativeStatus": "planned",
+          "driverExposure": "not exposed by current adapter",
+          "source": "https://github.com/ArduPilot/ardupilot/tree/afeb9c4941543d97f3e04fecf257b8f598f49a6a/libraries/AP_Frsky_Telem",
+          "issue": "https://github.com/stacksjs/drone/issues/7"
+        },
+        {
+          "path": "libraries/AP_GPS",
+          "treeSha": "72474f2be9677866cb848dd782af61a8d6d87491",
+          "roadmapKey": "sensors",
+          "nativeStatus": "planned",
+          "driverExposure": "not exposed by current adapter",
+          "source": "https://github.com/ArduPilot/ardupilot/tree/afeb9c4941543d97f3e04fecf257b8f598f49a6a/libraries/AP_GPS",
+          "issue": "https://github.com/stacksjs/drone/issues/3"
+        },
+        {
+          "path": "libraries/AP_GSOF",
+          "treeSha": "38231216edd3490470b5c50d344815fbb8fcd1f5",
+          "roadmapKey": "sensors",
+          "nativeStatus": "planned",
+          "driverExposure": "not exposed by current adapter",
+          "source": "https://github.com/ArduPilot/ardupilot/tree/afeb9c4941543d97f3e04fecf257b8f598f49a6a/libraries/AP_GSOF",
+          "issue": "https://github.com/stacksjs/drone/issues/3"
+        },
+        {
+          "path": "libraries/AP_Generator",
+          "treeSha": "0157c3534c2f5f39dd4b2e2390a8e4ce6458f0e9",
+          "roadmapKey": "payloads",
+          "nativeStatus": "planned",
+          "driverExposure": "not exposed by current adapter",
+          "source": "https://github.com/ArduPilot/ardupilot/tree/afeb9c4941543d97f3e04fecf257b8f598f49a6a/libraries/AP_Generator",
+          "issue": "https://github.com/stacksjs/drone/issues/8"
+        },
+        {
+          "path": "libraries/AP_Gripper",
+          "treeSha": "819067e3c87366b1bb2726cd606e352ead0e50f9",
+          "roadmapKey": "payloads",
+          "nativeStatus": "planned",
+          "driverExposure": "not exposed by current adapter",
+          "source": "https://github.com/ArduPilot/ardupilot/tree/afeb9c4941543d97f3e04fecf257b8f598f49a6a/libraries/AP_Gripper",
+          "issue": "https://github.com/stacksjs/drone/issues/8"
+        },
+        {
+          "path": "libraries/AP_GroundEffect",
+          "treeSha": "61203bc2491efec7191eb8cc1ff132de59dc4e8e",
+          "roadmapKey": "safety",
+          "nativeStatus": "planned",
+          "driverExposure": "not exposed by current adapter",
+          "source": "https://github.com/ArduPilot/ardupilot/tree/afeb9c4941543d97f3e04fecf257b8f598f49a6a/libraries/AP_GroundEffect",
+          "issue": "https://github.com/stacksjs/drone/issues/6"
+        },
+        {
+          "path": "libraries/AP_GyroFFT",
+          "treeSha": "4d10c5c7fab50708348148992b2fed80d75ccf1c",
+          "roadmapKey": "sensors",
+          "nativeStatus": "planned",
+          "driverExposure": "not exposed by current adapter",
+          "source": "https://github.com/ArduPilot/ardupilot/tree/afeb9c4941543d97f3e04fecf257b8f598f49a6a/libraries/AP_GyroFFT",
+          "issue": "https://github.com/stacksjs/drone/issues/3"
+        },
+        {
+          "path": "libraries/AP_HAL",
+          "treeSha": "3bef49e0107b15cc2c54993402e8e6a5fa4bff1c",
+          "roadmapKey": "runtime",
+          "nativeStatus": "planned",
+          "driverExposure": "not exposed by current adapter",
+          "source": "https://github.com/ArduPilot/ardupilot/tree/afeb9c4941543d97f3e04fecf257b8f598f49a6a/libraries/AP_HAL",
+          "issue": "https://github.com/stacksjs/drone/issues/2"
+        },
+        {
+          "path": "libraries/AP_HAL_ChibiOS",
+          "treeSha": "22224d79cdefda176003f0b31486c386494b38da",
+          "roadmapKey": "runtime",
+          "nativeStatus": "planned",
+          "driverExposure": "not exposed by current adapter",
+          "source": "https://github.com/ArduPilot/ardupilot/tree/afeb9c4941543d97f3e04fecf257b8f598f49a6a/libraries/AP_HAL_ChibiOS",
+          "issue": "https://github.com/stacksjs/drone/issues/2"
+        },
+        {
+          "path": "libraries/AP_HAL_ESP32",
+          "treeSha": "f0f6b196ba46c60bea8db5421fa6aca58403bb96",
+          "roadmapKey": "runtime",
+          "nativeStatus": "planned",
+          "driverExposure": "not exposed by current adapter",
+          "source": "https://github.com/ArduPilot/ardupilot/tree/afeb9c4941543d97f3e04fecf257b8f598f49a6a/libraries/AP_HAL_ESP32",
+          "issue": "https://github.com/stacksjs/drone/issues/2"
+        },
+        {
+          "path": "libraries/AP_HAL_Empty",
+          "treeSha": "28b4c26b8b8aa9dc6843b98e645bbb235e7f028e",
+          "roadmapKey": "runtime",
+          "nativeStatus": "planned",
+          "driverExposure": "not exposed by current adapter",
+          "source": "https://github.com/ArduPilot/ardupilot/tree/afeb9c4941543d97f3e04fecf257b8f598f49a6a/libraries/AP_HAL_Empty",
+          "issue": "https://github.com/stacksjs/drone/issues/2"
+        },
+        {
+          "path": "libraries/AP_HAL_Linux",
+          "treeSha": "25537517c9de1c6b55357bdfdaac0dc52ae37964",
+          "roadmapKey": "runtime",
+          "nativeStatus": "planned",
+          "driverExposure": "not exposed by current adapter",
+          "source": "https://github.com/ArduPilot/ardupilot/tree/afeb9c4941543d97f3e04fecf257b8f598f49a6a/libraries/AP_HAL_Linux",
+          "issue": "https://github.com/stacksjs/drone/issues/2"
+        },
+        {
+          "path": "libraries/AP_HAL_QURT",
+          "treeSha": "173ed8fa31f7b2999345ac23e2a91a42dbe68c4a",
+          "roadmapKey": "runtime",
+          "nativeStatus": "planned",
+          "driverExposure": "not exposed by current adapter",
+          "source": "https://github.com/ArduPilot/ardupilot/tree/afeb9c4941543d97f3e04fecf257b8f598f49a6a/libraries/AP_HAL_QURT",
+          "issue": "https://github.com/stacksjs/drone/issues/2"
+        },
+        {
+          "path": "libraries/AP_HAL_SITL",
+          "treeSha": "a39f42f093ba477b3f72c3e3abb8456b35f10a3f",
+          "roadmapKey": "runtime",
+          "nativeStatus": "planned",
+          "driverExposure": "not exposed by current adapter",
+          "source": "https://github.com/ArduPilot/ardupilot/tree/afeb9c4941543d97f3e04fecf257b8f598f49a6a/libraries/AP_HAL_SITL",
+          "issue": "https://github.com/stacksjs/drone/issues/2"
+        },
+        {
+          "path": "libraries/AP_Hott_Telem",
+          "treeSha": "b8fe6efcc2b1669c7475902f3205f84a711650bb",
+          "roadmapKey": "protocols",
+          "nativeStatus": "planned",
+          "driverExposure": "not exposed by current adapter",
+          "source": "https://github.com/ArduPilot/ardupilot/tree/afeb9c4941543d97f3e04fecf257b8f598f49a6a/libraries/AP_Hott_Telem",
+          "issue": "https://github.com/stacksjs/drone/issues/7"
+        },
+        {
+          "path": "libraries/AP_IBus_Telem",
+          "treeSha": "655345f3210e2f10b89c47c04dc12194ef1fe79a",
+          "roadmapKey": "protocols",
+          "nativeStatus": "planned",
+          "driverExposure": "not exposed by current adapter",
+          "source": "https://github.com/ArduPilot/ardupilot/tree/afeb9c4941543d97f3e04fecf257b8f598f49a6a/libraries/AP_IBus_Telem",
+          "issue": "https://github.com/stacksjs/drone/issues/7"
+        },
+        {
+          "path": "libraries/AP_ICEngine",
+          "treeSha": "209a0dcb27dccb215daf5786d1d7422d46e193ff",
+          "roadmapKey": "payloads",
+          "nativeStatus": "planned",
+          "driverExposure": "not exposed by current adapter",
+          "source": "https://github.com/ArduPilot/ardupilot/tree/afeb9c4941543d97f3e04fecf257b8f598f49a6a/libraries/AP_ICEngine",
+          "issue": "https://github.com/stacksjs/drone/issues/8"
+        },
+        {
+          "path": "libraries/AP_IOMCU",
+          "treeSha": "fa11d178baa402e0fb942bafb154582202c0f078",
+          "roadmapKey": "runtime",
+          "nativeStatus": "planned",
+          "driverExposure": "not exposed by current adapter",
+          "source": "https://github.com/ArduPilot/ardupilot/tree/afeb9c4941543d97f3e04fecf257b8f598f49a6a/libraries/AP_IOMCU",
+          "issue": "https://github.com/stacksjs/drone/issues/2"
+        },
+        {
+          "path": "libraries/AP_IRLock",
+          "treeSha": "35da3005134c212d4cb6b2525aac687689a5baa1",
+          "roadmapKey": "payloads",
+          "nativeStatus": "planned",
+          "driverExposure": "not exposed by current adapter",
+          "source": "https://github.com/ArduPilot/ardupilot/tree/afeb9c4941543d97f3e04fecf257b8f598f49a6a/libraries/AP_IRLock",
+          "issue": "https://github.com/stacksjs/drone/issues/8"
+        },
+        {
+          "path": "libraries/AP_InertialNav",
+          "treeSha": "3afe99c3d74776bc8084ba8ada7aa9ed9852553d",
+          "roadmapKey": "estimation",
+          "nativeStatus": "planned",
+          "driverExposure": "not exposed by current adapter",
+          "source": "https://github.com/ArduPilot/ardupilot/tree/afeb9c4941543d97f3e04fecf257b8f598f49a6a/libraries/AP_InertialNav",
+          "issue": "https://github.com/stacksjs/drone/issues/4"
+        },
+        {
+          "path": "libraries/AP_InertialSensor",
+          "treeSha": "1d52a5da0eec747209e50bd631f1958d3b512a63",
+          "roadmapKey": "sensors",
+          "nativeStatus": "planned",
+          "driverExposure": "not exposed by current adapter",
+          "source": "https://github.com/ArduPilot/ardupilot/tree/afeb9c4941543d97f3e04fecf257b8f598f49a6a/libraries/AP_InertialSensor",
+          "issue": "https://github.com/stacksjs/drone/issues/3"
+        },
+        {
+          "path": "libraries/AP_InternalError",
+          "treeSha": "5b98ec9da6de2b6b3b21804e8d29221b84cabd4e",
+          "roadmapKey": "runtime",
+          "nativeStatus": "planned",
+          "driverExposure": "not exposed by current adapter",
+          "source": "https://github.com/ArduPilot/ardupilot/tree/afeb9c4941543d97f3e04fecf257b8f598f49a6a/libraries/AP_InternalError",
+          "issue": "https://github.com/stacksjs/drone/issues/2"
+        },
+        {
+          "path": "libraries/AP_JSButton",
+          "treeSha": "4014ad13fc40e34bfd988def003f01eb97e8c12c",
+          "roadmapKey": "safety",
+          "nativeStatus": "planned",
+          "driverExposure": "not exposed by current adapter",
+          "source": "https://github.com/ArduPilot/ardupilot/tree/afeb9c4941543d97f3e04fecf257b8f598f49a6a/libraries/AP_JSButton",
+          "issue": "https://github.com/stacksjs/drone/issues/6"
+        },
+        {
+          "path": "libraries/AP_JSON",
+          "treeSha": "fd04a0c2c602674259b1f337564c6cfbb558953b",
+          "roadmapKey": "parity",
+          "nativeStatus": "planned",
+          "driverExposure": "not exposed by current adapter",
+          "source": "https://github.com/ArduPilot/ardupilot/tree/afeb9c4941543d97f3e04fecf257b8f598f49a6a/libraries/AP_JSON",
+          "issue": "https://github.com/stacksjs/drone/issues/28"
+        },
+        {
+          "path": "libraries/AP_KDECAN",
+          "treeSha": "48baa7912e61ef3da7c7c32dc82986f293e21a14",
+          "roadmapKey": "parity",
+          "nativeStatus": "planned",
+          "driverExposure": "not exposed by current adapter",
+          "source": "https://github.com/ArduPilot/ardupilot/tree/afeb9c4941543d97f3e04fecf257b8f598f49a6a/libraries/AP_KDECAN",
+          "issue": "https://github.com/stacksjs/drone/issues/28"
+        },
+        {
+          "path": "libraries/AP_L1_Control",
+          "treeSha": "f8522b64001ac50e934b5814104cbbd083fe4ba0",
+          "roadmapKey": "vehicles-air",
+          "nativeStatus": "planned",
+          "driverExposure": "not exposed by current adapter",
+          "source": "https://github.com/ArduPilot/ardupilot/tree/afeb9c4941543d97f3e04fecf257b8f598f49a6a/libraries/AP_L1_Control",
+          "issue": "https://github.com/stacksjs/drone/issues/12"
+        },
+        {
+          "path": "libraries/AP_LTM_Telem",
+          "treeSha": "f79ccd750562754baa1493aa46c4846da4e3173e",
+          "roadmapKey": "protocols",
+          "nativeStatus": "planned",
+          "driverExposure": "not exposed by current adapter",
+          "source": "https://github.com/ArduPilot/ardupilot/tree/afeb9c4941543d97f3e04fecf257b8f598f49a6a/libraries/AP_LTM_Telem",
+          "issue": "https://github.com/stacksjs/drone/issues/7"
+        },
+        {
+          "path": "libraries/AP_Landing",
+          "treeSha": "495539ff100721f736f02f2faa0e9673dda17231",
+          "roadmapKey": "vehicles-air",
+          "nativeStatus": "planned",
+          "driverExposure": "not exposed by current adapter",
+          "source": "https://github.com/ArduPilot/ardupilot/tree/afeb9c4941543d97f3e04fecf257b8f598f49a6a/libraries/AP_Landing",
+          "issue": "https://github.com/stacksjs/drone/issues/12"
+        },
+        {
+          "path": "libraries/AP_LandingGear",
+          "treeSha": "a181f45e6483bd90d53caf1c902f9bffe9dc3178",
+          "roadmapKey": "vehicles-air",
+          "nativeStatus": "planned",
+          "driverExposure": "not exposed by current adapter",
+          "source": "https://github.com/ArduPilot/ardupilot/tree/afeb9c4941543d97f3e04fecf257b8f598f49a6a/libraries/AP_LandingGear",
+          "issue": "https://github.com/stacksjs/drone/issues/12"
+        },
+        {
+          "path": "libraries/AP_LeakDetector",
+          "treeSha": "92e7a4a55f3748ea9ea0e57aaad25f1b83dbeaa2",
+          "roadmapKey": "vehicles-subsea",
+          "nativeStatus": "planned",
+          "driverExposure": "not exposed by current adapter",
+          "source": "https://github.com/ArduPilot/ardupilot/tree/afeb9c4941543d97f3e04fecf257b8f598f49a6a/libraries/AP_LeakDetector",
+          "issue": "https://github.com/stacksjs/drone/issues/15"
+        },
+        {
+          "path": "libraries/AP_LightWareSerial",
+          "treeSha": "b63aa3d102150252653626f0746f540d21df6a09",
+          "roadmapKey": "parity",
+          "nativeStatus": "planned",
+          "driverExposure": "not exposed by current adapter",
+          "source": "https://github.com/ArduPilot/ardupilot/tree/afeb9c4941543d97f3e04fecf257b8f598f49a6a/libraries/AP_LightWareSerial",
+          "issue": "https://github.com/stacksjs/drone/issues/28"
+        },
+        {
+          "path": "libraries/AP_Logger",
+          "treeSha": "78db11f557c554a5068a7383b169f61cbf6e2a52",
+          "roadmapKey": "observability",
+          "nativeStatus": "planned",
+          "driverExposure": "not exposed by current adapter",
+          "source": "https://github.com/ArduPilot/ardupilot/tree/afeb9c4941543d97f3e04fecf257b8f598f49a6a/libraries/AP_Logger",
+          "issue": "https://github.com/stacksjs/drone/issues/9"
+        },
+        {
+          "path": "libraries/AP_MSP",
+          "treeSha": "f923557027372bc88356da5e0214408163b75161",
+          "roadmapKey": "protocols",
+          "nativeStatus": "planned",
+          "driverExposure": "not exposed by current adapter",
+          "source": "https://github.com/ArduPilot/ardupilot/tree/afeb9c4941543d97f3e04fecf257b8f598f49a6a/libraries/AP_MSP",
+          "issue": "https://github.com/stacksjs/drone/issues/7"
+        },
+        {
+          "path": "libraries/AP_Math",
+          "treeSha": "e7b878e649975aebf470cdb43d0d0f2692f93a04",
+          "roadmapKey": "runtime",
+          "nativeStatus": "planned",
+          "driverExposure": "not exposed by current adapter",
+          "source": "https://github.com/ArduPilot/ardupilot/tree/afeb9c4941543d97f3e04fecf257b8f598f49a6a/libraries/AP_Math",
+          "issue": "https://github.com/stacksjs/drone/issues/2"
+        },
+        {
+          "path": "libraries/AP_Menu",
+          "treeSha": "366dda6804d8d67eb1f4a5239f699a125ec4e6a6",
+          "roadmapKey": "parity",
+          "nativeStatus": "planned",
+          "driverExposure": "not exposed by current adapter",
+          "source": "https://github.com/ArduPilot/ardupilot/tree/afeb9c4941543d97f3e04fecf257b8f598f49a6a/libraries/AP_Menu",
+          "issue": "https://github.com/stacksjs/drone/issues/28"
+        },
+        {
+          "path": "libraries/AP_Mission",
+          "treeSha": "14665afd49ecfacfc07ea878a441a77299a91e55",
+          "roadmapKey": "missions",
+          "nativeStatus": "planned",
+          "driverExposure": "not exposed by current adapter",
+          "source": "https://github.com/ArduPilot/ardupilot/tree/afeb9c4941543d97f3e04fecf257b8f598f49a6a/libraries/AP_Mission",
+          "issue": "https://github.com/stacksjs/drone/issues/10"
+        },
+        {
+          "path": "libraries/AP_Module",
+          "treeSha": "0482b18d3916d299b3462d19caa17a497687d059",
+          "roadmapKey": "runtime",
+          "nativeStatus": "planned",
+          "driverExposure": "not exposed by current adapter",
+          "source": "https://github.com/ArduPilot/ardupilot/tree/afeb9c4941543d97f3e04fecf257b8f598f49a6a/libraries/AP_Module",
+          "issue": "https://github.com/stacksjs/drone/issues/2"
+        },
+        {
+          "path": "libraries/AP_Motors",
+          "treeSha": "13f0bbef1b30a8128ae8fb9fdb6041b17f4cc81a",
+          "roadmapKey": "controls",
+          "nativeStatus": "planned",
+          "driverExposure": "not exposed by current adapter",
+          "source": "https://github.com/ArduPilot/ardupilot/tree/afeb9c4941543d97f3e04fecf257b8f598f49a6a/libraries/AP_Motors",
+          "issue": "https://github.com/stacksjs/drone/issues/5"
+        },
+        {
+          "path": "libraries/AP_Mount",
+          "treeSha": "75218124f98f051a9d90a43146b33874a9f272bf",
+          "roadmapKey": "payloads",
+          "nativeStatus": "planned",
+          "driverExposure": "not exposed by current adapter",
+          "source": "https://github.com/ArduPilot/ardupilot/tree/afeb9c4941543d97f3e04fecf257b8f598f49a6a/libraries/AP_Mount",
+          "issue": "https://github.com/stacksjs/drone/issues/8"
+        },
+        {
+          "path": "libraries/AP_MultiHeap",
+          "treeSha": "53e82bcd434b57dd508e9c169465386f077e404a",
+          "roadmapKey": "runtime",
+          "nativeStatus": "planned",
+          "driverExposure": "not exposed by current adapter",
+          "source": "https://github.com/ArduPilot/ardupilot/tree/afeb9c4941543d97f3e04fecf257b8f598f49a6a/libraries/AP_MultiHeap",
+          "issue": "https://github.com/stacksjs/drone/issues/2"
+        },
+        {
+          "path": "libraries/AP_NMEA_Output",
+          "treeSha": "b8be00981499683de1618fcc1626086267163946",
+          "roadmapKey": "protocols",
+          "nativeStatus": "planned",
+          "driverExposure": "not exposed by current adapter",
+          "source": "https://github.com/ArduPilot/ardupilot/tree/afeb9c4941543d97f3e04fecf257b8f598f49a6a/libraries/AP_NMEA_Output",
+          "issue": "https://github.com/stacksjs/drone/issues/7"
+        },
+        {
+          "path": "libraries/AP_NavEKF",
+          "treeSha": "c94a56f7d646935d02a9f762439ce608bc88356e",
+          "roadmapKey": "estimation",
+          "nativeStatus": "planned",
+          "driverExposure": "not exposed by current adapter",
+          "source": "https://github.com/ArduPilot/ardupilot/tree/afeb9c4941543d97f3e04fecf257b8f598f49a6a/libraries/AP_NavEKF",
+          "issue": "https://github.com/stacksjs/drone/issues/4"
+        },
+        {
+          "path": "libraries/AP_NavEKF2",
+          "treeSha": "bf35b6c3ee719e757cb161fe978d454347a5a89a",
+          "roadmapKey": "estimation",
+          "nativeStatus": "planned",
+          "driverExposure": "not exposed by current adapter",
+          "source": "https://github.com/ArduPilot/ardupilot/tree/afeb9c4941543d97f3e04fecf257b8f598f49a6a/libraries/AP_NavEKF2",
+          "issue": "https://github.com/stacksjs/drone/issues/4"
+        },
+        {
+          "path": "libraries/AP_NavEKF3",
+          "treeSha": "dd07d591d0fad12f5e893a8dc088f465ca5dfcda",
+          "roadmapKey": "estimation",
+          "nativeStatus": "planned",
+          "driverExposure": "not exposed by current adapter",
+          "source": "https://github.com/ArduPilot/ardupilot/tree/afeb9c4941543d97f3e04fecf257b8f598f49a6a/libraries/AP_NavEKF3",
+          "issue": "https://github.com/stacksjs/drone/issues/4"
+        },
+        {
+          "path": "libraries/AP_Navigation",
+          "treeSha": "42b1e43235a4e3c10cd1972fa516db657f983064",
+          "roadmapKey": "missions",
+          "nativeStatus": "planned",
+          "driverExposure": "not exposed by current adapter",
+          "source": "https://github.com/ArduPilot/ardupilot/tree/afeb9c4941543d97f3e04fecf257b8f598f49a6a/libraries/AP_Navigation",
+          "issue": "https://github.com/stacksjs/drone/issues/10"
+        },
+        {
+          "path": "libraries/AP_Networking",
+          "treeSha": "c137ea5eee8178206011af005cfbe1b33ef40774",
+          "roadmapKey": "protocols",
+          "nativeStatus": "planned",
+          "driverExposure": "not exposed by current adapter",
+          "source": "https://github.com/ArduPilot/ardupilot/tree/afeb9c4941543d97f3e04fecf257b8f598f49a6a/libraries/AP_Networking",
+          "issue": "https://github.com/stacksjs/drone/issues/7"
+        },
+        {
+          "path": "libraries/AP_Notify",
+          "treeSha": "bdb2125306ce23e05d6df7d0bc781c20d3f580cc",
+          "roadmapKey": "safety",
+          "nativeStatus": "planned",
+          "driverExposure": "not exposed by current adapter",
+          "source": "https://github.com/ArduPilot/ardupilot/tree/afeb9c4941543d97f3e04fecf257b8f598f49a6a/libraries/AP_Notify",
+          "issue": "https://github.com/stacksjs/drone/issues/6"
+        },
+        {
+          "path": "libraries/AP_OLC",
+          "treeSha": "0bbefa78f6aa97397882a87c0bd4d19fc8ba6462",
+          "roadmapKey": "parity",
+          "nativeStatus": "planned",
+          "driverExposure": "not exposed by current adapter",
+          "source": "https://github.com/ArduPilot/ardupilot/tree/afeb9c4941543d97f3e04fecf257b8f598f49a6a/libraries/AP_OLC",
+          "issue": "https://github.com/stacksjs/drone/issues/28"
+        },
+        {
+          "path": "libraries/AP_ONVIF",
+          "treeSha": "c7af34c145b7216db0137d3c8355df01127aa432",
+          "roadmapKey": "payloads",
+          "nativeStatus": "planned",
+          "driverExposure": "not exposed by current adapter",
+          "source": "https://github.com/ArduPilot/ardupilot/tree/afeb9c4941543d97f3e04fecf257b8f598f49a6a/libraries/AP_ONVIF",
+          "issue": "https://github.com/stacksjs/drone/issues/8"
+        },
+        {
+          "path": "libraries/AP_OSD",
+          "treeSha": "44ba36c2eb6ac7400db67fac6999572aeebf5067",
+          "roadmapKey": "payloads",
+          "nativeStatus": "planned",
+          "driverExposure": "not exposed by current adapter",
+          "source": "https://github.com/ArduPilot/ardupilot/tree/afeb9c4941543d97f3e04fecf257b8f598f49a6a/libraries/AP_OSD",
+          "issue": "https://github.com/stacksjs/drone/issues/8"
+        },
+        {
+          "path": "libraries/AP_OpenDroneID",
+          "treeSha": "4b0fb848e438b8eb596d851e2954a00f16dc6ad1",
+          "roadmapKey": "payloads",
+          "nativeStatus": "planned",
+          "driverExposure": "not exposed by current adapter",
+          "source": "https://github.com/ArduPilot/ardupilot/tree/afeb9c4941543d97f3e04fecf257b8f598f49a6a/libraries/AP_OpenDroneID",
+          "issue": "https://github.com/stacksjs/drone/issues/8"
+        },
+        {
+          "path": "libraries/AP_OpticalFlow",
+          "treeSha": "895d6f551610f082889df1b56a878758da5d043e",
+          "roadmapKey": "sensors",
+          "nativeStatus": "planned",
+          "driverExposure": "not exposed by current adapter",
+          "source": "https://github.com/ArduPilot/ardupilot/tree/afeb9c4941543d97f3e04fecf257b8f598f49a6a/libraries/AP_OpticalFlow",
+          "issue": "https://github.com/stacksjs/drone/issues/3"
+        },
+        {
+          "path": "libraries/AP_Parachute",
+          "treeSha": "9e3c6ec02d4f45a59d1899c410ed9aa8e1ba86b8",
+          "roadmapKey": "safety",
+          "nativeStatus": "planned",
+          "driverExposure": "not exposed by current adapter",
+          "source": "https://github.com/ArduPilot/ardupilot/tree/afeb9c4941543d97f3e04fecf257b8f598f49a6a/libraries/AP_Parachute",
+          "issue": "https://github.com/stacksjs/drone/issues/6"
+        },
+        {
+          "path": "libraries/AP_Param",
+          "treeSha": "4a5e902a1c592f30fa890796908654fb72a51880",
+          "roadmapKey": "runtime",
+          "nativeStatus": "planned",
+          "driverExposure": "not exposed by current adapter",
+          "source": "https://github.com/ArduPilot/ardupilot/tree/afeb9c4941543d97f3e04fecf257b8f598f49a6a/libraries/AP_Param",
+          "issue": "https://github.com/stacksjs/drone/issues/2"
+        },
+        {
+          "path": "libraries/AP_PiccoloCAN",
+          "treeSha": "5fd4115e7eee5f13bdc5f5bdcdfb1fa9b0e7fab0",
+          "roadmapKey": "parity",
+          "nativeStatus": "planned",
+          "driverExposure": "not exposed by current adapter",
+          "source": "https://github.com/ArduPilot/ardupilot/tree/afeb9c4941543d97f3e04fecf257b8f598f49a6a/libraries/AP_PiccoloCAN",
+          "issue": "https://github.com/stacksjs/drone/issues/28"
+        },
+        {
+          "path": "libraries/AP_Proximity",
+          "treeSha": "c4f7a96782224c31c143643f3e346cb6eacf822e",
+          "roadmapKey": "navigation",
+          "nativeStatus": "planned",
+          "driverExposure": "not exposed by current adapter",
+          "source": "https://github.com/ArduPilot/ardupilot/tree/afeb9c4941543d97f3e04fecf257b8f598f49a6a/libraries/AP_Proximity",
+          "issue": "https://github.com/stacksjs/drone/issues/11"
+        },
+        {
+          "path": "libraries/AP_Quicktune",
+          "treeSha": "097906e2c8796b6664c76e6537c8b0a6c1f2ee5b",
+          "roadmapKey": "controls",
+          "nativeStatus": "planned",
+          "driverExposure": "not exposed by current adapter",
+          "source": "https://github.com/ArduPilot/ardupilot/tree/afeb9c4941543d97f3e04fecf257b8f598f49a6a/libraries/AP_Quicktune",
+          "issue": "https://github.com/stacksjs/drone/issues/5"
+        },
+        {
+          "path": "libraries/AP_RAMTRON",
+          "treeSha": "b837752aa57def48bb27868b758a6563021e683a",
+          "roadmapKey": "runtime",
+          "nativeStatus": "planned",
+          "driverExposure": "not exposed by current adapter",
+          "source": "https://github.com/ArduPilot/ardupilot/tree/afeb9c4941543d97f3e04fecf257b8f598f49a6a/libraries/AP_RAMTRON",
+          "issue": "https://github.com/stacksjs/drone/issues/2"
+        },
+        {
+          "path": "libraries/AP_RCMapper",
+          "treeSha": "5a54fd88ac389e445fc040dc00223bd52ddae580",
+          "roadmapKey": "safety",
+          "nativeStatus": "planned",
+          "driverExposure": "not exposed by current adapter",
+          "source": "https://github.com/ArduPilot/ardupilot/tree/afeb9c4941543d97f3e04fecf257b8f598f49a6a/libraries/AP_RCMapper",
+          "issue": "https://github.com/stacksjs/drone/issues/6"
+        },
+        {
+          "path": "libraries/AP_RCProtocol",
+          "treeSha": "01a5198a34afcfb77d55a7c111e9ab07a64356e2",
+          "roadmapKey": "protocols",
+          "nativeStatus": "planned",
+          "driverExposure": "not exposed by current adapter",
+          "source": "https://github.com/ArduPilot/ardupilot/tree/afeb9c4941543d97f3e04fecf257b8f598f49a6a/libraries/AP_RCProtocol",
+          "issue": "https://github.com/stacksjs/drone/issues/7"
+        },
+        {
+          "path": "libraries/AP_RCTelemetry",
+          "treeSha": "c2cf44bdaa18c337dd7cb987b3666b4aca763dd8",
+          "roadmapKey": "protocols",
+          "nativeStatus": "planned",
+          "driverExposure": "not exposed by current adapter",
+          "source": "https://github.com/ArduPilot/ardupilot/tree/afeb9c4941543d97f3e04fecf257b8f598f49a6a/libraries/AP_RCTelemetry",
+          "issue": "https://github.com/stacksjs/drone/issues/7"
+        },
+        {
+          "path": "libraries/AP_ROMFS",
+          "treeSha": "8d7abce14d44016b7802fec5217c87dada4eb55b",
+          "roadmapKey": "runtime",
+          "nativeStatus": "planned",
+          "driverExposure": "not exposed by current adapter",
+          "source": "https://github.com/ArduPilot/ardupilot/tree/afeb9c4941543d97f3e04fecf257b8f598f49a6a/libraries/AP_ROMFS",
+          "issue": "https://github.com/stacksjs/drone/issues/2"
+        },
+        {
+          "path": "libraries/AP_RPM",
+          "treeSha": "c145adbc1075fe0a0acf08cac451780ace4229d5",
+          "roadmapKey": "payloads",
+          "nativeStatus": "planned",
+          "driverExposure": "not exposed by current adapter",
+          "source": "https://github.com/ArduPilot/ardupilot/tree/afeb9c4941543d97f3e04fecf257b8f598f49a6a/libraries/AP_RPM",
+          "issue": "https://github.com/stacksjs/drone/issues/8"
+        },
+        {
+          "path": "libraries/AP_RSSI",
+          "treeSha": "eb394457361d5f390a4bee07019a87e58051f5c8",
+          "roadmapKey": "parity",
+          "nativeStatus": "planned",
+          "driverExposure": "not exposed by current adapter",
+          "source": "https://github.com/ArduPilot/ardupilot/tree/afeb9c4941543d97f3e04fecf257b8f598f49a6a/libraries/AP_RSSI",
+          "issue": "https://github.com/stacksjs/drone/issues/28"
+        },
+        {
+          "path": "libraries/AP_RTC",
+          "treeSha": "d303cf5bae2604710b67af21ff3b11d2a531cf8f",
+          "roadmapKey": "runtime",
+          "nativeStatus": "planned",
+          "driverExposure": "not exposed by current adapter",
+          "source": "https://github.com/ArduPilot/ardupilot/tree/afeb9c4941543d97f3e04fecf257b8f598f49a6a/libraries/AP_RTC",
+          "issue": "https://github.com/stacksjs/drone/issues/2"
+        },
+        {
+          "path": "libraries/AP_Radio",
+          "treeSha": "0c9c877b608bd79004fa3f065eb10a7f3e3bd8bb",
+          "roadmapKey": "protocols",
+          "nativeStatus": "planned",
+          "driverExposure": "not exposed by current adapter",
+          "source": "https://github.com/ArduPilot/ardupilot/tree/afeb9c4941543d97f3e04fecf257b8f598f49a6a/libraries/AP_Radio",
+          "issue": "https://github.com/stacksjs/drone/issues/7"
+        },
+        {
+          "path": "libraries/AP_Rally",
+          "treeSha": "5283235f00473c8afced5f4d7f5aef21b5ae7107",
+          "roadmapKey": "missions",
+          "nativeStatus": "planned",
+          "driverExposure": "not exposed by current adapter",
+          "source": "https://github.com/ArduPilot/ardupilot/tree/afeb9c4941543d97f3e04fecf257b8f598f49a6a/libraries/AP_Rally",
+          "issue": "https://github.com/stacksjs/drone/issues/10"
+        },
+        {
+          "path": "libraries/AP_RangeFinder",
+          "treeSha": "1ee18593cf554eaeb3e902e7feb68210e8d6d5bf",
+          "roadmapKey": "sensors",
+          "nativeStatus": "planned",
+          "driverExposure": "not exposed by current adapter",
+          "source": "https://github.com/ArduPilot/ardupilot/tree/afeb9c4941543d97f3e04fecf257b8f598f49a6a/libraries/AP_RangeFinder",
+          "issue": "https://github.com/stacksjs/drone/issues/3"
+        },
+        {
+          "path": "libraries/AP_Relay",
+          "treeSha": "792bb8863a8b475a5a1901ca84ad84f68d45e30e",
+          "roadmapKey": "payloads",
+          "nativeStatus": "planned",
+          "driverExposure": "not exposed by current adapter",
+          "source": "https://github.com/ArduPilot/ardupilot/tree/afeb9c4941543d97f3e04fecf257b8f598f49a6a/libraries/AP_Relay",
+          "issue": "https://github.com/stacksjs/drone/issues/8"
+        },
+        {
+          "path": "libraries/AP_RobotisServo",
+          "treeSha": "753e51a47377abe2239e07e122312e426686efea",
+          "roadmapKey": "controls",
+          "nativeStatus": "planned",
+          "driverExposure": "not exposed by current adapter",
+          "source": "https://github.com/ArduPilot/ardupilot/tree/afeb9c4941543d97f3e04fecf257b8f598f49a6a/libraries/AP_RobotisServo",
+          "issue": "https://github.com/stacksjs/drone/issues/5"
+        },
+        {
+          "path": "libraries/AP_SBusOut",
+          "treeSha": "efeab473fac2658773615d91e9c0f0a97fbc56ce",
+          "roadmapKey": "parity",
+          "nativeStatus": "planned",
+          "driverExposure": "not exposed by current adapter",
+          "source": "https://github.com/ArduPilot/ardupilot/tree/afeb9c4941543d97f3e04fecf257b8f598f49a6a/libraries/AP_SBusOut",
+          "issue": "https://github.com/stacksjs/drone/issues/28"
+        },
+        {
+          "path": "libraries/AP_Scheduler",
+          "treeSha": "15937cdc569a17e30a700f432e603e1f979133a7",
+          "roadmapKey": "runtime",
+          "nativeStatus": "planned",
+          "driverExposure": "not exposed by current adapter",
+          "source": "https://github.com/ArduPilot/ardupilot/tree/afeb9c4941543d97f3e04fecf257b8f598f49a6a/libraries/AP_Scheduler",
+          "issue": "https://github.com/stacksjs/drone/issues/2"
+        },
+        {
+          "path": "libraries/AP_Scripting",
+          "treeSha": "ba5d8adbb6daf94c16a27aa2240a77f355f396d4",
+          "roadmapKey": "missions",
+          "nativeStatus": "planned",
+          "driverExposure": "not exposed by current adapter",
+          "source": "https://github.com/ArduPilot/ardupilot/tree/afeb9c4941543d97f3e04fecf257b8f598f49a6a/libraries/AP_Scripting",
+          "issue": "https://github.com/stacksjs/drone/issues/10"
+        },
+        {
+          "path": "libraries/AP_SerialLED",
+          "treeSha": "ab0b90bbe62be4e75a8084623ccb68eaab02a408",
+          "roadmapKey": "payloads",
+          "nativeStatus": "planned",
+          "driverExposure": "not exposed by current adapter",
+          "source": "https://github.com/ArduPilot/ardupilot/tree/afeb9c4941543d97f3e04fecf257b8f598f49a6a/libraries/AP_SerialLED",
+          "issue": "https://github.com/stacksjs/drone/issues/8"
+        },
+        {
+          "path": "libraries/AP_SerialManager",
+          "treeSha": "7a6c2ce6c09e259fe70944f19bd7fc333d40edcb",
+          "roadmapKey": "protocols",
+          "nativeStatus": "planned",
+          "driverExposure": "not exposed by current adapter",
+          "source": "https://github.com/ArduPilot/ardupilot/tree/afeb9c4941543d97f3e04fecf257b8f598f49a6a/libraries/AP_SerialManager",
+          "issue": "https://github.com/stacksjs/drone/issues/7"
+        },
+        {
+          "path": "libraries/AP_ServoRelayEvents",
+          "treeSha": "275a1ea83223575d295c7b72e0412f126d0161f0",
+          "roadmapKey": "controls",
+          "nativeStatus": "planned",
+          "driverExposure": "not exposed by current adapter",
+          "source": "https://github.com/ArduPilot/ardupilot/tree/afeb9c4941543d97f3e04fecf257b8f598f49a6a/libraries/AP_ServoRelayEvents",
+          "issue": "https://github.com/stacksjs/drone/issues/5"
+        },
+        {
+          "path": "libraries/AP_Servo_Telem",
+          "treeSha": "d5289b36239f5075e6ab851eda21bfc39a65aac7",
+          "roadmapKey": "controls",
+          "nativeStatus": "planned",
+          "driverExposure": "not exposed by current adapter",
+          "source": "https://github.com/ArduPilot/ardupilot/tree/afeb9c4941543d97f3e04fecf257b8f598f49a6a/libraries/AP_Servo_Telem",
+          "issue": "https://github.com/stacksjs/drone/issues/5"
+        },
+        {
+          "path": "libraries/AP_SmartRTL",
+          "treeSha": "4f0c3a9d98c9aa044265c146707aac3d9b1745de",
+          "roadmapKey": "missions",
+          "nativeStatus": "planned",
+          "driverExposure": "not exposed by current adapter",
+          "source": "https://github.com/ArduPilot/ardupilot/tree/afeb9c4941543d97f3e04fecf257b8f598f49a6a/libraries/AP_SmartRTL",
+          "issue": "https://github.com/stacksjs/drone/issues/10"
+        },
+        {
+          "path": "libraries/AP_Soaring",
+          "treeSha": "8b7917ba4819a6d7f530a63f00c40c7cb7de756f",
+          "roadmapKey": "vehicles-air",
+          "nativeStatus": "planned",
+          "driverExposure": "not exposed by current adapter",
+          "source": "https://github.com/ArduPilot/ardupilot/tree/afeb9c4941543d97f3e04fecf257b8f598f49a6a/libraries/AP_Soaring",
+          "issue": "https://github.com/stacksjs/drone/issues/12"
+        },
+        {
+          "path": "libraries/AP_Stats",
+          "treeSha": "03831626dd6ec7cd4f36144697830951597fe5e2",
+          "roadmapKey": "observability",
+          "nativeStatus": "planned",
+          "driverExposure": "not exposed by current adapter",
+          "source": "https://github.com/ArduPilot/ardupilot/tree/afeb9c4941543d97f3e04fecf257b8f598f49a6a/libraries/AP_Stats",
+          "issue": "https://github.com/stacksjs/drone/issues/9"
+        },
+        {
+          "path": "libraries/AP_SurfaceDistance",
+          "treeSha": "d11fe99cbb9f82279d7cb2eb7fec065a19e19e71",
+          "roadmapKey": "sensors",
+          "nativeStatus": "planned",
+          "driverExposure": "not exposed by current adapter",
+          "source": "https://github.com/ArduPilot/ardupilot/tree/afeb9c4941543d97f3e04fecf257b8f598f49a6a/libraries/AP_SurfaceDistance",
+          "issue": "https://github.com/stacksjs/drone/issues/3"
+        },
+        {
+          "path": "libraries/AP_TECS",
+          "treeSha": "2646e8ac9f9c16ca609dd6001f8d04e6b84f37f2",
+          "roadmapKey": "vehicles-air",
+          "nativeStatus": "planned",
+          "driverExposure": "not exposed by current adapter",
+          "source": "https://github.com/ArduPilot/ardupilot/tree/afeb9c4941543d97f3e04fecf257b8f598f49a6a/libraries/AP_TECS",
+          "issue": "https://github.com/stacksjs/drone/issues/12"
+        },
+        {
+          "path": "libraries/AP_TempCalibration",
+          "treeSha": "41925ada966ed59601bba124710a5fbb81ec4d67",
+          "roadmapKey": "sensors",
+          "nativeStatus": "planned",
+          "driverExposure": "not exposed by current adapter",
+          "source": "https://github.com/ArduPilot/ardupilot/tree/afeb9c4941543d97f3e04fecf257b8f598f49a6a/libraries/AP_TempCalibration",
+          "issue": "https://github.com/stacksjs/drone/issues/3"
+        },
+        {
+          "path": "libraries/AP_TemperatureSensor",
+          "treeSha": "d1630c110c0c519e1837e864f6d8d461e2df9b70",
+          "roadmapKey": "sensors",
+          "nativeStatus": "planned",
+          "driverExposure": "not exposed by current adapter",
+          "source": "https://github.com/ArduPilot/ardupilot/tree/afeb9c4941543d97f3e04fecf257b8f598f49a6a/libraries/AP_TemperatureSensor",
+          "issue": "https://github.com/stacksjs/drone/issues/3"
+        },
+        {
+          "path": "libraries/AP_Terrain",
+          "treeSha": "2f2bad8a13322c0fcc3acd9a3e2e8b48794f11c9",
+          "roadmapKey": "missions",
+          "nativeStatus": "planned",
+          "driverExposure": "not exposed by current adapter",
+          "source": "https://github.com/ArduPilot/ardupilot/tree/afeb9c4941543d97f3e04fecf257b8f598f49a6a/libraries/AP_Terrain",
+          "issue": "https://github.com/stacksjs/drone/issues/10"
+        },
+        {
+          "path": "libraries/AP_Torqeedo",
+          "treeSha": "10c0bee9056a191b4ab60b6bcb021d182449b3ae",
+          "roadmapKey": "vehicles-ground",
+          "nativeStatus": "planned",
+          "driverExposure": "not exposed by current adapter",
+          "source": "https://github.com/ArduPilot/ardupilot/tree/afeb9c4941543d97f3e04fecf257b8f598f49a6a/libraries/AP_Torqeedo",
+          "issue": "https://github.com/stacksjs/drone/issues/13"
+        },
+        {
+          "path": "libraries/AP_Tuning",
+          "treeSha": "5997cf959a55edb8ea9c3a7abeffaefa30987af4",
+          "roadmapKey": "controls",
+          "nativeStatus": "planned",
+          "driverExposure": "not exposed by current adapter",
+          "source": "https://github.com/ArduPilot/ardupilot/tree/afeb9c4941543d97f3e04fecf257b8f598f49a6a/libraries/AP_Tuning",
+          "issue": "https://github.com/stacksjs/drone/issues/5"
+        },
+        {
+          "path": "libraries/AP_Vehicle",
+          "treeSha": "622a291b1778bb507e2e270fda9e9fefaa7395ba",
+          "roadmapKey": "parity",
+          "nativeStatus": "planned",
+          "driverExposure": "not exposed by current adapter",
+          "source": "https://github.com/ArduPilot/ardupilot/tree/afeb9c4941543d97f3e04fecf257b8f598f49a6a/libraries/AP_Vehicle",
+          "issue": "https://github.com/stacksjs/drone/issues/28"
+        },
+        {
+          "path": "libraries/AP_VideoTX",
+          "treeSha": "1218a06269a2b9da8467abb143f91a9fc5b10a5f",
+          "roadmapKey": "payloads",
+          "nativeStatus": "planned",
+          "driverExposure": "not exposed by current adapter",
+          "source": "https://github.com/ArduPilot/ardupilot/tree/afeb9c4941543d97f3e04fecf257b8f598f49a6a/libraries/AP_VideoTX",
+          "issue": "https://github.com/stacksjs/drone/issues/8"
+        },
+        {
+          "path": "libraries/AP_VisualOdom",
+          "treeSha": "a4d8ea7ecccfba3d6f29e531934eadef11203b56",
+          "roadmapKey": "estimation",
+          "nativeStatus": "planned",
+          "driverExposure": "not exposed by current adapter",
+          "source": "https://github.com/ArduPilot/ardupilot/tree/afeb9c4941543d97f3e04fecf257b8f598f49a6a/libraries/AP_VisualOdom",
+          "issue": "https://github.com/stacksjs/drone/issues/4"
+        },
+        {
+          "path": "libraries/AP_Volz_Protocol",
+          "treeSha": "7200102ab24a9d30bb29e55d0dcb35fa3fb93f1a",
+          "roadmapKey": "parity",
+          "nativeStatus": "planned",
+          "driverExposure": "not exposed by current adapter",
+          "source": "https://github.com/ArduPilot/ardupilot/tree/afeb9c4941543d97f3e04fecf257b8f598f49a6a/libraries/AP_Volz_Protocol",
+          "issue": "https://github.com/stacksjs/drone/issues/28"
+        },
+        {
+          "path": "libraries/AP_WheelEncoder",
+          "treeSha": "88a0034233fcf0a77ca4577b58dbd2033568f7e9",
+          "roadmapKey": "vehicles-ground",
+          "nativeStatus": "planned",
+          "driverExposure": "not exposed by current adapter",
+          "source": "https://github.com/ArduPilot/ardupilot/tree/afeb9c4941543d97f3e04fecf257b8f598f49a6a/libraries/AP_WheelEncoder",
+          "issue": "https://github.com/stacksjs/drone/issues/13"
+        },
+        {
+          "path": "libraries/AP_Winch",
+          "treeSha": "5a5754881ad30885fee02d1b73569812f2897455",
+          "roadmapKey": "payloads",
+          "nativeStatus": "planned",
+          "driverExposure": "not exposed by current adapter",
+          "source": "https://github.com/ArduPilot/ardupilot/tree/afeb9c4941543d97f3e04fecf257b8f598f49a6a/libraries/AP_Winch",
+          "issue": "https://github.com/stacksjs/drone/issues/8"
+        },
+        {
+          "path": "libraries/AP_WindVane",
+          "treeSha": "239457234ad2f0f5871efd7b84071d2c6009e00b",
+          "roadmapKey": "sensors",
+          "nativeStatus": "planned",
+          "driverExposure": "not exposed by current adapter",
+          "source": "https://github.com/ArduPilot/ardupilot/tree/afeb9c4941543d97f3e04fecf257b8f598f49a6a/libraries/AP_WindVane",
+          "issue": "https://github.com/stacksjs/drone/issues/3"
+        },
+        {
+          "path": "libraries/AR_Motors",
+          "treeSha": "8a8c453fa9e6445b98ff3e6664a353e5c1f1c3b9",
+          "roadmapKey": "controls",
+          "nativeStatus": "planned",
+          "driverExposure": "not exposed by current adapter",
+          "source": "https://github.com/ArduPilot/ardupilot/tree/afeb9c4941543d97f3e04fecf257b8f598f49a6a/libraries/AR_Motors",
+          "issue": "https://github.com/stacksjs/drone/issues/5"
+        },
+        {
+          "path": "libraries/AR_WPNav",
+          "treeSha": "04f80376e08b612b848101db2ed941520ee0c4e5",
+          "roadmapKey": "missions",
+          "nativeStatus": "planned",
+          "driverExposure": "not exposed by current adapter",
+          "source": "https://github.com/ArduPilot/ardupilot/tree/afeb9c4941543d97f3e04fecf257b8f598f49a6a/libraries/AR_WPNav",
+          "issue": "https://github.com/stacksjs/drone/issues/10"
+        },
+        {
+          "path": "libraries/Filter",
+          "treeSha": "603194735dc73172887d06977bb2bfafd4fe0a4a",
+          "roadmapKey": "parity",
+          "nativeStatus": "planned",
+          "driverExposure": "not exposed by current adapter",
+          "source": "https://github.com/ArduPilot/ardupilot/tree/afeb9c4941543d97f3e04fecf257b8f598f49a6a/libraries/Filter",
+          "issue": "https://github.com/stacksjs/drone/issues/28"
+        },
+        {
+          "path": "libraries/GCS_MAVLink",
+          "treeSha": "15932d4eb624b0560f520aa79c30c2902c71e1b5",
+          "roadmapKey": "protocols",
+          "nativeStatus": "planned",
+          "driverExposure": "partial: heartbeat, SYS_STATUS, LOCAL_POSITION_NED and velocity-only local SITL",
+          "source": "https://github.com/ArduPilot/ardupilot/tree/afeb9c4941543d97f3e04fecf257b8f598f49a6a/libraries/GCS_MAVLink",
+          "issue": "https://github.com/stacksjs/drone/issues/7"
+        },
+        {
+          "path": "libraries/PID",
+          "treeSha": "40836cb4f4a70ef1ca50f5037e6a8b2b54f3dddb",
+          "roadmapKey": "controls",
+          "nativeStatus": "planned",
+          "driverExposure": "not exposed by current adapter",
+          "source": "https://github.com/ArduPilot/ardupilot/tree/afeb9c4941543d97f3e04fecf257b8f598f49a6a/libraries/PID",
+          "issue": "https://github.com/stacksjs/drone/issues/5"
+        },
+        {
+          "path": "libraries/RC_Channel",
+          "treeSha": "fcd6c25e3ee92f3a9c4ffbd0467e5a90bca27133",
+          "roadmapKey": "safety",
+          "nativeStatus": "planned",
+          "driverExposure": "not exposed by current adapter",
+          "source": "https://github.com/ArduPilot/ardupilot/tree/afeb9c4941543d97f3e04fecf257b8f598f49a6a/libraries/RC_Channel",
+          "issue": "https://github.com/stacksjs/drone/issues/6"
+        },
+        {
+          "path": "libraries/SITL",
+          "treeSha": "4ebfef1f761998f0f65232d0552ab864d158d04e",
+          "roadmapKey": "controls",
+          "nativeStatus": "planned",
+          "driverExposure": "not exposed by current adapter",
+          "source": "https://github.com/ArduPilot/ardupilot/tree/afeb9c4941543d97f3e04fecf257b8f598f49a6a/libraries/SITL",
+          "issue": "https://github.com/stacksjs/drone/issues/5"
+        },
+        {
+          "path": "libraries/SRV_Channel",
+          "treeSha": "2dbbfbc6fd27e00f7cbff30125e70817815924f8",
+          "roadmapKey": "controls",
+          "nativeStatus": "planned",
+          "driverExposure": "not exposed by current adapter",
+          "source": "https://github.com/ArduPilot/ardupilot/tree/afeb9c4941543d97f3e04fecf257b8f598f49a6a/libraries/SRV_Channel",
+          "issue": "https://github.com/stacksjs/drone/issues/5"
+        },
+        {
+          "path": "libraries/StorageManager",
+          "treeSha": "48f2a18c9f7324f3f7ba81d56940404d7af9fe35",
+          "roadmapKey": "runtime",
+          "nativeStatus": "planned",
+          "driverExposure": "not exposed by current adapter",
+          "source": "https://github.com/ArduPilot/ardupilot/tree/afeb9c4941543d97f3e04fecf257b8f598f49a6a/libraries/StorageManager",
+          "issue": "https://github.com/stacksjs/drone/issues/2"
+        },
+        {
+          "path": "libraries/doc",
+          "treeSha": "edbddcdf2b279312f9a269bfb42c871c6d76cf2a",
+          "roadmapKey": "parity",
+          "nativeStatus": "planned",
+          "driverExposure": "not exposed by current adapter",
+          "source": "https://github.com/ArduPilot/ardupilot/tree/afeb9c4941543d97f3e04fecf257b8f598f49a6a/libraries/doc",
+          "issue": "https://github.com/stacksjs/drone/issues/28"
+        }
+      ]
+    }
+  ]
+}

@@ -47,7 +47,7 @@ Confidence 1 here means the caller supplied a paired source; it is not a statist
 Accuracy remains checked by `decide`. Authentication, pairing and upstream sample age belong to the
 transport adapter; none is exposed as a public HTTP write endpoint in this release.
 
-A future vision source must emit a stable explicitly selected target ID plus valid position,
+A future calibrated metric vision source must emit a stable explicitly selected target ID plus valid position,
 heading, confidence, accuracy and local receipt time. A 2D bounding box alone is not such a source.
 
 ## Adapters
@@ -68,4 +68,18 @@ and frame 1. It never encodes arm, takeoff or mode-change commands.
 
 `GET /api/drone/capabilities` returns the adapter names, coordinate frame, default limits and
 `physicalFlightEnabled: false`. It is deliberately public metadata and has no actuator side effects.
-No web flight-control mutation endpoints exist. The browser simulator state lives in its own tab.
+Camera selection/source mutations are bearer-protected and never actuate a vehicle. No web flight-control mutation endpoints exist. The browser simulator state lives in its own tab.
+
+## Camera and visual interlock
+
+`createVisualTracker()` accepts timestamped `CameraFrame` detections. Select a candidate explicitly
+with its frame sequence; `snapshot(nowMs)` expires stale locks and returns an image observation only
+after continuity confirmation. Loss is latched until reselection. This is not a metric `Target`.
+
+`createVisualLockGuard({ selectedLockId, read })` binds the lock to a controller's optional `guard`.
+A lost, stale, unconfirmed or changed lock holds an otherwise valid velocity decision. Safety releases
+retain precedence. The guard supplements an independently supplied position target.
+
+The authenticated `/api/camera/state` and `/api/camera/command` Actions own the shared camera session.
+Read [the camera guide](camera-tracking.md) for the command schema and process/clock contract.
+ArduPilot and PX4 factories are server-only imports from `drone/drivers`; see [drivers](drivers.md).

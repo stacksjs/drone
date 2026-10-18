@@ -4,7 +4,7 @@ This is an engineering roadmap. Software tests do not establish an airworthy air
 
 1. Run the browser and terminal simulation. Validate custom behaviors at the decision boundary.
 2. Bring up Pi power, cooling, camera examples, and receive-only flight-controller telemetry with props removed.
-3. Complete a real ArduCopter SITL campaign, including all failures in `sitl.md`. Review telemetry rates,
+3. Complete ArduCopter and PX4 SITL campaigns, including failures in `sitl.md` and `drivers.md`. Review telemetry rates,
    coordinate origin, message identity, estimator validity, setpoint timing and independent failsafes.
 4. Assemble, calibrate and manually fly the airframe using the supported autopilot and independent RC link,
    after meeting the local aviation requirements. Confirm full mass, centre of gravity, thrust margin,
@@ -16,7 +16,10 @@ This is an engineering roadmap. Software tests do not establish an airworthy air
    for dynamics/uncertainty, a hardware authority switch, logging and supervised lifecycle.
 7. Validate at a suitable outdoor test site with a qualified pilot and observer, low speeds and generous
    separation. The person being followed should not be the only person supervising early autonomous tests.
-8. Add camera acquisition, explicit subject selection and identity tracking. Camera loss must not silently
-   switch to another person. Depth/obstacle sensing is a separate milestone, not supplied by a person detector.
+8. Validate the implemented Pi AI Camera acquisition, explicit selection and geometric association on the Pi.
+   Camera loss requires reselection. Depth, obstacle sensing and metric fusion remain separate milestones.
+
+The owned runtime follows the dependency-linked [roadmap](roadmap/README.md). The external drivers
+support comparison and development while native board controls are implemented and validated.
 
 Until those milestones are complete, the code here should be used for simulation and bench development.

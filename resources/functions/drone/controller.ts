@@ -2,7 +2,8 @@ import type { Behavior, Decision, FlightAdapter, FlightLimits, Target } from './
 import { decide, defaultLimits, validateLimits } from './safety'
 
 /** A finite lease prevents forgotten enable switches from running indefinitely. */
-export function createController(adapter: FlightAdapter, behavior: Behavior, options: { targetId: string, limits?: FlightLimits }) {
+export function createController(adapter: FlightAdapter, behavior: Behavior, options: { targetId: string, limits?: FlightLimits, guard?: (nowMs: number) => string | undefined }) {
+  const guard = options.guard
   const targetId = options.targetId
   if (!targetId.trim()) throw new TypeError('Select a target before creating a controller')
   const limits = { ...(options.limits ?? defaultLimits) }
@@ -29,7 +30,14 @@ export function createController(adapter: FlightAdapter, behavior: Behavior, opt
       if (!clockValid) enabledUntil = -Infinity
       else lastNow = nowMs
       if (nowMs < enabledAt) enabledUntil = -Infinity
-      const decision = decide({ telemetry: adapter.read(), target, targetId, enabled: clockValid && nowMs >= enabledAt && nowMs < enabledUntil, nowMs, behavior, limits })
+      let decision = decide({ telemetry: adapter.read(), target, targetId, enabled: clockValid && nowMs >= enabledAt && nowMs < enabledUntil, nowMs, behavior, limits })
+      if (guard && decision.kind === 'velocity') {
+        try {
+          const blocked = guard(nowMs)
+          if (blocked !== undefined) decision = { kind: 'hold', reason: typeof blocked === 'string' && blocked.trim() ? blocked : 'Invalid motion guard result' }
+        }
+        catch { decision = { kind: 'hold', reason: 'Motion guard failed' } }
+      }
       adapter.send(decision)
       return decision
     },

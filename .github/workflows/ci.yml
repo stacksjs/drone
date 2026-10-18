@@ -21,4 +21,7 @@ jobs:
       - run: ./buddy lint
       - run: ./buddy typecheck
       - run: bun run typecheck:views
+      - run: bun run roadmap:check
+      - run: python3 -m py_compile resources/functions/drone/camera/imx500_worker.py
+      - run: python3 -m unittest discover -s tests/hardware
       - run: ./buddy test

@@ -1,38 +1,54 @@
 # Validation evidence
 
-Initial release, October 17, 2026. Local development used Bun 1.4.2/1.4.3 on macOS ARM64.
+Camera and driver release, October 17, 2026. Local development used Bun 1.4.3 on macOS ARM64.
+The initial simulator release had 31 tests; the checks below cover the expanded release.
 
 ## Executed
 
-- `./buddy lint`: pickier through Buddy, zero errors/warnings after fixes.
+- `./buddy lint`: pickier through Buddy, zero errors/warnings.
 - `./buddy typecheck`: application TypeScript check passed.
-- `bunx --no-install stx typecheck 'resources/**/*.stx'`: two script blocks and 45 template expressions, zero errors/warnings.
-- `./buddy test`: 31 tests across two files, including a deterministic ten-minute ideal simulation,
-  target identity and freshness, failures, controller leases, GPS jumps and real loopback UDP.
-- Independent MAVLink fixtures generated with pymavlink 2.4.50 for v1/v2 heartbeat and velocity.
-  The encoder matches the external v1 fixture byte-for-byte; signed packets are refused.
-- `./buddy build views`: one static page built successfully.
-- `bun run simulate` and `./buddy drone:simulate`: terminal demonstrations completed.
-- `bun run telemetry`: receive-only listener started successfully without a controller attached.
-- HTTP `GET /api/drone/capabilities`: 200 and actual configured limits, physical flight disabled.
-- Real Chromium scenario: run simulation, observe velocity, lose target, observe hold; no console
-  errors or failed requests. Settings changes, low battery, recovery and pause also passed a second browser scenario.
-- Responsive Chromium captures: 320, 428, 768, 1280 and 1920 px widths, no horizontal overflow.
-- Full desktop and mobile screenshots visually inspected. Visible text uses no em-dash or separator en-dash.
+- `bun run typecheck:views`: three script blocks and 88 template expressions, zero errors/warnings.
+- `./buddy test`: 58 tests across four files, 12,182 assertions. Covers the deterministic ten-minute
+  ideal simulation, controller leases/envelope, GPS freshness/jumps, real loopback UDP, independent
+  MAVLink fixtures, explicit camera selection, confirmation, ambiguity/loss, source failures,
+  stale frames, session restarts, visual guards and process signal termination.
+- `python3 -m unittest discover -s tests/hardware`: five hardware-bridge contract tests without
+  vendor packages, covering SSD class/confidence filtering, coordinate order/normalization,
+  clipping, invalid tensors and bounds. Python compilation also passed.
+- Independent pymavlink 2.4.50 fixtures cover v1/v2 heartbeat/velocity and current common.xml
+  SYS_STATUS extension fields. The encoder matches the external v1 fixture; signed frames are refused.
+- PX4 local UDP tests cover firmware identity/mode decoding, explicit zero-stream preparation,
+  timing gaps, velocity transmission after preparation and physical receive-only restrictions.
+- `bun run roadmap:check`: 274 pinned upstream entries mapped to 28 acyclic implementation issues.
+  All 66 planned issue blockers were linked through GitHub's native dependency API.
+- `./buddy build views`: two static pages built successfully.
+- Registered camera API: valid authenticated commands return 200, missing bearer returns 401,
+  malformed authenticated JSON returns 400 and a one-megabyte whitespace command returns 413.
+  Unauthorized malformed/oversize bodies return 401 before parsing.
+- Real Chromium scenarios: explicit selection confirms tracking; lost/ambiguous detections latch
+  loss; restored detections stay lost until reselection. Clear and stop return to idle. No console
+  errors or failed requests. These scenarios passed at 320, 428, 768, 1280 and 1920 px widths,
+  with no horizontal overflow. Desktop and mobile captures were visually inspected.
+- The existing simulator UI's movement, failure, recovery, pause and settings scenarios passed
+  during the initial release, along with terminal simulation and receive-only telemetry startup.
 
-The product is a cockpit workspace rather than a marketing landing page. Applicable Stacks design
-preflight checks cover responsive layout, consistent dark theme and accent, readable labels/controls,
-keyboard focus, form validation, reduced-motion policy, stx script boundaries and honest state labels.
-Marketing-only requirements such as hero photography, marquees and logo walls do not apply.
+The product is an operator workspace. Applicable Stacks design preflight checks cover responsive
+layout, dark theme/accent consistency, readable controls, keyboard focus, form validation,
+reduced-motion policy, stx boundaries and honest state labels. Camera replay is visibly schematic.
+No real camera footage or physical flight state is fabricated. Marketing-only hero requirements
+are not applicable. Newly authored visible copy uses no em-dash or separator en-dash.
 
 ## Not yet executed
 
-- Raspberry Pi ARM64 runtime installation or power/thermal measurements.
-- A complete ArduCopter SITL flight. The wire adapter has local UDP and independent protocol tests only.
-- Flight-controller firmware flashing, sensor calibration, RC link or actual hardware testing.
-- Real GPS target transport, authentication, camera capture, inference or identity tracking.
-- Physical autonomous flight, collision avoidance, endurance or airworthiness validation.
+- Pi ARM64 runtime installation, camera capture/inference, power/thermal measurements or measured
+  acquisition latency. [On-device validation](https://github.com/stacksjs/drone/issues/29) is open.
+- Complete ArduCopter or PX4 SITL flights, including real mode-transition and loss/fallback campaigns.
+  Local UDP/protocol tests do not establish complete simulator integration.
+- Firmware flashing, sensor calibration, RC link, actuator outputs or physical airworthiness tests.
+- Authenticated paired GNSS transport or calibrated metric visual-position fusion.
+- Native board runtime, estimation/controls and the domain workflows listed in the
+  [replacement matrix](roadmap/feature-coverage.md). They remain planned work.
 
-The scaffold emits a warning that feature-stripped defaults differ from the installed full defaults.
-Build output can warn about inherited unused image assets and an unset deployed sitemap domain;
-these do not establish a deployed site. No cloud deployment was performed.
+The scaffold warns that feature-stripped defaults differ from the installed full defaults. Build
+output can warn about inherited unused image assets and an unset deployed sitemap domain. No cloud
+deployment or physical autonomous flight was performed.

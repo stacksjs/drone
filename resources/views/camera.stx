@@ -1,0 +1,7 @@
+@nolayout
+<!DOCTYPE html>
+<html lang="en">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="description" content="Explicit Pi AI Camera target selection and loss handling."><title>Camera tracking / Stacks Drone</title></head>
+<body class="min-h-[100dvh] antialiased text-neutral-100 bg-neutral-950"><div class="mx-auto px-5 sm:px-8 max-w-6xl"><header class="py-6 border-b border-neutral-700"><nav aria-label="Main navigation" class="flex gap-6 text-sm"><a href="/">stacks / drone</a><a href="/camera" aria-current="page" class="text-emerald-200">Camera tracking</a><a href="https://github.com/stacksjs/drone/issues">Roadmap</a></nav></header><main class="py-10 sm:py-14"><CameraTracking /></main></div></body>
+</html>
+<style>body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; } button:disabled { opacity: .4; cursor: default; }</style>

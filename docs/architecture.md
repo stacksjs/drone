@@ -3,7 +3,8 @@
 ```mermaid
 flowchart LR
   GPS[Paired phone or GNSS feed] --> TS[Target source]
-  Camera[Camera adapter, future] --> TS
+  Camera[Pi AI Camera image tracker] --> Guard[Optional visual lock guard]
+  Guard --> Gate
   TS --> Behavior[Custom TypeScript behavior]
   FC[Dedicated Pixhawk autopilot] --> Telemetry[Telemetry adapter]
   Telemetry --> Gate[Decision and envelope checks]
@@ -15,7 +16,8 @@ flowchart LR
   RC[Independent RC radio] --> FC
 ```
 
-The Pi runs Bun and Stacks for mission logic. A dedicated flight controller runs ArduCopter for
+The Pi runs Bun and Stacks for mission/camera logic. During development a dedicated controller runs
+ArduCopter or PX4 for
 attitude estimation, stabilization, motor timing, independent fencing, battery handling and RC override.
 Linux plus JavaScript is not used as a real-time motor-control loop.
 
@@ -62,11 +64,12 @@ A blocking plugin can starve that loop, so independent autopilot timeout remains
 
 The codec accepts CRC-valid common messages 0, 1, 32 and 84 in MAVLink v1/v2. It supports v2 zero-tail
 reconstruction. Unknown dialects and signed v2 frames are skipped: there is no signature verifier.
-The UDP receiver binds loopback only and pins its peer after an ArduCopter quadcopter heartbeat.
+The UDP receiver binds loopback only and pins its peer after a matching quadcopter heartbeat for the explicitly selected ArduPilot or PX4 profile.
 It uses the oldest heartbeat/position/battery receipt time for freshness. Physical mode deliberately
 reports position health false and never transmits. SITL assumes the simulator's position estimator
 is healthy; that assumption must never be carried into a physical adapter.
 
 The wire codec is a small experimental subset, not a replacement for a mature full MAVLink stack.
-A future physical adapter needs verified estimator status, source identity, sequence/replay handling,
+Both external stacks are optional drivers. The [owned-stack ADR](adr/0001-owned-autonomy.md) and
+[feature roadmap](roadmap/README.md) define the replacement path. A future physical adapter needs verified estimator status, source identity, sequence/replay handling,
 authenticated transport, link supervision, flight-controller configuration and hardware validation.
