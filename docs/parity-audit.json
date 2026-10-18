@@ -4253,7 +4253,7 @@
       "id": "runtime-owned-deadline-latch",
       "entry": "px4:src/modules/task_watchdog",
       "dimension": "failures",
-      "behavior": "Owned native C++ host bench scenarios exercise deadline, watchdog and safe reset paths.",
+      "behavior": "Owned native C++ host bench scenarios exercise deadline, lease freshness/expiry and protocol rejection paths.",
       "support": "native-subset",
       "sources": [
         {
@@ -4284,7 +4284,7 @@
       "id": "sensor-icm-spi",
       "entry": "px4:src/drivers/imu",
       "dimension": "hardware",
-      "behavior": "ICM-42688-P is selected for owned SPI acquisition, with byte-level fixture evidence only.",
+      "behavior": "Owned IMU byte conversion maps recorded raw measurements to BODY_FRD SI values. The selected fixture does not exercise SPI acquisition.",
       "support": "native-subset",
       "sources": [
         {
@@ -5245,7 +5245,7 @@
         }
       ],
       "limitations": [
-        "An owned Pi child command and ACK is tested. AP camera backends/MAVLink camera commands and physical IMX500 shutter behavior are not validated.",
+        "The selected test exercises replay-camera session cancellation and uncertain shutter outcome policy. It does not exercise the Pi child transport, AP camera backends, MAVLink camera commands or a physical IMX500 shutter.",
         "No upstream firmware SITL, HIL or physical vehicle evidence is retained for this case."
       ]
     },

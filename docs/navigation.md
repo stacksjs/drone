@@ -46,6 +46,8 @@ that missing detections imply a real sensor saw clear space. Up to eight cylinde
 130 graph vertices; Dijkstra searches a circumscribed 16-point boundary around each inflated column.
 Every candidate segment is checked against all columns. Horizontal fence and vertical center bounds
 are checked separately; the altitude ceiling remains the existing authority/mission convention.
+The renderer includes cylinders intersecting the coverage boundary. The navigator checks current
+position and each command against the latest coverage on every tick, including between replans.
 
 The clearance envelope is:
 
@@ -63,6 +65,7 @@ Actual measured speed can enlarge that envelope. Targets ramp at 0.6 m/s. Replan
 least every 200 ms and immediately when the current segment is obstructed or the goal changes.
 A 40 ms execution gap, invalid/stale/replayed range, reference/origin change, authority loss, speed
 over 1.5 m/s, current braking-envelope intrusion or absent route latches release.
+An inflated planning margin above the planner's supported 4 m limit also releases control.
 
 These principles account for sensor and controller delays and prohibit unobserved directions,
 consistent with [PX4's collision-prevention guidance](https://docs.px4.io/main/en/computer_vision/collision_prevention#cp-delay-delay-tuning).

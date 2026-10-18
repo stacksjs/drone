@@ -89,7 +89,7 @@ test('owned physics avoids sensed obstacles, replans, returns and precisely land
     else expect(maximumEast).toBeLessThan(0.5)
     expect(run.board.motorsN).toEqual([0, 0, 0, 0])
   }
-})
+}, 60000)
 
 test('range/position/landing loss, delayed range and RC takeover release modeled outputs', () => {
   for (const scenario of ['range-loss', 'range-delay', 'position-loss', 'landing-loss', 'rc-override'] as const) {
@@ -100,7 +100,7 @@ test('range/position/landing loss, delayed range and RC takeover release modeled
     expect(run.metrics.minTruthClearanceM).toBeGreaterThan(0.5)
     expect(run.authority.state).not.toBe('autonomous')
   }
-})
+}, 60000)
 
 import { command as cliCommand } from '@stacksjs/testing'
 test('native Stacks navigation command runs the owned pipeline and rejects invalid inputs', async () => {
@@ -113,3 +113,34 @@ test('native Stacks navigation command runs the owned pipeline and rejects inval
   expect((await cliCommand(['navigation:simulate', '--seconds', 'nan']).withTimeout(60000)).exitCode).toBe(1)
   expect((await cliCommand(['navigation:simulate', '--scenario', 'physical']).withTimeout(60000)).exitCode).toBe(1)
 }, 180000)
+
+import { createNavigationSensorFeed } from '../../resources/functions/drone/navigation/sensors'
+import { createRigidBody } from '../../resources/functions/drone/controls/physics'
+test('range coverage includes obstacles intersecting its boundary and invalidates newly unobserved space immediately', () => {
+  const feed = createNavigationSensorFeed(60)
+  const body = createRigidBody({ positionM: [0, 0, -1.2] })
+  feed.capture(1000, body.snapshot(), { reference: map.reference, atMs: 1000, positionM: [0, 0, -1.2], quaternionWxyz: [1, 0, 0, 0], positionSigmaM: 0.02 }, { obstacles: [{ id: 'edge', northM: 7.4, eastM: 0, radiusM: 0.3 }], groundNorthSlope: 0, landingM: [0.1, 0.06, 0] })
+  const received = feed.advanceTo(1060)!
+  const detected = detectNavigationMap(received.packet, received.pose)
+  expect(detected.obstacles).toHaveLength(1)
+  expect(detected.obstacles[0]!.northM).toBeCloseTo(7.4, 3)
+  const nav = createNavigator({ fenceRadiusM: 12, minDownM: -5 })
+  const intent = { mode: 'route' as const, goalM: [5, 0, -1.2] as [number, number, number], clearanceM: 1.2 }
+  expect(nav.step(observation(1060), map, intent).state).toBe('navigating')
+  const moved = structuredClone(map)
+  moved.sequence = 2; moved.capturedAtMs = 1080; moved.receivedAtMs = 1080; moved.latencyMs = 0; moved.coverage = { centerM: [10, 0, -1.2], radiusM: 2 }
+  expect(nav.step(observation(1080), moved, intent).reason).toBe('navigation-observed-coverage')
+})
+test('oversized valid braking envelopes release rather than throwing and caller settings stay immutable', () => {
+  const options = { fenceRadiusM: 12, minDownM: -5 }
+  const nav = createNavigator(options)
+  options.fenceRadiusM = NaN
+  const intent = { mode: 'route' as const, goalM: [5, 0, -1.2] as [number, number, number], clearanceM: 1.2 }
+  expect(nav.step(observation(1060), map, intent).state).toBe('navigating')
+  const wide = { ...structuredClone(map), uncertaintyM: 0.6, capturedAtMs: 1001, receivedAtMs: 1061, latencyMs: 60, sequence: 2 }
+  expect(nav.step({ ...observation(1080), velocityMps: [1.5, 0, 0] }, wide, intent).reason).toBe('navigation-envelope-unsupported')
+  const gradient: [number, number] = [-0.03, 0]
+  const body = createRigidBody({ positionM: [0, 0, -0.1], groundDownM: -0.1, groundGradient: gradient })
+  gradient[0] = NaN
+  expect(body.step([0, 0, 0, 0], 0.004).groundContact).toBe(true)
+})

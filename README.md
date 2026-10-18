@@ -189,7 +189,7 @@ and loss handling with a lagged mount simulation. Physical mount and RF measurem
 
 ```sh
 ./buddy antenna:bench --scenario nominal
-./buddy antenna:bench --scenario stale-target
+./buddy antenna:bench --scenario target-loss
 ```
 
 Read [antenna interfaces, modeled evidence and remaining acceptance](docs/antenna.md).

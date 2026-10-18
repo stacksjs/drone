@@ -14,7 +14,7 @@ export function createNavigationSensorFeed(delayMs = 60) {
       if (nowMs % 100 !== 0) return
       if (queue.length >= 8) throw new RangeError('Modeled range queue exhausted')
       function body(world: SensorVector): SensorVector { return rotateNedToBody(truth.quaternionWxyz, world.map((n, i) => n - truth.positionM[i]!) as SensorVector).map(n => Math.round(n * 10000) / 10000) as SensorVector }
-      const clusters = scene.obstacles.filter(c => Math.hypot(c.northM - truth.positionM[0], c.eastM - truth.positionM[1]) + c.radiusM < 7.5).map(c => {
+      const clusters = scene.obstacles.filter(c => Math.hypot(c.northM - truth.positionM[0], c.eastM - truth.positionM[1]) - c.radiusM <= 8).map(c => {
         const angle = Math.atan2(truth.positionM[1] - c.eastM, truth.positionM[0] - c.northM)
         const pointsBodyM = [-0.7, 0, 0.7].map(offset => body([c.northM + c.radiusM * Math.cos(angle + offset), c.eastM + c.radiusM * Math.sin(angle + offset), -1.2])) as [SensorVector, SensorVector, SensorVector]
         return { id: c.id, pointsBodyM }

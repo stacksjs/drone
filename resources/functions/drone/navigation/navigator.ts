@@ -39,7 +39,7 @@ export function navigationGoal(intent: NavigationIntent, o: MissionObservation, 
     goal = [...intent.goalM]
   }
   else {
-    if (!/^[a-z][a-z0-9-]{0,39}$/.test(intent.targetId) || !target || target.id !== intent.targetId || target.reference !== o.reference || !validVector(target.positionM) || !Number.isFinite(target.capturedAtMs) || target.capturedAtMs > o.nowMs || o.nowMs - target.capturedAtMs > 200) throw new TypeError('Selected navigation target lost')
+    if (typeof intent.targetId !== 'string' || !/^[a-z][a-z0-9-]{0,39}$/.test(intent.targetId) || !target || target.id !== intent.targetId || target.reference !== o.reference || !validVector(target.positionM) || !Number.isFinite(target.capturedAtMs) || target.capturedAtMs > o.nowMs || o.nowMs - target.capturedAtMs > 200) throw new TypeError('Selected navigation target lost')
     if (intent.mode === 'follow') {
       if (!validVector(intent.offsetM) || Math.hypot(...intent.offsetM) < 1 || Math.hypot(...intent.offsetM) > 5) throw new RangeError('Invalid selected-target offset')
       goal = target.positionM.map((n, i) => n + intent.offsetM[i]!) as SensorVector
@@ -56,6 +56,7 @@ export function navigationGoal(intent: NavigationIntent, o: MissionObservation, 
 }
 export function createNavigator(options: { fenceRadiusM: number, minDownM: number }) {
   if (!Number.isFinite(options.fenceRadiusM) || options.fenceRadiusM < 1 || options.fenceRadiusM > 19 || !Number.isFinite(options.minDownM) || options.minDownM < -9.5 || options.minDownM > -0.5) throw new RangeError('Invalid navigation fence')
+  options = { ...options }
   let lastCapturedAt = -1
   let frameSignature: string | null = null
   let lastNow: number | null = null
@@ -95,9 +96,12 @@ export function createNavigator(options: { fenceRadiusM: number, minDownM: numbe
       if (speed > 1.5) return blocked('navigation-speed-envelope')
       const envelope = navigationEnvelope({ speedMps: speed, ageMs, uncertaintyM: map.uncertaintyM })
       const planMarginM = Math.max(envelope.clearanceM, navigationEnvelope({ speedMps: 0.8, ageMs: 200, uncertaintyM: map.uncertaintyM }).clearanceM) + 0.3
+      if (planMarginM > 4) return blocked('navigation-envelope-unsupported')
+      const observed = (p: SensorVector) => Math.hypot(...p.map((n, i) => n - map.coverage.centerM[i]!)) + envelope.clearanceM <= map.coverage.radiusM
+      if (!observed(o.positionM)) return blocked('navigation-observed-coverage')
       const allowedPosition = Math.hypot(o.positionM[0], o.positionM[1]) + envelope.clearanceM <= options.fenceRadiusM && o.positionM[2] >= options.minDownM && o.positionM[2] <= 0
       if (!allowedPosition || !navigationSegmentClear(o.positionM, o.positionM, map, envelope.clearanceM)) return blocked('navigation-braking-envelope')
-      if (o.nowMs - plannedAt >= navigationPolicy.planPeriodMs || !previousGoal || Math.hypot(...goal.map((n, i) => n - previousGoal![i]!)) > 0.15 || !route.length || !navigationSegmentClear(o.positionM, route[0]!, map, envelope.clearanceM)) {
+      if (o.nowMs - plannedAt >= navigationPolicy.planPeriodMs || !previousGoal || Math.hypot(...goal.map((n, i) => n - previousGoal![i]!)) > 0.15 || !route.length || !observed(route[0]!) || !navigationSegmentClear(o.positionM, route[0]!, map, envelope.clearanceM)) {
         const planned = planNavigationPath({ map, startM: o.positionM, goalM: goal, marginM: planMarginM, ...options })
         if (!planned) return blocked('navigation-no-observed-route')
         route = planned.slice(1); plannedAt = o.nowMs; previousGoal = [...goal]; replans++
@@ -108,6 +112,7 @@ export function createNavigator(options: { fenceRadiusM: number, minDownM: numbe
       const distance = Math.hypot(...waypoint.map((n, i) => n - command![i]!))
       const scale = distance === 0 ? 1 : Math.min(1, navigationPolicy.speedMps * dt / 1000 / distance)
       const next = waypoint.map((n, i) => command![i]! + (n - command![i]!) * scale) as SensorVector
+      if (!observed(next)) return blocked('navigation-observed-coverage')
       if (!navigationSegmentClear(o.positionM, next, map, envelope.clearanceM)) return blocked('navigation-command-segment')
       command = next
       return { state: 'navigating', reason: intent.mode === 'land' ? 'selected-range-landing-site' : 'observed-braking-constrained-route', targetM: [...command], route: route.map(p => [...p]), marginM: envelope.clearanceM, perceptionAgeMs: ageMs, mode: intent.mode, replans, physicalFlightEnabled: false }

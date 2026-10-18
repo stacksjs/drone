@@ -12,7 +12,7 @@ export function rotateBodyToNed(q: Quaternion, v: SensorVector): SensorVector {
 export const rotateNedToBody = (q: Quaternion, v: SensorVector) => rotateBodyToNed([q[0], -q[1], -q[2], -q[3]], v)
 export function createRigidBody(input: { positionM?: SensorVector, motorsN?: Motors, groundDownM?: number, groundGradient?: [number, number] } = {}) {
   const groundDownM = input.groundDownM ?? 0
-  const groundGradient = input.groundGradient ?? [0, 0]
+  const groundGradient = [...(input.groundGradient ?? [0, 0])]
   if (!Array.isArray(groundGradient) || groundGradient.length !== 2 || !groundGradient.every(Number.isFinite) || Math.hypot(...groundGradient) > 0.1) throw new RangeError('Invalid modeled ground gradient')
   if (!Number.isFinite(groundDownM) || groundDownM < -1 || groundDownM > 0) throw new RangeError('Invalid modeled ground contact plane')
   let positionM = [...(input.positionM ?? [0, 0, -1])] as SensorVector
