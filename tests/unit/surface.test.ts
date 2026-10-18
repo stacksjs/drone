@@ -116,3 +116,10 @@ test('sampler does not confirm a sample from a stale position despite an asserte
   port.observe!(c)
   expect(port.poll(1200)!.outcome).toBe('uncertain')
 })
+
+test('survey export preserves uncertainty inputs and rejects relabeling a horizontal sigma', () => {
+  const c = surfaceContext(), m = c.measurement!
+  const row = { atMs: c.nowMs, measurement: m, measurementPose: { capturedAtMs: m.capturedAtMs, reference: m.reference, positionM: [0, 0, 0] as [number, number, number], quaternionWxyz: [1, 0, 0, 0] as [number, number, number, number] } }
+  const sounding = reduceSurfaceSurvey([row], { positionSigmaM: 0.05, timeSigmaMs: 2 }).soundings[0]!
+  expect(() => exportSurfaceSurvey([{ ...sounding, horizontalSigmaM: 0.000001 }])).toThrow()
+})
