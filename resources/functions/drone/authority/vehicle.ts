@@ -9,7 +9,9 @@ export function validateVehicleActuators(input: VehicleActuator[]): VehicleActua
   if (!Array.isArray(input) || input.length < 1 || input.length > 16 || new Set(input.map(a => a?.name)).size !== input.length || input.some(a => !a || typeof a.name !== 'string' || !/^[a-z][a-z0-9-]{0,39}$/.test(a.name) || !['normalized', 'newton', 'radian', 'metres-per-second'].includes(a.unit) || ![a.min, a.max, a.neutral].every(n => typeof n === 'number' && Number.isFinite(n)) || a.min < -100000 || a.max > 100000 || a.min >= a.max || a.neutral < a.min || a.neutral > a.max)) throw new TypeError('Invalid vehicle actuator declaration')
   return input.map(a => ({ ...a }))
 }
-export function validVehicleActuatorValues(input: unknown, declaration: VehicleActuator[]): input is number[] { return Array.isArray(input) && input.length === declaration.length && input.every((n, i) => typeof n === 'number' && Number.isFinite(n) && n >= declaration[i]!.min && n <= declaration[i]!.max) }
+export function validVehicleActuatorValues(input: unknown, declaration: VehicleActuator[]): input is number[] {
+  return Array.isArray(input) && input.length === declaration.length && input.every((n, i) => typeof n === 'number' && Number.isFinite(n) && n >= declaration[i]!.min && n <= declaration[i]!.max)
+}
 function vehicleKind(kind: VehicleKind) { if (!['fixed-wing', 'ground', 'surface'].includes(kind)) throw new TypeError('Unsupported simulated vehicle') }
 /** Profile-specific actuator adapter over the same arming, lease and failover lifecycle as quad-X. */
 export function createVehicleAuthoritySupervisor(options: { bootId: bigint, sessionId: bigint, vehicle: VehicleKind, actuators: VehicleActuator[], fence: { radiusM: number, minDownM: number, maxDownM: number } }) {

@@ -9,7 +9,9 @@ const keys = (v: object, allowed: string[]) => Object.keys(v).every(k => allowed
 const id = (v: unknown): v is string => typeof v === 'string' && /^[a-z][a-z0-9-]{0,39}$/.test(v)
 const number = (v: unknown, min: number, max: number): v is number => typeof v === 'number' && Number.isFinite(v) && v >= min && v <= max
 const active = (s: MissionState) => s === 'running' || s === 'paused'
-export function vehicleMissionContains(plan: VehicleMissionPlan, p: unknown) { return validVector(p) && Math.hypot(p[0], p[1]) <= plan.fence.radiusM && p[2] >= plan.fence.minDownM && p[2] <= plan.fence.maxDownM }
+export function vehicleMissionContains(plan: VehicleMissionPlan, p: unknown) {
+  return validVector(p) && Math.hypot(p[0], p[1]) <= plan.fence.radiusM && p[2] >= plan.fence.minDownM && p[2] <= plan.fence.maxDownM
+}
 export function vehicleTaskTarget(plan: VehicleMissionPlan, task: VehicleMissionTask) { return task.kind === 'return' ? [...plan.rallyM] : 'positionM' in task ? [...task.positionM] : null }
 export function validateVehicleMission(input: unknown): { plan: VehicleMissionPlan, worstCaseMs: number, requiredWh: number } {
   const invalid = (): never => { throw new TypeError('Invalid vehicle mission or unsupported profile') }
