@@ -14,6 +14,8 @@ The example grid is explicitly synthetic: four 1 m² cells with elevations 1, 2,
 a zero base produce 10 m³. `/volumes` runs analytic scenarios and displays the actual known
 surface, boundary, coverage, base, reference evidence and paginated contribution audit. Native
 Stacks `defineCommand` commands also compile into the standalone drone CLI.
+The `grid-nodata` scenario exposes 19 measured cell areas and one missing cell, with multiple audit
+pages. Its 86 m³ covered-domain sum does not establish the full-boundary volume.
 
 ## Reference and provenance contract
 
