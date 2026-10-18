@@ -83,7 +83,7 @@ test('navigation faults latch on range loss, replay, authority takeover, origin 
 test('owned physics avoids sensed obstacles, replans, returns and precisely lands on the selected range site', () => {
   for (const scenario of ['avoid-land', 'replan'] as const) {
     const run = simulateNavigation({ scenario })
-    expect(run.mission.state, JSON.stringify({ scenario, mission: run.mission, navigation: run.navigation, metrics: run.metrics, transitions: run.transitions, finalTruthPositionM: run.finalTruthPositionM, lastNavigation: run.navTrace.at(-2) })).toBe('completed')
+    expect(run.mission.state, JSON.stringify({ scenario, mission: run.mission, navigation: run.navigation, metrics: run.metrics, transitions: run.transitions, finalTruthPositionM: run.finalTruthPositionM, lastObservation: run.trace.rows.at(-2)?.observation, trajectory: run.navTrace.filter(row => row.atMs % 1000 === 0).map(row => ({ atMs: row.atMs, positionM: row.positionM, targetM: row.navigation.targetM, route: row.navigation.route })) })).toBe('completed')
     expect(run.navigation!.state).toBe('released')
     expect(run.navigation!.targetM).toBeNull()
     expect(run.metrics.minTruthClearanceM).toBeGreaterThan(1)
