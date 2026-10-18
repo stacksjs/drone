@@ -158,3 +158,46 @@ test('DVL lock loss preserves independently fresh pressure height without revivi
   packet.values.dvlLocked = true
   expect(nav.update(base(80), packet, 80).health.localPosition).toBe(false)
 })
+
+test('structure sonar measures the forward body ray against the declared water-bounded wall', () => {
+  const state = truth()
+  state.positionM = [2, 0, 2]
+  state.quaternionWxyz = [1, 0, 0, 0]
+  let packet = renderSubseaMeasurement(state, 0, reference, 1)
+  expect(packet.values.structureHit).toBe(true)
+  expect(packet.values.structureRangeM).toBe(4)
+  expect(packet.values.bottomRangeM).toBe(8)
+  state.quaternionWxyz = [Math.SQRT1_2, 0, 0, Math.SQRT1_2]
+  packet = renderSubseaMeasurement(state, 0, reference, 1)
+  expect(packet.values.structureHit).toBe(false)
+  expect(packet.values.structureRangeM).toBe(50)
+  // Nose-up30deg from3m depth: t=4/cos(30)=4.618802m and hit down=0.690599m.
+  state.positionM[2] = 3
+  state.quaternionWxyz = [Math.cos(Math.PI / 12), 0, Math.sin(Math.PI / 12), 0]
+  packet = renderSubseaMeasurement(state, 0, reference, 1)
+  expect(packet.values.structureHit).toBe(true)
+  expect(packet.values.structureRangeM).toBeCloseTo(4.6188, 4)
+  expect(packet.values.bottomRangeM).toBe(7)
+  state.positionM[2] = 2
+  packet = renderSubseaMeasurement(state, 0, reference, 1)
+  expect(packet.values.structureHit).toBe(false)
+  expect(packet.values.structureRangeM).toBe(50)
+  const noHit = structuredClone(packet)
+  noHit.values.structureRangeM = 2
+  expect(qualifySubseaMeasurement(noHit, 60)).toBe(null)
+})
+
+test('sensor rendering rejects malformed model truth without replacing nonfinite values with zero', () => {
+  for (const change of [
+    (state: VehiclePlantState) => { state.positionM[0] = NaN },
+    (state: VehiclePlantState) => { state.velocityMps[1] = Infinity },
+    (state: VehiclePlantState) => { state.accelerationMps2[2] = NaN },
+    (state: VehiclePlantState) => { state.angularRateRadS[0] = NaN },
+    (state: VehiclePlantState) => { state.quaternionWxyz = [2, 0, 0, 0] },
+    (state: VehiclePlantState) => { state.quaternionWxyz[0] = Infinity },
+    (state: VehiclePlantState) => { state.details.tetherLengthM = NaN },
+  ]) {
+    const state = truth(); change(state)
+    expect(() => renderSubseaMeasurement(state, 0, reference, 1)).toThrow()
+  }
+})
