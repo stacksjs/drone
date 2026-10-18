@@ -62,14 +62,14 @@ A blocking plugin can starve that loop, so independent autopilot timeout remains
 
 ## Protocol boundary
 
-The codec accepts CRC-valid common messages 0, 1, 32 and 84 in MAVLink v1/v2. It supports v2 zero-tail
-reconstruction. Unknown dialects and signed v2 frames are skipped: there is no signature verifier.
+The codec accepts a CRC-checked common.xml subset for telemetry, velocity and the new command/parameter/mission protocols in MAVLink v1/v2. It supports v2 zero-tail
+reconstruction. Unknown dialects are skipped. Signed v2 requires the optional strict signature verifier; unsigned input is refused when signing is configured.
 The UDP receiver binds loopback only and pins its peer after a matching quadcopter heartbeat for the explicitly selected ArduPilot or PX4 profile.
 It uses the oldest heartbeat/position/battery receipt time for freshness. Physical mode deliberately
 reports position health false and never transmits. SITL assumes the simulator's position estimator
 is healthy; that assumption must never be carried into a physical adapter.
 
-The wire codec is a small experimental subset, not a replacement for a mature full MAVLink stack.
+The wire codec is an experimental subset. [Shared acknowledged microservices](driver-protocols.md) add bounded command, parameter and waypoint transfers; serial/TCP and complete firmware coverage remain open.
 Both external stacks are optional drivers. The [owned-stack ADR](adr/0001-owned-autonomy.md) and
 [feature roadmap](roadmap/README.md) define the replacement path. A future physical adapter needs verified estimator status, source identity, sequence/replay handling,
 authenticated transport, link supervision, flight-controller configuration and hardware validation.
@@ -101,3 +101,6 @@ The [owned authority supervisor](authority.md), recorded in [ADR 6](adr/0006-sim
 adds explicit arm/engage, fault revocation and a separate modeled output watchdog above that same
 control path. A host-loss run stops all host execution while the modeled board clock continues.
 Physical firmware and external adapters remain separate from these simulation-only frames.
+
+[ADR 7](adr/0007-driver-transactions.md) records shared external-driver transactions and the strict
+separation between scripted UDP conformance, firmware SITL and physical evidence.

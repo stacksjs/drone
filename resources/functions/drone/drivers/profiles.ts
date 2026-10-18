@@ -2,8 +2,8 @@ import type { Telemetry } from '../types'
 
 export type AutopilotDriverId = 'ardupilot' | 'px4'
 export const driverProfiles = Object.freeze({
-  ardupilot: Object.freeze({ id: 'ardupilot', autopilotId: 3, vehicleType: 2, externalMode: 'Guided', offboardPriming: false, physicalCommands: false }),
-  px4: Object.freeze({ id: 'px4', autopilotId: 12, vehicleType: 2, externalMode: 'Offboard', offboardPriming: true, physicalCommands: false }),
+  ardupilot: Object.freeze({ id: 'ardupilot', autopilotId: 3, vehicleType: 2, externalMode: 'Guided', parameterEncodingFallback: 'c-cast' as const, offboardPriming: false, physicalCommands: false }),
+  px4: Object.freeze({ id: 'px4', autopilotId: 12, vehicleType: 2, externalMode: 'Offboard', parameterEncodingFallback: 'bytewise' as const, offboardPriming: true, physicalCommands: false }),
 })
 
 /** 'guided' is the existing library's external-velocity authority mode. */

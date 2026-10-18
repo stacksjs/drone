@@ -47,10 +47,29 @@ declare global {
   const createPhysicsSensorFeed: typeof autoImports.createPhysicsSensorFeed
   const simulateMultirotor: typeof autoImports.simulateMultirotor
   const controlScenarios: typeof autoImports.controlScenarios
+  const runDriverProtocolBench: typeof autoImports.runDriverProtocolBench
   const createArduPilotDriver: typeof autoImports.createArduPilotDriver
   const createPx4Driver: typeof autoImports.createPx4Driver
+  const commandPayload: typeof autoImports.commandPayload
+  const parseCapabilities: typeof autoImports.parseCapabilities
+  const parameterId: typeof autoImports.parameterId
+  const parameterBytes: typeof autoImports.parameterBytes
+  const parameterResponseId: typeof autoImports.parameterResponseId
+  const parseParameter: typeof autoImports.parseParameter
+  const readParameterPayload: typeof autoImports.readParameterPayload
+  const setParameterPayload: typeof autoImports.setParameterPayload
+  const missionCountPayload: typeof autoImports.missionCountPayload
+  const missionAckPayload: typeof autoImports.missionAckPayload
+  const normalizeWaypoint: typeof autoImports.normalizeWaypoint
+  const waypointPayload: typeof autoImports.waypointPayload
+  const parseWaypoint: typeof autoImports.parseWaypoint
+  const driverProtocolLimits: typeof autoImports.driverProtocolLimits
+  const messageView: typeof autoImports.messageView
   const decodeAutopilotMode: typeof autoImports.decodeAutopilotMode
   const driverProfiles: typeof autoImports.driverProfiles
+  const createDriverProtocol: typeof autoImports.createDriverProtocol
+  const DriverProtocolError: typeof autoImports.DriverProtocolError
+  const createMavlinkSigning: typeof autoImports.createMavlinkSigning
   const createEstimator: typeof autoImports.createEstimator
   const geodeticToEcef: typeof autoImports.geodeticToEcef
   const geodeticToNed: typeof autoImports.geodeticToNed
@@ -68,6 +87,7 @@ declare global {
   const finiteVector: typeof autoImports.finiteVector
   const horizontalDistance: typeof autoImports.horizontalDistance
   const encodeFrame: typeof autoImports.encodeFrame
+  const encodeFrameV2: typeof autoImports.encodeFrameV2
   const decodeDatagram: typeof autoImports.decodeDatagram
   const encodeVelocity: typeof autoImports.encodeVelocity
   const runRuntimeBench: typeof autoImports.runRuntimeBench

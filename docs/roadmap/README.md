@@ -22,6 +22,8 @@ companion application and simulator, not a native board autopilot.
 - Pi AI Camera acquisition bridge and explicit image-space target selection/loss policy, pending Pi hardware validation.
 - An optional visual guard that holds metric follow logic on lost, unconfirmed, stale or changed visual selection.
 - Explicit ArduPilot and PX4 quadcopter drivers for a limited telemetry/local-SITL setpoint contract.
+- Shared acknowledged command/parameter/waypoint transactions and optional strict MAVLink 2 signing.
+  Scripted UDP conformance passes; firmware SITL, transports and sub-services remain open in [#7](https://github.com/stacksjs/drone/issues/7).
 - PX4 Offboard preparation with a rate-checked zero-velocity stream. Both hardware drivers remain receive-only.
 
 ## Sequence

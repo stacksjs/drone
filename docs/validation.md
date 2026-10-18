@@ -1,5 +1,29 @@
 # Validation evidence
 
+## External-driver protocol software slice
+
+- 166 Bun tests pass with 17,002 assertions, including 20 protocol tests. Lint, application/runtime/view
+  typechecks and roadmap validation passed, as did the two native CTest contracts and five Python
+  bridge tests. Both independent review axes passed after loss, sequence-wrap and truncation fixes.
+- Independent pymavlink 2.4.50 vectors cover command/ACK, parameter, mission, version and signed
+  heartbeat wire layout. Builders match exact bytes, including bytewise/C-cast integers and zero-tail
+  truncation. Signing checks reject tampering, replay, unsigned downgrade and stale/reversed clocks.
+- Both public driver factories complete signed and unsigned real-loopback UDP discovery, rate ACK,
+  parameter metadata/write/readback, waypoint upload/download and acknowledged resume requests.
+  A deliberately dropped command ACK produces confirmation [0,1]. Physical-mode tests call every
+  new API after caller-option mutation and observe zero transmitted packets.
+- Tests exercise retry/progress/total deadlines, local abort, uncertain-outcome quarantine,
+  source/recipient/version filters, parameter precision/type/ID guards, mission order/count/cancel
+  faults and lost final-download-ACK recovery with bounded completion records. Fresh responses after
+  8-bit packet-sequence wrap remain valid. NaN-shaped uint32 parameter bits retain their integer value.
+- Native Stacks `drivers:bench` executes through Buddy and the compiled standalone binary outside
+  the checkout. Regeneration exactly matches [the retained report](driver-protocol-evidence.json).
+  The generated server function registry also loads successfully without duplicate runtime exports.
+- This is scripted protocol-peer conformance, not actual autopilot firmware SITL, flight or HIL.
+  [Issue #7](https://github.com/stacksjs/drone/issues/7) remains open for pinned-firmware campaigns,
+  serial/TCP, complete command/mission/parameter variants, persistent signing/key lifecycle and the
+  explicit FTP/log/event/time/RTCM/payload/ROS/CAN sub-capabilities. Physical writes remain disabled.
+
 ## Simulated authority and failsafe slice
 
 - 146 Bun tests pass with 16,781 assertions, including 15 authority tests. The two native CTest

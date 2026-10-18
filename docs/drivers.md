@@ -11,8 +11,8 @@ The driver implementation here is a small common-MAVLink subset, not full firmwa
 | External mode normalization | Guided becomes `guided` | Offboard becomes `guided` | Planned authority state machine |
 | Hardware commands | Disabled, receive-only | Disabled, receive-only | Not implemented |
 | Local simulator commands | LOCAL_NED velocity-only | LOCAL_NED velocity-only after priming | Existing ideal kinematic simulator |
-| Mode/arm/takeoff commands | Not implemented | Not implemented | Planned |
-| Missions/parameters/ACK/signing | Not implemented | Not implemented | Planned shared contracts |
+| Generic COMMAND_LONG | SITL-only acknowledged requests, execution unvalidated | Same | Separate native authority |
+| Missions/parameters/ACK/signing | Shared bounded transaction subset, optional strict signing, firmware SITL pending | Same, bytewise parameter profile | Separate mission/runtime contracts |
 
 Import factories from `resources/functions/drone/drivers/index.ts` on the server. The older
 `createUdpAdapter()` remains compatible and defaults to the ArduPilot profile. Driver choice and
@@ -22,6 +22,14 @@ They reject the other firmware's heartbeat and currently support only the quadco
 PX4 `custom_mode` stores main mode in bits 16-23 and submode in bits 24-31. Main 6 is Offboard;
 Auto submodes 5/6 are Return/Land. These are distinct from ArduCopter's mode numbers.
 The existing generic `guided` field means external-velocity authority, not a PX4 mode name.
+
+## Acknowledged protocol services
+
+The new `driver.protocol` interface adds capability discovery, COMMAND_ACK/retries, message-rate
+requests, parameter read/write with readback and bounded mission upload/download/resume.
+Read the [protocol contract, native conformance CLI and limits](driver-protocols.md).
+Only scripted loopback conformance has been executed; real firmware SITL and physical validation
+remain open. Physical receivers cannot transmit through any of these methods.
 
 ## PX4 Offboard entry
 

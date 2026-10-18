@@ -2,6 +2,10 @@
   "extends": "../tsconfig.json",
   "include": [
     "../bin/drone.ts",
+    "../resources/functions/drone/drivers/**/*.ts",
+    "../resources/functions/drone/udp.ts",
+    "../resources/functions/drone/mavlink.ts",
+    "./unit/driver-protocol.test.ts",
     "../scripts/build-runtime-cli.ts",
     "../resources/functions/drone/runtime/**/*.ts",
     "../resources/functions/drone/sensors/**/*.ts",

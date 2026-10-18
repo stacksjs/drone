@@ -111,6 +111,19 @@ and an independent modeled output watchdog on the owned control harness.
 See the [state machine, failure policies and hardware completion gates](docs/authority.md).
 Physical kill/RC wiring and HIL validation remain open. Zero simulated thrust is not a landing.
 
+## External-driver protocol services
+
+Issue #7 adds shared acknowledged commands, parameter read/write, mission upload/download/resume
+and optional strict MAVLink 2 signing behind both driver factories. Physical writes remain disabled.
+
+```sh
+./buddy drivers:bench --driver ardupilot --drop-first-ack
+./buddy drivers:bench --driver px4 --signed --drop-first-ack
+```
+
+See the [protocol contract and remaining firmware SITL gates](docs/driver-protocols.md).
+These commands use scripted UDP peers, with no autopilot firmware or flight simulated.
+
 ## Owned autopilot and roadmap
 
 The [dependency-linked roadmap](docs/roadmap/README.md) and [feature matrix](docs/roadmap/feature-coverage.md)

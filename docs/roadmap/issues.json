@@ -182,7 +182,24 @@
     "number": 7,
     "id": 5906643857,
     "url": "https://github.com/stacksjs/drone/issues/7",
-    "nativeDependencies": []
+    "nativeDependencies": [],
+    "implementationStatus": "in-progress",
+    "evidence": [
+      "resources/functions/drone/drivers/protocol.ts",
+      "resources/functions/drone/drivers/messages.ts",
+      "resources/functions/drone/drivers/signing.ts",
+      "app/Commands/DriversBench.ts",
+      "docs/driver-protocols.md",
+      "docs/driver-protocol-evidence.json",
+      "tests/unit/driver-protocol.test.ts"
+    ],
+    "remaining": [
+      "Pinned ArduPilot/PX4 firmware SITL round trips, supported commands, mission variants and measured message rates",
+      "Serial/TCP stream transport, reconnect/backpressure and hardware/HIL authority evidence",
+      "Signing key lifecycle, persistent replay watermarks and cross-restart campaigns",
+      "COMMAND_INT/remote cancellation, full mission/parameter protocols and ownership reconciliation",
+      "Explicit FTP/log/event/time/RTCM, payload/gimbal, DDS/ROS 2 and CAN gateway services"
+    ]
   },
   {
     "key": "payloads",
