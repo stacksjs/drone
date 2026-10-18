@@ -1,6 +1,6 @@
 import type { SensorVector } from '../../sensors/types'
 export interface SurfacePing {
-  id: string, reference: string, capturedAtMs: number, receivedAtMs: number
+  id: string, reference: string, capturedAtMs: number, receivedAtMs: number, clockSigmaMs: number
   twoWayTravelS: number, soundSpeedMps: number, draftM: number, waterLevelAboveDatumM: number, datum: string
   timeSigmaS: number, soundSpeedSigmaMps: number, draftSigmaM: number, waterLevelSigmaM: number, motionSigmaM: number
 }
@@ -9,8 +9,8 @@ export interface SurfaceSounding { id: string, reference: string, capturedAtMs: 
 /** Flat, homogeneous water column; vertical single beam. No refraction or multibeam model. */
 export function correctSurfaceSounding(pingInput: SurfacePing, poseInput: SurfaceSurveyPose): SurfaceSounding {
   const ping = structuredClone(pingInput), pose = structuredClone(poseInput)
-  const numeric = [ping.capturedAtMs, ping.receivedAtMs, ping.twoWayTravelS, ping.soundSpeedMps, ping.draftM, ping.waterLevelAboveDatumM, ping.timeSigmaS, ping.soundSpeedSigmaMps, ping.draftSigmaM, ping.waterLevelSigmaM, ping.motionSigmaM, pose.atMs, pose.rollRad, pose.pitchRad, pose.yawRad, pose.attitudeSigmaRad, pose.positionSigmaM, pose.timeSigmaMs, pose.speedMps, ...pose.positionM]
-  if (!Array.isArray(pose.positionM) || pose.positionM.length !== 3 || !numeric.every(Number.isFinite) || typeof ping.id !== 'string' || typeof ping.datum !== 'string' || typeof ping.reference !== 'string' || !ping.id || !ping.datum || !ping.reference || ping.reference !== pose.reference || ping.capturedAtMs !== pose.atMs || ping.receivedAtMs < ping.capturedAtMs || ping.receivedAtMs - ping.capturedAtMs > 120 || ping.twoWayTravelS <= 0 || ping.twoWayTravelS > 0.2 || ping.soundSpeedMps < 1300 || ping.soundSpeedMps > 1700 || ping.draftM < 0 || ping.draftM > 3 || Math.abs(pose.rollRad) > 0.05 || Math.abs(pose.pitchRad) > 0.05 || [pose.attitudeSigmaRad, ping.timeSigmaS, ping.soundSpeedSigmaMps, ping.draftSigmaM, ping.waterLevelSigmaM, ping.motionSigmaM, pose.positionSigmaM, pose.timeSigmaMs, pose.speedMps].some(n => n < 0)) throw new RangeError('Unqualified surface sounding or capture-time pose')
+  const numeric = [ping.clockSigmaMs, ping.capturedAtMs, ping.receivedAtMs, ping.twoWayTravelS, ping.soundSpeedMps, ping.draftM, ping.waterLevelAboveDatumM, ping.timeSigmaS, ping.soundSpeedSigmaMps, ping.draftSigmaM, ping.waterLevelSigmaM, ping.motionSigmaM, pose.atMs, pose.rollRad, pose.pitchRad, pose.yawRad, pose.attitudeSigmaRad, pose.positionSigmaM, pose.timeSigmaMs, pose.speedMps, ...pose.positionM]
+  if (!Array.isArray(pose.positionM) || pose.positionM.length !== 3 || !numeric.every(Number.isFinite) || ping.clockSigmaMs < 1 || ping.clockSigmaMs > 5 || pose.timeSigmaMs < ping.clockSigmaMs || typeof ping.id !== 'string' || typeof ping.datum !== 'string' || typeof ping.reference !== 'string' || !ping.id || !ping.datum || !ping.reference || ping.reference !== pose.reference || ping.capturedAtMs !== pose.atMs || ping.receivedAtMs < ping.capturedAtMs || ping.receivedAtMs - ping.capturedAtMs > 120 || ping.twoWayTravelS <= 0 || ping.twoWayTravelS > 0.2 || ping.soundSpeedMps < 1300 || ping.soundSpeedMps > 1700 || ping.draftM < 0 || ping.draftM > 3 || Math.abs(pose.rollRad) > 0.05 || Math.abs(pose.pitchRad) > 0.05 || [pose.attitudeSigmaRad, ping.timeSigmaS, ping.soundSpeedSigmaMps, ping.draftSigmaM, ping.waterLevelSigmaM, ping.motionSigmaM, pose.positionSigmaM, pose.timeSigmaMs, pose.speedMps].some(n => n < 0)) throw new RangeError('Unqualified surface sounding or capture-time pose')
   const provenance = pose.provenance
   if (provenance && (provenance.reference !== pose.reference || provenance.capturedAtMs !== pose.atMs || provenance.positionPredictedToMs !== pose.atMs || provenance.attitudePredictedToMs !== pose.atMs || provenance.attitudePrediction !== 'qualified-gyro-hold' || provenance.gyroCapturedAtMs !== provenance.attitudeCapturedAtMs || ![provenance.positionCapturedAtMs, provenance.attitudeCapturedAtMs].every(at => Number.isSafeInteger(at) && at >= 0 && at <= pose.atMs) || pose.atMs - provenance.positionCapturedAtMs > 200 || pose.atMs - provenance.attitudeCapturedAtMs > 60)) throw new RangeError('Invalid sounding capture pose provenance')
   const range = ping.twoWayTravelS * ping.soundSpeedMps / 2
@@ -39,6 +39,7 @@ import { quaternionEuler } from '../../estimation/frames'
 import { surfacePingFromMeasurement } from './sensors'
 /** Reduce only distinct capture-aligned packets. Caller supplies justified horizontal/clock sigmas. */
 export function reduceSurfaceSurvey(rows: { atMs: number, measurement: VehicleMeasurement | null, measurementPose: VehicleMeasurementPose | null }[], uncertainty: { positionSigmaM: number, timeSigmaMs: number, attitudeSigmaRad: number }) {
+  if (!Number.isFinite(uncertainty.timeSigmaMs) || uncertainty.timeSigmaMs < 1) throw new RangeError('Survey requires a finite clock uncertainty of at least 1 ms')
   const seen = new Set<number>(), soundings: SurfaceSounding[] = []
   for (const row of rows) {
     const m = row.measurement, pose = row.measurementPose

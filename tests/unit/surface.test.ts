@@ -2,7 +2,7 @@ import { expect, test } from 'bun:test'
 import { correctSurfaceSounding, exportSurfaceSurvey } from '../../resources/functions/drone/vehicles/surface/survey'
 
 test('single beam reduction retains travel time, sound speed, draft, water level, datum and independent uncertainty', () => {
-  const raw = { id: 'ping-1', reference: 'boot:1', capturedAtMs: 1000, receivedAtMs: 1060, twoWayTravelS: 0.01, soundSpeedMps: 1500, draftM: 0.3, waterLevelAboveDatumM: 1.2, datum: 'LOCAL_TEST_DATUM', timeSigmaS: 0.00001, soundSpeedSigmaMps: 2, draftSigmaM: 0.02, waterLevelSigmaM: 0.03, motionSigmaM: 0.01 }
+  const raw = { id: 'ping-1', reference: 'boot:1', capturedAtMs: 1000, receivedAtMs: 1060, clockSigmaMs: 1, twoWayTravelS: 0.01, soundSpeedMps: 1500, draftM: 0.3, waterLevelAboveDatumM: 1.2, datum: 'LOCAL_TEST_DATUM', timeSigmaS: 0.00001, soundSpeedSigmaMps: 2, draftSigmaM: 0.02, waterLevelSigmaM: 0.03, motionSigmaM: 0.01 }
   const pose = { reference: raw.reference, atMs: 1000, positionM: [4, 2, 0] as [number, number, number], rollRad: 0, pitchRad: 0, yawRad: 0, attitudeSigmaRad: 0, positionSigmaM: 0.05, timeSigmaMs: 2, speedMps: 1 }
   const reduced = correctSurfaceSounding(raw, pose)
   expect(reduced.depthBelowDatumM).toBeCloseTo(6.6, 10)
@@ -36,7 +36,7 @@ test('surface hull obeys force/mass, current-relative drag and yaw inertia witho
 import { createSurfaceController } from '../../resources/functions/drone/vehicles/surface/controller'
 import { createSurfaceSampler } from '../../resources/functions/drone/vehicles/surface/payload'
 import { createSurfaceProfile } from '../../resources/functions/drone/vehicles/surface/index'
-import { surfaceContext } from '../fixtures/surface/context'
+import { surfaceContext, surfacePayloadContext } from '../fixtures/surface/context'
 test('surface control uses estimated pose and qualified range, latches collision, stale and replay faults', () => {
   const c = surfaceContext(), controller = createSurfaceController()
   const out = controller.step(c)
@@ -59,9 +59,10 @@ test('surface control uses estimated pose and qualified range, latches collision
 test('sample acknowledgement scopes actual observed capture location/time and container, uncertainty cannot auto-retry', () => {
   const port = createSurfaceSampler(), c = surfaceContext(1000)
   const command = { eventId: 'sample-1', taskId: 'sample', operation: 'water-sample' as const, containerId: 'bottle-001', issuedAtMs: 1000, expiresAtMs: 2000, positionM: [0, 0, 0] as [number, number, number], reference: c.measurement!.reference }
-  port.request(command); command.positionM[0] = 9
+  const pendingCommand = structuredClone(command)
+  port.observe!(surfacePayloadContext(command)); port.request(command); command.positionM[0] = 9
   expect(port.poll(1180)).toBeNull()
-  const at = surfaceContext(1200); at.estimate.localPosition!.positionM[0] = 0.1
+  const at = surfacePayloadContext(pendingCommand, 1200); at.estimate.localPosition!.positionM[0] = 0.1
   port.observe!(at); at.estimate.localPosition!.positionM[0] = 100
   const ack = port.poll(1200)!
   expect(ack.outcome).toBe('confirmed'); expect(ack.positionM[0]).toBe(0.1); expect(ack.capturedAtMs).toBe(1200); expect(ack.containerId).toBe('bottle-001')
@@ -110,8 +111,10 @@ test('survey export cannot relabel a reduced ping timestamp or acoustic identifi
 })
 
 test('sampler does not confirm a sample from a stale position despite an asserted healthy flag', () => {
-  const c = surfaceContext(1200), port = createSurfaceSampler()
-  port.request({ eventId: 'stale-sample', taskId: 'sample', operation: 'water-sample', containerId: 'bottle-stale', issuedAtMs: 1000, expiresAtMs: 2000, positionM: [0, 0, 0], reference: c.measurement!.reference })
+  const port = createSurfaceSampler()
+  const command = { eventId: 'stale-sample', taskId: 'sample', operation: 'water-sample' as const, containerId: 'bottle-stale', issuedAtMs: 1000, expiresAtMs: 2000, positionM: [0, 0, 0] as [number, number, number], reference: surfaceContext().measurement!.reference }
+  port.observe!(surfacePayloadContext(command)); port.request(command)
+  const c = surfacePayloadContext(command, 1200)
   c.estimate.localPosition!.capturedAtMs = 1
   port.observe!(c)
   expect(port.poll(1200)!.outcome).toBe('uncertain')
@@ -175,8 +178,67 @@ test('native surface command writes a self-describing modeled survey artifact', 
       const survey = JSON.parse(await readFile(file, 'utf8'))
       expect(survey.metadata.physicalValidation).toBe(false)
       expect(survey.soundings[0].pose.provenance.attitudePrediction).toBe('qualified-gyro-hold')
+      expect(survey.soundings[0].raw.clockSigmaMs).toBe(1)
+      expect(survey.soundings[0].pose.timeSigmaMs).toBe(2)
     }
     finally { clearTimeout(timer); proc.kill('SIGKILL'); await proc.exited }
   }
   finally { await rm(directory, { recursive: true, force: true }) }
 }, 180000)
+
+
+test('sampler requires active authority and exact pending payload scope and latches intervening loss', () => {
+  const base = surfaceContext()
+  const command = { eventId: 'sample-scope', taskId: 'sample', operation: 'water-sample' as const, containerId: 'bottle-scope', issuedAtMs: 1000, expiresAtMs: 2000, positionM: [0, 0, 0] as [number, number, number], reference: base.measurement!.reference }
+  const faults: ((context: ReturnType<typeof surfacePayloadContext>) => void)[] = [
+    c => { c.enabled = false },
+    ...(['paused', 'blocked', 'aborted'] as const).map(state => (c: ReturnType<typeof surfacePayloadContext>) => { c.mission.state = state }),
+    c => { c.mission.taskId = 'another-task' },
+    c => { c.mission.taskKind = 'waypoint' },
+    c => { c.mission.payload = null },
+    ...(['eventId', 'taskId', 'containerId', 'reference'] as const).map(field => (c: ReturnType<typeof surfacePayloadContext>) => { c.mission.payload![field] = 'different' }),
+    c => { c.mission.payload!.operation = 'camera-still' },
+    c => { c.mission.payload!.issuedAtMs++ },
+    c => { c.mission.payload!.expiresAtMs++ },
+    c => { c.mission.payload!.positionM[0] = 0.1 },
+  ]
+  for (const change of faults) {
+    for (const recover of [false, true]) {
+      const port = createSurfaceSampler()
+      port.observe!(surfacePayloadContext(command)); port.request(command)
+      const bad = surfacePayloadContext(command, recover ? 1100 : 1200)
+      change(bad); port.observe!(bad)
+      if (recover) port.observe!(surfacePayloadContext(command, 1200))
+      const ack = port.poll(1200)!
+      expect(ack.outcome).toBe('uncertain')
+      expect(ack.metadata!.containerSealed).toBe(false)
+      expect(() => port.request({ ...command, eventId: 'retry' })).toThrow('container')
+      port.close()
+    }
+  }
+})
+
+
+test('surface survey rejects missing or understated clock budgets and retains the sensor declaration', () => {
+  const c = surfaceContext(), m = c.measurement!
+  const row = { atMs: c.nowMs, measurement: m, measurementPose: { capturedAtMs: m.capturedAtMs, reference: m.reference, positionCapturedAtMs: m.capturedAtMs, positionPredictedToMs: m.capturedAtMs, attitudeCapturedAtMs: m.capturedAtMs, attitudePredictedToMs: m.capturedAtMs, gyroCapturedAtMs: m.capturedAtMs, attitudePrediction: 'qualified-gyro-hold' as const, positionM: [0, 0, 0] as [number, number, number], quaternionWxyz: [1, 0, 0, 0] as [number, number, number, number] } }
+  const budget = { positionSigmaM: 0.05, timeSigmaMs: 2, attitudeSigmaRad: 0.001 }
+  expect(m.values.clockSigmaMs).toBe(1)
+  for (const declaration of [undefined, NaN, Infinity, 0, 0.5]) {
+    const bad = structuredClone(row)
+    if (declaration === undefined) delete bad.measurement.values.clockSigmaMs
+    else bad.measurement.values.clockSigmaMs = declaration
+    expect(() => reduceSurfaceSurvey([bad], budget)).toThrow()
+  }
+  m.values.clockSigmaMs = 2
+  for (const timeSigmaMs of [undefined, NaN, Infinity, -Infinity, 0, 0.5, 1.5]) {
+    // Deliberately exercise a missing runtime budget as well as numeric boundary values.
+    expect(() => reduceSurfaceSurvey([row], { ...budget, timeSigmaMs: timeSigmaMs as number })).toThrow()
+  }
+  const artifact = reduceSurfaceSurvey([row], budget)
+  expect(artifact.soundings[0]!.raw.clockSigmaMs).toBe(2)
+  expect(artifact.soundings[0]!.pose.timeSigmaMs).toBe(2)
+  const changed = structuredClone(artifact.soundings[0]!)
+  changed.pose.timeSigmaMs = 1
+  expect(() => exportSurfaceSurvey([changed])).toThrow()
+})
