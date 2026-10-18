@@ -156,6 +156,19 @@ a native stx scenario viewer at `/missions`. Physical outputs remain inhibited.
 Read the [mission semantics, evidence and remaining work](docs/missions.md). Camera tasks emit
 simulated events. Recovery requires retained supervised authority and explicit operator resume.
 
+## Owned range-backed navigation
+
+Issue #11 adds range-based obstacle routing, terrain clearance, RTL and selected-site landing
+on the owned mission physics stack. Perception latency is measured on the virtual clock; physical
+sensor and braking calibration remain open. Metric follow/orbit goal interfaces keep selection explicit.
+
+```sh
+./buddy navigation:simulate --scenario avoid-land
+./buddy navigation:simulate --scenario replan
+```
+
+See [navigation assumptions, evidence and remaining work](docs/navigation.md).
+
 ## External-driver protocol services
 
 Issue #7 adds shared acknowledged commands, parameter read/write, mission upload/download/resume

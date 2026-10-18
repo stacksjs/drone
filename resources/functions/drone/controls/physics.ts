@@ -10,8 +10,10 @@ export function rotateBodyToNed(q: Quaternion, v: SensorVector): SensorVector {
   return [v[0] + w * t[0]! + y * t[2]! - z * t[1]!, v[1] + w * t[1]! + z * t[0]! - x * t[2]!, v[2] + w * t[2]! + x * t[1]! - y * t[0]!]
 }
 export const rotateNedToBody = (q: Quaternion, v: SensorVector) => rotateBodyToNed([q[0], -q[1], -q[2], -q[3]], v)
-export function createRigidBody(input: { positionM?: SensorVector, motorsN?: Motors, groundDownM?: number } = {}) {
+export function createRigidBody(input: { positionM?: SensorVector, motorsN?: Motors, groundDownM?: number, groundGradient?: [number, number] } = {}) {
   const groundDownM = input.groundDownM ?? 0
+  const groundGradient = input.groundGradient ?? [0, 0]
+  if (!Array.isArray(groundGradient) || groundGradient.length !== 2 || !groundGradient.every(Number.isFinite) || Math.hypot(...groundGradient) > 0.1) throw new RangeError('Invalid modeled ground gradient')
   if (!Number.isFinite(groundDownM) || groundDownM < -1 || groundDownM > 0) throw new RangeError('Invalid modeled ground contact plane')
   let positionM = [...(input.positionM ?? [0, 0, -1])] as SensorVector
   let motorsN = [...(input.motorsN ?? [0, 0, 0, 0])] as Motors
@@ -37,8 +39,9 @@ export function createRigidBody(input: { positionM?: SensorVector, motorsN?: Mot
       accelerationMps2 = thrust.map((n, i) => (n + force[i]! - model.linearDragKgPerS * (velocityMps[i]! - wind[i]!)) / model.massKg + (i === 2 ? model.gravityMps2 : 0)) as SensorVector
       velocityMps = velocityMps.map((n, i) => n + accelerationMps2[i]! * dtS) as SensorVector
       positionM = positionM.map((n, i) => n + velocityMps[i]! * dtS) as SensorVector
-      groundContact = positionM[2] >= groundDownM
-      if (groundContact) { positionM[2] = groundDownM; if (velocityMps[2] > 0) velocityMps[2] = 0; accelerationMps2[2] = 0 }
+      const contactDownM = groundDownM + groundGradient[0]! * positionM[0] + groundGradient[1]! * positionM[1]
+      groundContact = positionM[2] >= contactDownM
+      if (groundContact) { positionM[2] = contactDownM; if (velocityMps[2] > 0) velocityMps[2] = 0; accelerationMps2[2] = 0 }
       if (![...positionM, ...velocityMps, ...angularRateRadS].every(Number.isFinite)) throw new RangeError('Physics model diverged')
       return snapshot()
     },

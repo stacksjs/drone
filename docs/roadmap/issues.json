@@ -336,6 +336,24 @@
     "nativeDependencies": [
       10,
       8
+    ],
+    "implementationStatus": "simulation-implemented-validation-pending",
+    "implemented": [
+      "Body-frame synthetic range detection, calibrated estimator-pose transform, cylinder/plane fitting and explicit selected range landing site",
+      "Bounded visibility-graph planning with latency/uncertainty/braking inflation, observed coverage, terrain clearance and fence checks",
+      "Owned mission/control/authority/watchdog physics avoidance, replanning, RTL, landing and loss/override scenarios",
+      "Selected metric follow/orbit goal interfaces and native Stacks navigation command"
+    ],
+    "evidence": [
+      "resources/functions/drone/navigation/",
+      "tests/unit/navigation.test.ts",
+      "docs/navigation-evidence.json",
+      "docs/navigation.md"
+    ],
+    "remaining": [
+      "Measured physical perception latency, coverage, extrinsics, uncertainty and braking bounds",
+      "Dynamic obstacle and full terrain-aware graph semantics, long moving-target follow/orbit campaigns",
+      "HIL and physical precision-landing/avoidance evidence"
     ]
   },
   {

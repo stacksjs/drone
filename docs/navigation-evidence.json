@@ -1,0 +1,94 @@
+{
+  "version": 1,
+  "kind": "owned-navigation-physics-simulation",
+  "perceptionModel": "quantized-body-range-arcs-and-plane-samples",
+  "latencyEvidence": "measured-on-virtual-capture-delivery-clock",
+  "physicalLatencyMeasured": false,
+  "physicalFlightEnabled": false,
+  "scenarios": [
+    {
+      "scenario": "avoid-land",
+      "mission": "completed",
+      "navigation": "released",
+      "reason": "mission-completed",
+      "minTruthClearanceM": 1.595554713574549,
+      "maxLatencyMs": 60,
+      "detectionFault": false,
+      "precisionLandingErrorM": 0.007506210589602,
+      "elapsedMs": 42220,
+      "modeledOutputsNeutral": true
+    },
+    {
+      "scenario": "replan",
+      "mission": "completed",
+      "navigation": "released",
+      "reason": "mission-completed",
+      "minTruthClearanceM": 1.595554713574549,
+      "maxLatencyMs": 60,
+      "detectionFault": false,
+      "precisionLandingErrorM": 0.009004182007895756,
+      "elapsedMs": 42220,
+      "modeledOutputsNeutral": true
+    },
+    {
+      "scenario": "range-loss",
+      "mission": "blocked",
+      "navigation": "blocked",
+      "reason": "navigation-range-stale-or-replayed",
+      "minTruthClearanceM": 1.7099825534245288,
+      "maxLatencyMs": 60,
+      "detectionFault": false,
+      "precisionLandingErrorM": 0.5829460218869038,
+      "elapsedMs": 5520,
+      "modeledOutputsNeutral": true
+    },
+    {
+      "scenario": "range-delay",
+      "mission": "blocked",
+      "navigation": "blocked",
+      "reason": "navigation-range-missing",
+      "minTruthClearanceM": 1.95,
+      "maxLatencyMs": 0,
+      "detectionFault": false,
+      "precisionLandingErrorM": 0.11661903789690602,
+      "elapsedMs": 20,
+      "modeledOutputsNeutral": true
+    },
+    {
+      "scenario": "position-loss",
+      "mission": "blocked",
+      "navigation": "blocked",
+      "reason": "mission-blocked",
+      "minTruthClearanceM": 1.7220450276948516,
+      "maxLatencyMs": 60,
+      "detectionFault": false,
+      "precisionLandingErrorM": 0.5462497705653003,
+      "elapsedMs": 5460,
+      "modeledOutputsNeutral": true
+    },
+    {
+      "scenario": "landing-loss",
+      "mission": "blocked",
+      "navigation": "blocked",
+      "reason": "navigation-intent-or-selected-target",
+      "minTruthClearanceM": 1.595554713574549,
+      "maxLatencyMs": 60,
+      "detectionFault": false,
+      "precisionLandingErrorM": 0.1495145434500062,
+      "elapsedMs": 38180,
+      "modeledOutputsNeutral": true
+    },
+    {
+      "scenario": "rc-override",
+      "mission": "blocked",
+      "navigation": "blocked",
+      "reason": "mission-blocked",
+      "minTruthClearanceM": 1.9293503757499109,
+      "maxLatencyMs": 60,
+      "detectionFault": false,
+      "precisionLandingErrorM": 0.12265763611562353,
+      "elapsedMs": 4400,
+      "modeledOutputsNeutral": true
+    }
+  ]
+}
