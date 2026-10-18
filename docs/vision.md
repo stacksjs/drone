@@ -79,7 +79,9 @@ covariance intersection. It assumes unknown correlations between inputs. This fo
 with an intentionally fixed weight of one half rather than an optimized estimator. The published
 sigma is a covariance upper-bound input, not a measured confidence guarantee or a probability of
 correct identity. Asynchronous positions include a declared target-motion allowance and publish
-the oldest capture epoch. Repeated identical packets add no information or freshness.
+the oldest source epoch. Qualified vision expiry retains the oldest contributing camera/depth/pose
+capture and summed clock uncertainty, even when an identical metric packet is reused. Fusion and
+the navigation target carry that expiry forward. Repeated packets add no information or freshness.
 
 Missing or stale observations, camera stalls, occlusion, ambiguous crossings, reselection, changed
 session/reference, packet replay, conflicting retained data and excessive innovation latch `lost`
