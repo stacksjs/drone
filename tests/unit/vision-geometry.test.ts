@@ -81,17 +81,30 @@ describe('calibrated selected-point localization', () => {
   test('retains independent positive uncertainty terms and responds to clock and depth errors', () => {
     const localizer = createVisionLocalizer(exampleVisionCalibration(), exampleVisionValidation()), packet = input()
     const initial = localizer.localize(packet)
-    // .03 pose + .01 translation + .012 camera rotation + .00816 pose rotation
-    // + .03 depth + .02719641466 pixel + .03 model + .009 vehicle time + .006 target time.
-    expect(initial.sigmaM).toBeCloseTo(0.162356414661021, 10)
+    // Includes finite depth/pixel/rotation cross terms and a 4.08m lever rotating
+    // at 35rad/s through 3ms combined clock uncertainty: angular timing=.4284m.
+    expect(initial.sigmaM).toBeCloseTo(0.591291734112160, 10)
     packet.pose!.capturedAtMs -= 10
-    expect(localizer.localize(packet).sigmaM - initial.sigmaM).toBeCloseTo(0.03, 10)
+    // Additional10ms contributes .03m translation +1.428m attitude sweep.
+    expect(localizer.localize(packet).sigmaM - initial.sigmaM).toBeCloseTo(1.458, 10)
     packet.depth!.sigmaM = 0.13
-    expect(localizer.localize(packet).sigmaM - initial.sigmaM).toBeCloseTo(0.13, 10)
+    expect(localizer.localize(packet).sigmaM - initial.sigmaM).toBeCloseTo(1.559183913997820, 10)
     // A 10cm range error remains within the independently declared isotropic bound.
     packet.depth!.opticalDepthM = 4.1
     const shifted = localizer.localize(packet)
     expect(Math.hypot(shifted.positionM[0] - 14.08, shifted.positionM[1] - 20, shifted.positionM[2] + 3)).toBeLessThan(shifted.sigmaM)
+    const delayedDepth = input(); delayedDepth.depth!.capturedAtMs -= 10
+    expect(localizer.localize(delayedDepth).sigmaM - initial.sigmaM).toBeCloseTo(1.448, 10)
+  })
+
+  test('rejects pixel uncertainty extending beyond the analytically certified lens domain', () => {
+    const calibration = exampleVisionCalibration(), validation = exampleVisionValidation()
+    calibration.intrinsics.fx = 200; calibration.intrinsics.fy = 200; calibration.intrinsics.distortion = [0, 0, 0, 0, 0]; calibration.uncertainty.pixelSigmaPx = 10
+    const pixels: [number, number][] = [[240, 180], [400, 180], [240, 300], [400, 300], [280, 260], [360, 220]]
+    validation.forEach((sample, index) => { sample.pixel = pixels[index]! })
+    const localizer = createVisionLocalizer(calibration, validation), packet = input(), box = { x: 0.5 / 640, y: 0.5 / 480, width: 1 / 640, height: 1 / 480 }
+    packet.tracking.selected!.box = box; packet.tracking.candidates[0]!.box = { ...box }; packet.depth!.pixel = [1, 1]
+    expect(() => localizer.localize(packet)).toThrow(/uncertainty leaves/)
   })
 
   test('rejects insufficient independent coverage and an optimistic model budget', () => {
