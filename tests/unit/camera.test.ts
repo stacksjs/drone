@@ -44,6 +44,22 @@ describe('explicit visual selection', () => {
     tracker.update(frame(3), 300)
     expect(tracker.select('1:0', 1, 300).confirmed).toBe(true)
   })
+  test('retrospective selection associates the latest exact detection and clears that association on loss', () => {
+    const tracker = createVisualTracker()
+    tracker.update(frame(1, 100), 100)
+    tracker.update(frame(2, 220, [person(0.8), person(0.21)]), 220)
+    tracker.update(frame(3, 330, [person(0.8), person(0.22)]), 330)
+    const current = tracker.select('1:0', 1, 350)
+    expect(current.confirmed).toBe(true)
+    expect(current.sequence).toBe(3)
+    expect(current.association).toEqual({ frameSequence: 3, candidateId: '3:1', capturedAtMs: 330 })
+    expect(current.selected!.lastSeenAtMs).toBe(330)
+    expect(current.selected!.box.x).toBe(0.22)
+    current.association!.candidateId = '1:0'
+    expect(tracker.snapshot(350).association!.candidateId).toBe('3:1')
+    expect(tracker.update(frame(4, 400, []), 400).association).toBeNull()
+    expect(tracker.update(frame(5), 500).association).toBeNull()
+  })
   test('lost targets never auto-reacquire, including when a person returns', () => {
     const tracker = selected()
     const original = tracker.snapshot(100).selected!.id

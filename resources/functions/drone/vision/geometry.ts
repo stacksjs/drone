@@ -135,6 +135,9 @@ export function createVisionLocalizer(calibration: VisionCalibration, heldOut: V
       if (pose.evidence !== c.evidence || (pose.headingAlignment !== 'initial-simulation-north' && pose.headingAlignment !== 'surveyed-body-to-ned') || (pose.evidence === 'declared-bench' && pose.headingAlignment !== 'surveyed-body-to-ned')) fail('qualified heading alignment required')
       number(pose.capturedAtMs, Math.max(0, now - c.timing.maxAgeMs), now, 'pose age'); number(pose.positionSigmaM, 0.0001, 5, 'pose position uncertainty'); number(pose.attitudeSigmaRad, 0.00001, 0.2, 'pose attitude uncertainty'); number(pose.clockUncertaintyMs, 0, 20, 'pose clock uncertainty')
       const poseSkewMs = Math.abs(pose.capturedAtMs - camera.capturedAtMs), depthSkewMs = Math.abs(depth.capturedAtMs - camera.capturedAtMs), clockUncertaintyMs = c.timing.clockUncertaintyMs + depth.clockUncertaintyMs + pose.clockUncertaintyMs
+      // Unknown clock correlations share the same additive budget as synchronization.
+      // Every contributing capture must remain fresh even at its oldest possible epoch.
+      if (now - Math.min(camera.capturedAtMs, depth.capturedAtMs, pose.capturedAtMs) + clockUncertaintyMs > c.timing.maxAgeMs) fail('capture age uncertainty budget')
       if (poseSkewMs + depthSkewMs + clockUncertaintyMs > c.timing.maxSkewMs) fail('capture synchronization budget')
       const body = bodyPoint(depth.pixel, depth.opticalDepthM, c)
       const rotated = rotate(pose.quaternionWxyz, body)
@@ -153,7 +156,7 @@ export function createVisionLocalizer(calibration: VisionCalibration, heldOut: V
       const angularTimingMotionSigmaM = Math.max(opticalRangeM, Math.hypot(...body)) * 35 * (poseSkewMs + depthSkewMs + clockUncertaintyMs) / 1000
       const sigmaM = pose.positionSigmaM + cameraTransformSigmaM + (Math.hypot(...body) + cameraTransformSigmaM) * pose.attitudeSigmaRad + u.modelSigmaM + vehicleTimingMotionSigmaM + targetTimingMotionSigmaM + angularTimingMotionSigmaM
       number(sigmaM, 0.0001, 10, 'localization uncertainty')
-      return { evidence: c.evidence, calibrationId: c.id, cameraSessionId: camera.sessionId, lockId: selected.id, candidateId: association.candidateId, frameSequence: camera.frameSequence, depthSourceId: depth.sourceId, depthSequence: depth.sequence, reference: pose.reference, capturedAtMs: camera.capturedAtMs, receivedAtMs: camera.receivedAtMs, positionM, sigmaM, physicalFlightEnabled: false }
+      return { evidence: c.evidence, calibrationId: c.id, cameraSessionId: camera.sessionId, lockId: selected.id, candidateId: association.candidateId, frameSequence: camera.frameSequence, depthSourceId: depth.sourceId, depthSequence: depth.sequence, reference: pose.reference, capturedAtMs: camera.capturedAtMs, receivedAtMs: Math.max(camera.receivedAtMs, depth.receivedAtMs, pose.capturedAtMs), positionM, sigmaM, physicalFlightEnabled: false }
     },
   }
 }

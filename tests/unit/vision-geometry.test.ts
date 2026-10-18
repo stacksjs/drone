@@ -20,10 +20,22 @@ describe('calibrated selected-point localization', () => {
     const observation = localizer.localize(input())
     // Optical [0,0,4] -> body [4.08,0,0], then translate vehicle [10,20,-3].
     expect(observation.positionM).toEqual([14.08, 20, -3])
-    expect(observation).toMatchObject({ lockId: 'chosen-lock', candidateId: '4:0', capturedAtMs: 1000, receivedAtMs: 1005, physicalFlightEnabled: false })
+    expect(observation).toMatchObject({ lockId: 'chosen-lock', candidateId: '4:0', capturedAtMs: 1000, receivedAtMs: 1006, physicalFlightEnabled: false })
     expect(localizer.report).toMatchObject({ samples: 6, minDepthM: 2, maxDepthM: 12, evidence: 'synthetic', physicalCalibrationVerified: false })
     expect(localizer.report.maxErrorM).toBeLessThan(1e-8)
     expect(observation.sigmaM).toBeGreaterThan(0.12)
+  })
+
+  test('a metric observation becomes available only after camera, depth and capture pose', () => {
+    const localizer = createVisionLocalizer(exampleVisionCalibration(), exampleVisionValidation()), packet = input()
+    packet.depth!.receivedAtMs = 1009
+    const observation = localizer.localize(packet)
+    expect(observation.receivedAtMs).toBe(1009)
+    expect(observation.capturedAtMs).toBe(1000)
+    packet.nowMs = 1008
+    expect(() => localizer.localize(packet)).toThrow(/depth age/)
+    packet.nowMs = 1010; packet.depth!.receivedAtMs = 1001; packet.camera.receivedAtMs = 1001; packet.pose!.capturedAtMs = 1008
+    expect(localizer.localize(packet).receivedAtMs).toBe(1008)
   })
 
   test('undoes Brown distortion and applies capture heading with independently worked coordinates', () => {
@@ -156,6 +168,25 @@ describe('calibrated selected-point localization', () => {
       p => { p.pose!.capturedAtMs = 990; p.depth!.capturedAtMs = 990 }, p => { p.pose!.clockUncertaintyMs = 20 },
     ]
     for (const change of changes) { const packet = input(); change(packet); expect(() => localizer.localize(packet)).toThrow() }
+  })
+
+  test('capture age includes the combined camera, depth and pose clock uncertainty', () => {
+    const localizer = createVisionLocalizer(exampleVisionCalibration(), exampleVisionValidation()), packet = input()
+    packet.nowMs = 1197
+    expect(localizer.localize(packet).capturedAtMs).toBe(1000)
+    packet.nowMs = 1198
+    expect(() => localizer.localize(packet)).toThrow(/age uncertainty/)
+    packet.nowMs = 1197; packet.depth!.clockUncertaintyMs = 2
+    expect(() => localizer.localize(packet)).toThrow(/age uncertainty/)
+    packet.depth!.clockUncertaintyMs = 1; packet.pose!.clockUncertaintyMs = 2
+    expect(() => localizer.localize(packet)).toThrow(/age uncertainty/)
+    packet.pose!.clockUncertaintyMs = 1; packet.depth!.capturedAtMs = 999
+    expect(() => localizer.localize(packet)).toThrow(/age uncertainty/)
+    packet.depth!.capturedAtMs = 1000; packet.pose!.capturedAtMs = 999
+    expect(() => localizer.localize(packet)).toThrow(/age uncertainty/)
+    const calibration = exampleVisionCalibration(); calibration.timing.clockUncertaintyMs = 2
+    packet.pose!.capturedAtMs = 1000
+    expect(() => createVisionLocalizer(calibration, exampleVisionValidation()).localize(packet)).toThrow(/age uncertainty/)
   })
 
   test('detaches accepted calibration, reports and output arrays from caller mutation', () => {
