@@ -14,7 +14,8 @@ export function runVehicleSimulation(profileInput: VehicleProfile, options: { sc
   const { plan, worstCaseMs, requiredWh } = validateVehicleMission(profileInput.mission)
   if (profileInput.vehicle !== plan.vehicle || plan.origin.latitudeDeg !== 0 || plan.origin.longitudeDeg !== 0 || plan.origin.ellipsoidHeightM !== 100) throw new TypeError('Vehicle fixture requires its declared 0,0,100 WGS84 origin')
   const actuators = structuredClone(profileInput.actuators), fence = structuredClone(profileInput.authorityFence)
-  const engine = createVehicleMissionEngine(plan), plant = profileInput.createPlant(), controller = profileInput.createController()
+  const session = profileInput.createSession()
+  const engine = createVehicleMissionEngine(plan), plant = session.createPlant(), controller = session.createController()
   const supervisor = createVehicleAuthoritySupervisor({ bootId: 55n, sessionId: 123n, vehicle: profileInput.vehicle, actuators, fence })
   const board = createVehicleOutputWatchdog({ bootId: 55n, sessionId: 123n, vehicle: profileInput.vehicle, actuators })
   const feed = createPhysicsSensorFeed(0), estimator = createEstimator({ origin: plan.origin, gravityCorrection: 'initialization-only' })
@@ -27,7 +28,7 @@ export function runVehicleSimulation(profileInput: VehicleProfile, options: { sc
   const path: { atMs: number, positionM: SensorVector | null, truthPositionM: SensorVector, mission: typeof mission, measurement: VehicleMeasurement | null, measurementPose: VehicleMeasurementPose | null, actuators: number[] }[] = []
   const transitions: { atMs: number, state: string, taskId: string, reason: string }[] = []
   let previousState = '', previousTask = ''
-  const payload = profileInput.createPayload?.()
+  const payload = session.createPayload?.()
   try {
     for (let nowMs = 0; nowMs <= seconds * 1000; nowMs += 4) {
       const faults = profileInput.faults(scenario, nowMs), boardState = board.tick(nowMs)
@@ -45,7 +46,7 @@ export function runVehicleSimulation(profileInput: VehicleProfile, options: { sc
       const capturePose = predictVehicleMeasurementPose(estimate, sensors.sensors.find(s => s.kind === 'imu')?.observation, nowMs)
       if (capturePose && !faults.dropVehicleSensor) {
         if (queue.length >= 8) throw new RangeError('Vehicle sensor queue exhausted')
-        const packet = structuredClone(profileInput.renderMeasurement(truth, nowMs, reference))
+        const packet = structuredClone(session.renderMeasurement(truth, nowMs, reference))
         if (packet.capturedAtMs !== nowMs || !Number.isSafeInteger(packet.receivedAtMs) || packet.receivedAtMs < nowMs + 20 || packet.receivedAtMs > nowMs + 100) throw new TypeError('Vehicle renderer must declare capture and bounded receipt epochs')
         queue.push({ measurement: packet, pose: capturePose })
         queue.sort((a, b) => a.measurement.receivedAtMs - b.measurement.receivedAtMs || a.measurement.sequence - b.measurement.sequence)

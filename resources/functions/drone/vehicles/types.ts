@@ -92,6 +92,14 @@ export interface VehicleFaults {
   rcOverride?: boolean
   kill?: boolean
 }
+/** One execution owns its plant, controller, payload and measurement sequence. */
+export interface VehicleSession {
+  createPlant(): VehiclePlant
+  createController(): VehicleController
+  createPayload?(): VehiclePayloadPort
+  /** Quantize model truth into declared measurements. Called every 20 ms with capture-time reference. */
+  renderMeasurement(state: VehiclePlantState, atMs: number, reference: string): VehicleMeasurement
+}
 export interface VehicleProfile {
   vehicle: VehicleKind
   name: string
@@ -101,11 +109,8 @@ export interface VehicleProfile {
   authorityFence: { radiusM: number, minDownM: number, maxDownM: number }
   mission: VehicleMissionPlan
   scenarios: readonly string[]
-  createPlant(): VehiclePlant
-  createController(): VehicleController
-  createPayload?(): VehiclePayloadPort
-  /** Quantize model truth into declared measurements. Called every 20 ms with capture-time reference. */
-  renderMeasurement(state: VehiclePlantState, atMs: number, reference: string): VehicleMeasurement
+  /** Allocate independent mutable state for each execution. Never reuse a session for another run. */
+  createSession(): VehicleSession
   /** Declared fault fixture. Undefined fields retain the nominal environment. */
   faults(scenario: string, atMs: number): VehicleFaults
 }
