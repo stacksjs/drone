@@ -1,11 +1,12 @@
 #pragma once
 #include "runtime.hpp"
+#include "sensors.hpp"
 
 namespace drone {
 // HAL boundary: IO supplies nonblocking readable/read/writable/write methods.
 struct Wire {
-    uint8_t rx[drone::frame_size]{}, tx[drone::frame_size]{};
-    unsigned received = 0, sent = drone::frame_size;
+    uint8_t rx[drone::frame_size]{}, tx[drone::sensor_frame_size]{};
+    unsigned received = 0, sent = 0, tx_size = 0;
     bool response = false;
     template<class IO>
     void poll(drone::Runtime& runtime, uint64_t now, IO& io) {
@@ -25,13 +26,19 @@ struct Wire {
                 received = 0; response = true;
             }
         }
-        for (unsigned i = 0; i < 32 && sent < drone::frame_size && io.writable(); ++i)
+        for (unsigned i = 0; i < 32 && sent < tx_size && io.writable(); ++i)
             io.write(tx[sent++]);
     }
     void report(drone::Runtime& runtime, uint64_t now, bool periodic) {
-        if (sent != drone::frame_size || (!response && !periodic)) return;
-        drone::encode(runtime.status(now), tx); sent = 0; response = false;
+        if (sent != tx_size || (!response && !periodic)) return;
+        uint8_t bytes[drone::frame_size];
+        drone::encode(runtime.status(now), bytes);
+        std::memcpy(tx, bytes, drone::frame_size); tx_size = drone::frame_size; sent = 0; response = false;
+    }
+    bool queue_sensor(const SensorFrame& frame) {
+        if (sent != tx_size || response) return false;
+        encode_sensor(frame, tx); tx_size = sensor_frame_size; sent = 0; return true;
     }
 };
-static_assert(sizeof(Wire) <= 160, "UART memory budget exceeded");
+static_assert(sizeof(Wire) <= 224, "UART memory budget exceeded");
 }

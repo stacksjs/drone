@@ -4,6 +4,9 @@
     "../bin/drone.ts",
     "../scripts/build-runtime-cli.ts",
     "../resources/functions/drone/runtime/**/*.ts",
-    "./unit/runtime.test.ts"
+    "../resources/functions/drone/sensors/**/*.ts",
+    "./fixtures/sensors/generate.ts",
+    "./unit/runtime.test.ts",
+    "./unit/sensors.test.ts"
   ]
 }

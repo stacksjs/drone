@@ -121,6 +121,31 @@ int main() {
         wire.poll(r, 1000, uart); wire.poll(r, 1000, uart);
         CHECK(r.status(1000).session == 0 && r.neutral());
     }
+    {
+        drone::Runtime r(123); CHECK(r.tick(1000, 1000));
+        drone::Wire wire; TestUART uart; drone::SensorFrame sensor;
+        sensor.sequence = 1; sensor.boot = 123; sensor.length = 16; sensor.device = 1;
+        sensor.flags = drone::sensor_valid;
+        CHECK(wire.queue_sensor(sensor));
+        CHECK(!wire.queue_sensor(sensor));
+        auto c = command(drone::Kind::hello, 1, 0); c.boot = 0;
+        uint8_t request[drone::frame_size]; drone::encode(c, request);
+        std::memcpy(uart.input, request, drone::frame_size); uart.size = drone::frame_size;
+        uart.ready = false; wire.poll(r, 1000, uart); wire.poll(r, 1000, uart);
+        CHECK(wire.response && uart.writes == 0);
+        wire.report(r, 1000, true); CHECK(wire.tx_size == 128);
+        uart.ready = true;
+        for (unsigned i = 0; i < 4; ++i) { wire.poll(r, 1000, uart); CHECK(uart.writes == (i + 1) * 32); }
+        CHECK(!wire.queue_sensor(sensor)); // Awaited diagnostic reply wins once TX becomes idle.
+        wire.report(r, 1000, false); CHECK(!wire.response && wire.tx_size == 64);
+        wire.poll(r, 1000, uart); wire.poll(r, 1000, uart);
+        CHECK(uart.writes == 192);
+        uint8_t ds[128], dr[64]; std::memcpy(ds, uart.output, 128); std::memcpy(dr, uart.output + 128, 64);
+        drone::SensorFrame decoded_sensor; drone::Frame status;
+        CHECK(drone::decode_sensor(ds, decoded_sensor) && decoded_sensor.sequence == 1);
+        CHECK(drone::decode(dr, status) && status.session == 456 && status.kind == drone::Kind::status);
+        CHECK(wire.queue_sensor(sensor) && r.neutral());
+    }
     std::puts("Runtime contract: sampling, bounds, neutral state, expiry, replay, identity, deadlines, reset and clock checks passed");
     return 0;
 }

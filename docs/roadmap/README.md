@@ -10,6 +10,8 @@ companion application and simulator, not a native board autopilot.
 
 - Native neutral-only bench kernel, real host-process harness, Pico 2 HAL/UF2 build and Stacks CLI.
   Board boot, timing, stack and watchdog evidence remain open in [#2](https://github.com/stacksjs/drone/issues/2).
+- Native IMU/pressure/GNSS acquisition profile, typed calibration/health pipeline and simulator replay.
+  Physical capture, measured calibration and clock alignment remain open in [#3](https://github.com/stacksjs/drone/issues/3).
 - TypeScript follow/behavior library, kinematic simulator, controller leases and envelope checks.
 - Pi AI Camera acquisition bridge and explicit image-space target selection/loss policy, pending Pi hardware validation.
 - An optional visual guard that holds metric follow logic on lost, unconfirmed, stale or changed visual selection.

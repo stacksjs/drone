@@ -1,0 +1,39 @@
+{
+  "evidenceLevel": "host-tests-and-cross-compilation-only",
+  "toolchainLock": "../firmware/runtime/toolchain-lock.json",
+  "profile": "pico2-sensors, rp2350-arm-s, neutral-only, ICM42688P/BMP280/NAV-PVT",
+  "pico2CrossBuild": {
+    "textBytes": 20440,
+    "dataBytes": 0,
+    "bssBytes": 836,
+    "mainStaticStackFrameBytes": 1112,
+    "sensorPollStaticStackFrameBytes": 320,
+    "measuredStackHighWaterBytes": null,
+    "uf2Sha256": "18f0d8d57098fa97c0008bd875421381b2c87340511c98edbac226731eee796a",
+    "boardFlashed": false,
+    "sensorCaptureMeasured": false,
+    "gpioTimingMeasured": false
+  },
+  "dataset": {
+    "path": "../tests/fixtures/sensors/bench-v1.json",
+    "evidence": "synthetic-register-fixture",
+    "records": 64,
+    "actualDeviceCapture": false,
+    "actualCalibration": false,
+    "measurementEpochAligned": false
+  },
+  "remainingIssue": "https://github.com/stacksjs/drone/issues/3",
+  "checks": {
+    "bunTests": 97,
+    "bunAssertions": 12451,
+    "sensorTests": 24,
+    "nativeCTestContracts": 2,
+    "picameraBridgeTests": 5,
+    "lint": true,
+    "applicationTypecheck": true,
+    "runtimeToolTypecheck": true,
+    "viewTypecheck": true,
+    "roadmapCheck": true,
+    "standaloneCliOutsideCheckout": true
+  }
+}

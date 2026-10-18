@@ -82,3 +82,7 @@ characters>`, each newline-terminated and bounded by a 160-byte input buffer. Ea
 128-character status-frame hex line. `tick` advances virtual time; it does not sleep in real time.
 This channel is not a firmware transport or public network service. The Stacks harness serializes
 requests, bounds response lines, times out unresponsive processes and closes them after each run.
+
+The optional [DS sensor stream](sensors.md) shares UART TX as complete 128-byte frames.
+DR remains 64 bytes. Awaited DR replies take priority when the current frame finishes; partial
+frames are never overwritten. UART state has a 64-byte RX buffer and a 128-byte TX buffer.

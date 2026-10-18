@@ -54,6 +54,20 @@ declare global {
   const validateLimits: typeof autoImports.validateLimits
   const decide: typeof autoImports.decide
   const defaultLimits: typeof autoImports.defaultLimits
+  const validateSensorCalibrations: typeof autoImports.validateSensorCalibrations
+  const convertImu: typeof autoImports.convertImu
+  const convertPressure: typeof autoImports.convertPressure
+  const inspectSensorCapture: typeof autoImports.inspectSensorCapture
+  const sensorAnchorFromHandshake: typeof autoImports.sensorAnchorFromHandshake
+  const validateSensorAnchor: typeof autoImports.validateSensorAnchor
+  const createSensorPipeline: typeof autoImports.createSensorPipeline
+  const sensorLimits: typeof autoImports.sensorLimits
+  const decodeSensorFrame: typeof autoImports.decodeSensorFrame
+  const sensorFrameBytes: typeof autoImports.sensorFrameBytes
+  const sensorKinds: typeof autoImports.sensorKinds
+  const parseSensorDataset: typeof autoImports.parseSensorDataset
+  const createSensorReplay: typeof autoImports.createSensorReplay
+  const maxSensorDatasetBytes: typeof autoImports.maxSensorDatasetBytes
   const createSimulator: typeof autoImports.createSimulator
   const createGpsTargetSource: typeof autoImports.createGpsTargetSource
   const createUdpAdapter: typeof autoImports.createUdpAdapter

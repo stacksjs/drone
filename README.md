@@ -57,12 +57,27 @@ Read the [runtime build and bench guide](docs/runtime.md) and [wire contract](do
 The standalone CLI uses the same native Stacks command definitions as Buddy. It does not flash or
 control hardware. Keep your Pi 5 for Stacks mission/camera logic; the Pico 2 is a separate bench board.
 
+## Sensor acquisition and replay
+
+Issue #3 adds a separate Pico 2 sensor image for ICM-42688-P, BMP280 and u-blox NAV-PVT,
+plus SI conversion, calibration profiles, independent freshness/quality checks and simulator replay.
+The retained dataset is synthetic. Physical capture, calibration and timing evidence remain open.
+
+```sh
+./buddy sensors:replay tests/fixtures/sensors/bench-v1.json --at-ms 500
+./buddy sensors:inspect /tmp/sensors-uart.bin
+./buddy runtime:build --target pico2 --sensors --sdk /path/to/pico-sdk
+```
+
+See the [sensor wiring, calibration and clock guide](docs/sensors.md). Sensor replay is diagnostic;
+it does not yet supply an owned attitude/position estimator. That is issue #4.
+
 ## Owned autopilot and roadmap
 
 The [dependency-linked roadmap](docs/roadmap/README.md) and [feature matrix](docs/roadmap/feature-coverage.md)
 cover the requested air, ground, surface, subsea, payload and industry workflows. A pinned inventory
-accounts for 274 top-level upstream module/driver/library entries. Native board firmware and detailed
-feature parity remain planned, with explicit issues and evidence gates.
+accounts for 274 top-level upstream module/driver/library entries. The first native bench firmware is implemented; hardware validation and detailed
+feature parity remain open, with explicit issues and evidence gates.
 See [the ownership decision](docs/adr/0001-owned-autonomy.md) and [driver contract](docs/drivers.md).
 
 ## Where your code goes
@@ -73,6 +88,7 @@ See [the ownership decision](docs/adr/0001-owned-autonomy.md) and [driver contra
 | `resources/functions/drone/mavlink.ts` | Small verified MAVLink v1/v2 common-message codec |
 | `resources/functions/drone/udp.ts` | Bun UDP adapter, imported explicitly on the server only |
 | `resources/functions/drone/camera/` | TypeScript tracker, session, API and a small Picamera2 acquisition helper |
+| `resources/functions/drone/sensors/` | Typed sensor stream, calibration, clocks, health and capture/replay |
 | `resources/functions/drone/drivers/` | Explicit ArduPilot/PX4 factories and mode profiles |
 | `resources/components/` | Reusable stx simulator, operating-envelope and hardware components |
 | `resources/views/index.stx` | Mission workspace |

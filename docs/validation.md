@@ -1,5 +1,24 @@
 # Validation evidence
 
+## Sensor bench slice
+
+- Stacks replay/inspection commands and standalone CLI executed, including replay outside the checkout.
+- Native register bus tests cover identity/configuration, data-ready, bus failure, forced pressure
+  conversions, timeout recovery, UBX checksum/epoch/week rollover and actual DS codec round trips.
+- Mixed DR/DS UART tests preserve complete frames under partial writes and prioritize awaited replies.
+- Sensor tests cover SI values, right-handed mount axes, thermal corrections, diagonal variance,
+  skew/future/stale/replayed data, independent ages, stuck/recovery, clock refreshes and EOF playback.
+- The retained fixture is independently encoded scripted data, not a physical recording. Simulator
+  sensor snapshots match direct replay, and replay continues to age after EOF without stopping motion.
+- Both synthetic and sensor Pico 2 images cross-compiled with the pinned toolchain. The sensor image
+  uses 20,440 text bytes, 836 BSS bytes and a 1,112-byte compiler-reported main stack frame. These
+  are static build values, not measured hardware timing or stack high-water. See [build evidence](sensor-evidence.json).
+- Lint, application/runtime/view typechecks, roadmap validation, native CTest and the Bun/Python
+  suites passed: 97 Bun tests with 12,451 assertions, two native CTest contracts and five Python tests.
+- Physical sensor capture, mounting/thermal/noise calibration, group-delay measurement and GNSS
+  PPS/TIM-TP alignment remain open in [#3](https://github.com/stacksjs/drone/issues/3), along with
+  issue #2's physical runtime evidence. No estimator or actuator authority is introduced.
+
 ## Owned runtime slice, October 17, 2026
 
 - Native CMake/CTest contract passes for the same kernel used by the Pico HAL, including synthetic

@@ -4,11 +4,15 @@ import { printError } from '@stacksjs/cli/output'
 import RuntimeBuild from '../app/Commands/RuntimeBuild'
 import RuntimeBench from '../app/Commands/RuntimeBench'
 import RuntimeInspect from '../app/Commands/RuntimeInspect'
+import SensorsReplay from '../app/Commands/SensorsReplay'
+import SensorsInspect from '../app/Commands/SensorsInspect'
 
 const app = cli('drone')
 RuntimeBuild(app)
 RuntimeBench(app)
 RuntimeInspect(app)
+SensorsReplay(app)
+SensorsInspect(app)
 app.help()
 app.version('0.1.0')
 try { await app.parse(process.argv) }

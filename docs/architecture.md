@@ -80,3 +80,9 @@ The owned kernel and Pico 2 HAL live in `firmware/runtime/`, with the explicit C
 [ADR 2](adr/0002-bench-runtime.md). Stacks owns the [CLI and protocol tools](runtime.md) under
 `resources/functions/drone/runtime/`. The first profile is synthetic-sensor and neutral-output
 only. It has no physical flight command path and does not replace estimation or vehicle controls.
+
+
+The optional [sensor bench profile](sensors.md), recorded in [ADR 3](adr/0003-sensor-bench.md),
+adds original SPI/I2C/UART acquisition and a receive-only DS stream. TypeScript applies units,
+calibration, clock uncertainty and independent health checks. The same pipeline runs against
+recordings on the simulator clock. Replay snapshots are diagnostic; estimator fusion is issue #4.

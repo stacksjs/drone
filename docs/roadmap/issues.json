@@ -45,6 +45,21 @@
     "url": "https://github.com/stacksjs/drone/issues/3",
     "nativeDependencies": [
       2
+    ],
+    "implementationStatus": "in-progress",
+    "evidence": [
+      "firmware/runtime/include/sensors.hpp",
+      "firmware/runtime/include/pico_sensors.hpp",
+      "resources/functions/drone/sensors/",
+      "docs/sensors.md",
+      "tests/fixtures/sensors/bench-v1.json",
+      "tests/unit/sensors.test.ts"
+    ],
+    "remaining": [
+      "Physical ICM-42688-P, BMP280 and GNSS disabled-load capture with hardware identities",
+      "Measured mount, six-orientation, stationary, thermal and noise calibration",
+      "Measured acquisition/group delay, transport timing and GNSS PPS/TIM-TP alignment",
+      "Hardware dropout/stuck fault campaign and issue #2 timing/watchdog gates"
     ]
   },
   {

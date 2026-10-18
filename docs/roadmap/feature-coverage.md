@@ -7,7 +7,7 @@ means there is no native implementation yet. A protocol-compatible transport is 
 | --- | --- | --- | --- |
 | Pi AI Camera and selected-person image tracking | Implemented acquisition bridge, geometric tracking, UI and loss guard. Pi execution unvalidated. | No upstream camera-control exposure | [#29](https://github.com/stacksjs/drone/issues/29) |
 | Native board HAL, scheduler, watchdog, boot and memory | Neutral-only C++ kernel, host HAL and cross-compiled Pico 2 HAL; board boot/timing/watchdog validation pending | External firmware owns these today | [#2](https://github.com/stacksjs/drone/issues/2) |
-| Calibration, sensor timing and quality | GPS-target normalization only | Local position/battery telemetry subset | [#3](https://github.com/stacksjs/drone/issues/3) |
+| Calibration, sensor timing and quality | Native register acquisition, SI conversion, thermal/mount calibration profiles, independent age/stuck/dropout checks and replay; physical capture/calibration/timing pending | Local position/battery telemetry subset | [#3](https://github.com/stacksjs/drone/issues/3) |
 | Attitude, navigation estimation, EKF, VIO, RTK and redundancy | Planned | Estimator output subset; no health-fusion parity | [#4](https://github.com/stacksjs/drone/issues/4) |
 | Rate, attitude, velocity, position, allocation and tuning | Ideal kinematics only; physical controls planned | Velocity-only quadcopter SITL | [#5](https://github.com/stacksjs/drone/issues/5) |
 | Arming, RC override, kill, fences, battery and recovery | Companion leases/envelope only; board supervisor planned | No arm/mode/kill commands; physical receive-only | [#6](https://github.com/stacksjs/drone/issues/6) |

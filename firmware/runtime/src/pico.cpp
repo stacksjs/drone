@@ -4,6 +4,9 @@
 #include "pico/rand.h"
 #include "hardware/uart.h"
 #include "hardware/watchdog.h"
+#if DRONE_SENSOR_BENCH
+#include "pico_sensors.hpp"
+#endif
 
 namespace {
 constexpr uint output_pin = 15, trace_pin = 16;
@@ -25,6 +28,9 @@ int main() {
     uart_set_fifo_enabled(uart0, true);
     auto boot = get_rand_64();
     if (!boot) boot = 1;
+#if DRONE_SENSOR_BENCH
+    drone::PicoSensors sensors(boot);
+#endif
     const auto origin = time_us_64();
     drone::Runtime runtime(boot, watchdog_caused_reboot(), origin);
     drone::Wire wire;
@@ -39,7 +45,13 @@ int main() {
         gpio_put(output_pin, false);  // There is no non-neutral output path.
         const bool healthy = runtime.tick(start, start);
         wire.poll(runtime, start, io);
+#if DRONE_SENSOR_BENCH
+        sensors.poll(start);
+#endif
         wire.report(runtime, start, ++iterations % 100 == 0);
+#if DRONE_SENSOR_BENCH
+        sensors.report(wire);
+#endif
         gpio_put(trace_pin, false);
         const bool completed = runtime.finish_tick(start, time_us_64());
         if (healthy && completed) watchdog_update();

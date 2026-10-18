@@ -34,5 +34,7 @@
     "viewTypecheck": true,
     "roadmapCheck": true
   },
-  "remainingIssue": "https://github.com/stacksjs/drone/issues/2"
+  "remainingIssue": "https://github.com/stacksjs/drone/issues/2",
+  "sourceCommit": "2d4a8a3e6b852bd3564ffcbc5112538264d9ad3b",
+  "scope": "Historical issue #2 snapshot before the DS sensor stream; not current sensor-profile footprint"
 }

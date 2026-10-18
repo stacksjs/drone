@@ -79,7 +79,7 @@ The build fetches the pinned picotool source for UF2 conversion when it is not a
 
 Output: `storage/runtime-build/pico2/drone_runtime.uf2`, `.elf`, `.elf.map` and compiler `.su` files.
 Build products and SDK checkouts are local state. The linker limits flash to 64 KiB and static RAM
-to 8 KiB. The kernel is statically limited to 128 bytes and the UART buffers to 160 bytes. The board
+to 8 KiB. The kernel is statically limited to 128 bytes and the UART state to 224 bytes (64-byte RX and 128-byte TX). The board
 reserves a 4 KiB primary stack; `.su` reports are static analysis, not measured stack high-water.
 Linker wrapping rejects ordinary malloc/calloc/realloc/free dependencies. There are no dynamic
 containers, exceptions or RTTI in the kernel.
@@ -150,5 +150,8 @@ remain separate work. A diagnostic lease never changes GP15 from neutral.
   Issue #2 remains open for those acceptance gates. No physical flight capability is claimed.
 
 The [validation record](validation.md) tracks the complete release checks, and the
-[build evidence snapshot](runtime-evidence.json) records artifact hashes and static footprint. Add real bench captures,
+[historical runtime build evidence snapshot](runtime-evidence.json) records artifact hashes and static footprint. Add real bench captures,
 logic-analyser measurements, exact board revision and stack/watchdog results before closing #2.
+
+The optional [sensor bench profile](sensors.md) adds bounded IMU, barometer and GNSS acquisition.
+Its larger footprint must be checked separately from the historical synthetic-only snapshot.

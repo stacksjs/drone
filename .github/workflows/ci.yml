@@ -29,6 +29,8 @@ jobs:
       - run: bun run runtime:cli
       - run: $GITHUB_WORKSPACE/storage/runtime-build/cli/drone runtime:bench --project "$GITHUB_WORKSPACE" --ticks 100 --fault deadline
         working-directory: ${{ runner.temp }}
+      - run: $GITHUB_WORKSPACE/storage/runtime-build/cli/drone sensors:replay "$GITHUB_WORKSPACE/tests/fixtures/sensors/bench-v1.json" --at-ms 500
+        working-directory: ${{ runner.temp }}
   firmware:
     runs-on: ubuntu-latest
     steps:
@@ -50,6 +52,9 @@ jobs:
           cmake -S firmware/runtime -B storage/runtime-build/pico2 -DDRONE_PICO2=ON -DCMAKE_BUILD_TYPE=Release
           cmake --build storage/runtime-build/pico2 --parallel 2
           "$PICO_TOOLCHAIN_PATH/bin/arm-none-eabi-size" storage/runtime-build/pico2/drone_runtime.elf
+          cmake -S firmware/runtime -B storage/runtime-build/pico2-sensors -DDRONE_PICO2=ON -DDRONE_SENSOR_BENCH=ON -DCMAKE_BUILD_TYPE=Release
+          cmake --build storage/runtime-build/pico2-sensors --parallel 2
+          "$PICO_TOOLCHAIN_PATH/bin/arm-none-eabi-size" storage/runtime-build/pico2-sensors/drone_runtime.elf
       - uses: actions/upload-artifact@v4
         with:
           name: pico2-neutral-only-bench
@@ -58,3 +63,11 @@ jobs:
             storage/runtime-build/pico2/drone_runtime.elf
             storage/runtime-build/pico2/drone_runtime.elf.map
             storage/runtime-build/pico2/**/*.su
+      - uses: actions/upload-artifact@v4
+        with:
+          name: pico2-sensor-bench
+          path: |
+            storage/runtime-build/pico2-sensors/drone_runtime.uf2
+            storage/runtime-build/pico2-sensors/drone_runtime.elf
+            storage/runtime-build/pico2-sensors/drone_runtime.elf.map
+            storage/runtime-build/pico2-sensors/**/*.su

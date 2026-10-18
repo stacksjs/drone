@@ -2,9 +2,12 @@ import type { Behavior, Decision, FlightAdapter, Target, Telemetry, Vector3 } fr
 import { follow } from './behaviors'
 import { decide } from './safety'
 import { zero } from './geometry'
+import type { SensorReplay } from './sensors/replay'
 
-export function createSimulator(options: { behavior?: Behavior } = {}) {
+export function createSimulator(options: { behavior?: Behavior, sensorReplay?: SensorReplay } = {}) {
   const customBehavior = options.behavior ? { ...options.behavior } : undefined
+  const sensorReplay = options.sensorReplay
+  if (sensorReplay && sensorReplay.snapshot().nowMs !== 0) throw new RangeError('Attach a fresh sensor replay at simulation time zero')
   let nowMs = 0
   let running = false
   let targetLost = false
@@ -29,7 +32,7 @@ export function createSimulator(options: { behavior?: Behavior } = {}) {
     close() { running = false; velocity = zero() },
   }
   function snapshot() {
-    return structuredClone({ mode: 'simulation' as const, running, nowMs, distanceMeters, altitudeMeters, targetLost, telemetry: telemetry(), target: target(), decision, trail, events })
+    return structuredClone({ mode: 'simulation' as const, running, nowMs, distanceMeters, altitudeMeters, targetLost, telemetry: telemetry(), target: target(), decision, trail, events, sensors: sensorReplay?.snapshot() ?? null })
   }
   return {
     adapter,
@@ -56,6 +59,7 @@ export function createSimulator(options: { behavior?: Behavior } = {}) {
       if (!Number.isFinite(deltaMs) || deltaMs <= 0 || deltaMs > 1000) throw new RangeError('Invalid simulation step')
       if (!running) return snapshot()
       nowMs += deltaMs
+      sensorReplay?.advanceTo(nowMs)
       const next = decide({ telemetry: telemetry(), target: target(), targetId: 'pilot', enabled: true, nowMs, behavior: customBehavior ?? follow({ distanceMeters, altitudeMeters, gain: 0.7 }) })
       if (next.reason !== decision.reason) { events.unshift({ atMs: nowMs, reason: next.reason }); events.splice(20) }
       adapter.send(next)
