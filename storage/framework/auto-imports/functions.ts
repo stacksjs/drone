@@ -15,7 +15,6 @@ export { createArduPilotDriver, createPx4Driver } from '../../../resources/funct
 export { decodeAutopilotMode, driverProfiles } from '../../../resources/functions/drone/drivers/profiles'
 export type { AutopilotDriverId } from '../../../resources/functions/drone/drivers/profiles'
 export { clampVelocity, gpsToLocal, zero, finiteVector, horizontalDistance } from '../../../resources/functions/drone/geometry'
-export { createVisualTracker, createVisualLockGuard } from '../../../resources/functions/drone/index'
 export { encodeFrame, decodeDatagram, encodeVelocity } from '../../../resources/functions/drone/mavlink'
 export type { MavlinkFrame } from '../../../resources/functions/drone/mavlink'
 export { validateLimits, decide, defaultLimits } from '../../../resources/functions/drone/safety'

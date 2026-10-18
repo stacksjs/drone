@@ -9,6 +9,10 @@ import { createVisualLockGuard } from '../../resources/functions/drone/camera/gu
 
 const person = (x = 0.2, confidence = 0.95) => ({ label: 'person' as const, confidence, box: { x, y: 0.2, width: 0.2, height: 0.6 } })
 const frame = (sequence: number, time = sequence * 100, detections = [person()]): CameraFrame => ({ sequence, capturedAtMs: time, receivedAtMs: time, detections })
+test('the generated server function registry loads without duplicate barrel exports', async () => {
+  const registry = await import('../../storage/framework/auto-imports/functions')
+  expect(registry.createVisualTracker).toBe(createVisualTracker)
+})
 function selected() {
   const tracker = createVisualTracker()
   tracker.update(frame(1), 100)

@@ -8,10 +8,10 @@ The initial simulator release had 31 tests; the checks below cover the expanded 
 - `./buddy lint`: pickier through Buddy, zero errors/warnings.
 - `./buddy typecheck`: application TypeScript check passed.
 - `bun run typecheck:views`: three script blocks and 88 template expressions, zero errors/warnings.
-- `./buddy test`: 58 tests across four files, 12,182 assertions. Covers the deterministic ten-minute
+- `./buddy test`: 59 tests across four files, 12,183 assertions. Covers the deterministic ten-minute
   ideal simulation, controller leases/envelope, GPS freshness/jumps, real loopback UDP, independent
   MAVLink fixtures, explicit camera selection, confirmation, ambiguity/loss, source failures,
-  stale frames, session restarts, visual guards and process signal termination.
+  stale frames, session restarts, visual guards, process signal termination and generated registry loading.
 - `python3 -m unittest discover -s tests/hardware`: five hardware-bridge contract tests without
   vendor packages, covering SSD class/confidence filtering, coordinate order/normalization,
   clipping, invalid tensors and bounds. Python compilation also passed.

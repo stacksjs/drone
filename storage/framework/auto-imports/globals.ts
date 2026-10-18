@@ -34,8 +34,6 @@ declare global {
   const zero: typeof autoImports.zero
   const finiteVector: typeof autoImports.finiteVector
   const horizontalDistance: typeof autoImports.horizontalDistance
-  const createVisualTracker: typeof autoImports.createVisualTracker
-  const createVisualLockGuard: typeof autoImports.createVisualLockGuard
   const encodeFrame: typeof autoImports.encodeFrame
   const decodeDatagram: typeof autoImports.decodeDatagram
   const encodeVelocity: typeof autoImports.encodeVelocity
