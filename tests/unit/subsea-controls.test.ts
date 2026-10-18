@@ -149,3 +149,28 @@ test('valid leak observations latch during authority inhibition and a surface pa
   surfaced.measurement!.values.pressurePa = 101325; surfaced.measurement!.values.onSurface = true
   expect(createSubseaController().step(surfaced).actuators).toEqual(Array(8).fill(0))
 })
+
+import { multiplyQuaternion, quaternionEuler } from '../../resources/functions/drone/estimation/frames'
+test('six-axis estimated-pose control recovers roll, pitch and yaw while holding underwater position', () => {
+  const q = multiplyQuaternion(multiplyQuaternion([Math.cos(0.15), 0, 0, Math.sin(0.15)], [Math.cos(-0.075), 0, Math.sin(-0.075), 0]), [Math.cos(0.1), Math.sin(0.1), 0, 0])
+  const plant = createSubseaPlant({ positionM: [0, 0, 2], quaternionWxyz: q }), controller = createSubseaController(), reference = subseaContext().measurement!.reference
+  let fault = '', sequence = 0
+  const queue = [renderSubseaMeasurement(plant.snapshot(), 940, reference, ++sequence)]
+  let measurement = queue.shift()!
+  for (let atMs = 1000; atMs <= 9000; atMs += 4) {
+    const state = plant.snapshot()
+    if (atMs % 20 === 0) queue.push(renderSubseaMeasurement(state, atMs, reference, ++sequence))
+    while (queue[0] && queue[0].receivedAtMs <= atMs) measurement = queue.shift()!
+    const c = subseaContext(atMs); c.measurement = measurement
+    c.estimate.localPosition!.positionM = [...state.positionM]; c.estimate.localPosition!.velocityMps = [...state.velocityMps]
+    c.estimate.attitude!.quaternionWxyz = [...state.quaternionWxyz]; c.estimate.attitude!.eulerRad = quaternionEuler(state.quaternionWxyz)
+    const output = controller.step(c)
+    if (output.inhibited) { fault = output.reason; break }
+    plant.step(output.actuators, 0.004, calm)
+  }
+  expect(fault).toBe('')
+  const final = plant.snapshot()
+  expect(Math.hypot(...quaternionEuler(final.quaternionWxyz))).toBeLessThan(0.001)
+  expect(Math.hypot(...final.angularRateRadS)).toBeLessThan(0.001)
+  expect(Math.hypot(final.positionM[0], final.positionM[1], final.positionM[2] - 2)).toBeLessThan(0.03)
+})
