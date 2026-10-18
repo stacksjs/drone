@@ -14,6 +14,7 @@ export function createAirController(): VehicleController {
     const expectedReference = vehicleReference(c.estimate)
     if (m.reference !== expectedReference || (reference !== null && m.reference !== reference)) return false
     const v = m.values
+    if (!v || typeof v !== 'object' || Array.isArray(v)) return false
     if (typeof v.differentialPressurePa !== 'number' || !Number.isFinite(v.differentialPressurePa) || v.differentialPressurePa < 0 || Math.abs(Math.sqrt(2 * v.differentialPressurePa / airModel.densityKgM3) - (v.airspeedMps as number)) > 0.02 || typeof v.airspeedMps !== 'number' || !Number.isFinite(v.airspeedMps) || v.airspeedMps < 0 || v.airspeedMps > 60 || typeof v.alphaRad !== 'number' || !Number.isFinite(v.alphaRad) || Math.abs(v.alphaRad) > Math.PI || typeof v.betaRad !== 'number' || !Number.isFinite(v.betaRad) || Math.abs(v.betaRad) > Math.PI || typeof v.onSurface !== 'boolean' || typeof v.stopped !== 'boolean' || !Array.isArray(v.rateRadS) || v.rateRadS.length !== 3 || !v.rateRadS.every(n => Number.isFinite(n) && Math.abs(n) < 40)) return false
     const nextSignature = JSON.stringify(m)
     if (m.sequence < lastSequence || m.capturedAtMs < lastCaptured || (m.sequence === lastSequence && nextSignature !== signature) || (m.sequence > lastSequence && m.capturedAtMs <= lastCaptured)) return false

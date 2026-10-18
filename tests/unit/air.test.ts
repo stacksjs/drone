@@ -165,3 +165,8 @@ test('native air command executes the owned runway mission and rejects invalid i
     expect(text).toBe(''); expect(code).toBe(1); expect(error.length).toBeGreaterThan(0)
   }
 }, 180000)
+
+test('malformed vehicle sensor values inhibit at the public controller boundary', () => {
+  const context = airContext(); context.measurement!.values = null as never
+  expect(createAirController().step(context).inhibited).toBe(true)
+})
