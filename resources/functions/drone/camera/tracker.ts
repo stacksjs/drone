@@ -28,11 +28,13 @@ export function createVisualTracker(options: { maxAgeMs?: number, minConfidence?
   let lastNow = -Infinity
   let candidates: Candidate[] = []
   let selected: VisualLock | null = null
+  let association: TrackingSnapshot['association'] = null
   let lockSequence = 0
   const trackerId = crypto.randomUUID()
   const history: { sequence: number, capturedAtMs: number, candidates: Candidate[] }[] = []
 
   function lose(message: string) {
+    association = null
     if (selected) state = 'lost'
     reason = message
   }
@@ -54,7 +56,7 @@ export function createVisualTracker(options: { maxAgeMs?: number, minConfidence?
     }
     return true
   }
-  function associate(next: Candidate[], timestamp: number) {
+  function associate(next: Candidate[], timestamp: number, frameSequence: number) {
     if (state !== 'tracking' || !selected) return
     const previous = selected.box
     const matches = next.filter(item => {
@@ -67,6 +69,7 @@ export function createVisualTracker(options: { maxAgeMs?: number, minConfidence?
       return
     }
     const match = matches[0]!
+    association = { frameSequence, candidateId: match.id, capturedAtMs: timestamp }
     selected = { ...selected, box: { ...match.box }, confidence: match.confidence, lastSeenAtMs: timestamp, confirmations: Math.min(confirmations, selected.confirmations + 1) }
     reason = selected.confirmations >= confirmations ? 'Selected person tracked' : 'Confirming selected person'
   }
@@ -74,23 +77,24 @@ export function createVisualTracker(options: { maxAgeMs?: number, minConfidence?
     expire(nowMs)
     const confirmed = state === 'tracking' && selected !== null && selected.confirmations >= confirmations
     return structuredClone({
-      state, reason, sequence: sequence < 0 ? null : sequence, candidates, selected, confirmed,
+      state, reason, sequence: sequence < 0 ? null : sequence, candidates, selected, confirmed, association: confirmed ? association : null,
       observation: confirmed && selected ? { horizontalError: 2 * (selected.box.x + selected.box.width / 2 - 0.5), verticalError: 2 * (selected.box.y + selected.box.height / 2 - 0.5) } : null,
     })
   }
   return {
     snapshot,
     fail(message: string) { candidates = []; history.length = 0; lose(message) },
-    clear() { selected = null; state = 'idle'; reason = 'Select a person explicitly' },
+    clear() { selected = null; association = null; state = 'idle'; reason = 'Select a person explicitly' },
     select(candidateId: string, frameSequence: number, nowMs: number) {
       if (!expire(nowMs)) throw new RangeError('Invalid selection clock')
       const shown = history.find(frame => frame.sequence === frameSequence)
       const candidate = shown?.candidates.find(item => item.id === candidateId)
       if (!candidate || !shown || nowMs - shown.capturedAtMs > maxAge) throw new RangeError('Candidate expired or unavailable')
       selected = { id: `${trackerId}:${++lockSequence}`, box: { ...candidate.box }, confidence: candidate.confidence, lastSeenAtMs: shown.capturedAtMs, confirmations: 1 }
+      association = { frameSequence, candidateId: candidate.id, capturedAtMs: shown.capturedAtMs }
       state = 'tracking'
       reason = 'Confirming selected person'
-      for (const frame of history.filter(frame => frame.sequence > frameSequence)) associate(frame.candidates, frame.capturedAtMs)
+      for (const frame of history.filter(frame => frame.sequence > frameSequence)) associate(frame.candidates, frame.capturedAtMs, frame.sequence)
       return snapshot(nowMs)
     },
     update(frame: CameraFrame, nowMs: number) {
@@ -111,7 +115,7 @@ export function createVisualTracker(options: { maxAgeMs?: number, minConfidence?
       candidates = frame.detections.filter(item => item.confidence >= minConfidence).map((item, index) => ({ ...structuredClone(item), id: `${sequence}:${index}` }))
       history.push({ sequence, capturedAtMs: capturedAt, candidates: structuredClone(candidates) })
       while (history.length > 64 || (history[0] && nowMs - history[0].capturedAtMs > maxAge)) history.shift()
-      associate(candidates, capturedAt)
+      associate(candidates, capturedAt, sequence)
       return snapshot(nowMs)
     },
   }

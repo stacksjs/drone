@@ -22,6 +22,8 @@ export interface TrackingSnapshot {
   candidates: Candidate[]
   selected: VisualLock | null
   confirmed: boolean
+  /** Exact matched detection in the current frame. Absent legacy snapshots remain image-only. */
+  association?: { frameSequence: number, candidateId: string, capturedAtMs: number } | null
   /** Image-space observation only. Never a metric position or navigation target. */
   observation: { horizontalError: number, verticalError: number } | null
 }
