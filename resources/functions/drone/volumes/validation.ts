@@ -1,5 +1,5 @@
 import type { KnownSurface, SurfaceMetadata, SurfaceReference, VolumeBase, VolumeBoundary, VolumeReference, VolumeRequest, VolumeXY } from './types'
-import { bounds, boundsOverlap, cross, insideRing, intersectConvex, onSegment, samePoint, segmentsTouch, signedArea } from './geometry'
+import { volumeBounds, volumeBoundsOverlap, volumeCross2D, volumeInsideRing, volumeIntersectConvex, volumeOnSegment, volumeSamePoint, volumeSegmentsTouch, volumeSignedArea } from './geometry'
 
 export const volumeLimits = Object.freeze({ vertices: 32768, primitives: 16384, gridCells: 32768, boundaryVertices: 64, holes: 8, integrationPieces: 32768, candidatePairs: 500000, clippingCandidates: 1000000 })
 function fail(message: string): never { throw new Error(`Volume input: ${message}`) }
@@ -78,7 +78,7 @@ function checkTin(surface: Extract<KnownSurface['geometry'], { kind: 'tin' }>): 
     elevations.set(k, vertices[i]![2])
   }
   const triangles = surface.triangles.map((indices, id) => {
-    const points = indices.map(i => xy[i]!), area = Math.abs(signedArea(points))
+    const points = indices.map(i => xy[i]!), area = Math.abs(volumeSignedArea(points))
     if (area <= 1e-10) fail('TIN has degenerate horizontal triangle')
     const keys = indices.map(key), face = [...keys].sort().join('|')
     if (faces.has(face)) fail('TIN has duplicate projected face')
@@ -88,7 +88,7 @@ function checkTin(surface: Extract<KnownSurface['geometry'], { kind: 'tin' }>): 
       if (count > 2) fail('TIN has non-manifold shared edge')
       edges.set(edge, count)
     }
-    return { id, indices, points, bbox: bounds(points) }
+    return { id, indices, points, bbox: volumeBounds(points) }
   }).sort((a, b) => a.bbox[0] - b.bbox[0])
   let candidates = 0
   const active: typeof triangles = []
@@ -96,14 +96,14 @@ function checkTin(surface: Extract<KnownSurface['geometry'], { kind: 'tin' }>): 
     for (let i = active.length - 1; i >= 0; i--) if (active[i]!.bbox[2] < current.bbox[0]) active.splice(i, 1)
     for (const other of active) {
       if (++candidates > volumeLimits.candidatePairs) fail('TIN topology candidate-pair budget exceeded; tile the surface')
-      if (!boundsOverlap(current.bbox, other.bbox)) continue
-      const intersection = intersectConvex(current.points, other.points)
-      if (intersection.length >= 3 && Math.abs(signedArea(intersection)) > 1e-9) fail('TIN projected interiors overlap; terrain must be single-valued')
+      if (!volumeBoundsOverlap(current.bbox, other.bbox)) continue
+      const intersection = volumeIntersectConvex(current.points, other.points)
+      if (intersection.length >= 3 && Math.abs(volumeSignedArea(intersection)) > 1e-9) fail('TIN projected interiors overlap; terrain must be single-valued')
       // Even a zero-area shared boundary must agree in elevation, including T-junctions.
       for (const [one, two] of [[current, other], [other, current]]) {
         for (let v = 0; v < 3; v++) for (let e = 0; e < 3; e++) {
           const p = one!.points[v]!, a = two!.points[e]!, b = two!.points[(e + 1) % 3]!
-          if (!onSegment(p, a, b)) continue
+          if (!volumeOnSegment(p, a, b)) continue
           const length2 = (b[0] - a[0]) ** 2 + (b[1] - a[1]) ** 2
           const t = ((p[0] - a[0]) * (b[0] - a[0]) + (p[1] - a[1]) * (b[1] - a[1])) / length2
           const zA = vertices[two!.indices[e]!]![2], zB = vertices[two!.indices[(e + 1) % 3]!]![2], z = vertices[one!.indices[v]!]![2]
@@ -152,25 +152,25 @@ function boundary(input: unknown): VolumeBoundary {
     if (!Array.isArray(value) || value.length < 3 || value.length > volumeLimits.boundaryVertices) fail('boundary ring vertex count invalid')
     const points = value.map((p, i) => point(p, `boundary vertex ${i}`, 2) as VolumeXY)
     for (let i = 0; i < points.length; i++) {
-      if (samePoint(points[i]!, points[(i + 1) % points.length]!)) fail('boundary ring has repeated adjacent vertex or explicit closing vertex')
+      if (volumeSamePoint(points[i]!, points[(i + 1) % points.length]!)) fail('boundary ring has repeated adjacent vertex or explicit closing vertex')
       const prev = points[(i + points.length - 1) % points.length]!, next = points[(i + 1) % points.length]!
-      if (Math.abs(cross(prev, points[i]!, next)) < 1e-9 && !onSegment(points[i]!, prev, next)) fail('boundary doubles back along an edge')
+      if (Math.abs(volumeCross2D(prev, points[i]!, next)) < 1e-9 && !volumeOnSegment(points[i]!, prev, next)) fail('boundary doubles back along an edge')
       for (let j = i + 1; j < points.length; j++) {
         if (j === i + 1 || i === 0 && j === points.length - 1) continue
-        if (segmentsTouch(points[i]!, points[(i + 1) % points.length]!, points[j]!, points[(j + 1) % points.length]!)) fail('boundary ring self-intersects or touches')
+        if (volumeSegmentsTouch(points[i]!, points[(i + 1) % points.length]!, points[j]!, points[(j + 1) % points.length]!)) fail('boundary ring self-intersects or touches')
       }
     }
-    if (Math.abs(signedArea(points)) < 1e-8) fail('boundary has zero or unresolved area')
+    if (Math.abs(volumeSignedArea(points)) < 1e-8) fail('boundary has zero or unresolved area')
     return points
   }
   const outer = ring(b.outer), holes = b.holes.map(ring), all = [outer, ...holes]
   if (all.reduce((sum, r) => sum + r.length, 0) > volumeLimits.boundaryVertices) fail('total boundary vertex budget exceeded')
   for (let h = 1; h < all.length; h++) {
-    if (!insideRing(all[h]![0]!, outer)) fail('boundary hole lies outside outer ring')
+    if (!volumeInsideRing(all[h]![0]!, outer)) fail('boundary hole lies outside outer ring')
     for (let j = 0; j < h; j++) {
       const a = all[h]!, c = all[j]!
-      for (let i = 0; i < a.length; i++) for (let k = 0; k < c.length; k++) if (segmentsTouch(a[i]!, a[(i + 1) % a.length]!, c[k]!, c[(k + 1) % c.length]!)) fail('boundary rings cross or touch')
-      if (j > 0 && (insideRing(a[0]!, c) || insideRing(c[0]!, a))) fail('boundary holes overlap or nest')
+      for (let i = 0; i < a.length; i++) for (let k = 0; k < c.length; k++) if (volumeSegmentsTouch(a[i]!, a[(i + 1) % a.length]!, c[k]!, c[(k + 1) % c.length]!)) fail('boundary rings cross or touch')
+      if (j > 0 && (volumeInsideRing(a[0]!, c) || volumeInsideRing(c[0]!, a))) fail('boundary holes overlap or nest')
     }
   }
   return { outer, holes }
@@ -202,7 +202,8 @@ export function validateVolumeRequest(input: unknown): VolumeRequest {
     if (Math.abs(refAtAnchor - plane.anchorM[2]) > 1e-8 || refBase.gradientEast !== plane.gradientEast || refBase.gradientNorth !== plane.gradientNorth) fail('comparison base convention mismatch')
     if (surface.metadata.provenance.evidence === 'synthetic' && evidence !== 'synthetic') fail('synthetic surface cannot be promoted to surveyed comparison evidence')
     const surveyedAt = text(v.surveyedAt, 'reference survey date')
-    if (!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,3})?Z$/.test(surveyedAt) || !Number.isFinite(Date.parse(surveyedAt))) fail('reference surveyedAt must be an ISO UTC date')
+    if (!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,3})?Z$/.test(surveyedAt) || !Number.isFinite(Date.parse(surveyedAt)) || new Date(surveyedAt).toISOString().slice(0, 19) !== surveyedAt.slice(0, 19)) fail('reference surveyedAt must be a valid ISO UTC calendar date')
+    if (v.independence === 'declared-independent' && (v.id === surface.metadata.id || v.id === r.id || v.sourceSha256 === surface.metadata.provenance.sourceSha256)) fail('independent comparison requires a distinct source identity and digest')
     reference = { id: text(v.id, 'reference id'), evidence, sourceSha256: hash(v.sourceSha256), surveyedAt, method: text(v.method, 'reference method'), independence: literal(v.independence, 'reference independence', ['declared-independent', 'not-independent']), reference: refFrame, boundary: refBoundary, base: refBase, aboveBaseM3: finite(v.aboveBaseM3, 'reference above volume', 0, 1e20), belowBaseM3: finite(v.belowBaseM3, 'reference below volume', 0, 1e20), volumeBoundM3: v.volumeBoundM3 === null ? null : finite(v.volumeBoundM3, 'reference bound', 0, 1e20) }
   }
   return { version: 1, id: text(r.id, 'request id'), surface, boundary: domain, base: plane, reference }

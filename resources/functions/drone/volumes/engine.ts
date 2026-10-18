@@ -1,7 +1,7 @@
 import type { VolumePiece, VolumeReport, VolumeXY } from './types'
-import { bounds, boundsOverlap, clipHalfPlane, cross, intersectConvex, signedArea, triangulateRing } from './geometry'
+import { volumeBounds, volumeBoundsOverlap, volumeClipHalfPlane, volumeCross2D, volumeIntersectConvex, volumeSignedArea, volumeTriangulateRing } from './geometry'
 import { validateVolumeRequest, volumeLimits } from './validation'
-export { validateKnownSurface, validateSurfaceMetadata, validateVolumeRequest, volumeLimits } from './validation'
+export * from './validation'
 
 class Sum {
   value = 0
@@ -15,15 +15,15 @@ interface Primitive { id: string, polygon: VolumeXY[], top: (p: VolumeXY) => num
 export function processStockpile(input: unknown): VolumeReport {
   const request = validateVolumeRequest(input), { surface, base } = request, anchor = request.boundary.outer[0]!
   const local = (p: VolumeXY): VolumeXY => [p[0] - anchor[0], p[1] - anchor[1]]
-  const parts = [request.boundary.outer, ...request.boundary.holes].flatMap((ring, index) => triangulateRing(ring.map(local)).map((polygon, ear) => ({ polygon, bbox: bounds(polygon), weight: (index === 0 ? 1 : -1) as 1 | -1, id: index === 0 ? `outer:${ear}` : `hole:${index - 1}:${ear}` })))
+  const parts = [request.boundary.outer, ...request.boundary.holes].flatMap((ring, index) => volumeTriangulateRing(ring.map(local)).map((polygon, ear) => ({ polygon, bbox: volumeBounds(polygon), weight: (index === 0 ? 1 : -1) as 1 | -1, id: index === 0 ? `outer:${ear}` : `hole:${index - 1}:${ear}` })))
   const boundaryArea = new Sum()
-  for (const part of parts) boundaryArea.add(part.weight * Math.abs(signedArea(part.polygon)))
+  for (const part of parts) boundaryArea.add(part.weight * Math.abs(volumeSignedArea(part.polygon)))
   const primitives: Primitive[] = [], excludedGridCells: VolumeReport['excludedGridCells'] = []
   if (surface.geometry.kind === 'tin') {
     const g = surface.geometry
     for (let index = 0; index < g.triangles.length; index++) {
       const vertices = g.triangles[index]!.map(i => g.vertices[i]!), polygon = vertices.map(p => local([p[0], p[1]]))
-      const a = polygon[0]!, b = polygon[1]!, c = polygon[2]!, z0 = vertices[0]![2], z1 = vertices[1]![2], z2 = vertices[2]![2], det = cross(a, b, c)
+      const a = polygon[0]!, b = polygon[1]!, c = polygon[2]!, z0 = vertices[0]![2], z1 = vertices[1]![2], z2 = vertices[2]![2], det = volumeCross2D(a, b, c)
       const east = ((z1 - z0) * (c[1] - a[1]) - (z2 - z0) * (b[1] - a[1])) / det
       const north = ((b[0] - a[0]) * (z2 - z0) - (c[0] - a[0]) * (z1 - z0)) / det
       primitives.push({ id: `triangle:${index}`, polygon, top: p => z0 + east * (p[0] - a[0]) + north * (p[1] - a[1]) })
@@ -42,24 +42,24 @@ export function processStockpile(input: unknown): VolumeReport {
   const covered = new Sum(), above = new Sum(), below = new Sum(), pieces: VolumePiece[] = []
   let candidates = 0
   for (const primitive of primitives) {
-    const bbox = bounds(primitive.polygon), difference = (p: VolumeXY) => primitive.top(p) - baseAtAnchor - base.gradientEast * p[0] - base.gradientNorth * p[1]
+    const bbox = volumeBounds(primitive.polygon), difference = (p: VolumeXY) => primitive.top(p) - baseAtAnchor - base.gradientEast * p[0] - base.gradientNorth * p[1]
     for (const part of parts) {
       if (++candidates > volumeLimits.clippingCandidates) throw new Error('Volume clipping candidate budget exceeded; tile the surface or simplify the boundary')
-      if (!boundsOverlap(bbox, part.bbox)) continue
-      const intersection = intersectConvex(primitive.polygon, part.polygon)
-      if (intersection.length < 3 || Math.abs(signedArea(intersection)) < 1e-12) continue
+      if (!volumeBoundsOverlap(bbox, part.bbox)) continue
+      const intersection = volumeIntersectConvex(primitive.polygon, part.polygon)
+      if (intersection.length < 3 || Math.abs(volumeSignedArea(intersection)) < 1e-12) continue
       // Zero-height polygons must appear once, and crossings are split BEFORE affine integration.
       const values = intersection.map(difference)
       const min = Math.min(...values), max = Math.max(...values)
-      const split = min >= 0 || max <= 0 ? [intersection] : [clipHalfPlane(intersection, difference), clipHalfPlane(intersection, p => -difference(p))]
+      const split = min >= 0 || max <= 0 ? [intersection] : [volumeClipHalfPlane(intersection, difference), volumeClipHalfPlane(intersection, p => -difference(p))]
       for (const polygon of split) {
         if (polygon.length < 3) continue
-        const area = Math.abs(signedArea(polygon))
+        const area = Math.abs(volumeSignedArea(polygon))
         if (area < 1e-12) continue
         const integral = new Sum(), first = polygon[0]!
         for (let i = 1; i + 1 < polygon.length; i++) {
           const b = polygon[i]!, c = polygon[i + 1]!
-          integral.add(Math.abs(cross(first, b, c)) / 2 * (difference(first) + difference(b) + difference(c)) / 3)
+          integral.add(Math.abs(volumeCross2D(first, b, c)) / 2 * (difference(first) + difference(b) + difference(c)) / 3)
         }
         if (!Number.isFinite(integral.value)) throw new Error('Volume integration exceeded finite numeric bounds')
         const positive = Math.max(0, integral.value), negative = Math.max(0, -integral.value)
