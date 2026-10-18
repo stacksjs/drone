@@ -23,7 +23,7 @@ export function createPhysicsSensorFeed(additionalDelayMs: number) {
     queue.push({ atMs: atMs + 4 + additionalDelayMs, bytes })
   }
   return {
-    capture(state: RigidBodyState, atMs: number, dropImu = false) {
+    capture(state: Pick<RigidBodyState, 'positionM' | 'velocityMps' | 'accelerationMps2' | 'quaternionWxyz' | 'angularRateRadS'>, atMs: number, dropImu = false, dropPosition = false) {
       if (atMs % 20 === 0 && !dropImu) {
         const p = new Uint8Array(16), v = new DataView(p.buffer)
         const specific = rotateNedToBody(state.quaternionWxyz, [state.accelerationMps2[0], state.accelerationMps2[1], state.accelerationMps2[2] - multirotorModel.gravityMps2])
@@ -33,7 +33,7 @@ export function createPhysicsSensorFeed(additionalDelayMs: number) {
         counts.forEach((n, i) => v.setInt16(2 + i * 2, Math.max(-32768, Math.min(32767, Math.round(n))), false))
         p[14] = 6; p[15] = 6; packet(1, imuSequence, atMs, p, valid)
       }
-      if (atMs % 100 === 0) {
+      if (atMs % 100 === 0 && !dropPosition) {
         const p = new Uint8Array(80), v = new DataView(p.buffer)
         v.setUint32(0, 100000 + atMs, true); p[20] = 3; p[21] = 1; p[23] = 12
         v.setInt32(28, Math.round(state.positionM[0] / 6335539.3272928195 * 180 / Math.PI * 1e7), true)
