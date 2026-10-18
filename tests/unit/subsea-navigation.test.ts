@@ -141,3 +141,20 @@ test('nonfinite or reversed clocks latch loss while retaining finite inspectable
     expect(nav.update(base(80), renderSubseaMeasurement(truth(), 20, reference, 2), 80).health.localPosition).toBe(false)
   }
 })
+
+test('DVL lock loss preserves independently fresh pressure height without reviving horizontal navigation', () => {
+  const nav = createSubseaNavigation()
+  for (let t = 0; t <= 60; t += 4) nav.update(base(t), null, t)
+  nav.update(base(60), renderSubseaMeasurement(truth(), 0, reference, 1), 60)
+  for (let t = 64; t <= 80; t += 4) nav.update(base(t), null, t)
+  const packet = renderSubseaMeasurement(moving(), 20, reference, 2)
+  packet.values.dvlLocked = false
+  const loss = nav.update(base(80), packet, 80)
+  expect(loss.health.localPosition).toBe(false)
+  expect(loss.health.pressureHeight).toBe(true)
+  expect(loss.pressureHeight?.downM).toBeCloseTo(2, 7)
+  expect(loss.pressureHeight?.capturedAtMs).toBe(20)
+  expect(loss.pressureHeight?.varianceM2).toBe(0.0001)
+  packet.values.dvlLocked = true
+  expect(nav.update(base(80), packet, 80).health.localPosition).toBe(false)
+})
