@@ -146,6 +146,7 @@ declare global {
   const inspectionProjector: typeof autoImports.inspectionProjector
   const projectInspectionPixel: typeof autoImports.projectInspectionPixel
   const createInspectionPlan: typeof autoImports.createInspectionPlan
+  const inspectionCapturePolicy: typeof autoImports.inspectionCapturePolicy
   const inspectionImagePreview: typeof autoImports.inspectionImagePreview
   const simulateInspection: typeof autoImports.simulateInspection
   const inspectionScenarios: typeof autoImports.inspectionScenarios

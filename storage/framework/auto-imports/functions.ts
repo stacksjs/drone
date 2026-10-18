@@ -77,6 +77,7 @@ export { writeInspectionDataset } from '../../../resources/functions/drone/inspe
 export { exampleInspectionConfig } from '../../../resources/functions/drone/inspection/fixtures'
 export { inspectionRotate, inspectionAssetPoint, inspectionSegmentSeparation, inspectionProjector, projectInspectionPixel } from '../../../resources/functions/drone/inspection/geometry'
 export { createInspectionPlan } from '../../../resources/functions/drone/inspection/planner'
+export { inspectionCapturePolicy } from '../../../resources/functions/drone/inspection/policy'
 export { inspectionImagePreview } from '../../../resources/functions/drone/inspection/presentation'
 export { simulateInspection, inspectionScenarios } from '../../../resources/functions/drone/inspection/runtime'
 export type { InspectionAsset, InspectionConfig, InspectionStation, InspectionPlan, InspectionImage, InspectionRangePacket, InspectionAssetObservation, InspectionCapture, InspectionCaptureQuality, InspectionScenario, InspectionRun, InspectionReviewInput, InspectionReview, InspectionComparison } from '../../../resources/functions/drone/inspection/types'
