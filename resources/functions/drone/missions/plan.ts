@@ -2,6 +2,7 @@ import type { SensorVector } from '../sensors/types'
 import type { GeodeticOrigin } from '../estimation/frames'
 import { authorityPolicy } from '../authority/supervisor'
 import { validVector } from '../controls/model'
+import { missionGraphBudget } from './graph'
 
 export type MissionTask =
   | { id: string, kind: 'takeoff' | 'waypoint' | 'land', positionM: SensorVector, timeoutMs: number, next?: string }
@@ -68,24 +69,8 @@ export function validateMission(input: unknown): { plan: MissionPlan, worstCaseM
     tasks.set(t.id, t)
   }
   if (tasks.get(p.start)?.kind !== 'takeoff' || p.tasks.some(t => t.id !== p.start && t.kind === 'takeoff')) invalid()
-  // Acyclic graphs bound execution and prevent repeating a payload during recovery.
-  const visited = new Set<string>()
-  const visiting = new Set<string>()
-  const costs = new Map<string, number>()
-  function cost(id: string): number {
-    if (visiting.has(id)) return invalid()
-    if (costs.has(id)) return costs.get(id)!
-    const task = tasks.get(id)
-    if (!task) return invalid()
-    visiting.add(id); visited.add(id)
-    const children = missionEdges(task)
-    const duration = 'timeoutMs' in task ? task.timeoutMs : 20
-    const total = duration + Math.max(0, ...children.map(cost))
-    visiting.delete(id); costs.set(id, total)
-    return total
-  }
-  const worstCaseMs = cost(p.start)
-  if (visited.size !== tasks.size || worstCaseMs > 120000) invalid()
+  // The same bounded graph accounting is used by the explicit vehicle v2 profile.
+  const worstCaseMs = missionGraphBudget(p.tasks.map(t => ({ id: t.id, durationMs: 'timeoutMs' in t ? t.timeoutMs : 20, edges: missionEdges(t) })), p.start, 120000)
   const requiredWh = p.power.hoverW * worstCaseMs / 3600000
   if (requiredWh > p.power.availableWh * (1 - p.power.reservePercent / 100)) throw new RangeError('Mission endurance budget cannot preserve reserve')
   return { plan: structuredClone(p), worstCaseMs, requiredWh }
