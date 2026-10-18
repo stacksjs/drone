@@ -70,6 +70,10 @@ jobs:
         working-directory: ${{ runner.temp }}
       - run: $GITHUB_WORKSPACE/storage/runtime-build/cli/drone surface:simulate --scenario nominal --seconds 120 --survey "$RUNNER_TEMP/surface-survey.json" --position-sigma 1 --clock-sigma 2 --attitude-sigma 0.002
         working-directory: ${{ runner.temp }}
+      - run: $GITHUB_WORKSPACE/storage/runtime-build/cli/drone subsea:simulate --scenario nominal --seconds 120 --inspection "$RUNNER_TEMP/subsea-inspection.json"
+        working-directory: ${{ runner.temp }}
+      - run: $GITHUB_WORKSPACE/storage/runtime-build/cli/drone subsea:simulate --scenario tether-loss --seconds 120
+        working-directory: ${{ runner.temp }}
   firmware:
     runs-on: ubuntu-latest
     steps:

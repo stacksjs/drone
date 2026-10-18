@@ -29,6 +29,7 @@ import AntennaBench from '../app/Commands/AntennaBench'
 import AirSimulate from '../app/Commands/AirSimulate'
 import GroundSimulate from '../app/Commands/GroundSimulate'
 import SurfaceSimulate from '../app/Commands/SurfaceSimulate'
+import SubseaSimulate from '../app/Commands/SubseaSimulate'
 
 const app = cli('drone')
 RuntimeBuild(app)
@@ -54,6 +55,7 @@ AntennaBench(app)
 AirSimulate(app)
 GroundSimulate(app)
 SurfaceSimulate(app)
+SubseaSimulate(app)
 app.help()
 app.version('0.1.0')
 try { await app.parse(process.argv) }

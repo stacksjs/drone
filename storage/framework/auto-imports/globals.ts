@@ -235,6 +235,22 @@ declare global {
   const createVehicleMeasurementQualifier: typeof autoImports.createVehicleMeasurementQualifier
   const predictVehicleMeasurementPose: typeof autoImports.predictVehicleMeasurementPose
   const runVehicleSimulation: typeof autoImports.runVehicleSimulation
+  const subseaWrenchFromThrusters: typeof autoImports.subseaWrenchFromThrusters
+  const allocateSubseaWrench: typeof autoImports.allocateSubseaWrench
+  const subseaThrusters: typeof autoImports.subseaThrusters
+  const createSubseaController: typeof autoImports.createSubseaController
+  const createSubseaProfile: typeof autoImports.createSubseaProfile
+  const subseaScenarios: typeof autoImports.subseaScenarios
+  const reduceSubseaInspection: typeof autoImports.reduceSubseaInspection
+  const subseaInspectionUncertainty: typeof autoImports.subseaInspectionUncertainty
+  const pressureDepthM: typeof autoImports.pressureDepthM
+  const createSubseaNavigation: typeof autoImports.createSubseaNavigation
+  const createSubseaCapture: typeof autoImports.createSubseaCapture
+  const createSubseaPlant: typeof autoImports.createSubseaPlant
+  const subseaModel: typeof autoImports.subseaModel
+  const renderSubseaMeasurement: typeof autoImports.renderSubseaMeasurement
+  const qualifySubseaMeasurement: typeof autoImports.qualifySubseaMeasurement
+  const subseaCalibration: typeof autoImports.subseaCalibration
   const createSurfaceController: typeof autoImports.createSurfaceController
   const createSurfaceProfile: typeof autoImports.createSurfaceProfile
   const surfaceScenarios: typeof autoImports.surfaceScenarios

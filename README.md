@@ -34,19 +34,20 @@ bun run sitl --enable-sitl # 30-second local simulator experiment; read docs/sit
 
 ## Owned vehicle missions
 
-Open `/missions` to select quadcopter, fixed-wing, ground or surface simulation. One workspace shows
+Open `/missions` to select quadcopter, fixed-wing, ground, surface or subsea simulation. One workspace shows
 plans, energy budgets, estimated routes, decision playback, payload requests and correlated modeled
 acknowledgements. Host loss shows the last host snapshot separately from independent board expiry.
 
 ```sh
 ./buddy air:simulate --scenario crosswind --seconds 120
 ./buddy ground:simulate --scenario logistics --seconds 120
+./buddy subsea:simulate --scenario nominal --inspection /tmp/modeled-subsea-inspection.json
 ./buddy surface:simulate --scenario nominal --seconds 120 --survey /tmp/modeled-harbour-survey.json
 ```
 
 These profiles use owned raw sensors, estimation, mission policy, controls and authority. Physical
 outputs remain inhibited. Read the [shared contract](docs/vehicles.md), [air model](docs/vehicles-air.md),
-[ground model](docs/vehicles-ground.md) and [surface corrections](docs/vehicles-surface.md).
+[ground model](docs/vehicles-ground.md) and [surface corrections](docs/vehicles-surface.md) and [subsea pressure/DVL inspection](docs/vehicles-subsea.md).
 
 ## Camera tracking
 

@@ -14,7 +14,7 @@ test('common mission workspace exposes ground coverage and material tasks with r
 import { missionWorkspacePlot } from '../../resources/functions/drone/vehicles/workspace'
 
 test('all profile definitions retain their own budgets, goals and caller-owned task arrays', () => {
-  for (const profile of ['quadcopter', 'fixed-wing', 'ground', 'surface'] as const) {
+  for (const profile of ['quadcopter', 'fixed-wing', 'ground', 'surface', 'subsea'] as const) {
     const definition = getMissionWorkspaceDefinition(profile)
     expect(definition.tasks.length).toBeGreaterThan(2)
     expect(definition.budget.requiredWh).toBeLessThanOrEqual(definition.budget.usableWh)
@@ -75,3 +75,22 @@ test('north-up plotting projects estimated north upward and east right on one sq
   expect(second![1]!).toBeLessThan(first![1]!)
   expect(plot.current).not.toBeNull()
 })
+
+
+test('subsea workspace exposes pressure DVL provenance and capture-bound synthetic camera and sonar evidence', () => {
+  const run = runMissionWorkspace('subsea')
+  expect(run.status).toBe('completed')
+  expect(run.definition.assumptions).toContain('GPS is absent underwater')
+  expect(run.navigationEvidence!.observedSensors.gnss).toBe(0)
+  expect(run.navigationEvidence!.observedSensors.imu).toBeGreaterThan(100)
+  expect(run.navigationEvidence!.datum).toBe('LOCAL_WATER_SURFACE')
+  const frame = run.inspection!.frames[0]!
+  expect(frame.camera.format).toBe('pgm-p5')
+  expect(frame.camera.pixels).toHaveLength(16)
+  expect(frame.camera.bytes).toHaveLength(27)
+  expect(frame.pose.capturedAtMs).toBe(frame.capturedAtMs)
+  expect(frame.sonar.rangeM).toBeGreaterThan(3.5)
+  expect(run.rows.some(row => row.payloadAck?.operation === 'inspection-capture' && row.payloadAck.correlated)).toBe(true)
+  expect(run.boardNeutral).toBe(true)
+  expect(run.rows.at(-1)!.targetM).toBeNull()
+}, 60000)

@@ -46,6 +46,10 @@ companion application and simulator, not a native board autopilot.
 - Surface vessel current/wind simulation, corrected single-beam survey, sample ACK and energy return.
   Physical hull/survey/container qualification remains in [#14](https://github.com/stacksjs/drone/issues/14).
 
+- Six-axis tethered ROV physics, pressure/DVL dead reckoning without underwater GPS, depth hold,
+  leak/tether faults and scoped synthetic camera/sonar evidence. Physical inspection and underwater
+  hardware qualification remain in [#15](https://github.com/stacksjs/drone/issues/15).
+
 ## Sequence
 
 1. Deliver one deterministic board sensor-to-neutral-output loop and versioned Pi/runtime handshake.

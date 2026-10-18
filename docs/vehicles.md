@@ -1,6 +1,6 @@
 # Owned vehicle runtime
 
-The fixed-wing, ground and surface profiles execute through one owned raw sensor, estimator,
+The fixed-wing, ground, surface and subsea profiles execute through one owned raw sensor, estimator,
 mission, authority and independent modeled board loop. The existing v1 quadcopter mission remains
 compatible. The new v2 graph explicitly declares a vehicle, arrival speed and settling conditions,
 contact-gated land/stop, scoped payload commands and longest-path energy/time budgets.
@@ -19,8 +19,11 @@ consumed containers or closed ports. Close a session's port at teardown; a close
 The standalone plant/controller constructors remain available for focused physics experiments.
 
 The simulation integrates model dynamics every 4 ms, renders bounded delayed vehicle measurements
-and runs policy every 20 ms. Common IMU and GNSS observations enter the existing sensor pipeline
-and estimator. Vehicle controllers see estimated pose and qualified measurements, never plant truth.
+and runs policy every 20 ms. Common IMU observations enter the existing sensor pipeline and estimator. Air, ground and surface
+profiles also use GNSS. Underwater GNSS is disabled: qualified pressure and bottom-locked DVL
+measurements provide owned local dead reckoning from an explicit stationary surface alignment.
+The subsea datum is LOCAL_WATER_SURFACE, never a disguised underwater GNSS fix. Runtime source
+counts retain whether raw GNSS observations were seen. Vehicle controllers see estimated pose and qualified measurements, never plant truth.
 The initial north heading is a simulation assumption. Absolute heading and physical calibration
 remain unqualified. Model truth is retained only for error evaluation.
 
@@ -57,8 +60,18 @@ interlocks and host loss as applicable. Tests compare public decisions and physi
 recompute mission replay, reject altered traces and exercise payload uncertainty and session reuse.
 All evidence is owned physics simulation. The Pico neutral-only board image does not run these
 TypeScript controllers. Native board execution, external firmware SITL, HIL and measured physical
-vehicle acceptance remain separate gates. VTOL, helicopter, soaring, blimp, subsea and other vehicle
+vehicle acceptance remain separate gates. VTOL, helicopter, soaring, blimp and other vehicle
 families remain explicit roadmap work.
 
-Read [air](vehicles-air.md), [ground](vehicles-ground.md), [surface](vehicles-surface.md),
+Read [air](vehicles-air.md), [ground](vehicles-ground.md), [surface](vehicles-surface.md), [subsea](vehicles-subsea.md),
 [mission semantics](missions.md) and [the replacement matrix](roadmap/feature-coverage.md).
+
+## Subsea inspection records
+
+The six-axis ROV profile adds eight signed thrusters, hydrodynamic/current and positive-buoyancy
+assumptions, pressure depth, capture-attitude DVL rotation, growing local uncertainty and tether/leak
+interlocks. A new scoped inspection capture waits for post-request camera/sonar measurements. Its
+modeled PGM P5 fixture, forward ray and vertical bottom range retain the owned local capture pose
+and source epochs. The native CLI can write the JSON artifact; the common stx workspace displays
+its pixels, ranges and raw source counts. These are synthetic observations, not acquired hardware
+imagery, imaging sonar or certified inspection coverage.

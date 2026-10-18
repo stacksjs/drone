@@ -128,3 +128,10 @@ replay, payload scope and authority lifecycle while each model owns its control 
 Fresh sessions isolate state. The common stx workspace inspects recorded estimated routes and
 acknowledgements. The v1 quadcopter contract remains compatible. All new evidence is physics
 simulation; physical endpoints remain inhibited.
+
+The subsea profile uses pressure depth and capture-attitude bottom-locked DVL integration instead of
+GNSS. A normalized local navigation snapshot carries an explicit water-surface datum; authority
+selects that datum for subsea and retains the ellipsoid gate for existing profiles. Inspection ACKs
+bind post-request synthetic camera/sonar capture records to the owned estimated pose. Tether/link,
+leak, depth and independent output-expiry cases inhibit modeled thrusters. Positive buoyancy alone
+does not establish recovery around a structure or tether.
