@@ -37,6 +37,6 @@ export function qualifySubseaMeasurement(m: VehicleMeasurement | null, nowMs: nu
   for (const key of ['onSurface', 'stopped', 'dvlLocked', 'leak', 'linkConnected', 'emergency']) if (typeof v[key] !== 'boolean') return null
   if (v.calibration !== subseaCalibration || v.clockSigmaMs !== 1 || v.surfacePressurePa !== 101325 || v.waterDensityKgM3 !== 1025 || typeof v.pressurePa !== 'number' || v.pressurePa < 100319.818375 || v.pressurePa > 201843.1625 || !vector(v.dvlVelocityBodyMps, 5) || !vector(v.angularRateBodyRadS, 35) || Math.hypot(...v.angularRateBodyRadS) > 35) return null
   for (const [key, max] of [['tetherLengthM', 100], ['tetherTensionN', 200], ['bottomRangeM', 50], ['structureRangeM', 50]] as const) if (typeof v[key] !== 'number' || Number(v[key]) < 0 || Number(v[key]) > max) return null
-  if (!Array.isArray(v.cameraLuma) || v.cameraLuma.length !== 16 || v.cameraLuma.some(n => !Number.isInteger(n) || n < 0 || n > 255) || typeof v.cameraFrameId !== 'string' || !/^subsea-model-[0-9]+-[0-9]+$/.test(v.cameraFrameId)) return null
+  if (!Array.isArray(v.cameraLuma) || v.cameraLuma.length !== 16 || v.cameraLuma.some(n => !Number.isInteger(n) || n < 0 || n > 255) || typeof v.cameraFrameId !== 'string' || v.cameraFrameId !== `subsea-model-${m.sequence}-${m.capturedAtMs}`) return null
   return structuredClone(m)
 }
