@@ -1,5 +1,6 @@
 import { resolve, relative, isAbsolute } from 'node:path'
 import { existsSync, readFileSync } from 'node:fs'
+import { runParityProcess } from './parity-process'
 
 export const parityDimensions = ['parameters', 'modes', 'protocols', 'hardware', 'failures'] as const
 export type ParityDimension = typeof parityDimensions[number]
@@ -158,7 +159,8 @@ export function checkParityAudit(inventory: Inventory, issues: WorkItem[], audit
     errors,
   }
 }
-export async function runParityEvidence(audit: ParityAudit, root = process.cwd()) {
+export interface ParityEvidenceOptions { timeoutMs?: number, env?: Record<string, string | undefined> }
+export async function runParityEvidence(audit: ParityAudit, root = process.cwd(), options: ParityEvidenceOptions = {}) {
   const results: { testFile: string, testName: string, kind: Evidence['kind'], testSha256: string, passed: boolean, detail: string }[] = []
   const seen = new Set<string>()
   for (const c of audit.cases) for (const e of c.evidence) {
@@ -166,13 +168,15 @@ export async function runParityEvidence(audit: ParityAudit, root = process.cwd()
     if (seen.has(key)) continue
     seen.add(key)
     const escaped = e.testName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
-    const child = Bun.spawn([process.execPath, 'test', `./${e.testFile}`, '--test-name-pattern', `${escaped}$`], { cwd: root, stdout: 'pipe', stderr: 'pipe' })
-    const timer = setTimeout(() => child.kill(), 60000)
-    const [code, stdout, stderr] = await Promise.all([child.exited, new Response(child.stdout).text(), new Response(child.stderr).text()])
-    clearTimeout(timer)
-    const output = `${stdout}\n${stderr}`
-    const passed = code === 0 && /\b1 pass\b/.test(output) && /\b0 fail\b/.test(output)
-    results.push({ testFile: e.testFile, testName: e.testName, kind: e.kind, testSha256: new Bun.CryptoHasher('sha256').update(readFileSync(localParityPath(root, e.testFile))).digest('hex'), passed, detail: passed ? 'One selected behavior passed; evidence environment unchanged' : output.slice(-4000) })
+    let passed = false, detail: string
+    try {
+      const result = await runParityProcess([process.execPath, 'test', `./${e.testFile}`, '--test-name-pattern', `${escaped}$`], { cwd: root, env: options.env, timeoutMs: options.timeoutMs ?? 60000, stdoutBytes: 1_000_000, stderrBytes: 1_000_000, label: 'Parity evidence' })
+      const output = `${result.stdout}\n${result.stderr}`
+      passed = result.exitCode === 0 && /\b1 pass\b/.test(output) && /\b0 fail\b/.test(output)
+      detail = passed ? 'One selected behavior passed; evidence environment unchanged' : output.slice(-4000)
+    }
+    catch (error) { detail = (error instanceof Error ? error.message : String(error)).slice(-4000) }
+    results.push({ testFile: e.testFile, testName: e.testName, kind: e.kind, testSha256: new Bun.CryptoHasher('sha256').update(readFileSync(localParityPath(root, e.testFile))).digest('hex'), passed, detail })
   }
   return results
 }

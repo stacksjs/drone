@@ -147,7 +147,7 @@ else { console.error('fixture failure'); process.exitCode = 3 }
 
 test('GitHub stdout is bounded by bytes, including multibyte JSON below the old character limit', async () => {
   await withFakeGitHub(async (pidFile, env) => {
-    await expect(readGitHub('stdout-overflow', { env })).rejects.toThrow('stdout exceeds inventory byte limit')
+    await expect(readGitHub('stdout-overflow', { env })).rejects.toThrow('stdout exceeds byte limit')
     const pid = Number(await readFile(pidFile, 'utf8'))
     expect(() => process.kill(pid, 0)).toThrow()
   })
@@ -156,8 +156,8 @@ test('GitHub stdout is bounded by bytes, including multibyte JSON below the old 
 test('GitHub stderr overflow and a deadline kill the real child and finish pipe cleanup before rejection', async () => {
   await withFakeGitHub(async (pidFile, env) => {
     for (const [mode, message, timeoutMs] of [
-      ['stderr-overflow', 'stderr exceeds inventory byte limit', 20000],
-      ['timeout', 'request timed out', 1000],
+      ['stderr-overflow', 'stderr exceeds byte limit', 20000],
+      ['timeout', 'timed out', 1000],
     ] as const) {
       await expect(readGitHub(mode, { env, timeoutMs })).rejects.toThrow(message)
       const pid = Number(await readFile(pidFile, 'utf8'))
@@ -195,3 +195,60 @@ test('candidate snapshots use exclusive creation so existing files and racing wr
   }
   finally { await rm(directory, { recursive: true, force: true }) }
 })
+
+import { runParityProcess } from '../../scripts/parity-process'
+
+// Public bounded process seam uses a real descendant that holds its parent's stdout open.
+test.skipIf(process.platform === 'win32')('a descendant holding inherited pipes cannot extend the parity process deadline', async () => {
+  const directory = await mkdtemp(join(tmpdir(), 'drone-parity-descendant-'))
+  const config = join(directory, 'bunfig.toml'), parent = join(directory, 'parent.ts'), descendant = join(directory, 'descendant.ts')
+  const parentPidFile = join(directory, 'parent.pid'), descendantPidFile = join(directory, 'descendant.pid')
+  await Bun.write(config, 'preload = []\n')
+  await Bun.write(descendant, `await Bun.write(process.argv[2]!, String(process.pid)); process.on('SIGTERM', () => {}); await Bun.sleep(60000)`)
+  await Bun.write(parent, `const child = Bun.spawn([process.execPath, '--no-env-file', ${JSON.stringify(`--config=${config}`)}, ${JSON.stringify(descendant)}, ${JSON.stringify(descendantPidFile)}], { stdout: 'inherit', stderr: 'inherit' });
+while (!await Bun.file(${JSON.stringify(descendantPidFile)}).exists()) await Bun.sleep(5);
+await Bun.write(${JSON.stringify(parentPidFile)}, String(process.pid)); child.unref(); process.exit(0)`)
+  try {
+    await expect(runParityProcess([process.execPath, '--no-env-file', `--config=${config}`, parent], { timeoutMs: 1000, stdoutBytes: 1024, stderrBytes: 1024, label: 'Descendant fixture' })).rejects.toThrow('timed out')
+    const parentPid = Number(await readFile(parentPidFile, 'utf8'))
+    expect(() => process.kill(parentPid, 0)).toThrow()
+    const descendantPid = Number(await readFile(descendantPidFile, 'utf8'))
+    let alive = true
+    for (let attempt = 0; attempt < 100; attempt++) {
+      try { process.kill(descendantPid, 0) }
+      catch { alive = false; break }
+      await Bun.sleep(10)
+    }
+    expect(alive).toBe(false)
+  }
+  finally {
+    if (await Bun.file(parentPidFile).exists()) { try { process.kill(-Number(await readFile(parentPidFile, 'utf8')), 'SIGKILL') } catch {} }
+    await rm(directory, { recursive: true, force: true })
+  }
+}, 10000)
+
+test('evidence deadlines and output limits fail the selected case, reap its child and still check the next selector', async () => {
+  const directory = await mkdtemp(join(tmpdir(), 'drone-parity-evidence-'))
+  const testFile = 'tests/unit/evidence.test.ts', pidFile = join(directory, 'child.pid')
+  await Bun.write(join(directory, 'bunfig.toml'), 'preload = []\n[test]\nroot = "tests"\n')
+  await Bun.write(join(directory, testFile), `import { test } from 'bun:test'
+process.on('SIGTERM', () => {})
+test('ignores termination', async () => { await Bun.write(${JSON.stringify(`${pidFile}.timeout`)}, String(process.pid)); await Bun.sleep(60000) })
+test('overflows output', async () => { await Bun.write(${JSON.stringify(`${pidFile}.overflow`)}, String(process.pid)); await new Promise<void>(resolve => process.stdout.write('x'.repeat(1000001), () => resolve())); await Bun.sleep(60000) })
+test('one selected behavior', () => {})
+`)
+  try {
+    const a = details(), c = a.cases.find(c => c.evidence.length)!, evidence = c.evidence[0]!
+    c.evidence = ['ignores termination', 'overflows output', 'one selected behavior'].map(testName => ({ ...evidence, testFile, testName }))
+    a.cases = [c]
+    const result = await runParityEvidence(a, directory, { timeoutMs: 1000 })
+    expect(result.map(r => r.passed)).toEqual([false, false, true])
+    expect(result[0]!.detail).toContain('timed out')
+    expect(result[1]!.detail).toContain('stdout exceeds byte limit')
+    for (const suffix of ['timeout', 'overflow']) {
+      const pid = Number(await readFile(`${pidFile}.${suffix}`, 'utf8'))
+      expect(() => process.kill(pid, 0)).toThrow()
+    }
+  }
+  finally { await rm(directory, { recursive: true, force: true }) }
+}, 10000)

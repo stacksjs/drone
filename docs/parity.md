@@ -55,7 +55,7 @@ missing test selectors and fabricated evidence environments. A test selector mus
 one passing test; a successful Bun process that selects zero tests fails evidence verification.
 An evidence run invokes existing behavioral tests through their public function seams, rather than
 asserting that implementation files exist. Selector failures include bounded diagnostic output.
-The run does not promote its evidence environment or change support classifications.
+The run does not promote its evidence environment or change support classifications. Evidence commands share the bounded process owner with upstream requests: each selector has a 60-second deadline and a 1,000,000-byte cap on each output stream. Timeout or overflow records a failed case and continues to the next selector. Cleanup uses SIGKILL, cancels the readers and reaps the direct child; on POSIX it also terminates the owned process group so inherited descendant pipes cannot extend the deadline.
 
 ## Review upstream changes
 

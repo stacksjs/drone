@@ -1,4 +1,5 @@
 import { open } from 'node:fs/promises'
+import { runParityProcess } from './parity-process'
 import inventory from '../docs/roadmap/upstream-inventory.json'
 import audit from '../docs/parity-audit.json'
 import { entryId } from './parity'
@@ -16,44 +17,9 @@ export async function readGitHub(endpoint: string, options: GitHubProcessOptions
   const timeoutMs = options.timeoutMs ?? 20000
   if (!Number.isSafeInteger(timeoutMs) || timeoutMs < 1 || timeoutMs > 20000) throw new Error('Invalid GitHub request timeout')
   // gh supplies account authentication without copying credentials into process arguments or reports.
-  const child = Bun.spawn(['gh', 'api', endpoint], { stdout: 'pipe', stderr: 'pipe', env: options.env ?? process.env })
-  const readers = [child.stdout.getReader(), child.stderr.getReader()]
-  const cancellations: Promise<unknown>[] = []
-  let failure: Error | undefined
-  function stop(error: Error) {
-    failure ??= error
-    try { child.kill('SIGKILL') }
-    catch { /* The process may already have exited. Stream cleanup is still required. */ }
-    for (const reader of readers) cancellations.push(reader.cancel().catch(() => {}))
-  }
-  async function consume(reader: ReadableStreamDefaultReader<Uint8Array>, limit: number, label: string) {
-    const chunks: Uint8Array[] = []
-    let bytes = 0
-    try {
-      while (true) {
-        const { done, value } = await reader.read()
-        if (done) return Buffer.concat(chunks, bytes).toString('utf8')
-        if (value.byteLength > limit - bytes) throw new Error(`GitHub ${label} exceeds inventory byte limit`)
-        bytes += value.byteLength
-        chunks.push(value)
-      }
-    }
-    catch (error) { stop(error instanceof Error ? error : new Error(String(error))); throw error }
-  }
-  const timeout = setTimeout(() => stop(new Error('GitHub inventory request timed out')), timeoutMs)
-  const stdout = consume(readers[0]!, 2_000_000, 'stdout'), stderr = consume(readers[1]!, 65536, 'stderr')
-  try {
-    const [code, output, diagnostic] = await Promise.all([child.exited, stdout, stderr])
-    if (failure) throw failure
-    if (code !== 0) throw new Error(`GitHub inventory request failed: ${diagnostic.slice(-500)}`)
-    return JSON.parse(output)
-  }
-  finally {
-    clearTimeout(timeout)
-    if (child.exitCode === null) stop(new Error('GitHub inventory request interrupted'))
-    await Promise.allSettled([child.exited, stdout, stderr, ...cancellations])
-    for (const reader of readers) reader.releaseLock()
-  }
+  const result = await runParityProcess(['gh', 'api', endpoint], { env: options.env, timeoutMs, stdoutBytes: 2_000_000, stderrBytes: 65536, label: 'GitHub inventory request' })
+  if (result.exitCode !== 0) throw new Error(`GitHub inventory request failed: ${result.stderr.slice(-500)}`)
+  return JSON.parse(result.stdout)
 }
 export async function refreshUpstreamSnapshot(input: Inventory, refs: Record<string, string> = {}, read: GitHubReader = readGitHub): Promise<UpstreamSnapshot> {
   for (const key of Object.keys(refs)) if (!input.upstreams.some(u => u.id === key)) throw new Error(`Unknown upstream: ${key}`)
