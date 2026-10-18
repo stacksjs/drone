@@ -42,3 +42,25 @@ export function quaternionEuler(q: Quaternion): SensorVector {
   const [w, x, y, z] = q
   return [Math.atan2(2 * (w * x + y * z), 1 - 2 * (x * x + y * y)), Math.asin(Math.max(-1, Math.min(1, 2 * (w * y - z * x)))), Math.atan2(2 * (w * z + x * y), 1 - 2 * (y * y + z * z))]
 }
+
+/** Invert the fixed WGS84 tangent frame through ECEF, preserving ellipsoidal height. */
+export function nedToGeodetic(positionM: SensorVector, origin: GeodeticOrigin): GeodeticOrigin {
+  if (!Array.isArray(positionM) || positionM.length !== 3 || positionM.some(n => !Number.isFinite(n) || Math.abs(n) > 100000)) throw new RangeError('Invalid fixed NED coordinates')
+  const base = geodeticToEcef(origin), p = origin.latitudeDeg * Math.PI / 180, l = origin.longitudeDeg * Math.PI / 180
+  const [north, east, down] = positionM
+  const x = base[0] - Math.sin(p) * Math.cos(l) * north - Math.sin(l) * east - Math.cos(p) * Math.cos(l) * down
+  const y = base[1] - Math.sin(p) * Math.sin(l) * north + Math.cos(l) * east - Math.cos(p) * Math.sin(l) * down
+  const z = base[2] + Math.cos(p) * north - Math.sin(p) * down
+  const a = 6378137, flattening = 1 / 298.257223563, e2 = flattening * (2 - flattening), horizontal = Math.hypot(x, y)
+  if (horizontal < 1e-8) return { latitudeDeg: z >= 0 ? 90 : -90, longitudeDeg: origin.longitudeDeg, ellipsoidHeightM: Math.abs(z) - a * (1 - flattening) }
+  let latitude = Math.atan2(z, horizontal * (1 - e2))
+  for (let iteration = 0; iteration < 12; iteration++) {
+    const n = a / Math.sqrt(1 - e2 * Math.sin(latitude) ** 2)
+    const next = Math.atan2(z + e2 * n * Math.sin(latitude), horizontal)
+    if (Math.abs(next - latitude) < 1e-15) { latitude = next; break }
+    latitude = next
+  }
+  const n = a / Math.sqrt(1 - e2 * Math.sin(latitude) ** 2)
+  const height = horizontal * Math.cos(latitude) + z * Math.sin(latitude) - n * (1 - e2 * Math.sin(latitude) ** 2)
+  return { latitudeDeg: latitude * 180 / Math.PI, longitudeDeg: Math.atan2(y, x) * 180 / Math.PI, ellipsoidHeightM: height }
+}
