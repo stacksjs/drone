@@ -86,3 +86,18 @@ test('native analytic examples distinguish cut/fill, missing coverage and unknow
   }
   finally { await rm(root, { recursive: true, force: true }) }
 }, 240000)
+
+// Native CLI seam catches error presentation; it does not validate survey acquisition.
+test('native processing rejects malformed private JSON without echoing its source', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'volumes-private-json-'))
+  try {
+    const path = join(root, 'request.json')
+    await writeFile(path, '{"secret":PRIVATE_SURVEY_TOKEN}')
+    const rejected = await command(['volumes:process', path]).withTimeout(60000)
+    expect(rejected.exitCode).toBe(1)
+    expect(rejected.stderr).not.toContain('PRIVATE_SURVEY_TOKEN')
+    expect(rejected.stderr).not.toContain('secret')
+    expect(rejected.stderr).toContain('Invalid volume request JSON')
+  }
+  finally { await rm(root, { recursive: true, force: true }) }
+}, 90000)

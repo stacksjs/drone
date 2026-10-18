@@ -156,7 +156,11 @@ export async function importPlySurface(text: string, input: SurfaceMetadata): Pr
 }
 
 export function parseVolumeRequest(text: string): VolumeRequest {
-  return validateVolumeRequest(JSON.parse(boundedText(text, surfaceImportLimits.requestBytes)))
+  const source = boundedText(text, surfaceImportLimits.requestBytes)
+  let request: unknown
+  try { request = JSON.parse(source) }
+  catch (cause) { throw new Error('Invalid volume request JSON', { cause }) }
+  return validateVolumeRequest(request)
 }
 
 export function exportGridSurface(input: KnownSurface): string {

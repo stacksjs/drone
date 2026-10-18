@@ -242,3 +242,45 @@ test('handles zero height, collinear AOI vertices, zero lines on edges and cut/f
   expect(processStockpile(request).belowBaseM3).toBeCloseTo(4 / 3, 10)
   expect(processStockpile(request).signedTopMinusBaseM3).toBeCloseTo(-4 / 3, 10)
 })
+
+test('compares operator-imported surfaces to independent declared surveys without verifying physical accuracy', () => {
+  const request = exampleVolumeRequest('reference-comparison')
+  const provenance = request.surface.metadata.provenance
+  provenance.evidence = 'operator-imported'
+  provenance.sourceKind = 'surveyed-mesh'
+  provenance.acquisition = { status: 'external', sourceId: 'operator-declared-survey-source' }
+  provenance.reconstructionOrMeshing = { status: 'external', sourceId: 'operator-declared-mesh-source' }
+  request.base.evidence = 'operator-declared-survey'
+  const reference = request.reference!
+  reference.evidence = 'operator-declared-survey'
+  reference.base.evidence = 'operator-declared-survey'
+  reference.method = 'Test declaration of independently surveyed comparison; no field evidence is supplied'
+  reference.sourceSha256 = new Bun.CryptoHasher('sha256').update(reference.method).digest('hex')
+  const agreement = processStockpile(request)
+  expect(agreement.comparison.status).toBe('operator-declared-reference')
+  expect(agreement.comparison.signedDifferenceM3).toBe(0)
+  expect(agreement.comparison.withinCombinedDeclaredBound).toBe(true)
+  expect(agreement.physicalAccuracyVerified).toBe(false)
+  reference.aboveBaseM3 = 20
+  const disagreement = processStockpile(request)
+  expect(disagreement.comparison.signedDifferenceM3).toBe(-4)
+  expect(disagreement.comparison.relativeSignedDifference).toBe(-.2)
+  expect(disagreement.comparison.combinedDeclaredBoundM3).toBeCloseTo(2.65, 10)
+  expect(disagreement.comparison.withinCombinedDeclaredBound).toBe(false)
+  expect(disagreement.physicalAccuracyVerified).toBe(false)
+})
+
+test('accepts equivalent tilted comparison planes expressed with different anchor points', () => {
+  const request = exampleVolumeRequest('reference-comparison')
+  if (request.surface.geometry.kind !== 'tin') throw new Error('Fixture requires TIN')
+  request.base.anchorM = [0, 0, 10]
+  request.base.gradientEast = .2
+  request.base.gradientNorth = -.1
+  for (const point of request.surface.geometry.vertices) point[2] += 10 + .2 * point[0] - .1 * point[1]
+  request.reference!.base = { ...structuredClone(request.base), anchorM: [5, 4, 10.6] }
+  const report = processStockpile(request)
+  expect(report.fullBoundarySignedM3).toBeCloseTo(16, 10)
+  expect(report.comparison.status).toBe('synthetic-comparison')
+  expect(report.comparison.signedDifferenceM3).toBeCloseTo(0, 10)
+  expect(report.comparison.withinCombinedDeclaredBound).toBe(true)
+})
