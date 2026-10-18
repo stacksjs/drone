@@ -116,3 +116,67 @@ test('inspection export rejects unacknowledged, relabeled or conflicting capture
   const r = inspectionRecording()
   expect(() => reduceSubseaInspection(r.path, r.trace, { positionSigmaM: 0.1, attitudeSigmaRad: 0.02, timeSigmaMs: 0.5, rangeSigmaM: 0.05 })).toThrow()
 })
+
+import { createSubseaProfile, subseaScenarios } from '../../resources/functions/drone/vehicles/subsea/index'
+import { runVehicleSimulation } from '../../resources/functions/drone/vehicles/runtime'
+test('owned pressure and DVL inspection completes in current without GNSS and retains scoped modeled evidence', () => {
+  for (const scenario of ['nominal', 'current'] as const) {
+    const run = runVehicleSimulation(createSubseaProfile(scenario), { seconds: 120 })
+    expect(run.status).toBe('completed'); expect(run.fault).toBeNull()
+    expect(run.navigationEvidence.observedSensors.gnss).toBe(0); expect(run.navigationEvidence.observedSensors.imu).toBeGreaterThan(100)
+    expect(run.navigationEvidence.datum).toBe('LOCAL_WATER_SURFACE')
+    expect(run.path.some(p => p.positionM && p.positionM[2] > 1.8)).toBe(true)
+    expect(Math.hypot(...run.finalTruthPositionM)).toBeLessThan(0.2)
+    expect(run.board.actuators).toEqual(Array(8).fill(0))
+    expect(Math.max(...run.path.flatMap(p => p.positionM ? [Math.hypot(...p.positionM.map((v, i) => v - p.truthPositionM[i]!))] : []))).toBeLessThan(0.1)
+    const artifact = reduceSubseaInspection(run.path, run.trace)
+    expect(artifact.frames).toHaveLength(1)
+    expect(artifact.frames[0]!.camera.pixels).toHaveLength(16)
+    expect(artifact.frames[0]!.pose.positionCapturedAtMs).toBeLessThan(artifact.frames[0]!.capturedAtMs)
+  }
+}, 60000)
+
+test('each subsea hazard inhibits all eight outputs and cannot manufacture a completed inspection', () => {
+  for (const scenario of subseaScenarios.filter(s => s !== 'nominal' && s !== 'current')) {
+    const run = runVehicleSimulation(createSubseaProfile(scenario), { seconds: 120 })
+    expect(run.status).toBe(scenario === 'host-loss' ? 'host-lost' : 'blocked')
+    expect(run.board.actuators).toEqual(Array(8).fill(0))
+    expect(run.navigationEvidence.observedSensors.gnss).toBe(0)
+    expect(() => reduceSubseaInspection(run.path, run.trace)).toThrow('No confirmed')
+    if (scenario === 'host-loss') expect(run.board.fault).toBe('output-lease-expired')
+  }
+}, 60000)
+
+test('subsea profile allocates independent sensor, navigation and capture sessions on repeated runs', () => {
+  const profile = createSubseaProfile()
+  const first = runVehicleSimulation(profile, { seconds: 120 }), second = runVehicleSimulation(profile, { seconds: 120 })
+  expect(first.status).toBe('completed'); expect(second.status).toBe('completed')
+  expect(second.trace).toEqual(first.trace)
+  expect(() => createSubseaProfile('physical' as 'nominal')).toThrow()
+})
+
+import { mkdtemp, readFile, rm } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
+import { join, resolve } from 'node:path'
+test('native subsea command exports scoped synthetic inspection evidence from outside the checkout', async () => {
+  const directory = await mkdtemp(join(tmpdir(), 'drone-subsea-cli-'))
+  try {
+    const file = join(directory, 'inspection.json')
+    const source = `import { cli } from ${JSON.stringify(import.meta.resolve('@stacksjs/cli'))};import command from ${JSON.stringify(resolve('app/Commands/SubseaSimulate.ts'))};const app=cli('subsea-test');command(app);await app.parse(process.argv)`
+    const script = join(directory, 'cli.ts'); await Bun.write(script, source)
+    const proc = Bun.spawn([process.execPath, '--no-env-file', `--config=${resolve('tests/fixtures/process/bunfig.toml')}`, script, 'subsea:simulate', '--scenario', 'nominal', '--seconds', '120', '--inspection', file], { cwd: directory, stdout: 'pipe', stderr: 'pipe' })
+    const timer = setTimeout(() => proc.kill('SIGKILL'), 60000)
+    try {
+      const [stdout, stderr, code] = await Promise.all([new Response(proc.stdout).text(), new Response(proc.stderr).text(), proc.exited])
+      expect(stderr).toBe(''); expect(code).toBe(0)
+      const report = JSON.parse(stdout), artifact = JSON.parse(await readFile(file, 'utf8'))
+      expect(report.status).toBe('completed'); expect(report.exportedFrames).toBe(1)
+      expect(report.navigationEvidence.observedSensors.gnss).toBe(0)
+      expect(artifact.physicalValidation).toBe(false)
+      expect(artifact.frames[0].camera.bytes).toHaveLength(27)
+      expect(artifact.frames[0].uncertainty.timeSigmaMs).toBe(2)
+    }
+    finally { clearTimeout(timer); proc.kill('SIGKILL'); await proc.exited }
+  }
+  finally { await rm(directory, { recursive: true, force: true }) }
+}, 70000)

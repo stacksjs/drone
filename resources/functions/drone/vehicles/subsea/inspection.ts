@@ -22,7 +22,7 @@ export function reduceSubseaInspection(pathInput: SubseaInspectionPathRow[], tra
     if (ack && ack.operation === 'inspection-capture' && ack.outcome === 'confirmed') {
       const command = pending.get(ack.eventId)
       if (!command || used.has(ack.eventId) || row.result.reason !== 'payload-confirmed' || ack.containerId !== null || ack.taskId !== command.taskId || ack.reference !== command.reference || ack.capturedAtMs < command.issuedAtMs || ack.capturedAtMs >= command.expiresAtMs) throw new RangeError('Unscoped or repeated inspection acknowledgement')
-      const matching = path.filter(p => p.measurement?.sequence === ack.metadata?.measurementSequence && p.measurement.reference === ack.reference && p.measurement.capturedAtMs === ack.capturedAtMs && p.atMs <= row.observation.nowMs)
+      const matching = path.filter(p => p.measurement !== null && p.measurement.sequence === ack.metadata?.measurementSequence && p.measurement.reference === ack.reference && p.measurement.capturedAtMs === ack.capturedAtMs && p.atMs <= row.observation.nowMs)
       const source = matching.find(p => p.measurementPose !== null)
       if (!source?.measurement || !source.measurementPose) throw new RangeError('Inspection acknowledgement has no recorded capture pose')
       const raw = qualifySubseaMeasurement(source.measurement, source.atMs, ack.reference), pose = source.measurementPose
