@@ -11,6 +11,9 @@ import DriversBench from '../app/Commands/DriversBench'
 import AuthoritySimulate from '../app/Commands/AuthoritySimulate'
 import ControlsSimulate from '../app/Commands/ControlsSimulate'
 
+import PayloadsBench from '../app/Commands/PayloadsBench'
+import PayloadsCapture from '../app/Commands/PayloadsCapture'
+
 const app = cli('drone')
 RuntimeBuild(app)
 RuntimeBench(app)
@@ -21,6 +24,8 @@ EstimatorReplay(app)
 ControlsSimulate(app)
 AuthoritySimulate(app)
 DriversBench(app)
+PayloadsBench(app)
+PayloadsCapture(app)
 app.help()
 app.version('0.1.0')
 try { await app.parse(process.argv) }

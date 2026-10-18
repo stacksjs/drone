@@ -8,6 +8,7 @@ import os
 import signal
 import sys
 import time
+import uuid
 
 MODEL = "/usr/share/imx500-models/imx500_network_ssd_mobilenetv2_fpnlite_320x320_pp.rpk"
 WIDTH, HEIGHT = 640, 480
@@ -51,12 +52,125 @@ def person_detections(outputs, camera, imx500, metadata, intrinsics):
     return result
 
 
+def payload_command(value, session, boot_id, previous_sequence, now_ms):
+    """Bounded local capture protocol. No bus/actuator command or output pathname is accepted."""
+    if (not isinstance(value, dict) or value.get("version") != 1 or value.get("kind") != "capture"
+            or value.get("sessionId") != session or value.get("bootId") != boot_id):
+        raise ValueError("Capture scope invalid")
+    sequence = value.get("sequence")
+    start, deadline = value.get("notBeforeMonotonicMs"), value.get("deadlineMonotonicMs")
+    if (type(sequence) is not int or sequence <= previous_sequence or sequence > 0xFFFFFFFF
+            or not all(type(v) in (int, float) and math.isfinite(v) for v in (start, deadline, now_ms))
+            or start < 0 or start > now_ms + 5 or deadline <= now_ms or deadline - start > 2000):
+        raise ValueError("Capture sequence/deadline invalid")
+    return sequence, start, deadline
+
+
+def payload_timestamp(metadata, boot_ns, mono_before_ns, mono_after_ns, not_before_ms):
+    """Map libcamera first-row BOOTTIME to MONOTONIC; this is not sensor timing calibration."""
+    sensor_ns, exposure_us = metadata.get("SensorTimestamp"), metadata.get("ExposureTime")
+    if (type(sensor_ns) is not int or type(exposure_us) not in (int, float)
+            or not math.isfinite(exposure_us) or not 0 <= exposure_us <= 1000000
+            or mono_after_ns < mono_before_ns or not 0 <= boot_ns - sensor_ns <= 500000000):
+        raise ValueError("Capture timestamp/exposure invalid")
+    uncertainty_ms = (mono_after_ns - mono_before_ns) / 2000000
+    if uncertainty_ms > 5:
+        raise ValueError("Capture clock sampling uncertainty too large")
+    captured_ms = (sensor_ns - boot_ns + (mono_before_ns + mono_after_ns) / 2) / 1000000
+    # Reject pre-trigger exposure even when the completed frame was queued after the command.
+    if captured_ms - exposure_us / 1000 - uncertainty_ms < not_before_ms:
+        return None
+    return captured_ms, uncertainty_ms, exposure_us
+
+
+def payload_main(session):
+    """Exclusive low-resolution still acquisition for the Pi AI Camera, without an inference model."""
+    if not session or len(session) > 128 or not all(c.isascii() and (c.isalnum() or c in "_-") for c in session):
+        raise ValueError("Invalid payload session")
+    with contextlib.redirect_stdout(sys.stderr):
+        import cv2
+        from picamera2 import Picamera2
+        cameras = [c for c in Picamera2.global_camera_info() if c.get("Model", "").lower() == "imx500"]
+        if len(cameras) != 1:
+            raise RuntimeError("Select exactly one connected IMX500; stop the tracking worker first")
+        info = cameras[0]
+        camera = Picamera2(info["Num"])
+    boot_id, sequence, sync_sequence = uuid.uuid4().hex, 0, 0
+    try:
+        with contextlib.redirect_stdout(sys.stderr):
+            camera.start(camera.create_preview_configuration(main={"size": (WIDTH, HEIGHT), "format": "RGB888"}, controls={"FrameRate": 15}, buffer_count=4), show_preview=False)
+        hello = {"version": 1, "kind": "hello", "sessionId": session, "bootId": boot_id, "deviceId": str(info["Id"]), "model": "imx500", "evidence": "hardware", "width": WIDTH, "height": HEIGHT}
+        print(json.dumps(hello, allow_nan=False), flush=True)
+        while True:
+            line = sys.stdin.buffer.readline(4097)
+            if not line:
+                break
+            if len(line) > 4096 or not line.endswith(b"\n"):
+                raise ValueError("Capture command exceeds packet budget")
+            value = json.loads(line)
+            if isinstance(value, dict) and value.get("kind") == "sync":
+                seq = value.get("sequence")
+                if (value.get("version") != 1 or value.get("sessionId") != session or value.get("bootId") != boot_id
+                        or type(seq) is not int or not max(sequence, sync_sequence) < seq <= 0xFFFFFFFF):
+                    raise ValueError("Invalid/replayed clock sync")
+                sync_sequence = seq
+                print(json.dumps({"version": 1, "kind": "sync", "sessionId": session, "bootId": boot_id,
+                                  "sequence": seq, "monotonicMs": time.monotonic_ns() / 1000000}), flush=True)
+                continue
+            if not isinstance(value, dict) or value.get("sequence") != sync_sequence:
+                raise ValueError("Capture requires fresh clock synchronization")
+            sequence, start_ms, deadline_ms = payload_command(value, session, boot_id, sequence, time.monotonic_ns() / 1000000)
+            while True:
+                if time.monotonic_ns() / 1000000 >= deadline_ms:
+                    raise TimeoutError("Capture deadline expired")
+                request = camera.capture_request(wait=0.25)
+                try:
+                    metadata = request.get_metadata()
+                    mono_before = time.monotonic_ns()
+                    boot_ns = time.clock_gettime_ns(time.CLOCK_BOOTTIME)
+                    mono_after = time.monotonic_ns()
+                    timing = payload_timestamp(metadata, boot_ns, mono_before, mono_after, start_ms)
+                    if timing is None:
+                        continue
+                    with contextlib.redirect_stdout(sys.stderr):
+                        ok, jpeg = cv2.imencode(".jpg", request.make_array("main"), [cv2.IMWRITE_JPEG_QUALITY, 85])
+                    if not ok or len(jpeg) > 524288:
+                        raise ValueError("Capture encoding failed or exceeded image budget")
+                    acknowledged_ms = time.monotonic_ns() / 1000000
+                    if acknowledged_ms >= deadline_ms:
+                        raise TimeoutError("Capture encoding/ACK exceeded deadline")
+                    packet = {"version": 1, "kind": "capture", "sessionId": session, "bootId": boot_id, "sequence": sequence, "capturedMonotonicMs": timing[0], "clockUncertaintyMs": timing[1], "exposureTimeUs": timing[2], "acknowledgedMonotonicMs": acknowledged_ms, "width": WIDTH, "height": HEIGHT, "jpeg": base64.b64encode(jpeg).decode("ascii")}
+                    print(json.dumps(packet, allow_nan=False, separators=(",", ":")), flush=True)
+                    break
+                finally:
+                    request.release()
+    finally:
+        with contextlib.redirect_stdout(sys.stderr):
+            # Numeric capture_request timeouts leave a queued SDK job. Cancel it before stop.
+            try:
+                camera.cancel_all_and_flush()
+            finally:
+                try:
+                    camera.stop()
+                finally:
+                    camera.close()
+
+
 def main():
     # Do not leave a camera process holding the device after its Bun parent dies.
     parent = os.getppid()
     libc = ctypes.CDLL(None, use_errno=True)
     if libc.prctl(1, signal.SIGKILL, 0, 0, 0) != 0 or os.getppid() != parent:
         raise RuntimeError("Unable to establish camera worker parent-death handling")
+    if "--payload" in sys.argv:
+        if "--session" not in sys.argv:
+            raise ValueError("Payload session missing")
+        def stop_payload(_signal, _frame):
+            raise SystemExit(0)
+        signal.signal(signal.SIGTERM, stop_payload)
+        signal.signal(signal.SIGINT, stop_payload)
+        payload_main(sys.argv[sys.argv.index("--session") + 1])
+        return
     # Vendor diagnostics must not contaminate the bounded NDJSON protocol on stdout.
     with contextlib.redirect_stdout(sys.stderr):
         import cv2

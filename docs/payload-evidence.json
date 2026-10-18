@@ -1,0 +1,113 @@
+{
+  "evidence": "fixtures-only",
+  "physicalDeviceValidated": false,
+  "runs": [
+    {
+      "scenario": "nominal",
+      "evidence": "owned-estimator-camera-fixture",
+      "triggers": 1,
+      "outcome": "captured",
+      "capture": {
+        "version": 1,
+        "requestId": "replay-payload-session:1",
+        "camera": {
+          "version": 1,
+          "driver": "replay-camera",
+          "deviceId": "synthetic-grey-camera",
+          "sessionId": "replay-payload-session",
+          "bootId": "replay-camera-boot",
+          "evidence": "fixture",
+          "width": 8,
+          "height": 8,
+          "maxImageBytes": 524288,
+          "sensorTimingCalibrated": false,
+          "cameraExtrinsicsCalibrated": false,
+          "physicalFlightEnabled": false
+        },
+        "command": {
+          "version": 1,
+          "sessionId": "replay-payload-session",
+          "bootId": "replay-camera-boot",
+          "sequence": 1,
+          "issuedAtMs": 600,
+          "deadlineMs": 2600
+        },
+        "capturedAtMs": 620,
+        "acknowledgedAtMs": 640,
+        "receivedAtMs": 640,
+        "clockUncertaintyMs": 0,
+        "timestampReference": "fixture",
+        "exposureTimeUs": 1000,
+        "sensorTimingCalibrated": false,
+        "association": {
+          "status": "associated",
+          "reason": "nearest-qualified-snapshot",
+          "offsetMs": 0,
+          "pose": {
+            "snapshotAtMs": 620,
+            "attitudeAtMs": 600,
+            "positionMeasurementAtMs": 600,
+            "positionPredictedToMs": 620,
+            "bootId": "55",
+            "evidence": "fixture",
+            "origin": {
+              "latitudeDeg": 0,
+              "longitudeDeg": 0,
+              "ellipsoidHeightM": 100
+            },
+            "positionM": [
+              0,
+              0,
+              -1
+            ],
+            "quaternionWxyz": [
+              0.9999999999254943,
+              0,
+              0.00001220703124727152,
+              0
+            ],
+            "frame": "LOCAL_NED",
+            "attitudeReference": "GRAVITY_ALIGNED_RELATIVE_YAW",
+            "altitudeDatum": "WGS84_ELLIPSOID"
+          },
+          "georeferenced": false
+        },
+        "sha256": "9c2cd5b056a60ad9c094ae985cff6151124767e505907d81d8e28c211a6b9b95",
+        "byteLength": 137,
+        "physicalFlightEnabled": false
+      }
+    },
+    {
+      "scenario": "wrong-identity",
+      "evidence": "owned-estimator-camera-fixture",
+      "triggers": 1,
+      "outcome": "rejected",
+      "error": "Capture ACK identity, time or capabilities invalid",
+      "capture": null
+    },
+    {
+      "scenario": "stale-clock",
+      "evidence": "owned-estimator-camera-fixture",
+      "triggers": 1,
+      "outcome": "rejected",
+      "error": "Capture ACK identity, time or capabilities invalid",
+      "capture": null
+    },
+    {
+      "scenario": "lost-ack",
+      "evidence": "owned-estimator-camera-fixture",
+      "triggers": 1,
+      "outcome": "rejected",
+      "error": "Capture timed out; shutter outcome may be unknown",
+      "capture": null
+    },
+    {
+      "scenario": "pose-reset",
+      "evidence": "owned-estimator-camera-fixture",
+      "triggers": 1,
+      "outcome": "rejected",
+      "error": "Capture completed but no qualified pose association is available",
+      "capture": null
+    }
+  ]
+}

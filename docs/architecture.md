@@ -104,3 +104,8 @@ Physical firmware and external adapters remain separate from these simulation-on
 
 [ADR 7](adr/0007-driver-transactions.md) records shared external-driver transactions and the strict
 separation between scripted UDP conformance, firmware SITL and physical evidence.
+
+[ADR 8](adr/0008-camera-payload-adapters.md) adds owned camera acquisition with bounded local IPC,
+per-command clock synchronization, no automatic shutter retry and capture-epoch pose association.
+Native Stacks [payload commands](payloads.md) expose replay and explicit Pi acquisition. Bus
+contracts remain configuration only; payloads cannot bypass the flight authority supervisor.

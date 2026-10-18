@@ -39,6 +39,21 @@ replay for a hardware-free test, or Pi AI Camera on the Pi. Explicit selection c
 lock; ambiguity, stale inference and lost detections invalidate it until reselection.
 See [camera setup and limits](docs/camera-tracking.md). Image-space tracking is not metric navigation.
 
+## Camera and payload adapters
+
+Issue #8 adds an owned Pi AI Camera still adapter, bounded command/ACK and clock synchronization,
+image manifests, estimator-pose association and typed bus contracts. Physical camera calibration
+and execution remain unvalidated; other payload device drivers remain planned.
+
+```sh
+./buddy payloads:bench
+./buddy payloads:bench --scenario lost-ack
+./buddy payloads:capture --driver replay --output /tmp/new-drone-capture
+```
+
+See [payload acquisition, Pi commands and acceptance gates](docs/payloads.md). A standalone physical
+capture has no live pose feed and reports unavailable association. No output claims georeferencing.
+
 ## Owned runtime and CLI
 
 The first native kernel now builds for a host harness and a Pico 2 development board. It provides
@@ -54,8 +69,8 @@ bun run runtime:cli
 ```
 
 Read the [runtime build and bench guide](docs/runtime.md) and [wire contract](docs/runtime-protocol.md).
-The standalone CLI uses the same native Stacks command definitions as Buddy. It does not flash or
-control hardware. Keep your Pi 5 for Stacks mission/camera logic; the Pico 2 is a separate bench board.
+The standalone CLI uses the same native Stacks command definitions as Buddy. Runtime commands do
+not flash hardware; physical camera acquisition requires an explicit `--driver imx500`. Keep your Pi 5 for Stacks mission/camera logic; the Pico 2 is a separate bench board.
 
 ## Sensor acquisition and replay
 

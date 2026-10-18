@@ -90,6 +90,23 @@ declare global {
   const encodeFrameV2: typeof autoImports.encodeFrameV2
   const decodeDatagram: typeof autoImports.decodeDatagram
   const encodeVelocity: typeof autoImports.encodeVelocity
+  const savePayloadCapture: typeof autoImports.savePayloadCapture
+  const runPayloadBench: typeof autoImports.runPayloadBench
+  const payloadJson: typeof autoImports.payloadJson
+  const payloadScenarios: typeof autoImports.payloadScenarios
+  const jpegDimensions: typeof autoImports.jpegDimensions
+  const validateCaptureCommand: typeof autoImports.validateCaptureCommand
+  const validateCaptureAck: typeof autoImports.validateCaptureAck
+  const createPayloadCaptureSession: typeof autoImports.createPayloadCaptureSession
+  const validatePayloadBus: typeof autoImports.validatePayloadBus
+  const payloadInventory: typeof autoImports.payloadInventory
+  const openPiAiCameraPayload: typeof autoImports.openPiAiCameraPayload
+  const createPayloadPoseTimeline: typeof autoImports.createPayloadPoseTimeline
+  const openCameraPayloadProcess: typeof autoImports.openCameraPayloadProcess
+  const payloadFixtureJpeg: typeof autoImports.payloadFixtureJpeg
+  const createReplayCameraPayload: typeof autoImports.createReplayCameraPayload
+  const payloadLimits: typeof autoImports.payloadLimits
+  const PayloadCaptureError: typeof autoImports.PayloadCaptureError
   const runRuntimeBench: typeof autoImports.runRuntimeBench
   const runtimeBenchFaults: typeof autoImports.runtimeBenchFaults
   const buildRuntime: typeof autoImports.buildRuntime

@@ -220,6 +220,23 @@
     "nativeDependencies": [
       2,
       3
+    ],
+    "implementationStatus": "in-progress",
+    "evidence": [
+      "resources/functions/drone/payloads/",
+      "resources/functions/drone/camera/imx500_worker.py",
+      "app/Commands/PayloadsBench.ts",
+      "app/Commands/PayloadsCapture.ts",
+      "docs/payloads.md",
+      "tests/unit/payloads.test.ts",
+      "tests/hardware/test_imx500_bridge.py"
+    ],
+    "remaining": [
+      "Physical Pi 5 IMX500 wiring, discovery, capture and fault campaign",
+      "Measured camera clock/exposure/rolling-shutter, intrinsics and body mount calibration",
+      "Live hardware-backed owned-estimator pose integration and independent timing/pose error evidence",
+      "SPI/I2C/UART/CAN/DroneCAN/Cyphal, GPIO/PWM/DShot and power-monitor device implementations and electrical validation",
+      "Gimbal, LiDAR, thermal/multispectral, ESC, gripper/winch, relay/light, transponder and sampling payload drivers"
     ]
   },
   {

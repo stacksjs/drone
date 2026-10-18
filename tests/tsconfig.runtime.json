@@ -20,6 +20,9 @@
     "./unit/estimation.test.ts",
     "./fixtures/sensors/generate.ts",
     "./unit/runtime.test.ts",
-    "./unit/sensors.test.ts"
+    "./unit/sensors.test.ts",
+    "../resources/functions/drone/payloads/**/*.ts",
+    "./unit/payloads.test.ts",
+    "./fixtures/payloads/**/*.ts"
   ]
 }

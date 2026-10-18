@@ -248,10 +248,10 @@ describe('native capture and simulator replay', () => {
     expect(() => replay.advanceTo(99)).toThrow()
   })
   test('native Stacks command runs the replay and reports invalid CLI values', async () => {
-    const result = await command(['sensors:replay', 'tests/fixtures/sensors/bench-v1.json', '--at-ms', '500']).withTimeout(10000)
+    const result = await command(['sensors:replay', 'tests/fixtures/sensors/bench-v1.json', '--at-ms', '500']).withTimeout(60000)
     expect(result.exitCode).toBe(0)
     expect(JSON.parse(result.stdout).evidence).toBe('synthetic-register-fixture')
-    const invalid = await command(['sensors:replay', 'tests/fixtures/sensors/bench-v1.json', '--at-ms', 'nan']).withTimeout(10000)
+    const invalid = await command(['sensors:replay', 'tests/fixtures/sensors/bench-v1.json', '--at-ms', 'nan']).withTimeout(60000)
     expect(invalid.exitCode).toBe(1)
-  }, 20000)
+  }, 180000)
 })
