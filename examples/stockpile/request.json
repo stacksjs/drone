@@ -1,0 +1,146 @@
+{
+  "version": 1,
+  "id": "stockpile-pyramid",
+  "surface": {
+    "version": 1,
+    "metadata": {
+      "version": 1,
+      "id": "analytic-pyramid",
+      "reference": {
+        "horizontalCrs": {
+          "kind": "engineering",
+          "id": "LOCAL:analytic-stockpile",
+          "definition": "Analytic east/north metre fixture, origin at southwest base corner",
+          "coordinateEpoch": null
+        },
+        "axes": "EAST_NORTH",
+        "horizontalUnit": "metre",
+        "verticalDatum": {
+          "kind": "engineering",
+          "id": "analytic-zero",
+          "definition": "Elevation zero is the specified analytic ground plane"
+        },
+        "verticalUnit": "metre",
+        "elevationPositive": "up"
+      },
+      "provenance": {
+        "evidence": "synthetic",
+        "sourceKind": "analytic",
+        "sourceSha256": "75c0b15d9b67ab0564f5b370511a58ab43226206a230072a58b6e32af5a39d45",
+        "acquisition": {
+          "status": "synthetic",
+          "sourceId": "analytic-formula-side4-height3"
+        },
+        "reconstructionOrMeshing": {
+          "status": "synthetic",
+          "sourceId": "four-explicit-pyramid-faces"
+        },
+        "boresightCalibration": {
+          "status": "not-applicable",
+          "reportId": null
+        },
+        "timeCalibration": {
+          "status": "not-applicable",
+          "reportId": null
+        },
+        "groundClassification": {
+          "status": "declared",
+          "description": "Specified analytic material surface, no vegetation or equipment",
+          "reportId": "analytic-construction"
+        },
+        "georeferencing": {
+          "verticalBoundM": 0.1,
+          "horizontalBoundM": null,
+          "reportId": "conditional-synthetic-error-example"
+        }
+      }
+    },
+    "geometry": {
+      "kind": "tin",
+      "vertices": [
+        [
+          0,
+          0,
+          0
+        ],
+        [
+          4,
+          0,
+          0
+        ],
+        [
+          4,
+          4,
+          0
+        ],
+        [
+          0,
+          4,
+          0
+        ],
+        [
+          2,
+          2,
+          3
+        ]
+      ],
+      "triangles": [
+        [
+          0,
+          1,
+          4
+        ],
+        [
+          1,
+          2,
+          4
+        ],
+        [
+          2,
+          3,
+          4
+        ],
+        [
+          3,
+          0,
+          4
+        ]
+      ]
+    }
+  },
+  "boundary": {
+    "outer": [
+      [
+        0,
+        0
+      ],
+      [
+        4,
+        0
+      ],
+      [
+        4,
+        4
+      ],
+      [
+        0,
+        4
+      ]
+    ],
+    "holes": []
+  },
+  "base": {
+    "kind": "plane",
+    "anchorM": [
+      0,
+      0,
+      0
+    ],
+    "gradientEast": 0,
+    "gradientNorth": 0,
+    "assumption": "Known analytic basal plane, not inferred from surface samples",
+    "evidence": "synthetic",
+    "verticalBoundM": 0.05
+  },
+  "reference": null
+}

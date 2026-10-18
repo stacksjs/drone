@@ -10,6 +10,8 @@ Object.assign(globalThis, autoImports)
 
 // TypeScript declarations
 declare global {
+  const writeCompletedArtifact: typeof autoImports.writeCompletedArtifact
+  const completedArtifactLimits: typeof autoImports.completedArtifactLimits
   const antennaBenchConfig: typeof autoImports.antennaBenchConfig
   const runAntennaBench: typeof autoImports.runAntennaBench
   const antennaBenchScenarios: typeof autoImports.antennaBenchScenarios
@@ -291,6 +293,35 @@ declare global {
   const parseVisionProfile: typeof autoImports.parseVisionProfile
   const simulateVision: typeof autoImports.simulateVision
   const visionScenarios: typeof autoImports.visionScenarios
+  const processStockpile: typeof autoImports.processStockpile
+  const writeVolumeDataset: typeof autoImports.writeVolumeDataset
+  const exampleVolumeRequest: typeof autoImports.exampleVolumeRequest
+  const volumeScenarios: typeof autoImports.volumeScenarios
+  const volumeCross2D: typeof autoImports.volumeCross2D
+  const volumeSignedArea: typeof autoImports.volumeSignedArea
+  const volumeSamePoint: typeof autoImports.volumeSamePoint
+  const volumeOnSegment: typeof autoImports.volumeOnSegment
+  const volumeSegmentsTouch: typeof autoImports.volumeSegmentsTouch
+  const volumeInsideRing: typeof autoImports.volumeInsideRing
+  const volumeCleanPolygon: typeof autoImports.volumeCleanPolygon
+  const volumeTriangulateRing: typeof autoImports.volumeTriangulateRing
+  const volumeClipHalfPlane: typeof autoImports.volumeClipHalfPlane
+  const volumeIntersectConvex: typeof autoImports.volumeIntersectConvex
+  const volumeBounds: typeof autoImports.volumeBounds
+  const volumeBoundsOverlap: typeof autoImports.volumeBoundsOverlap
+  const volumeGeometryEpsilon: typeof autoImports.volumeGeometryEpsilon
+  const surfaceSourceDigest: typeof autoImports.surfaceSourceDigest
+  const importGridSurface: typeof autoImports.importGridSurface
+  const importPlySurface: typeof autoImports.importPlySurface
+  const parseVolumeRequest: typeof autoImports.parseVolumeRequest
+  const exportGridSurface: typeof autoImports.exportGridSurface
+  const exportPlySurface: typeof autoImports.exportPlySurface
+  const surfaceImportLimits: typeof autoImports.surfaceImportLimits
+  const validateSurfaceReference: typeof autoImports.validateSurfaceReference
+  const validateSurfaceMetadata: typeof autoImports.validateSurfaceMetadata
+  const validateKnownSurface: typeof autoImports.validateKnownSurface
+  const validateVolumeRequest: typeof autoImports.validateVolumeRequest
+  const volumeLimits: typeof autoImports.volumeLimits
 }
 
 export {}

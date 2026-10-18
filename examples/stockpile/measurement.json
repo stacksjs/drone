@@ -1,0 +1,39 @@
+{
+  "version": 1,
+  "id": "four-cell-volume",
+  "boundary": {
+    "outer": [
+      [
+        0,
+        0
+      ],
+      [
+        2,
+        0
+      ],
+      [
+        2,
+        2
+      ],
+      [
+        0,
+        2
+      ]
+    ],
+    "holes": []
+  },
+  "base": {
+    "kind": "plane",
+    "anchorM": [
+      0,
+      0,
+      0
+    ],
+    "gradientEast": 0,
+    "gradientNorth": 0,
+    "assumption": "Known analytic basal plane, not inferred from surface samples",
+    "evidence": "synthetic",
+    "verticalBoundM": 0.05
+  },
+  "reference": null
+}

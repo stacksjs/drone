@@ -88,6 +88,12 @@ jobs:
         working-directory: ${{ runner.temp }}
       - run: $GITHUB_WORKSPACE/storage/runtime-build/cli/drone mapping:simulate --scenario camera-loss
         working-directory: ${{ runner.temp }}
+      - run: $GITHUB_WORKSPACE/storage/runtime-build/cli/drone volumes:demo --scenario reference-comparison --output "$RUNNER_TEMP/volume-pyramid"
+        working-directory: ${{ runner.temp }}
+      - run: $GITHUB_WORKSPACE/storage/runtime-build/cli/drone volumes:process "$GITHUB_WORKSPACE/examples/stockpile/request.json"
+        working-directory: ${{ runner.temp }}
+      - run: $GITHUB_WORKSPACE/storage/runtime-build/cli/drone volumes:import "$GITHUB_WORKSPACE/examples/stockpile/surface.asc" --format asc --metadata "$GITHUB_WORKSPACE/examples/stockpile/metadata.json" --measurement "$GITHUB_WORKSPACE/examples/stockpile/measurement.json" --output "$RUNNER_TEMP/volume-grid"
+        working-directory: ${{ runner.temp }}
   firmware:
     runs-on: ubuntu-latest
     steps:

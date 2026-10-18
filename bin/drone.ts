@@ -34,6 +34,9 @@ import VisionValidate from '../app/Commands/VisionValidate'
 import VisionSimulate from '../app/Commands/VisionSimulate'
 import MappingPlan from '../app/Commands/MappingPlan'
 import MappingSimulate from '../app/Commands/MappingSimulate'
+import VolumesDemo from '../app/Commands/VolumesDemo'
+import VolumesProcess from '../app/Commands/VolumesProcess'
+import VolumesImport from '../app/Commands/VolumesImport'
 
 const app = cli('drone')
 RuntimeBuild(app)
@@ -64,6 +67,9 @@ VisionValidate(app)
 VisionSimulate(app)
 MappingPlan(app)
 MappingSimulate(app)
+VolumesDemo(app)
+VolumesProcess(app)
+VolumesImport(app)
 app.help()
 app.version('0.1.0')
 try { await app.parse(process.argv) }

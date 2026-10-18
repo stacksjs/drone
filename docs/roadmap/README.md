@@ -55,6 +55,13 @@ companion application and simulator, not a native board autopilot.
 
 ## Sequence
 
+Known-surface processing now integrates numeric TIN and cell-grid products with explicit boundary,
+base, coverage, cut/fill, provenance and conditional uncertainty. Native import/export and a stx
+audit workspace are implemented. Independent physical survey qualification, raw-point meshing and
+richer formats remain in [#19](https://github.com/stacksjs/drone/issues/19). The collection runtime
+in [#18](https://github.com/stacksjs/drone/issues/18) exports synthetic georeferenced imagery;
+reconstruction remains a distinct stage.
+
 1. Deliver one deterministic board sensor-to-neutral-output loop and versioned Pi/runtime handshake.
 2. Add calibrated/time-aligned sensors, an owned estimator, and physics-tested vehicle controls.
 3. Establish independent authority, arming/failsafes and disabled-prop HIL before physical output.

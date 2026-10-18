@@ -4,7 +4,7 @@ import { resolve } from 'node:path'
 import type { MissionTrace } from './engine'
 import { missionLimits, parseMissionTrace } from './engine'
 /** Private local simulation artifacts only. No application storage or hardware transport is opened. */
-export async function readMissionFile(path: string): Promise<string> {
+export async function readMissionFile(path: string, options: { preserveBom?: boolean } = {}): Promise<string> {
   const file = await open(path, constants.O_RDONLY | constants.O_NONBLOCK | constants.O_NOFOLLOW)
   try {
     const stat = await file.stat()
@@ -17,7 +17,7 @@ export async function readMissionFile(path: string): Promise<string> {
       used += bytesRead
     }
     if (used > missionLimits.bytes) throw new RangeError('Mission file exceeds 8 MiB')
-    return new TextDecoder('utf-8', { fatal: true }).decode(buffer.subarray(0, used))
+    return new TextDecoder('utf-8', { fatal: true, ignoreBOM: options.preserveBom ?? false }).decode(buffer.subarray(0, used))
   }
   finally { await file.close() }
 }

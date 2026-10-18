@@ -74,7 +74,7 @@ export async function importGridSurface(text: string, input: SurfaceMetadata): P
     if (key === 'xllcenter' || key === 'yllcenter')
       throw new Error('AAIGrid center-origin point samples are unsupported; provide an explicit corner-origin cell-area product')
     if (!supported.has(key) || tokens.length !== 2 || fields.has(key))
-      throw new Error(`Unsupported, duplicate or malformed AAIGrid header: ${key}`)
+      throw new Error('Unsupported, duplicate or malformed AAIGrid header')
     fields.set(key, tokens[1]!)
     cursor++
   }

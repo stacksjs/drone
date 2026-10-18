@@ -86,6 +86,21 @@ reconstruction, physical accuracy and measured RTK/PPK/GCP evidence remain unver
 
 Read the [survey collection and export contract](docs/mapping.md).
 
+## Stockpile volume processing
+
+Open `/volumes` to inspect known-surface integration, cut/fill, base assumptions, gaps and uncertainty.
+The native engine accepts numeric cell grids and indexed TINs with explicit reference/provenance;
+it keeps acquisition, reconstruction and measurement separate.
+
+```sh
+./buddy volumes:demo --scenario pyramid
+./buddy volumes:process examples/stockpile/request.json
+./buddy volumes:import examples/stockpile/surface.asc --format asc --metadata examples/stockpile/metadata.json --measurement examples/stockpile/measurement.json
+```
+
+Read the [numeric import, integration and audit contract](docs/volumes.md). Examples are synthetic;
+physical surveyed accuracy, raw-point meshing and richer format adapters remain unverified.
+
 ## Camera and payload adapters
 
 Issue #8 adds an owned Pi AI Camera still adapter, bounded command/ACK and clock synchronization,
