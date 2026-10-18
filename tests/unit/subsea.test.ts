@@ -46,6 +46,8 @@ test('inspection latches intervening authority and command-scope loss, and rejec
   }
   for (const change of [
     (c: VehicleControllerContext) => { c.measurementPose = null },
+    (c: VehicleControllerContext) => { c.measurementPose!.positionM[0] = NaN },
+    (c: VehicleControllerContext) => { c.measurementPose!.quaternionWxyz = [1, 1, 1, 1] },
     (c: VehicleControllerContext) => { c.measurementPose!.capturedAtMs++ },
     (c: VehicleControllerContext) => { c.measurementPose!.positionM[0] += 0.3 },
     (c: VehicleControllerContext) => { c.estimate.localPosition!.capturedAtMs = 1 },
@@ -59,4 +61,55 @@ test('inspection latches intervening authority and command-scope loss, and rejec
     const bad = captureContext(command, 1060); change(bad); port.observe!(bad)
     expect(port.poll(1060)!.outcome).toBe('uncertain')
   }
+})
+
+import { createVehicleMissionEngine } from '../../resources/functions/drone/missions/vehicle'
+import { reduceSubseaInspection } from '../../resources/functions/drone/vehicles/subsea/inspection'
+import type { VehicleMissionObservation, VehicleMissionPlan } from '../../resources/functions/drone/vehicles/types'
+function inspectionRecording() {
+  const move = { acceptanceM: 0.2, maxArrivalSpeedMps: 0.12, settleMs: 0, timeoutMs: 1000 }
+  const plan: VehicleMissionPlan = { version: 2, vehicle: 'subsea', id: 'inspection-fixture', frame: 'LOCAL_NED', altitude: 'ORIGIN_RELATIVE_DOWN', terrain: 'DECLARED_MODEL_SURFACE', origin: { latitudeDeg: 0, longitudeDeg: 0, ellipsoidHeightM: 100 }, fence: { radiusM: 8, minDownM: -0.1, maxDownM: 8 }, rallyM: [0, 0, 0], power: { availableWh: 10, maxW: 100, reservePercent: 30 }, start: 'start', tasks: [
+    { id: 'start', kind: 'start', next: 'dive' }, { id: 'dive', kind: 'waypoint', positionM: [2, 0, 2], ...move, next: 'capture' }, { id: 'capture', kind: 'payload', operation: 'inspection-capture', containerId: null, timeoutMs: 1000, next: 'return' }, { id: 'return', kind: 'return', ...move, next: 'stop' }, { id: 'stop', kind: 'stop', positionM: [0, 0, 0], ...move },
+  ] }
+  const engine = createVehicleMissionEngine(plan), port = createSubseaCapture()
+  const observation = (atMs: number): VehicleMissionObservation => ({ kind: 'simulation', nowMs: atMs, reference: command.reference, origin: plan.origin, healthy: true, positionM: atMs === 1000 ? [0, 0, 0] : [2, 0, 2], velocityMps: [0, 0, 0], authority: 'autonomous', batteryPercent: 100, onGround: atMs === 1000, payloadAck: null })
+  engine.step(observation(1000), 'start'); engine.step(observation(1020)); const pending = engine.step(observation(1040)).payload!
+  port.observe!(captureContext(pending, 1040)); port.request(pending)
+  engine.step(observation(1060)); engine.step(observation(1080))
+  const c = captureContext(pending, 1100); port.observe!(c)
+  engine.step({ ...observation(1100), payloadAck: port.poll(1100) })
+  return { trace: engine.trace(), path: [{ atMs: 1100, measurement: c.measurement, measurementPose: c.measurementPose! }] }
+}
+
+test('inspection evidence joins exact acknowledged camera pixels, sonar and capture pose without global location claims', () => {
+  const recording = inspectionRecording()
+  const artifact = reduceSubseaInspection(recording.path, recording.trace)
+  expect(artifact.physicalValidation).toBe(false); expect(artifact.frames).toHaveLength(1)
+  const capture = artifact.frames[0]!
+  expect(capture.capturedAtMs).toBe(1040); expect(capture.positionM).toEqual([2, 0, 2])
+  expect(capture.camera.pixels).toEqual([0, 16, 32, 48, 64, 80, 96, 112, 128, 144, 160, 176, 192, 208, 224, 240])
+  expect(new TextDecoder().decode(new Uint8Array(capture.camera.bytes.slice(0, 11)))).toBe('P5\n4 4\n255\n')
+  expect(capture.camera.bytes).toHaveLength(27); expect(capture.sonar.rangeM).toBe(2)
+  expect(capture.pose.positionCapturedAtMs).toBe(980); expect(capture.pose.attitudePredictedToMs).toBe(1040)
+  recording.path[0]!.measurement!.values.cameraLuma = [1]
+  expect(capture.camera.pixels).toHaveLength(16)
+})
+
+test('inspection export rejects unacknowledged, relabeled or conflicting capture records and understated clock assumptions', () => {
+  for (const change of [
+    (r: ReturnType<typeof inspectionRecording>) => { r.path[0]!.measurement!.values.cameraFrameId = 'subsea-model-99-1040' },
+    (r: ReturnType<typeof inspectionRecording>) => { r.path[0]!.measurement!.values.structureRangeM = 3 },
+    (r: ReturnType<typeof inspectionRecording>) => { (r.path[0]!.measurement!.values.cameraLuma as number[])[0] = 255 },
+    (r: ReturnType<typeof inspectionRecording>) => { r.path[0]!.measurementPose!.quaternionWxyz = [0, 0, 0, 1] },
+    (r: ReturnType<typeof inspectionRecording>) => { r.path[0]!.measurementPose!.positionM[0] += 0.1 },
+    (r: ReturnType<typeof inspectionRecording>) => { r.path[0]!.measurementPose!.attitudeCapturedAtMs = 1 },
+    (r: ReturnType<typeof inspectionRecording>) => { r.trace.rows.at(-1)!.observation.payloadAck!.capturedAtMs++ },
+    (r: ReturnType<typeof inspectionRecording>) => { r.path = [] },
+    (r: ReturnType<typeof inspectionRecording>) => { r.path.push(structuredClone(r.path[0]!)); r.path[1]!.measurement!.values.cameraLuma = Array(16).fill(42) },
+  ]) {
+    const recording = inspectionRecording(); change(recording)
+    expect(() => reduceSubseaInspection(recording.path, recording.trace)).toThrow()
+  }
+  const r = inspectionRecording()
+  expect(() => reduceSubseaInspection(r.path, r.trace, { positionSigmaM: 0.1, attitudeSigmaRad: 0.02, timeSigmaMs: 0.5, rangeSigmaM: 0.05 })).toThrow()
 })
