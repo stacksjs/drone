@@ -35,12 +35,12 @@ export function createAirController(): VehicleController {
       if (!contact) hasFlown = true
       if (speed > airModel.maximumMps || (!contact && hasFlown && (speed < airModel.minimumMps || Math.abs(alpha) > airModel.stallAlphaRad + 0.03)) || Math.abs(roll!) > 0.9 || Math.abs(pitch!) > 0.65) fault = 'air-flight-envelope'
       if (fault) return output(c, [0, 0, 0, 0, 1], fault, true)
-      const landing = c.mission.taskKind === 'land' || c.mission.taskKind === 'stop'
-      if (c.mission.taskId !== lastTask) { landingContact = false; landingHeading = null; lastTask = c.mission.taskId }
-      if (landing && contact && hasFlown) landingContact = true
-      if (landingContact) return output(c, [0, clamp(-roll! * 1.4 - rates[0]! * 0.25, -0.4, 0.4), clamp(-pitch! * 1.4 - rates[1]! * 0.25, -0.4, 0.4), 0, 1], 'landing-rollout')
       const paused = c.mission.state === 'paused'
+      const landing = !paused && (c.mission.taskKind === 'land' || c.mission.taskKind === 'stop')
+      if (c.mission.taskId !== lastTask) { landingContact = false; landingHeading = null; lastTask = c.mission.taskId }
       if (paused && contact) return output(c, [0, 0, 0, 0, 1], 'runway-paused')
+      if (landing && contact && hasFlown) landingContact = true
+      if (landing && landingContact) return output(c, [0, clamp(-roll! * 1.4 - rates[0]! * 0.25, -0.4, 0.4), clamp(-pitch! * 1.4 - rates[1]! * 0.25, -0.4, 0.4), 0, 1], 'landing-rollout')
       if (paused && !loiterCenter) loiterCenter = [position[0]! - 45 * Math.sin(yaw!), position[1]! + 45 * Math.cos(yaw!), position[2]!]
       if (!paused) loiterCenter = null
       const goal = paused ? loiterCenter : c.mission.targetM

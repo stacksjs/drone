@@ -170,3 +170,15 @@ test('malformed vehicle sensor values inhibit at the public controller boundary'
   const context = airContext(); context.measurement!.values = null as never
   expect(createAirController().step(context).inhibited).toBe(true)
 })
+
+test('pausing an airborne landing uses the same altitude-preserving loiter control as a paused waypoint', () => {
+  const waypoint = airContext(), landing = airContext()
+  waypoint.mission.state = 'paused'; landing.mission.state = 'paused'
+  landing.mission.taskId = 'land'; landing.mission.taskKind = 'land'; landing.mission.targetM = [650, 0, 0]
+  const expected = createAirController().step(waypoint), actual = createAirController().step(landing)
+  expect(actual.inhibited).toBe(false)
+  expect(actual.reason).toBe('bounded-air-loiter')
+  expect(actual.actuators).toEqual(expected.actuators)
+  landing.measurement!.values.onSurface = true
+  expect(createAirController().step(landing).actuators).toEqual([0, 0, 0, 0, 1])
+})
