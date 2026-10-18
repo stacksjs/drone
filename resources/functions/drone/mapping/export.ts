@@ -1,21 +1,11 @@
 import type { SurveyRun } from './types'
 import { createHash } from 'node:crypto'
-import { link, mkdir, open, unlink } from 'node:fs/promises'
-import { dirname, join, resolve } from 'node:path'
+import { join } from 'node:path'
 import { createImageData, encode } from 'ts-images'
+import { writeCompletedArtifact } from '../../artifacts/completed-directory'
 import { surveyDatasetLimits, surveyQuality, validateSurveyDataset } from './quality'
 
 function sha256(bytes: string | Uint8Array) { return createHash('sha256').update(bytes).digest('hex') }
-async function writeSynced(path: string, data: string | Uint8Array) {
-  const file = await open(path, 'wx', 0o600)
-  try { await file.writeFile(data); await file.sync() }
-  finally { await file.close() }
-}
-async function syncDirectory(path: string) {
-  const directory = await open(path, 'r')
-  try { await directory.sync() }
-  finally { await directory.close() }
-}
 /**
  * Server-only local export. A new private directory and wx writes prevent
  * replacement. Files and directory entries receive fsync barriers before a
@@ -83,22 +73,11 @@ export async function writeSurveyDataset(directory: string, input: SurveyRun) {
     'ODM input source: https://github.com/OpenDroneMap/ODM/blob/77439b1f45ceb4775b826f900916c64f03736331/opendm/geo.py',
     '',
   ].join('\n')
-  const target = resolve(directory)
-  await mkdir(target, { mode: 0o700 })
-  await mkdir(join(target, 'images'), { mode: 0o700 })
-  for (const image of encoded) await writeSynced(join(target, 'images', image.filename), image.bytes)
-  await writeSynced(join(target, 'geo.txt'), geo)
-  await writeSynced(join(target, 'quality.json'), qualityJson)
-  await writeSynced(join(target, 'README.txt'), readme)
-  await syncDirectory(join(target, 'images'))
-  await syncDirectory(target)
-  await syncDirectory(dirname(target))
-  const manifestPath = join(target, 'manifest.json')
-  const pendingManifest = join(target, 'manifest.pending.json')
-  await writeSynced(pendingManifest, manifestJson)
-  await link(pendingManifest, manifestPath)
-  await syncDirectory(target)
-  await unlink(pendingManifest)
-  await syncDirectory(target)
-  return { directory: target, manifest: manifestPath, quality: join(target, 'quality.json'), images: images.length, manifestSha256: sha256(manifestJson) }
+  const output = await writeCompletedArtifact(directory, [
+    ...encoded.map(image => ({ path: `images/${image.filename}`, contents: image.bytes })),
+    { path: 'geo.txt', contents: geo },
+    { path: 'quality.json', contents: qualityJson },
+    { path: 'README.txt', contents: readme },
+  ], manifestJson, { directories: ['images'] })
+  return { ...output, quality: join(output.directory, 'quality.json'), images: images.length, manifestSha256: sha256(manifestJson) }
 }
