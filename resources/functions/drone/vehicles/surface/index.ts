@@ -11,12 +11,13 @@ export function createSurfaceProfile(scenario: SurfaceScenario = 'nominal'): Veh
   const move = { acceptanceM: 0.35, maxArrivalSpeedMps: 0.25, settleMs: 400, timeoutMs: 25000 }
   const mission: VehicleMissionPlan = { version: 2, vehicle: 'surface', id: 'harbour-survey-sample-return', frame: 'LOCAL_NED', altitude: 'ORIGIN_RELATIVE_DOWN', terrain: 'DECLARED_MODEL_SURFACE', origin: { latitudeDeg: 0, longitudeDeg: 0, ellipsoidHeightM: 100 }, fence: { radiusM: 15, minDownM: -0.5, maxDownM: 0.5 }, rallyM: [0, 0, 0], power: { availableWh: 60, maxW: 120, reservePercent: 30 }, start: 'start', tasks: [
     { id: 'start', kind: 'start', next: 'survey-a' },
-    { id: 'survey-a', kind: 'waypoint', positionM: [5, 0, 0], ...move, next: 'survey-b' },
+    { id: 'survey-a', kind: 'waypoint', positionM: [5, 0, 0], ...move, next: scenario === 'harbour-return' ? 'energy-check' : 'survey-b' },
     { id: 'survey-b', kind: 'waypoint', positionM: [5, 2, 0], ...move, next: 'sample' },
     { id: 'sample', kind: 'payload', operation: 'water-sample', containerId: 'harbour-bottle-001', timeoutMs: 1000, next: 'return' },
     { id: 'return', kind: 'return', ...move, timeoutMs: 30000, next: 'stop' },
     { id: 'stop', kind: 'stop', positionM: [0, 0, 0], ...move, timeoutMs: 10000 },
   ] }
+  if (scenario === 'harbour-return') mission.tasks.push({ id: 'energy-check', kind: 'branch', batteryAtLeast: 100, then: 'survey-b', otherwise: 'return' })
   return { vehicle: 'surface', name: 'Owned planar vector-thrust harbour vessel', evidence: 'modeled-vehicle-profile', physicalFlightEnabled: false,
     actuators: [{ name: 'body-surge', unit: 'normalized', min: -1, max: 1, neutral: 0 }, { name: 'body-sway', unit: 'normalized', min: -1, max: 1, neutral: 0 }, { name: 'body-yaw', unit: 'normalized', min: -1, max: 1, neutral: 0 }], authorityFence: { ...mission.fence }, mission,
     scenarios: surfaceScenarios, createPlant: createSurfacePlant, createController: createSurfaceController,

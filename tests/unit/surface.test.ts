@@ -123,3 +123,8 @@ test('survey export preserves uncertainty inputs and rejects relabeling a horizo
   const sounding = reduceSurfaceSurvey([row], { positionSigmaM: 0.05, timeSigmaMs: 2 }).soundings[0]!
   expect(() => exportSurfaceSurvey([{ ...sounding, horizontalSigmaM: 0.000001 }])).toThrow()
 })
+
+test('harbour return mission has an explicit reserve decision that can omit uncertain new collection work', () => {
+  const plan = createSurfaceProfile('harbour-return').mission
+  expect(plan.tasks.some(t => t.kind === 'branch' && t.otherwise === 'return')).toBe(true)
+})
