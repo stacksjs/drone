@@ -38,6 +38,11 @@ as a horizontal goal plus a declared terrain clearance. The fixture uses a shall
 waypoint is [5,0,-1.35], so mission acceptance and navigation agree on altitude. This is not general
 terrain-aware graph compilation.
 
+The authored approach waypoint [2.5,-2.5,-1.275] splits the conservative detour into two legs.
+Each leg retains the v1 20-second task limit and 500 ms settling requirement. This budgets the
+route without relying on a platform choosing one side of an equal-cost path. The navigator still
+computes obstacle clearance and the second detected column changes the return route.
+
 ## Constraints and planning
 
 Range packets declare complete 360 degree modeled coverage within 8 m. Incomplete coverage is

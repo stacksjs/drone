@@ -11,11 +11,11 @@
       "mission": "completed",
       "navigation": "released",
       "reason": "mission-completed",
-      "minTruthClearanceM": 1.595554713574549,
+      "minTruthClearanceM": 1.595747424446152,
       "maxLatencyMs": 60,
       "detectionFault": false,
-      "precisionLandingErrorM": 0.007506210589602,
-      "elapsedMs": 42220,
+      "precisionLandingErrorM": 0.007265393540399624,
+      "elapsedMs": 42020,
       "modeledOutputsNeutral": true
     },
     {
@@ -23,11 +23,11 @@
       "mission": "completed",
       "navigation": "released",
       "reason": "mission-completed",
-      "minTruthClearanceM": 1.595554713574549,
+      "minTruthClearanceM": 1.595747424446152,
       "maxLatencyMs": 60,
       "detectionFault": false,
-      "precisionLandingErrorM": 0.009004182007895756,
-      "elapsedMs": 42220,
+      "precisionLandingErrorM": 0.009218341119208932,
+      "elapsedMs": 42020,
       "modeledOutputsNeutral": true
     },
     {
@@ -35,10 +35,10 @@
       "mission": "blocked",
       "navigation": "blocked",
       "reason": "navigation-range-stale-or-replayed",
-      "minTruthClearanceM": 1.7099825534245288,
+      "minTruthClearanceM": 1.7097955055926535,
       "maxLatencyMs": 60,
       "detectionFault": false,
-      "precisionLandingErrorM": 0.5829460218869038,
+      "precisionLandingErrorM": 0.5841398012709308,
       "elapsedMs": 5520,
       "modeledOutputsNeutral": true
     },
@@ -59,10 +59,10 @@
       "mission": "blocked",
       "navigation": "blocked",
       "reason": "mission-blocked",
-      "minTruthClearanceM": 1.7220450276948516,
+      "minTruthClearanceM": 1.7218564956369262,
       "maxLatencyMs": 60,
       "detectionFault": false,
-      "precisionLandingErrorM": 0.5462497705653003,
+      "precisionLandingErrorM": 0.5473586469625557,
       "elapsedMs": 5460,
       "modeledOutputsNeutral": true
     },
@@ -71,11 +71,11 @@
       "mission": "blocked",
       "navigation": "blocked",
       "reason": "navigation-intent-or-selected-target",
-      "minTruthClearanceM": 1.595554713574549,
+      "minTruthClearanceM": 1.595747424446152,
       "maxLatencyMs": 60,
       "detectionFault": false,
-      "precisionLandingErrorM": 0.1495145434500062,
-      "elapsedMs": 38180,
+      "precisionLandingErrorM": 0.14962254487348056,
+      "elapsedMs": 37980,
       "modeledOutputsNeutral": true
     },
     {
@@ -83,10 +83,10 @@
       "mission": "blocked",
       "navigation": "blocked",
       "reason": "mission-blocked",
-      "minTruthClearanceM": 1.9293503757499109,
+      "minTruthClearanceM": 1.929312059007106,
       "maxLatencyMs": 60,
       "detectionFault": false,
-      "precisionLandingErrorM": 0.12265763611562353,
+      "precisionLandingErrorM": 0.12269222316078604,
       "elapsedMs": 4400,
       "modeledOutputsNeutral": true
     }

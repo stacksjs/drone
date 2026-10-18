@@ -23,7 +23,10 @@ export function simulateNavigation(options: { scenario?: NavigationScenario, sec
   if (!navigationScenarios.includes(scenario) || !Number.isInteger(seconds) || seconds < 8 || seconds > 120) throw new RangeError('Invalid navigation scenario or duration (8..120 seconds)')
   const missionPlan = exampleMission()
   missionPlan.tasks = [
-    { id: 'takeoff', kind: 'takeoff', positionM: [0, 0, -1.2], timeoutMs: 12000, next: 'survey' },
+    { id: 'takeoff', kind: 'takeoff', positionM: [0, 0, -1.2], timeoutMs: 12000, next: 'approach' },
+    // Two authored legs budget the inflated obstacle detour and settling inside v1's
+    // 20-second task limit, independently of which equal-cost side a platform selects.
+    { id: 'approach', kind: 'waypoint', positionM: [2.5, -2.5, -1.275], timeoutMs: 20000, next: 'survey' },
     // Author the fixed-origin waypoint at the same height as the declared 1.2 m clearance
     // over the fixture's D=-0.03N plane. Acceptance must not chase a different altitude.
     { id: 'survey', kind: 'waypoint', positionM: [5, 0, -1.35], timeoutMs: 20000, next: 'return' },
