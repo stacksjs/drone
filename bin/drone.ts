@@ -14,6 +14,11 @@ import ControlsSimulate from '../app/Commands/ControlsSimulate'
 import PayloadsBench from '../app/Commands/PayloadsBench'
 import PayloadsCapture from '../app/Commands/PayloadsCapture'
 
+import DiagnosticsRecord from '../app/Commands/DiagnosticsRecord'
+import DiagnosticsReplay from '../app/Commands/DiagnosticsReplay'
+import DiagnosticsInspect from '../app/Commands/DiagnosticsInspect'
+import DiagnosticsExport from '../app/Commands/DiagnosticsExport'
+
 const app = cli('drone')
 RuntimeBuild(app)
 RuntimeBench(app)
@@ -26,6 +31,10 @@ AuthoritySimulate(app)
 DriversBench(app)
 PayloadsBench(app)
 PayloadsCapture(app)
+DiagnosticsRecord(app)
+DiagnosticsReplay(app)
+DiagnosticsInspect(app)
+DiagnosticsExport(app)
 app.help()
 app.version('0.1.0')
 try { await app.parse(process.argv) }

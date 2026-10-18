@@ -47,6 +47,29 @@ declare global {
   const createPhysicsSensorFeed: typeof autoImports.createPhysicsSensorFeed
   const simulateMultirotor: typeof autoImports.simulateMultirotor
   const controlScenarios: typeof autoImports.controlScenarios
+  const recordRuntimeDiagnostics: typeof autoImports.recordRuntimeDiagnostics
+  const loadDiagnosticFile: typeof autoImports.loadDiagnosticFile
+  const readDiagnosticsFile: typeof autoImports.readDiagnosticsFile
+  const exportDiagnostics: typeof autoImports.exportDiagnostics
+  const hashDiagnostic: typeof autoImports.hashDiagnostic
+  const sealDiagnostic: typeof autoImports.sealDiagnostic
+  const parseDiagnosticsJournal: typeof autoImports.parseDiagnosticsJournal
+  const diagnosticObject: typeof autoImports.diagnosticObject
+  const diagnosticKeys: typeof autoImports.diagnosticKeys
+  const diagnosticInteger: typeof autoImports.diagnosticInteger
+  const diagnosticTime: typeof autoImports.diagnosticTime
+  const diagnosticHash: typeof autoImports.diagnosticHash
+  const validateDiagnosticProvenance: typeof autoImports.validateDiagnosticProvenance
+  const validateDiagnosticHeader: typeof autoImports.validateDiagnosticHeader
+  const recordRuntimeFrame: typeof autoImports.recordRuntimeFrame
+  const restoreRecordedRuntimeFrame: typeof autoImports.restoreRecordedRuntimeFrame
+  const validateDiagnosticEvent: typeof autoImports.validateDiagnosticEvent
+  const createDiagnosticsRecorder: typeof autoImports.createDiagnosticsRecorder
+  const openDiagnosticsRecorder: typeof autoImports.openDiagnosticsRecorder
+  const createDiagnosticsReplay: typeof autoImports.createDiagnosticsReplay
+  const diagnoseDiagnostics: typeof autoImports.diagnoseDiagnostics
+  const diagnosticLimits: typeof autoImports.diagnosticLimits
+  const diagnosticHealthCodes: typeof autoImports.diagnosticHealthCodes
   const runDriverProtocolBench: typeof autoImports.runDriverProtocolBench
   const createArduPilotDriver: typeof autoImports.createArduPilotDriver
   const createPx4Driver: typeof autoImports.createPx4Driver

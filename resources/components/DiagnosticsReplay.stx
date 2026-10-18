@@ -1,0 +1,73 @@
+<script client>
+import type { DiagnosticJournal } from '../functions/drone/diagnostics/types'
+import { parseDiagnosticsJournal } from '../functions/drone/diagnostics/journal'
+import { loadDiagnosticFile } from '../functions/drone/diagnostics/client'
+import { createDiagnosticsReplay, diagnoseDiagnostics } from '../functions/drone/diagnostics/replay'
+
+const fileInput = useRef<HTMLInputElement>('diagnosticFile')
+const current = state<DiagnosticJournal | null>(null)
+const busy = state(false)
+const error = state('')
+const offset = state(0)
+const replay = derived(() => current() ? createDiagnosticsReplay(current()!).advanceTo(offset()) : null)
+const report = derived(() => current() ? diagnoseDiagnostics(current()!) : null)
+const duration = derived(() => current()?.footer?.atMs ?? current()?.events.at(-1)?.atMs ?? 0)
+const rows = derived(() => (current()?.events ?? []).filter(row => row.atMs <= offset()).slice(-24))
+let revision = 0
+async function openSelected(event: Event) {
+  const file = (event.target as HTMLInputElement).files?.[0]
+  if (!file || busy()) return
+  const epoch = ++revision
+  busy.set(true); error.set(''); current.set(null); offset.set(0)
+  try { const journal = await loadDiagnosticFile(file); if (epoch === revision) current.set(journal) }
+  catch (failure) { if (epoch === revision) error.set(failure instanceof Error ? failure.message : 'Unable to verify recording') }
+  finally { if (epoch === revision) { if (fileInput.current) fileInput.current.value = ''; busy.set(false) } }
+}
+async function example() {
+  if (busy()) return
+  const epoch = ++revision
+  busy.set(true); error.set(''); current.set(null); offset.set(0)
+  try {
+    const response = await fetch('/diagnostics/runtime-deadline.ndjson', { cache: 'no-store' })
+    if (!response.ok) throw new Error('Example recording unavailable')
+    const journal = await parseDiagnosticsJournal(await response.text())
+    if (epoch === revision) current.set(journal)
+  }
+  catch (failure) { if (epoch === revision) error.set(failure instanceof Error ? failure.message : 'Example verification failed') }
+  finally { if (epoch === revision) { if (fileInput.current) fileInput.current.value = ''; busy.set(false) } }
+}
+function forget() { if (fileInput.current) fileInput.current.value = ''; revision++; current.set(null); offset.set(0); error.set(''); busy.set(false) }
+onDestroy(() => { revision++ })
+</script>
+
+<template>
+  <section aria-labelledby="diagnostics-title">
+    <p class="font-mono text-emerald-200 text-xs">OWNED RUNTIME / RECORDED EVIDENCE</p>
+    <h1 id="diagnostics-title" class="mt-3 font-semibold text-3xl tracking-tight">Inspect what happened.</h1>
+    <p class="mt-3 max-w-2xl text-neutral-400">Verify a runtime journal, inspect faults and move through recorded time. Opened files stay in this tab. Replay has no vehicle connection.</p>
+    <div class="flex flex-wrap gap-4 items-end mt-8 pb-6 border-b border-neutral-700">
+      <div><label for="diagnostic-file" class="block mb-2 text-sm">Open a diagnostic journal, up to 4 MiB</label><input id="diagnostic-file" ref="diagnosticFile" type="file" accept=".ndjson,.jsonl" @change="openSelected($event)" :disabled="busy()" class="block max-w-full text-neutral-300 text-sm focus-visible:outline-emerald-200"></div>
+      <button type="button" @click="example()" :disabled="busy()" class="px-4 py-3 border border-neutral-600 rounded focus-visible:outline-emerald-200">Load deadline example</button>
+      <button :if="current()" type="button" @click="forget()" class="px-4 py-3 text-neutral-400 underline underline-offset-4">Clear recording</button>
+    </div>
+    <p :if="busy()" role="status" class="mt-5 text-neutral-400 text-sm">Verifying record hashes and bounded schema...</p>
+    <p :if="error()" role="alert" class="mt-5 p-4 text-red-200 border border-red-400 rounded">{{ error() }}</p>
+    <div :if="current() && replay()" class="mt-8">
+      <div class="flex flex-wrap gap-4 justify-between pb-6 border-b border-neutral-700">
+        <div><h2 class="text-neutral-400 text-xs">Recording state</h2><p class="mt-2 font-mono text-emerald-200 text-lg" data-recording-completion>{{ current()?.completion }}</p><p class="mt-2 break-all font-mono text-neutral-400 text-xs">{{ current()?.header.runId }}</p></div>
+        <dl class="flex flex-wrap gap-8 text-sm"><div><dt class="text-neutral-400">Evidence</dt><dd class="mt-2 font-mono">{{ current()?.header.evidence }}</dd></div><div><dt class="text-neutral-400">Verified events</dt><dd class="mt-2 font-mono">{{ current()?.events.length }}</dd></div><div><dt class="text-neutral-400">Known dropped</dt><dd class="mt-2 font-mono">{{ current()?.loss.knownDropped }}</dd></div><div><dt class="text-neutral-400">Tail</dt><dd class="mt-2 font-mono">{{ current()?.loss.tailUnknown ? 'unknown' : 'accounted' }}</dd></div></dl>
+      </div>
+      <div class="mt-6"><label for="diagnostic-offset" class="flex gap-4 justify-between text-sm">Recorded time <span class="font-mono" data-replay-offset>{{ offset() }} / {{ duration() }} ms</span></label><input id="diagnostic-offset" type="range" min="0" :max="duration()" step="0.1" x-model.number="offset" class="mt-3 w-full accent-emerald-200"><div class="flex gap-3 mt-3"><button type="button" @click="offset.set(0)" class="px-3 py-2 text-sm border border-neutral-600 rounded">Beginning</button><button type="button" @click="offset.set(duration())" class="px-3 py-2 text-sm border border-neutral-600 rounded">End of recording</button></div></div>
+      <div class="grid gap-8 lg:grid-cols-[1.5fr_1fr] mt-8">
+        <div class="min-w-0"><h2 class="font-semibold text-lg">Runtime at this epoch</h2><dl class="grid gap-5 grid-cols-2 sm:grid-cols-3 mt-5 text-sm"><div><dt class="text-neutral-400">Consumed records</dt><dd class="mt-2 font-mono">{{ replay()?.consumed }}</dd></div><div><dt class="text-neutral-400">Board ticks</dt><dd class="mt-2 font-mono">{{ replay()?.latest?.ticks ?? 'none' }}</dd></div><div><dt class="text-neutral-400">Deadline misses</dt><dd class="mt-2 font-mono">{{ replay()?.latest?.deadlineMisses ?? 'none' }}</dd></div><div><dt class="text-neutral-400">Maximum execution</dt><dd class="mt-2 font-mono">{{ replay()?.latest?.maxExecutionUs ?? 'none' }} us</dd></div><div><dt class="text-neutral-400">Boot segments</dt><dd class="mt-2 font-mono">{{ replay()?.bootSegments }}</dd></div><div><dt class="text-neutral-400">Recorded commands</dt><dd class="mt-2 font-mono">{{ replay()?.commands }}</dd></div></dl>
+          <p class="mt-5 text-neutral-400 text-sm">Observed faults: <span class="font-mono text-neutral-100" data-replay-faults>{{ replay()?.health.join(', ') || 'none at this epoch' }}</span></p>
+          <h3 class="mt-8 text-neutral-400 text-sm">Last 24 records at this epoch</h3><div class="overflow-x-auto mt-3"><table class="w-full text-left text-xs"><thead><tr class="text-neutral-400 border-b border-neutral-700"><th scope="col" class="pr-4 py-3">Seq</th><th scope="col" class="pr-4 py-3">Time / ms</th><th scope="col" class="py-3">Event</th></tr></thead><tbody><tr :for="row in rows()" class="border-b border-neutral-800"><td class="pr-4 py-3 font-mono">{{ row.sequence }}</td><td class="pr-4 py-3 font-mono">{{ row.atMs }}</td><td class="py-3 font-mono">{{ row.event.kind === 'runtime' ? row.event.direction + ' / ' + row.event.frame.kind : row.event.kind === 'health' ? row.event.code : 'board tick' }}</td></tr></tbody></table></div>
+        </div>
+        <aside class="min-w-0"><h2 class="font-semibold text-lg">Recording checks</h2><p class="mt-2 text-neutral-400 text-sm">These checks diagnose the file. Hardware commissioning remains blocked.</p><dl class="mt-5 text-sm"><div :for="check in report()?.checks || []" class="py-3 border-b border-neutral-700"><dt class="flex gap-3 justify-between"><span>{{ check.id }}</span><span class="font-mono">{{ check.state }}</span></dt><dd class="mt-2 break-words text-neutral-400 text-xs">{{ check.detail }}</dd></div></dl>
+          <details class="mt-6"><summary class="text-sm cursor-pointer">Firmware and configuration provenance</summary><dl class="mt-4 space-y-4 text-xs"><div><dt class="text-neutral-400">Firmware SHA-256</dt><dd class="mt-1 break-all font-mono">{{ current()?.header.provenance.firmwareSha256 }}</dd></div><div><dt class="text-neutral-400">Configuration SHA-256</dt><dd class="mt-1 break-all font-mono">{{ current()?.header.provenance.configurationSha256 }}</dd></div><div><dt class="text-neutral-400">Model SHA-256</dt><dd class="mt-1 break-all font-mono">{{ current()?.header.provenance.modelSha256 }}</dd></div><div><dt class="text-neutral-400">Calibration SHA-256</dt><dd class="mt-1 break-all font-mono">{{ current()?.header.provenance.calibrationSha256 }}</dd></div></dl></details>
+        </aside>
+      </div>
+    </div>
+    <p class="mt-10 pt-5 leading-relaxed text-neutral-400 text-xs border-neutral-700 border-t">Runtime-only journals exclude tokens, imagery and location fields. Hashes detect corruption but do not authenticate a sender. This viewer never arms, flashes or commands hardware. Physical crash tests and signed update/rollback remain pending.</p>
+  </section>
+</template>

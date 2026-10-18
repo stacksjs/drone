@@ -72,6 +72,21 @@ Read the [runtime build and bench guide](docs/runtime.md) and [wire contract](do
 The standalone CLI uses the same native Stacks command definitions as Buddy. Runtime commands do
 not flash hardware; physical camera acquisition requires an explicit `--driver imx500`. Keep your Pi 5 for Stacks mission/camera logic; the Pico 2 is a separate bench board.
 
+## Runtime diagnostics and replay
+
+Issue #9 adds bounded private journals of the native host runtime, explicit loss accounting,
+verified crash-prefix recovery, provenance and offline replay through CLI and `/diagnostics`.
+
+```sh
+./buddy diagnostics:record --ticks 1000 --fault deadline --output /tmp/new-runtime-recording
+./buddy diagnostics:replay /tmp/new-runtime-recording/journal.ndjson
+./buddy diagnostics:inspect /tmp/new-runtime-recording/journal.ndjson
+```
+
+The viewer opens files locally in the browser. The v1 format excludes imagery, location and
+operator tokens. See [diagnostics, durability and remaining acceptance](docs/diagnostics.md).
+Physical logging/commissioning and signed firmware update/rollback remain pending.
+
 ## Sensor acquisition and replay
 
 Issue #3 adds a separate Pico 2 sensor image for ICM-42688-P, BMP280 and u-blox NAV-PVT,

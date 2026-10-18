@@ -258,6 +258,23 @@
     "nativeDependencies": [
       2,
       3
+    ],
+    "implementationStatus": "in-progress",
+    "evidence": [
+      "resources/functions/drone/diagnostics/",
+      "resources/functions/drone/runtime/bench.ts",
+      "app/Commands/DiagnosticsRecord.ts",
+      "resources/components/DiagnosticsReplay.stx",
+      "docs/diagnostics.md",
+      "public/diagnostics/runtime-deadline.ndjson",
+      "tests/unit/diagnostics.test.ts"
+    ],
+    "remaining": [
+      "Live runtime/sensor/estimator/authority/mission/payload correlation and measured clock relations",
+      "Physical crash, reset cause, power loss, ENOSPC/EDQUOT and electrical storage fault evidence",
+      "Measured board logging deadlines, memory, rotation and long-mission retention",
+      "Signed firmware updates, trust/key lifecycle, anti-rollback and known-good recovery slot",
+      "Commissioning workflow backed by independent physical interlock, calibration and recovery evidence"
     ]
   },
   {

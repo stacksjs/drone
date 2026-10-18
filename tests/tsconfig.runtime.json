@@ -23,6 +23,9 @@
     "./unit/sensors.test.ts",
     "../resources/functions/drone/payloads/**/*.ts",
     "./unit/payloads.test.ts",
-    "./fixtures/payloads/**/*.ts"
+    "./fixtures/payloads/**/*.ts",
+    "../resources/functions/drone/diagnostics/**/*.ts",
+    "./unit/diagnostics.test.ts",
+    "./fixtures/diagnostics/**/*.ts"
   ]
 }

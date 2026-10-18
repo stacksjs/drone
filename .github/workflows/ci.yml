@@ -45,6 +45,12 @@ jobs:
         working-directory: ${{ runner.temp }}
       - run: $GITHUB_WORKSPACE/storage/runtime-build/cli/drone payloads:capture --driver replay --output "$RUNNER_TEMP/payload-capture"
         working-directory: ${{ runner.temp }}
+      - run: $GITHUB_WORKSPACE/storage/runtime-build/cli/drone diagnostics:record --project "$GITHUB_WORKSPACE" --ticks 20 --fault deadline --output "$RUNNER_TEMP/runtime-recording"
+        working-directory: ${{ runner.temp }}
+      - run: $GITHUB_WORKSPACE/storage/runtime-build/cli/drone diagnostics:replay "$RUNNER_TEMP/runtime-recording/journal.ndjson"
+        working-directory: ${{ runner.temp }}
+      - run: $GITHUB_WORKSPACE/storage/runtime-build/cli/drone diagnostics:export "$RUNNER_TEMP/runtime-recording/journal.ndjson" --output "$RUNNER_TEMP/runtime-export"
+        working-directory: ${{ runner.temp }}
   firmware:
     runs-on: ubuntu-latest
     steps:

@@ -109,3 +109,8 @@ separation between scripted UDP conformance, firmware SITL and physical evidence
 per-command clock synchronization, no automatic shutter retry and capture-epoch pose association.
 Native Stacks [payload commands](payloads.md) expose replay and explicit Pi acquisition. Bus
 contracts remain configuration only; payloads cannot bypass the flight authority supervisor.
+
+[ADR 9](adr/0009-runtime-diagnostics.md) records bounded runtime-only journals with typed events,
+provenance digests, loss accounting and crash-prefix recovery. Native Stacks commands and a local
+[stx viewer](diagnostics.md) share the pure verifier/replay projection. No replay path has a
+vehicle transport, update/flash capability or runtime authority.
