@@ -14,7 +14,7 @@ export function runVehicleSimulation(profileInput: VehicleProfile, options: { sc
   const { plan, worstCaseMs, requiredWh } = validateVehicleMission(profileInput.mission)
   if (profileInput.vehicle !== plan.vehicle || plan.origin.latitudeDeg !== 0 || plan.origin.longitudeDeg !== 0 || plan.origin.ellipsoidHeightM !== 100) throw new TypeError('Vehicle fixture requires its declared 0,0,100 WGS84 origin')
   const actuators = structuredClone(profileInput.actuators), fence = structuredClone(profileInput.authorityFence)
-  const engine = createVehicleMissionEngine(plan), plant = profileInput.createPlant(), controller = profileInput.createController(), payload = profileInput.createPayload?.()
+  const engine = createVehicleMissionEngine(plan), plant = profileInput.createPlant(), controller = profileInput.createController()
   const supervisor = createVehicleAuthoritySupervisor({ bootId: 55n, sessionId: 123n, vehicle: profileInput.vehicle, actuators, fence })
   const board = createVehicleOutputWatchdog({ bootId: 55n, sessionId: 123n, vehicle: profileInput.vehicle, actuators })
   const feed = createPhysicsSensorFeed(0), estimator = createEstimator({ origin: plan.origin, gravityCorrection: 'initialization-only' })
@@ -27,6 +27,7 @@ export function runVehicleSimulation(profileInput: VehicleProfile, options: { sc
   const path: { atMs: number, positionM: SensorVector | null, truthPositionM: SensorVector, mission: typeof mission, measurement: VehicleMeasurement | null, measurementPose: VehicleMeasurementPose | null, actuators: number[] }[] = []
   const transitions: { atMs: number, state: string, taskId: string, reason: string }[] = []
   let previousState = '', previousTask = ''
+  const payload = profileInput.createPayload?.()
   try {
     for (let nowMs = 0; nowMs <= seconds * 1000; nowMs += 4) {
       const faults = profileInput.faults(scenario, nowMs), boardState = board.tick(nowMs)
