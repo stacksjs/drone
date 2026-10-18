@@ -16,7 +16,7 @@ export function airAerodynamics(relativeBodyMps: SensorVector, rateRadS: SensorV
   if (!validVector(relativeBodyMps) || !validVector(rateRadS)) throw new RangeError('Invalid aerodynamic vector')
   validateAirActuators(actuators)
   const [u, v, w] = relativeBodyMps
-  const speedMps = Math.hypot(u, v, w), alphaRad = Math.atan2(w, Math.max(0.1, u)), betaRad = Math.atan2(v, Math.hypot(u, w))
+  const speedMps = Math.hypot(u, v, w), alphaRad = Math.atan2(w, u), betaRad = Math.atan2(v, Math.hypot(u, w))
   const dynamicPressurePa = 0.5 * airModel.densityKgM3 * speedMps ** 2
   const linearLift = 0.25 + 4.8 * alphaRad
   // Bounded post-stall loss, retaining drag. No claim of dynamic stall or spin modeling.

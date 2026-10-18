@@ -6,7 +6,7 @@ const vector = (v: unknown): v is number[] => Array.isArray(v) && v.length === 3
 export function createAirController(): VehicleController {
   let lastNow = -Infinity, lastSequence = -1, lastCaptured = -Infinity, signature = '', reference: string | null = null, fault = ''
   let hasFlown = false, lastTask = '', landingContact = false
-  let loiterCenter: number[] | null = null
+  let loiterCenter: number[] | null = null, landingHeading: number | null = null
   function output(c: VehicleControllerContext, a: number[], reason: string, inhibited = false): VehicleControlOutput { return { kind: 'simulated-vehicle-control', vehicle: 'fixed-wing', atMs: c.nowMs, actuators: [...a], inhibited, reason, physicalFlightEnabled: false, boardOutputsInhibited: true } }
   function qualify(c: VehicleControllerContext, m: VehicleMeasurement | null) {
     if (!m || m.version !== 1 || m.evidence !== 'modeled-vehicle-sensors' || m.vehicle !== 'fixed-wing' || !Number.isSafeInteger(m.sequence) || m.sequence < 1 || !Number.isFinite(m.capturedAtMs) || !Number.isFinite(m.receivedAtMs) || m.capturedAtMs > m.receivedAtMs || m.receivedAtMs > c.nowMs || c.nowMs - m.capturedAtMs > 160 || m.receivedAtMs - m.capturedAtMs !== 60) return false
@@ -34,16 +34,23 @@ export function createAirController(): VehicleController {
       if (speed > airModel.maximumMps || (!contact && hasFlown && (speed < airModel.minimumMps || Math.abs(alpha) > airModel.stallAlphaRad + 0.03)) || Math.abs(roll!) > 0.9 || Math.abs(pitch!) > 0.65) fault = 'air-flight-envelope'
       if (fault) return output(c, [0, 0, 0, 0, 1], fault, true)
       const landing = c.mission.taskKind === 'land' || c.mission.taskKind === 'stop'
-      if (c.mission.taskId !== lastTask) { landingContact = false; lastTask = c.mission.taskId }
+      if (c.mission.taskId !== lastTask) { landingContact = false; landingHeading = null; lastTask = c.mission.taskId }
       if (landing && contact && hasFlown) landingContact = true
       if (landingContact) return output(c, [0, clamp(-roll! * 1.4 - rates[0]! * 0.25, -0.4, 0.4), clamp(-pitch! * 1.4 - rates[1]! * 0.25, -0.4, 0.4), 0, 1], 'landing-rollout')
       const paused = c.mission.state === 'paused'
+      if (paused && contact) return output(c, [0, 0, 0, 0, 1], 'runway-paused')
       if (paused && !loiterCenter) loiterCenter = [position[0]! - 45 * Math.sin(yaw!), position[1]! + 45 * Math.cos(yaw!), position[2]!]
       if (!paused) loiterCenter = null
       const goal = paused ? loiterCenter : c.mission.targetM
       if (!goal || !vector(goal)) return output(c, [0, 0, 0, 0, 1], 'air-mission-target-missing', true)
       const dx = goal[0]! - position[0]!, dy = goal[1]! - position[1]!, distance = Math.hypot(dx, dy)
-      let desiredHeading = Math.atan2(dy, dx)
+      let desiredHeading = Math.atan2(dy, dx), approachRemaining = distance
+      if (landing) {
+        landingHeading ??= desiredHeading
+        approachRemaining = Math.max(0, dx * Math.cos(landingHeading) + dy * Math.sin(landingHeading))
+        const crossTrack = -dx * Math.sin(landingHeading) + dy * Math.cos(landingHeading)
+        desiredHeading = landingHeading + clamp(Math.atan2(crossTrack, Math.max(30, approachRemaining)), -0.3, 0.3)
+      }
       if (paused || c.mission.taskKind === 'loiter') {
         const radial = Math.atan2(position[1]! - goal[1]!, position[0]! - goal[0]!)
         desiredHeading = radial + Math.PI / 2 + Math.atan2(distance - 45, 30)
@@ -52,8 +59,8 @@ export function createAirController(): VehicleController {
       const bankTarget = contact ? 0 : clamp(wrap(desiredHeading - groundCourse) * 1.2, -0.5, 0.5)
       const targetSpeed = landing ? 10.5 : airModel.cruiseMps
       let desiredDown = goal[2]!
-      if (landing) desiredDown = -Math.min(20, distance * 0.055)
-      const climbTarget = clamp((position[2]! - desiredDown) * 0.12, -1.5, 1.8)
+      if (landing) desiredDown = 0.25 - Math.min(20, approachRemaining * 0.055)
+      const climbTarget = clamp((position[2]! - desiredDown) * (landing ? 0.35 : 0.12) - (landing ? targetSpeed * 0.055 : 0), -1.5, 1.8)
       const targetLiftCoefficient = airModel.massKg * airModel.gravityMps2 / Math.max(10, 0.5 * airModel.densityKgM3 * speed ** 2 * airModel.areaM2 * Math.cos(bankTarget))
       const trimAlpha = clamp((targetLiftCoefficient - 0.25) / 4.8, -0.04, 0.12)
       let pitchTarget = clamp(climbTarget / Math.max(8, speed) + trimAlpha, -0.14, 0.22)

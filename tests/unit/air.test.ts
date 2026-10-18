@@ -96,3 +96,25 @@ test('malformed estimator attitude cannot produce nonfinite actuator commands', 
   expect(result.inhibited).toBe(true)
   expect(result.actuators.every(Number.isFinite)).toBe(true)
 })
+
+test('reverse relative airflow is outside the declared normal-flight alpha envelope', () => {
+  expect(Math.abs(airAerodynamics([-10, 0, 0], [0, 0, 0], [0, 0, 0, 0, 0]).alphaRad)).toBeCloseTo(Math.PI, 8)
+})
+
+test('pausing before takeoff holds the runway with brakes instead of launching', () => {
+  const context = airContext(); context.mission.state = 'paused'; context.measurement!.values.onSurface = true; context.measurement!.values.stopped = true
+  context.measurement!.values.airspeedMps = 0; context.measurement!.values.differentialPressurePa = 0
+  const output = createAirController().step(context)
+  expect(output.actuators).toEqual([0, 0, 0, 0, 1])
+  expect(output.reason).toBe('runway-paused')
+})
+
+test('landing follows its captured runway heading through goal overshoot instead of commanding a turnback', () => {
+  const controller = createAirController(), context = airContext()
+  context.mission.taskId = 'land'; context.mission.taskKind = 'land'; context.mission.targetM = [650, 0, 0]
+  context.estimate.localPosition!.positionM = [600, 0, -3]
+  expect(controller.step(context).inhibited).toBe(false)
+  context.nowMs += 20; context.estimate.nowMs += 20; context.estimate.localPosition!.predictedToMs += 20
+  context.estimate.localPosition!.positionM = [655, 0, -1]
+  expect(Math.abs(controller.step(context).actuators[1]!)).toBeLessThan(0.01)
+})
