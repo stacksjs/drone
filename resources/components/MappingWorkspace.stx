@@ -1,0 +1,134 @@
+<script client>
+import type { SurveyScenario } from '../functions/drone/mapping/runtime'
+import type { SurveyPoint, SurveyRun } from '../functions/drone/mapping/types'
+import { simulateSurvey, surveyScenarios } from '../functions/drone/mapping/runtime'
+import { surveyQuality } from '../functions/drone/mapping/quality'
+const scenario = state<SurveyScenario>('nominal')
+const resultScenario = state<SurveyScenario | null>(null)
+const result = state<SurveyRun | null>(null)
+const busy = state(false)
+const error = state('')
+const rowIndex = state(0)
+const recording = derived(() => resultScenario() === scenario() ? result() : null)
+const validIndex = derived(() => Number.isInteger(rowIndex()) && rowIndex() >= 0 && rowIndex() < (recording()?.path.length ?? 1))
+const rows = derived(() => recording()?.path.slice(0, (validIndex() ? rowIndex() : 0) + 1) ?? [])
+const current = derived(() => rows().at(-1) ?? null)
+const captures = derived(() => recording()?.captures.filter(capture => capture.acknowledgedAtMs <= (current()?.atMs ?? -1)) ?? [])
+const latestCapture = derived(() => captures().at(-1) ?? null)
+const quality = derived(() => { const run = recording(); return run ? surveyQuality(run) : null })
+const atEnd = derived(() => !!recording() && validIndex() && rowIndex() === recording()!.path.length - 1)
+const transitions = derived(() => rows().filter((row, index, all) => index === 0 || row.state !== all[index - 1]?.state || row.taskId !== all[index - 1]?.taskId).slice(-6))
+const plotExtent = derived(() => {
+  const plan = recording()?.plan
+  if (!plan) return { north: 0, east: 0, span: 1 }
+  const points = [...plan.config.boundary, ...plan.lanes.flatMap(lane => [[lane.fromM[0], lane.fromM[1]], [lane.toM[0], lane.toM[1]]]), [0, 0]]
+  const north = points.map(point => point[0]!), east = points.map(point => point[1]!)
+  const span = Math.max(1, Math.max(...north) - Math.min(...north), Math.max(...east) - Math.min(...east)) + Math.max(plan.footprintM.along, plan.footprintM.across) * 2
+  return { north: (Math.max(...north) + Math.min(...north)) / 2, east: (Math.max(...east) + Math.min(...east)) / 2, span }
+})
+function plotPoint(point: number[]) {
+  const extent = plotExtent()
+  return `${180 + (point[1]! - extent.east) / extent.span * 280},${180 - (point[0]! - extent.north) / extent.span * 280}`
+}
+function polygon(points: SurveyPoint[]) { return points.map(plotPoint).join(' ') }
+function track() { return rows().flatMap(row => row.positionM ? [plotPoint(row.positionM)] : []).join(' ') }
+function vector(value: number[] | null | undefined) { return value ? value.map(n => n.toFixed(2)).join(', ') : 'unavailable' }
+const computation = useTimeout(() => {
+  const selected = scenario()
+  try {
+    const completed = simulateSurvey({ scenario: selected })
+    resultScenario.set(selected)
+    result.set(completed)
+    void nextTick(() => { if (result() === completed) rowIndex.set(completed.path.length - 1) })
+  }
+  catch (failure) { error.set(failure instanceof Error ? failure.message : 'Survey simulation failed') }
+  finally { busy.set(false) }
+}, 32)
+computation.stop()
+onDestroy(() => computation.stop())
+effect(() => { scenario(); computation.stop(); result.set(null); resultScenario.set(null); busy.set(false); error.set(''); rowIndex.set(0) })
+function execute() { result.set(null); resultScenario.set(null); error.set(''); rowIndex.set(0); busy.set(true); computation.start() }
+function clear() { computation.stop(); result.set(null); resultScenario.set(null); busy.set(false); error.set(''); rowIndex.set(0) }
+</script>
+<template>
+  <section aria-labelledby="mapping-title" :aria-busy="busy()">
+    <h1 id="mapping-title" class="font-semibold text-3xl tracking-tight">Aerial survey collection</h1>
+    <p class="mt-3 max-w-3xl leading-relaxed text-neutral-400">Inspect clipped survey lanes, exposure records and estimated camera footprints on the owned mission runtime.</p>
+    <p class="mt-3 text-emerald-200 text-sm">Synthetic collection only. Reconstruction has not been performed. Physical outputs remain inhibited.</p>
+    <div class="flex flex-wrap gap-4 items-end mt-8">
+      <div><label for="mapping-scenario" class="block mb-2 text-sm">Operator scenario</label><select id="mapping-scenario" x-model="scenario" class="px-3 py-3 max-w-full text-neutral-100 bg-neutral-900 border border-neutral-600 rounded focus-visible:outline-emerald-200"><option :for="name in surveyScenarios" :value="name">{{ name }}</option></select></div>
+      <button type="button" @click="execute()" :disabled="busy()" class="px-4 py-3 font-medium text-neutral-950 bg-emerald-200 rounded focus-visible:outline-emerald-200 focus-visible:outline-offset-4 disabled:opacity-60">{{ busy() ? 'Recording…' : 'Run survey scenario' }}</button>
+      <button type="button" @click="clear()" class="px-4 py-3 text-sm border border-neutral-600 rounded focus-visible:outline-emerald-200 focus-visible:outline-offset-4">Clear recording</button>
+    </div>
+    <p :if="busy()" role="status" class="mt-5 text-emerald-200 text-sm">Running the owned sensor, estimator, authority, controls and camera collection loops.</p>
+    <p :if="error()" role="alert" class="mt-5 p-4 text-red-200 border border-red-400 rounded">{{ error() }}</p>
+    <p :if="!recording() && !busy() && !error()" class="mt-7 py-5 text-neutral-400 border-neutral-700 border-t">No recording yet. Choose a survey or inject a collection fault to inspect its recorded outcome.</p>
+    <div :if="recording()" class="grid gap-8 lg:grid-cols-[1fr_1.5fr] mt-9">
+      <aside class="min-w-0">
+        <h2 class="font-semibold text-lg">Survey plan</h2>
+        <p class="mt-3 break-all font-mono text-neutral-400 text-xs">{{ recording()?.plan.config.id }}</p>
+        <dl class="grid gap-5 grid-cols-2 mt-5 text-sm">
+          <div><dt class="text-neutral-400">Area of interest</dt><dd class="mt-1">{{ recording()?.plan.areaM2.toFixed(2) }} m²</dd></div>
+          <div><dt class="text-neutral-400">Survey lanes</dt><dd class="mt-1">{{ recording()?.plan.lanes.length }}{{ recording()?.plan.config.crosshatch ? ' / crosshatch' : '' }}</dd></div>
+          <div><dt class="text-neutral-400">Nominal AGL</dt><dd class="mt-1">{{ recording()?.plan.config.altitudeAglM.toFixed(2) }} m</dd></div>
+          <div><dt class="text-neutral-400">Planned GSD bound</dt><dd class="mt-1">{{ ((recording()?.plan.gsdM ?? 0) * 100).toFixed(2) }} cm/pixel</dd></div>
+          <div><dt class="text-neutral-400">Front / side overlap</dt><dd class="mt-1">{{ ((recording()?.plan.config.overlap.front ?? 0) * 100).toFixed(0) }}% / {{ ((recording()?.plan.config.overlap.side ?? 0) * 100).toFixed(0) }}%</dd></div>
+          <div><dt class="text-neutral-400">Minimum trigger interval</dt><dd class="mt-1">{{ recording()?.plan.config.minTriggerIntervalMs }} ms</dd></div>
+          <div><dt class="text-neutral-400">Capture spacing</dt><dd class="mt-1">{{ recording()?.plan.captureSpacingM.toFixed(2) }} m</dd></div>
+          <div><dt class="text-neutral-400">Plan duration estimate</dt><dd class="mt-1">{{ recording()?.plan.estimatedSeconds.toFixed(1) }} s</dd></div>
+          <div><dt class="text-neutral-400">Energy estimate</dt><dd class="mt-1">{{ recording()?.plan.requiredWh.toFixed(2) }} Wh</dd></div>
+          <div><dt class="text-neutral-400">Terrain N / E gradient</dt><dd class="mt-1">{{ vector(recording()?.plan.config.terrain.gradient) }}</dd></div>
+        </dl>
+        <p class="mt-5 leading-relaxed text-neutral-400 text-sm">The area of interest and its holes clip imaging lanes. They are not flight exclusion zones. Transit segments and image footprints may extend beyond them inside the mission fence.</p>
+        <h3 class="mt-7 font-semibold text-sm">Collection evidence</h3>
+        <p class="mt-3 leading-relaxed text-neutral-400 text-sm">Capture poses use the owned estimator, camera lever arm and an assumed initial north alignment. Absolute heading is not observed. The calibration and geotags are synthetic.</p>
+        <dl class="grid gap-3 grid-cols-2 mt-4 text-sm"><div><dt class="text-neutral-400">RTK</dt><dd class="mt-1">Unavailable</dd></div><div><dt class="text-neutral-400">PPK</dt><dd class="mt-1">Unavailable</dd></div><div><dt class="text-neutral-400">Surveyed GCPs</dt><dd class="mt-1">Unavailable</dd></div><div><dt class="text-neutral-400">Reconstruction</dt><dd class="mt-1">Not performed</dd></div></dl>
+        <p class="mt-5 break-all font-mono text-neutral-400 text-xs">Calibration: {{ recording()?.plan.config.calibration.id }}</p>
+        <a href="https://github.com/stacksjs/drone/blob/main/docs/mapping.md" class="inline-block mt-5 text-emerald-200 text-sm underline underline-offset-4">Collection, export and remaining survey evidence</a>
+      </aside>
+      <div class="min-w-0">
+        <h2 class="font-semibold text-lg">Planned lanes and recorded collection</h2>
+        <svg width="360" height="360" viewBox="0 0 360 360" role="img" aria-label="North-up survey plot of planned boundary and lanes, estimated flight track, and acknowledged exposure footprints" class="mt-4 max-h-96 w-full bg-neutral-900 border border-neutral-700 rounded">
+          <text x="180" y="18" text-anchor="middle" fill="#a3a3a3" font-size="11">North</text><text x="340" y="184" text-anchor="middle" fill="#a3a3a3" font-size="11">East</text>
+          <polygon :points="polygon(recording()?.plan.config.boundary ?? [])" fill="#262626" stroke="#a3a3a3" stroke-width="1.5" />
+          <polygon :for="hole in recording()?.plan.config.holes ?? []" :points="polygon(hole)" fill="#171717" stroke="#a3a3a3" stroke-width="1" stroke-dasharray="3 3" />
+          <polyline :for="lane in recording()?.plan.lanes ?? []" :points="plotPoint(lane.fromM) + ' ' + plotPoint(lane.toM)" fill="none" stroke="#737373" stroke-width="1.5" stroke-dasharray="4 4" />
+          <polygon :for="capture in captures()" :points="polygon(capture.footprintM)" fill="none" stroke="#fde68a" stroke-width="1" opacity="0.55" />
+          <polyline :points="track()" fill="none" stroke="#a7f3d0" stroke-width="2" />
+        </svg>
+        <p class="mt-2 text-neutral-400 text-xs">{{ plotExtent().span.toFixed(1) }} m square extent, north up. Grey: plan. Emerald: vehicle estimate. Amber: acknowledged exposure footprints from estimated camera poses.</p>
+        <label for="mapping-row" class="flex flex-wrap gap-3 justify-between mt-7 text-sm">Recorded fixture time <span class="font-mono">{{ current()?.atMs }} ms</span></label>
+        <input id="mapping-row" type="range" min="0" :max="(recording()?.path.length || 1) - 1" step="1" x-model.number="rowIndex" class="mt-3 w-full accent-emerald-200">
+        <div class="flex flex-wrap gap-3 mt-3"><button type="button" @click="rowIndex.set(0)" class="px-3 py-2 text-sm border border-neutral-600 rounded focus-visible:outline-emerald-200">Beginning</button><button type="button" @click="rowIndex.set((recording()?.path.length || 1) - 1)" class="px-3 py-2 text-sm border border-neutral-600 rounded focus-visible:outline-emerald-200">End of recording</button></div>
+        <dl class="grid gap-5 grid-cols-2 mt-7 text-sm">
+          <div><dt class="text-neutral-400">Recorded mission state</dt><dd class="mt-2 font-mono text-lg" data-mapping-state>{{ current()?.state }}</dd></div>
+          <div><dt class="text-neutral-400">Acknowledged photos</dt><dd class="mt-2 font-mono" data-mapping-captures>{{ captures().length }} / {{ recording()?.plan.estimatedPhotos }} estimated</dd></div>
+        </dl>
+        <p class="mt-3 break-all font-mono text-neutral-400 text-xs">Active task: {{ current()?.taskId }}</p>
+        <p class="mt-2 break-words font-mono text-neutral-400 text-xs">Estimated N/E/D: {{ vector(current()?.positionM) }} m</p>
+        <p :if="atEnd()" class="mt-4 break-words font-mono text-xs" data-mapping-outcome>Recording outcome: {{ recording()?.status }} / {{ recording()?.reason }}. Modeled board neutral: {{ recording()?.boardNeutral ? 'yes' : 'no' }}.</p>
+        <p :if="!atEnd()" class="mt-4 text-neutral-400 text-xs">Later exposure records and the final outcome are withheld during playback.</p>
+        <div :if="atEnd()" class="mt-7 pt-5 border-neutral-700 border-t">
+          <h3 class="font-semibold text-sm">Collection quality report</h3>
+          <p class="mt-3 font-mono text-emerald-200 text-xs" data-mapping-quality>{{ quality()?.status }}</p>
+          <dl class="grid gap-4 grid-cols-2 mt-4 text-sm"><div><dt class="text-neutral-400">Sampled area covered</dt><dd class="mt-1">{{ quality()?.observed.coverage.coveredFraction === null ? 'unavailable' : ((quality()?.observed.coverage.coveredFraction ?? 0) * 100).toFixed(1) + '%' }}</dd></div><div><dt class="text-neutral-400">Spacing gaps</dt><dd class="mt-1">{{ quality()?.observed.lanes.filter(lane => lane.plannedSpacingExceeded).length }} lanes</dd></div></dl>
+          <p class="mt-3 text-neutral-400 text-xs">Coverage samples estimated footprints on the declared terrain plane. It does not measure image registration or reconstructed surface accuracy.</p>
+          <ul :if="quality()?.issues.length" class="mt-3 space-y-2 text-amber-200 text-xs"><li :for="issue in quality()?.issues ?? []" class="break-words">{{ issue }}</li></ul>
+        </div>
+        <div :if="latestCapture()" class="mt-7 pt-5 border-neutral-700 border-t">
+          <h3 class="font-semibold text-sm">Latest acknowledged exposure</h3>
+          <p class="mt-3 break-all font-mono text-emerald-200 text-xs" data-mapping-photo>{{ latestCapture()?.filename }} / {{ latestCapture()?.laneId }}</p>
+          <p class="mt-2 break-all font-mono text-neutral-400 text-xs">{{ latestCapture()?.width }} × {{ latestCapture()?.height }} pixels / {{ latestCapture()?.exposureTimeUs }} µs exposure</p>
+          <p class="mt-2 break-words font-mono text-neutral-400 text-xs">Exposure: {{ latestCapture()?.capturedAtMs }} ms. Ack: {{ latestCapture()?.acknowledgedAtMs }} ms. Clock uncertainty: {{ latestCapture()?.clockUncertaintyMs }} ms.</p>
+          <p class="mt-2 break-words font-mono text-neutral-400 text-xs">Camera position sigma: {{ latestCapture()?.pose.positionSigmaM.toFixed(3) }} m</p>
+          <p class="mt-2 break-all font-mono text-neutral-400 text-xs">Pose reference: {{ latestCapture()?.pose.reference }}</p>
+          <p class="mt-3 text-neutral-400 text-xs">Times use a fixture monotonic clock, not UTC. The exported dataset contains image pixels and per-exposure pose/calibration metadata.</p>
+        </div>
+        <p :if="!latestCapture()" class="mt-7 text-neutral-400 text-sm">No acknowledged image at this playback time.</p>
+        <h3 class="mt-7 font-semibold text-sm">Recorded mission transitions</h3>
+        <ol class="mt-3 space-y-3 text-xs"><li :for="row in transitions()" class="break-words"><span class="font-mono text-emerald-200">{{ row.atMs }} ms / {{ row.state }}</span><span class="block mt-1 text-neutral-400">{{ row.taskId }}</span></li></ol>
+        <p class="mt-5 leading-relaxed text-neutral-400 text-xs">A collection fault latches loss and releases modeled thrust. A neutral board after an airborne abort does not establish a safe landing. Survey accuracy needs measured calibration and field evidence.</p>
+      </div>
+    </div>
+  </section>
+</template>
