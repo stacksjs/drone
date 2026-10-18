@@ -1,0 +1,186 @@
+<script client>
+import type { VolumePoint, VolumeReport, VolumeRequest, VolumeXY } from '../functions/drone/volumes/types'
+import type { VolumeScenario } from '../functions/drone/volumes/fixtures'
+import { processStockpile } from '../functions/drone/volumes/engine'
+import { exampleVolumeRequest, volumeScenarios } from '../functions/drone/volumes/fixtures'
+const scenario = state<VolumeScenario>('pyramid')
+const resultScenario = state<VolumeScenario | null>(null)
+const request = state<VolumeRequest | null>(null)
+const result = state<VolumeReport | null>(null)
+const busy = state(false)
+const error = state('')
+const page = state(0)
+const report = derived(() => resultScenario() === scenario() ? result() : null)
+const source = derived(() => report() ? request() : null)
+const pages = derived(() => Math.max(1, Math.ceil((report()?.integrationPieces.length ?? 0) / 12)))
+const pieces = derived(() => report()?.integrationPieces.slice(page() * 12, page() * 12 + 12) ?? [])
+const extent = derived(() => {
+  const points = source()?.boundary.outer ?? [[0, 0], [1, 1]]
+  const east = points.map(point => point[0]), north = points.map(point => point[1])
+  return { east: (Math.max(...east) + Math.min(...east)) / 2, north: (Math.max(...north) + Math.min(...north)) / 2, span: Math.max(1, Math.max(...east) - Math.min(...east), Math.max(...north) - Math.min(...north)) * 1.22 }
+})
+function plotPoint(point: number[]) {
+  const bounds = extent()
+  return `${180 + (point[0]! - bounds.east) / bounds.span * 300},${180 - (point[1]! - bounds.north) / bounds.span * 300}`
+}
+function polygon(points: number[][]) { return points.map(plotPoint).join(' ') }
+function ringPath(points: VolumeXY[]) { return points.length ? `M${points.map(plotPoint).join(' L')} Z` : '' }
+const boundaryPath = derived(() => {
+  const boundary = source()?.boundary
+  return boundary ? [boundary.outer, ...boundary.holes].map(ringPath).join(' ') : ''
+})
+function baseElevation(point: number[]) {
+  const base = source()?.base
+  return base ? base.anchorM[2] + base.gradientEast * (point[0]! - base.anchorM[0]) + base.gradientNorth * (point[1]! - base.anchorM[1]) : 0
+}
+const facets = derived(() => {
+  const geometry = source()?.surface.geometry
+  if (!geometry) return []
+  const polygons: { id: string, points: VolumePoint[], deltaM: number }[] = []
+  if (geometry.kind === 'tin') {
+    for (let index = 0; index < geometry.triangles.length; index++) {
+      const points = geometry.triangles[index]!.map(vertex => geometry.vertices[vertex]!)
+      polygons.push({ id: `triangle-${index}`, points, deltaM: points.reduce((sum, point) => sum + point[2] - baseElevation(point), 0) / 3 })
+    }
+  }
+  else {
+    for (let row = 0; row < geometry.height; row++) {
+      for (let column = 0; column < geometry.width; column++) {
+        const elevation = geometry.rows[row]![column]
+        if (elevation === null || elevation === undefined) continue
+        const east = geometry.westM + column * geometry.cellSizeM
+        const north = geometry.southM + (geometry.height - row - 1) * geometry.cellSizeM
+        const points: VolumePoint[] = [[east, north, elevation], [east + geometry.cellSizeM, north, elevation], [east + geometry.cellSizeM, north + geometry.cellSizeM, elevation], [east, north + geometry.cellSizeM, elevation]]
+        polygons.push({ id: `cell-${row}-${column}`, points, deltaM: elevation - baseElevation([east + geometry.cellSizeM / 2, north + geometry.cellSizeM / 2]) })
+      }
+    }
+  }
+  return polygons
+})
+const colorScale = derived(() => Math.max(0.001, ...facets().map(facet => Math.abs(facet.deltaM))))
+function facetColor(delta: number) {
+  const strength = Math.min(1, Math.abs(delta) / colorScale())
+  return delta < -0.000001 ? `rgb(${Math.round(80 + strength * 150)} ${Math.round(65 + strength * 90)} 50)` : `rgb(35 ${Math.round(65 + strength * 125)} ${Math.round(55 + strength * 85)})`
+}
+function quantity(value: number | null | undefined, unit = 'm³') { return value === null || value === undefined ? 'unavailable' : `${value.toFixed(3)} ${unit}` }
+function vector(value: number[] | undefined) { return value ? value.map(component => component.toFixed(3)).join(', ') : 'unavailable' }
+const computation = useTimeout(() => {
+  const selected = scenario()
+  try {
+    const input = exampleVolumeRequest(selected)
+    const completed = processStockpile(input)
+    request.set(input)
+    resultScenario.set(selected)
+    result.set(completed)
+  }
+  catch (failure) { error.set(failure instanceof Error ? failure.message : 'Volume processing failed') }
+  finally { busy.set(false) }
+}, 32)
+computation.stop()
+onDestroy(() => computation.stop())
+function clear() { computation.stop(); result.set(null); request.set(null); resultScenario.set(null); busy.set(false); error.set(''); page.set(0) }
+effect(() => { scenario(); clear() })
+function execute() { clear(); busy.set(true); computation.start() }
+</script>
+<template>
+  <section aria-labelledby="volumes-title" :aria-busy="busy()">
+    <h1 id="volumes-title" class="font-semibold text-3xl tracking-tight">Stockpile volume analysis</h1>
+    <p class="mt-3 max-w-3xl leading-relaxed text-neutral-400">Integrate a known surface against an explicit base and inspect the boundary, missing coverage and contribution audit.</p>
+    <p class="mt-3 text-emerald-200 text-sm">Analytic examples only. No acquisition, reconstruction or physical accuracy validation is performed.</p>
+    <div class="flex flex-wrap gap-4 items-end mt-8">
+      <div class="min-w-0"><label for="volume-scenario" class="block mb-2 text-sm">Analysis example</label><select id="volume-scenario" x-model="scenario" class="px-3 py-3 max-w-full text-neutral-100 bg-neutral-900 border border-neutral-600 rounded focus-visible:outline-emerald-200"><option :for="name in volumeScenarios" :value="name">{{ name }}</option></select></div>
+      <button type="button" @click="execute()" :disabled="busy()" class="px-4 py-3 font-medium text-neutral-950 bg-emerald-200 rounded focus-visible:outline-emerald-200 focus-visible:outline-offset-4 disabled:opacity-60">{{ busy() ? 'Processing…' : 'Process known surface' }}</button>
+      <button type="button" @click="clear()" class="px-4 py-3 text-sm border border-neutral-600 rounded focus-visible:outline-emerald-200 focus-visible:outline-offset-4">Clear analysis</button>
+    </div>
+    <p :if="busy()" role="status" class="mt-5 text-emerald-200 text-sm">Clipping the known surface and integrating above and below the declared base.</p>
+    <p :if="error()" role="alert" class="mt-5 p-4 break-words text-red-200 border border-red-400 rounded">{{ error() }}</p>
+    <p :if="!report() && !busy() && !error()" class="mt-7 py-5 text-neutral-400 border-neutral-700 border-t">No analysis yet. Choose an example to inspect exact surface integration and its evidence limits.</p>
+    <div :if="report()" class="mt-9">
+      <div class="grid gap-8 lg:grid-cols-[1fr_1.3fr]">
+        <aside class="min-w-0">
+          <h2 class="font-semibold text-lg">Covered-domain result</h2>
+          <p class="mt-3 break-words font-mono text-emerald-200 text-sm" data-volume-status>{{ report()?.status }} / {{ report()?.evidence }}</p>
+          <dl class="grid gap-5 grid-cols-2 mt-5 text-sm">
+            <div><dt class="text-neutral-400">Above base</dt><dd class="mt-2 font-mono" data-volume-above>{{ quantity(report()?.aboveBaseM3) }}</dd></div>
+            <div><dt class="text-neutral-400">Below base</dt><dd class="mt-2 font-mono" data-volume-below>{{ quantity(report()?.belowBaseM3) }}</dd></div>
+            <div><dt class="text-neutral-400">Signed top minus base</dt><dd class="mt-2 font-mono" data-volume-signed>{{ quantity(report()?.signedTopMinusBaseM3) }}</dd></div>
+            <div><dt class="text-neutral-400">Full boundary signed</dt><dd class="mt-2 font-mono" data-volume-full>{{ quantity(report()?.fullBoundarySignedM3) }}</dd></div>
+          </dl>
+          <p class="mt-4 leading-relaxed text-neutral-400 text-xs">Above and below are positive magnitudes. Signed volume equals above minus below. Partial coverage does not establish the volume of the whole boundary.</p>
+          <h3 class="mt-7 font-semibold text-sm">Boundary and domain</h3>
+          <dl class="grid gap-4 grid-cols-2 mt-4 text-sm">
+            <div><dt class="text-neutral-400">Boundary area</dt><dd class="mt-1">{{ quantity(report()?.boundaryAreaM2, 'm²') }}</dd></div>
+            <div><dt class="text-neutral-400">Covered area</dt><dd class="mt-1">{{ quantity(report()?.coveredAreaM2, 'm²') }}</dd></div>
+            <div><dt class="text-neutral-400">Uncovered area</dt><dd class="mt-1" data-volume-gap>{{ quantity(report()?.uncoveredAreaM2, 'm²') }}</dd></div>
+            <div><dt class="text-neutral-400">Coverage</dt><dd class="mt-1">{{ ((report()?.coverageFraction ?? 0) * 100).toFixed(2) }}%</dd></div>
+            <div><dt class="text-neutral-400">Boundary vertices / holes</dt><dd class="mt-1">{{ source()?.boundary.outer.length }} / {{ source()?.boundary.holes.length }}</dd></div>
+            <div><dt class="text-neutral-400">Excluded nodata cells</dt><dd class="mt-1">{{ report()?.excludedGridCells.length }}</dd></div>
+          </dl>
+          <h3 class="mt-7 font-semibold text-sm">Explicit base plane</h3>
+          <p class="mt-3 leading-relaxed text-neutral-400 text-sm">{{ source()?.base.assumption }}</p>
+          <p class="mt-3 break-words font-mono text-neutral-400 text-xs">E/N/up anchor: {{ vector(source()?.base.anchorM) }} m</p>
+          <p class="mt-2 break-words font-mono text-neutral-400 text-xs">E / N gradient: {{ source()?.base.gradientEast }} / {{ source()?.base.gradientNorth }}</p>
+          <p class="mt-2 text-neutral-400 text-xs">Base evidence: {{ source()?.base.evidence }}</p>
+        </aside>
+        <div class="min-w-0">
+          <h2 class="font-semibold text-lg">Known surface and analysis boundary</h2>
+          <svg width="360" height="360" viewBox="0 0 360 360" role="img" aria-label="North-up map of actual known surface triangles or cells clipped to the analysis boundary, with excluded holes and missing coverage" class="mt-4 max-h-96 w-full bg-neutral-900 border border-neutral-700 rounded">
+            <defs><clipPath id="volume-boundary-clip"><path :d="boundaryPath()" clip-rule="evenodd" /></clipPath></defs>
+            <text x="180" y="18" text-anchor="middle" fill="#a3a3a3" font-size="11">North</text><text x="340" y="184" text-anchor="middle" fill="#a3a3a3" font-size="11">East</text>
+            <path :d="boundaryPath()" fill="#404040" fill-rule="evenodd" />
+            <g clip-path="url(#volume-boundary-clip)"><polygon :for="facet in facets()" :points="polygon(facet.points)" :fill="facetColor(facet.deltaM)" stroke="#737373" stroke-width="0.7"><title>{{ facet.id }} / centroid top minus base {{ facet.deltaM.toFixed(3) }} m</title></polygon></g>
+            <path :d="boundaryPath()" fill="none" stroke="#e5e5e5" stroke-width="1.6" />
+          </svg>
+          <p class="mt-2 leading-relaxed text-neutral-400 text-xs">{{ extent().span.toFixed(2) }} m square extent, north up. Geometry uses metres in E/N coordinates. Facet colour shows centroid top minus base, not a reconstructed orthophoto.</p>
+          <div class="flex flex-wrap gap-4 mt-3 text-xs"><span class="flex gap-2 items-center"><span aria-hidden="true" class="h-3 w-3 bg-emerald-400"></span>Above base</span><span class="flex gap-2 items-center"><span aria-hidden="true" class="h-3 w-3 bg-amber-500"></span>Below base</span><span class="flex gap-2 items-center"><span aria-hidden="true" class="h-3 w-3 bg-neutral-600"></span>Missing coverage</span></div>
+          <p class="mt-3 text-neutral-400 text-xs">Colour intensity spans 0 to {{ colorScale().toFixed(3) }} m in absolute mean height difference. Exact volume integration splits every contribution at the base crossing. Holes are excluded from the domain.</p>
+          <h3 class="mt-7 font-semibold text-sm">Uncertainty and reference</h3>
+          <dl class="grid gap-5 grid-cols-2 mt-4 text-sm">
+            <div><dt class="text-neutral-400">Conditional vertical bound</dt><dd class="mt-1 font-mono" data-volume-conditional>{{ quantity(report()?.uncertainty.conditionalVerticalBoundM3) }}</dd></div>
+            <div><dt class="text-neutral-400">Overall accuracy bound</dt><dd class="mt-1 font-mono">unavailable</dd></div>
+            <div><dt class="text-neutral-400">Declared horizontal bound</dt><dd class="mt-1">{{ quantity(report()?.uncertainty.horizontalBoundM, 'm') }}</dd></div>
+            <div><dt class="text-neutral-400">Reference comparison</dt><dd class="mt-1 break-words" data-volume-reference>{{ report()?.comparison.status }}</dd></div>
+          </dl>
+          <p class="mt-4 leading-relaxed text-neutral-400 text-xs">A conditional bound adds the declared top and base vertical errors over covered area. It excludes boundary, horizontal, classification and field calibration errors. Unknown inputs remain unavailable.</p>
+          <div :if="source()?.reference" class="mt-4 pl-4 border-l border-neutral-600">
+            <p class="break-words text-sm">{{ source()?.reference?.id }} / {{ source()?.reference?.independence }}</p>
+            <p class="mt-2 break-words text-neutral-400 text-xs">{{ source()?.reference?.method }} / {{ source()?.reference?.surveyedAt }}</p>
+            <p class="mt-2 text-neutral-400 text-xs">Reference evidence: {{ source()?.reference?.evidence }}. Operator declarations are not authenticated survey validation.</p>
+            <p class="mt-3 text-sm">Computed minus reference: {{ quantity(report()?.comparison.signedDifferenceM3) }}</p>
+            <p class="mt-2 text-neutral-400 text-xs">Relative signed difference: {{ report()?.comparison.relativeSignedDifference === null ? 'unavailable' : ((report()?.comparison.relativeSignedDifference ?? 0) * 100).toFixed(2) + '%' }}</p>
+            <p class="mt-2 text-neutral-400 text-xs">Combined declared bound: {{ quantity(report()?.comparison.combinedDeclaredBoundM3) }}</p>
+            <p class="mt-2 text-neutral-400 text-xs">Within combined declared bound: {{ report()?.comparison.withinCombinedDeclaredBound === null ? 'unavailable' : report()?.comparison.withinCombinedDeclaredBound ? 'yes' : 'no' }}. This comparison does not establish overall accuracy.</p>
+          </div>
+        </div>
+      </div>
+      <section aria-labelledby="volume-provenance" class="mt-9 pt-6 border-neutral-700 border-t">
+        <h2 id="volume-provenance" class="font-semibold text-lg">Source and coordinate provenance</h2>
+        <dl class="grid gap-5 sm:grid-cols-2 mt-5 text-sm">
+          <div class="min-w-0"><dt class="text-neutral-400">Source identity / geometry</dt><dd class="mt-1 break-words">{{ source()?.surface.metadata.id }} / {{ source()?.surface.geometry.kind }}</dd></div>
+          <div class="min-w-0"><dt class="text-neutral-400">Evidence / source kind</dt><dd class="mt-1 break-words">{{ source()?.surface.metadata.provenance.evidence }} / {{ source()?.surface.metadata.provenance.sourceKind }}</dd></div>
+          <div class="min-w-0"><dt class="text-neutral-400">Horizontal reference</dt><dd class="mt-1 break-words">{{ report()?.reference.horizontalCrs.id }} / {{ report()?.reference.horizontalCrs.definition }}</dd></div>
+          <div class="min-w-0"><dt class="text-neutral-400">Vertical datum</dt><dd class="mt-1 break-words">{{ report()?.reference.verticalDatum.id }} / {{ report()?.reference.verticalDatum.definition }}</dd></div>
+          <div><dt class="text-neutral-400">Coordinate epoch</dt><dd class="mt-1">{{ report()?.reference.horizontalCrs.coordinateEpoch ?? 'not declared' }}</dd></div>
+          <div><dt class="text-neutral-400">Axes and units</dt><dd class="mt-1">Easting / northing / elevation up, metres</dd></div>
+          <div><dt class="text-neutral-400">Acquisition / meshing status</dt><dd class="mt-1">{{ source()?.surface.metadata.provenance.acquisition.status }} / {{ source()?.surface.metadata.provenance.reconstructionOrMeshing.status }}</dd></div>
+          <div><dt class="text-neutral-400">Boresight / time calibration</dt><dd class="mt-1">{{ source()?.surface.metadata.provenance.boresightCalibration.status }} / {{ source()?.surface.metadata.provenance.timeCalibration.status }}</dd></div>
+          <div class="min-w-0"><dt class="text-neutral-400">Ground classification</dt><dd class="mt-1 break-words">{{ source()?.surface.metadata.provenance.groundClassification.status }} / {{ source()?.surface.metadata.provenance.groundClassification.description }}</dd></div>
+          <div class="min-w-0"><dt class="text-neutral-400">Original source SHA-256</dt><dd class="mt-1 break-all font-mono text-xs">{{ source()?.surface.metadata.provenance.sourceSha256 }}</dd></div>
+        </dl>
+        <p class="mt-5 leading-relaxed text-neutral-400 text-xs">Coordinate and calibration metadata are declarations. No CRS, datum or unit conversion is performed. Imported surfaces can carry external LiDAR or photogrammetry provenance; this workspace runs synthetic analytic examples.</p>
+      </section>
+      <section aria-labelledby="volume-contributions" class="mt-9 pt-6 border-neutral-700 border-t">
+        <h2 id="volume-contributions" class="font-semibold text-lg">Integration contributions</h2>
+        <p class="mt-3 leading-relaxed text-neutral-400 text-sm">Each row retains its source primitive and clipped boundary part. Outer-ring weights add coverage; hole weights subtract it. Area and volumes shown are unweighted piece values before the boundary weight.</p>
+        <div class="overflow-x-auto mt-5 max-w-full border border-neutral-700 rounded" tabindex="0" role="region" aria-label="Scrollable contribution audit table">
+          <table class="w-full text-left text-xs whitespace-nowrap"><caption class="sr-only">Clipped surface contributions, unweighted area and volumes, with signed boundary weights</caption><thead class="text-neutral-300 bg-neutral-900"><tr><th scope="col" class="p-3">Source / part</th><th scope="col" class="p-3">Weight</th><th scope="col" class="p-3">Area m²</th><th scope="col" class="p-3">Above m³</th><th scope="col" class="p-3">Below m³</th><th scope="col" class="p-3">Signed m³</th></tr></thead><tbody><tr :for="piece in pieces()" class="border-neutral-800 border-t"><th scope="row" class="p-3 font-normal"><span class="block">{{ piece.sourceId }}</span><span class="block mt-1 text-neutral-400">{{ piece.boundaryPart }}</span></th><td class="p-3 font-mono">{{ piece.weight }}</td><td class="p-3 font-mono">{{ piece.areaM2.toFixed(3) }}</td><td class="p-3 font-mono">{{ piece.aboveBaseM3.toFixed(3) }}</td><td class="p-3 font-mono">{{ piece.belowBaseM3.toFixed(3) }}</td><td class="p-3 font-mono">{{ piece.signedTopMinusBaseM3.toFixed(3) }}</td></tr></tbody></table>
+        </div>
+        <p :if="!report()?.integrationPieces.length" class="mt-4 text-neutral-400 text-sm">No covered surface contributions intersect this boundary.</p>
+        <div class="flex flex-wrap gap-3 items-center mt-4 text-sm"><button type="button" @click="page.update(value => Math.max(0, value - 1))" :disabled="page() === 0" class="px-3 py-2 border border-neutral-600 rounded focus-visible:outline-emerald-200 disabled:opacity-40">Previous pieces</button><span role="status">Page {{ page() + 1 }} / {{ pages() }}. {{ report()?.integrationPieces.length }} pieces.</span><button type="button" @click="page.update(value => Math.min(pages() - 1, value + 1))" :disabled="page() >= pages() - 1" class="px-3 py-2 border border-neutral-600 rounded focus-visible:outline-emerald-200 disabled:opacity-40">Next pieces</button></div>
+      </section>
+      <details class="mt-8 pt-5 border-neutral-700 border-t"><summary class="text-sm focus-visible:outline-emerald-200 cursor-pointer">Warnings, uncertainty assumptions and evidence limits</summary><ul class="mt-4 space-y-3 text-neutral-400 text-sm"><li :for="warning in report()?.warnings ?? []" class="break-words text-amber-200">{{ warning }}</li><li :for="assumption in report()?.uncertainty.assumptions ?? []" class="break-words">{{ assumption }}</li><li :for="limitation in report()?.limitations ?? []" class="break-words">{{ limitation }}</li></ul></details>
+      <p class="mt-6 text-neutral-400 text-xs">For known-surface import and auditable dataset export, use the native Stacks volume commands. Binary LiDAR, raw-point meshing and surveyed field validation remain separate work.</p>
+      <a href="https://github.com/stacksjs/drone/issues/19" class="inline-block mt-4 text-emerald-200 text-sm underline underline-offset-4">Volume processing scope and remaining evidence</a>
+    </div>
+  </section>
+</template>
