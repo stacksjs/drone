@@ -268,6 +268,13 @@ declare global {
   const runMissionWorkspace: typeof autoImports.runMissionWorkspace
   const missionWorkspacePlot: typeof autoImports.missionWorkspacePlot
   const missionWorkspaceProfiles: typeof autoImports.missionWorkspaceProfiles
+  const exampleVisionCalibration: typeof autoImports.exampleVisionCalibration
+  const exampleVisionValidation: typeof autoImports.exampleVisionValidation
+  const createVisionTargetFusion: typeof autoImports.createVisionTargetFusion
+  const createVisionLocalizer: typeof autoImports.createVisionLocalizer
+  const parseVisionProfile: typeof autoImports.parseVisionProfile
+  const simulateVision: typeof autoImports.simulateVision
+  const visionScenarios: typeof autoImports.visionScenarios
 }
 
 export {}

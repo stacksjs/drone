@@ -53,7 +53,12 @@ Every metric observation requires all of the following:
   20 ms including declared clock uncertainty, and measurement age no greater than 200 ms.
 - Conservative uncertainty covering pixel/depth error, pose position and attitude, extrinsic
   translation/rotation, model residual and motion during timing uncertainty. Depth must stay
-  within the held-out calibration interval. Invalid lens inverses, folds and understated inputs fail.
+  within the held-out calibration interval. Lens inverses, folds, declared numeric bounds and
+  the minimum depth-noise budget are checked. Actual error distributions require measurements.
+
+The motion assumptions are at most 3 m/s vehicle translation, 2 m/s target motion and 35 rad/s
+angular motion, matching the owned estimator's admitted gyro ceiling. The uncertainty includes
+range-scaled angular timing error and cross terms. A hardware integration must justify those bounds.
 
 The current estimator has relative yaw and no observed absolute heading. The owned fixture starts
 north-aligned and explicitly budgets drift while predicting capture attitude from qualified raw
