@@ -1,11 +1,12 @@
 import type { SurfaceMetadata, VolumeRequest } from './types'
-export const volumeScenarios = ['pyramid', 'cut-fill', 'coverage-gap', 'tilted-base', 'unknown-uncertainty', 'reference-comparison'] as const
+export const volumeScenarios = ['pyramid', 'cut-fill', 'coverage-gap', 'grid-nodata', 'tilted-base', 'unknown-uncertainty', 'reference-comparison'] as const
 export type VolumeScenario = typeof volumeScenarios[number]
 // SHA256 of UTF8 JSON.stringify(surface.geometry), pinned so browser fixtures need no crypto or server dependency.
 const geometryDigests: Record<VolumeScenario, string> = {
   'pyramid': '75c0b15d9b67ab0564f5b370511a58ab43226206a230072a58b6e32af5a39d45',
   'cut-fill': '68b097bb17e4ef7bac13388a554bc1d8b9f88cc9422efa7af564297db69e6c80',
   'coverage-gap': 'ed9480b1f19a26eabe18b3e0e9d11b4bc7722bc85eafde7282ecc006ff86f595',
+  'grid-nodata': '949065b24321076f81aea72657e0e3fe83fce858c0d2c290f90107ef7d0c49a6',
   'tilted-base': 'be6ce65151c0d5cc979ca6fde826ccba12fb2ed2b7110b1b176354863f491d4b',
   'unknown-uncertainty': '75c0b15d9b67ab0564f5b370511a58ab43226206a230072a58b6e32af5a39d45',
   'reference-comparison': '75c0b15d9b67ab0564f5b370511a58ab43226206a230072a58b6e32af5a39d45',
@@ -28,6 +29,13 @@ export function exampleVolumeRequest(scenario: VolumeScenario = 'pyramid'): Volu
     metadata.id = 'analytic-cut-fill'
   }
   if (scenario === 'coverage-gap' && request.surface.geometry.kind === 'tin') request.surface.geometry.triangles.pop()
+  if (scenario === 'grid-nodata') {
+    request.surface.geometry = { kind: 'cell-grid', width: 5, height: 4, westM: 0, southM: 0, cellSizeM: 1, rows: [[1, 2, 3, 4, 5], [2, 3, null, 5, 6], [3, 4, 5, 6, 7], [4, 5, 6, 7, 8]], rowOrder: 'north-to-south', interpretation: 'piecewise-constant-cell-elevation' }
+    request.boundary.outer = [[0, 0], [5, 0], [5, 4], [0, 4]]
+    metadata.id = 'analytic-grid-nodata'
+    metadata.provenance.acquisition.sourceId = 'analytic-cell-elevations-with-one-unknown-cell'
+    metadata.provenance.reconstructionOrMeshing.sourceId = 'explicit-north-first-cell-area-product'
+  }
   if (scenario === 'tilted-base' && request.surface.geometry.kind === 'tin') {
     request.base.gradientEast = .2; request.base.gradientNorth = -.1
     request.base.anchorM[2] = 10
