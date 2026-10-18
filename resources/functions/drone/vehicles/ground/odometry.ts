@@ -29,7 +29,7 @@ export function createGroundOdometry() {
       lastNow = nowMs
       const p = estimate.localPosition, a = estimate.attitude
       const reference = `${estimate.bootId}:${Object.values(estimate.resets).join(',')}`
-      if (estimate.physicalFlightEnabled !== false || estimate.evidence !== 'fixture' || !estimate.health.localPosition || !estimate.health.tilt || !p || !a || p.frame !== 'LOCAL_NED' || p.origin?.latitudeDeg !== 0 || p.origin?.longitudeDeg !== 0 || p.origin?.ellipsoidHeightM !== 100 || a.reference !== 'GRAVITY_ALIGNED_RELATIVE_YAW' || p.altitudeDatum !== 'WGS84_ELLIPSOID' || p.capturedAtMs === null || nowMs - p.capturedAtMs > 200 || p.capturedAtMs > nowMs || a.capturedAtMs === null || nowMs - a.capturedAtMs > 60 || a.capturedAtMs > nowMs || ![...p.positionM, ...p.velocityMps, ...a.eulerRad, ...a.quaternionWxyz].every(Number.isFinite)) return invalid('ground-localization-loss')
+      if (!Number.isFinite(estimate.nowMs) || estimate.nowMs !== nowMs || estimate.physicalFlightEnabled !== false || estimate.evidence !== 'fixture' || !estimate.health.localPosition || !estimate.health.tilt || !p || !a || p.frame !== 'LOCAL_NED' || p.origin?.latitudeDeg !== 0 || p.origin?.longitudeDeg !== 0 || p.origin?.ellipsoidHeightM !== 100 || a.reference !== 'GRAVITY_ALIGNED_RELATIVE_YAW' || p.altitudeDatum !== 'WGS84_ELLIPSOID' || !Number.isFinite(p.capturedAtMs) || p.capturedAtMs === null || nowMs - p.capturedAtMs > 200 || p.capturedAtMs > nowMs || !Number.isFinite(p.predictedToMs) || p.predictedToMs < p.capturedAtMs || p.predictedToMs > nowMs || nowMs - p.predictedToMs > 40 || !Number.isFinite(a.capturedAtMs) || a.capturedAtMs === null || nowMs - a.capturedAtMs > 60 || a.capturedAtMs > nowMs || ![...p.positionM, ...p.velocityMps, ...a.eulerRad, ...a.quaternionWxyz].every(Number.isFinite)) return invalid('ground-localization-loss')
       if (!packet || packet.version !== 1 || packet.vehicle !== 'ground' || packet.evidence !== 'modeled-vehicle-sensors' || packet.reference !== reference || !Number.isSafeInteger(packet.sequence) || packet.sequence < 1 || !Number.isSafeInteger(packet.capturedAtMs) || !Number.isSafeInteger(packet.receivedAtMs) || packet.receivedAtMs - packet.capturedAtMs < 20 || packet.receivedAtMs - packet.capturedAtMs > 100 || packet.receivedAtMs > nowMs || packet.capturedAtMs < 0 || nowMs - packet.capturedAtMs + 1 > 140) return invalid('ground-sensor-stale-or-reference')
       const v = packet.values
       const counts = v.encoderCounts
@@ -61,7 +61,7 @@ export function createGroundOdometry() {
     },
   }
 }
-/** Distance includes body radius, measurement+lease latency and bounded active braking. Neutral still coasts. */
+/** Distance includes body radius, measurement+lease latency and bounded active braking. Declared neutral engages the independently modeled spring brake. */
 export function groundStoppingEnvelope(speedMps: number, ageMs: number, uncertaintyM: number): number {
   if (![speedMps, ageMs, uncertaintyM].every(Number.isFinite) || Math.abs(speedMps) > 5 || ageMs < 0 || ageMs > 140 || uncertaintyM < 0 || uncertaintyM > 1) throw new RangeError('Invalid modeled ground stopping envelope')
   return groundModel.bodyRadiusM + Math.abs(speedMps) * (ageMs / 1000 + 0.1) + speedMps ** 2 / (2 * 0.5) + uncertaintyM + 0.15

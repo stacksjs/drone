@@ -51,6 +51,7 @@ test('qualified wheel sensors reject stale, reordered, wrong calibration and unh
   }
   const odometry = createGroundOdometry(), c = groundContext()
   expect(odometry.step(c.measurement, c.estimate, c.nowMs).healthy).toBe(true)
+  c.estimate.nowMs += 20
   expect(odometry.step(c.measurement, c.estimate, c.nowMs + 20).healthy).toBe(true)
   const old = groundPacket(980)
   expect(odometry.step(old, c.estimate, c.nowMs + 20).reason).toBe('ground-sensor-replay')
@@ -58,7 +59,7 @@ test('qualified wheel sensors reject stale, reordered, wrong calibration and unh
 
 test('proximity and implement hazards latch and revoke mower and drive outputs', () => {
   for (const [key, value, reason] of [['personMm', 1500, 'ground-person-proximity'], ['obstacleMm', 500, 'ground-obstacle-stopping-envelope'], ['emergency', true, 'ground-emergency-stop'], ['guardClosed', false, 'ground-implement-interlock']] as const) {
-    const profile = createGroundProfile(), controller = profile.createController(), c = groundContext()
+    const session = createGroundProfile().createSession(), controller = session.createController(), c = groundContext()
     expect(controller.step(c).actuators[0]).toBeGreaterThan(0)
     const hazard = groundContext(1020)
     hazard.measurement!.values[key] = value
@@ -69,7 +70,7 @@ test('proximity and implement hazards latch and revoke mower and drive outputs',
 })
 
 test('payload acknowledgement is scoped once and mower requires stationary guarded surface', () => {
-  const profile = createGroundProfile(), port = profile.createPayload!(), controller = profile.createController(), c = groundContext()
+  const session = createGroundProfile().createSession(), port = session.createPayload!(), controller = session.createController(), c = groundContext()
   const command = { eventId: 'ground-mowing-coverage:1:0,0,0,0,0:enable', taskId: 'enable', operation: 'mower-enable' as const, containerId: null, issuedAtMs: 1000, expiresAtMs: 1500, positionM: [0, 0, 0] as [number, number, number], reference: c.measurement!.reference }
   port.observe!(groundPayloadContext(c, command))
   port.request(command)
@@ -145,7 +146,7 @@ test('normally engaged neutral brake stops modeled nominal motion inside declare
 })
 
 test('implement port rejects superficially safe booleans without qualified wheel calibration', () => {
-  const profile = createGroundProfile(), port = profile.createPayload!(), c = groundContext()
+  const session = createGroundProfile().createSession(), port = session.createPayload!(), c = groundContext()
   c.measurement!.values.calibration = 'unverified-radius'
   const command = { eventId: 'bad-calibration', taskId: 'enable', operation: 'mower-enable' as const, containerId: null, issuedAtMs: 1000, expiresAtMs: 1500, positionM: [0, 0, 0] as [number, number, number], reference: '1:0,0,0,0,0' }
   port.observe!(groundPayloadContext(c, command))
@@ -170,7 +171,7 @@ test('lateral slip consumes the contact friction budget instead of rotating velo
 })
 
 test('material tray is consumed once and command position is checked before acknowledgement', () => {
-  const port = createGroundProfile('logistics').createPayload!(), c = groundContext()
+  const port = createGroundProfile('logistics').createSession().createPayload!(), c = groundContext()
   const command = { eventId: 'drop-1', taskId: 'drop', operation: 'material-drop' as const, containerId: 'tray-1', issuedAtMs: 1000, expiresAtMs: 1500, positionM: [0, 0, 0] as [number, number, number], reference: '1:0,0,0,0,0' }
   port.observe!(groundPayloadContext(c, command))
   port.request(command)
@@ -180,7 +181,7 @@ test('material tray is consumed once and command position is checked before ackn
   port.request(again)
   expect(port.poll(1060)).toMatchObject({ outcome: 'rejected' })
   expect(() => port.poll(1059)).toThrow()
-  const distant = createGroundProfile().createPayload!()
+  const distant = createGroundProfile().createSession().createPayload!()
   const distantCommand = { ...command, eventId: 'mower-away', operation: 'mower-enable' as const, containerId: null, positionM: [10, 0, 0] as [number, number, number] }
   distant.observe!(groundPayloadContext(c, distantCommand))
   distant.request(distantCommand)
@@ -237,10 +238,65 @@ test('native GroundSimulate command parses real options and reports a bounded mo
 }, 180000)
 
 test('implement commands must match the current pending mission event before an action can occur', () => {
-  const profile = createGroundProfile(), port = profile.createPayload!(), c = groundContext()
+  const session = createGroundProfile().createSession(), port = session.createPayload!(), c = groundContext()
   const authorized = { eventId: 'scoped-enable', taskId: 'enable', operation: 'mower-enable' as const, containerId: null, issuedAtMs: 1000, expiresAtMs: 1500, positionM: [0, 0, 0] as [number, number, number], reference: '1:0,0,0,0,0' }
   port.observe!(groundPayloadContext(c, authorized))
   port.request({ ...authorized, operation: 'material-drop', containerId: 'tray-1' })
   expect(port.poll(1060)).toMatchObject({ outcome: 'rejected' })
-  expect(profile.createController().step(c).actuators[2]).toBe(0)
+  expect(session.createController().step(c).actuators[2]).toBe(0)
+})
+
+test('the same reusable ground profile starts isolated complete runs without retained closed payload state', async () => {
+  const { runVehicleSimulation } = await import('../../resources/functions/drone/vehicles/runtime')
+  for (const scenario of ['nominal', 'logistics']) {
+    const profile = createGroundProfile(scenario)
+    const first = runVehicleSimulation(profile, { scenario, seconds: 120 })
+    const second = runVehicleSimulation(profile, { scenario, seconds: 120 })
+    expect(first.status).toBe('completed')
+    expect(second.status).toBe('completed')
+    expect(second.trace).toEqual(first.trace)
+  }
+})
+
+test('ground rejects stale estimator time and stale or future position prediction epochs', () => {
+  for (const fault of ['stale-clock', 'future-clock', 'invalid-clock', 'stale-prediction', 'future-prediction', 'invalid-prediction']) {
+    const c = groundContext()
+    if (fault === 'stale-clock') c.estimate.nowMs -= 1
+    if (fault === 'future-clock') c.estimate.nowMs += 1
+    if (fault === 'invalid-clock') c.estimate.nowMs = NaN
+    if (fault === 'stale-prediction') { c.estimate.localPosition!.capturedAtMs = c.nowMs - 100; c.estimate.localPosition!.predictedToMs = c.nowMs - 41 }
+    if (fault === 'future-prediction') c.estimate.localPosition!.predictedToMs = c.nowMs + 1
+    if (fault === 'invalid-prediction') c.estimate.localPosition!.predictedToMs = NaN
+    expect(createGroundOdometry().step(c.measurement, c.estimate, c.nowMs).healthy).toBe(false)
+    const session = createGroundProfile().createSession()
+    expect(session.createController().step(c)).toMatchObject({ inhibited: true, actuators: [0, 0, 0, 1], reason: 'ground-localization-loss' })
+    const port = session.createPayload!()
+    const command = { eventId: 'time-enable', taskId: 'enable', operation: 'mower-enable' as const, containerId: null, issuedAtMs: 1000, expiresAtMs: 1500, positionM: [0, 0, 0] as [number, number, number], reference: '1:0,0,0,0,0' }
+    port.observe!(groundPayloadContext(c, command))
+    port.request(command)
+    expect(port.poll(1060)).toMatchObject({ outcome: 'rejected' })
+  }
+})
+
+test('concurrent ground sessions isolate mower authority, payload events, close state and measurement sequence', () => {
+  const profile = createGroundProfile(), a = profile.createSession(), b = profile.createSession()
+  const aController = a.createController(), bController = b.createController(), aPort = a.createPayload!(), bPort = b.createPayload!(), c = groundContext()
+  const command = { eventId: 'session-enable', taskId: 'enable', operation: 'mower-enable' as const, containerId: null, issuedAtMs: 1000, expiresAtMs: 1500, positionM: [0, 0, 0] as [number, number, number], reference: '1:0,0,0,0,0' }
+  aPort.observe!(groundPayloadContext(c, command))
+  bPort.observe!(groundPayloadContext(c, command))
+  aPort.request(command)
+  expect(aController.step(c).actuators[2]).toBe(1)
+  expect(bController.step(c).actuators[2]).toBe(0)
+  expect(bPort.poll(1060)).toBe(null)
+  expect(aPort.poll(1060)).toMatchObject({ outcome: 'confirmed' })
+  aPort.close()
+  bPort.request(command)
+  expect(bPort.poll(1060)).toMatchObject({ outcome: 'confirmed' })
+  expect(bController.step(c).actuators[2]).toBe(1)
+  const aPlant = a.createPlant(), bPlant = b.createPlant()
+  expect(a.renderMeasurement(aPlant.snapshot(), 1000, command.reference).sequence).toBe(1)
+  expect(a.renderMeasurement(aPlant.snapshot(), 1020, command.reference).sequence).toBe(2)
+  expect(b.renderMeasurement(bPlant.snapshot(), 1000, command.reference).sequence).toBe(1)
+  aPlant.step([1, 1, 0, 0], 0.004, { windMps: [0, 0, 0], currentMps: [0, 0, 0] })
+  expect(bPlant.snapshot().details.leftWheelRadS).toBe(0)
 })

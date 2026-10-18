@@ -1,4 +1,4 @@
-import type { VehicleControllerContext, VehicleControlOutput, VehicleMissionPlan, VehiclePayloadAck, VehiclePayloadPort, VehicleProfile } from '../types'
+import type { VehicleControllerContext, VehicleControlOutput, VehicleMissionPlan, VehiclePayloadAck, VehiclePayloadPort, VehicleProfile, VehicleSession } from '../types'
 import { createGroundPlant, groundModel } from './plant'
 import { createGroundOdometry, groundStoppingEnvelope } from './odometry'
 import { planGroundCoverage } from './coverage'
@@ -27,8 +27,8 @@ export function groundMission(mode: 'mowing' | 'logistics' = 'mowing'): VehicleM
   ] }
 }
 
-export function createGroundProfile(scenario: string = 'nominal'): VehicleProfile {
-  if (!groundScenarios.includes(scenario as GroundScenario)) throw new RangeError('Unknown ground scenario')
+export function createGroundSession(scenario: GroundScenario = 'nominal'): VehicleSession {
+  if (!groundScenarios.includes(scenario)) throw new RangeError('Unknown ground scenario')
   let sequence = 0, mowerEnabled = false, context: VehicleControllerContext | null = null, closed = false, lastPoll = -Infinity, payloadHealthy = false
   const queue: { deliverAtMs: number, ack: VehiclePayloadAck }[] = [], seen = new Set<string>(), consumedContainers = new Set<string>(), payloadOdometry = createGroundOdometry()
   function payloadPort(): VehiclePayloadPort {
@@ -62,9 +62,6 @@ export function createGroundProfile(scenario: string = 'nominal'): VehicleProfil
     }
   }
   return {
-    vehicle: 'ground', name: 'Owned differential ground vehicle', evidence: 'modeled-vehicle-profile', physicalFlightEnabled: false,
-    actuators: [{ name: 'left-wheel-torque', unit: 'normalized', min: -1, max: 1, neutral: 0 }, { name: 'right-wheel-torque', unit: 'normalized', min: -1, max: 1, neutral: 0 }, { name: 'mower-enable', unit: 'normalized', min: 0, max: 1, neutral: 0 }, { name: 'spring-brake', unit: 'normalized', min: 0, max: 1, neutral: 1 }],
-    authorityFence: { radiusM: 12, minDownM: -0.3, maxDownM: 0.3 }, mission: groundMission(scenario === 'logistics' ? 'logistics' : 'mowing'), scenarios: groundScenarios,
     createPlant: () => createGroundPlant({ friction: scenario === 'low-traction' ? 0.015 : groundModel.grip }),
     createPayload: payloadPort,
     createController() {
@@ -105,6 +102,16 @@ export function createGroundProfile(scenario: string = 'nominal'): VehicleProfil
         guardClosed: !(scenario === 'implement-open' && active), emergency: scenario === 'emergency' && active, bumper: false,
       } }
     },
+  }
+}
+
+export function createGroundProfile(scenario: string = 'nominal'): VehicleProfile {
+  if (!groundScenarios.includes(scenario as GroundScenario)) throw new RangeError('Unknown ground scenario')
+  return {
+    vehicle: 'ground', name: 'Owned differential ground vehicle', evidence: 'modeled-vehicle-profile', physicalFlightEnabled: false,
+    actuators: [{ name: 'left-wheel-torque', unit: 'normalized', min: -1, max: 1, neutral: 0 }, { name: 'right-wheel-torque', unit: 'normalized', min: -1, max: 1, neutral: 0 }, { name: 'mower-enable', unit: 'normalized', min: 0, max: 1, neutral: 0 }, { name: 'spring-brake', unit: 'normalized', min: 0, max: 1, neutral: 1 }],
+    authorityFence: { radiusM: 12, minDownM: -0.3, maxDownM: 0.3 }, mission: groundMission(scenario === 'logistics' ? 'logistics' : 'mowing'), scenarios: groundScenarios,
+    createSession: () => createGroundSession(scenario as GroundScenario),
     faults(name, atMs) { return atMs < 4000 ? {} : { dropPosition: name === 'localization-loss', dropVehicleSensor: name === 'sensor-loss', hostLost: name === 'host-loss', rcOverride: name === 'manual' } },
   }
 }
