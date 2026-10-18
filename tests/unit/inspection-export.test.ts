@@ -91,3 +91,10 @@ test('export detaches images and operator declarations before asynchronous work 
   await expect(writeInspectionDataset(target, simulateInspection())).rejects.toThrow('EEXIST')
   expect(await readFile(join(target, 'manifest.json'), 'utf8')).toBe(manifest)
 })
+
+test('export rejects impossible capture stopping clearance before creating a dataset', async () => {
+  const run = simulateInspection(), target = await destination()
+  run.captures[0]!.assetObservation.uncertaintyM = 99
+  await expect(writeInspectionDataset(target, run)).rejects.toThrow('inspection-clearance-unqualified')
+  await expect(stat(target)).rejects.toThrow('ENOENT')
+})

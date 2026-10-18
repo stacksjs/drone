@@ -8,6 +8,7 @@ import { predictVehicleMeasurementPose } from '../vehicles/measurements'
 import { createModeledCamera } from '../payloads/modeled-camera'
 import { createInspectionPlan } from './planner'
 import { exampleInspectionConfig } from './fixtures'
+import { inspectionCapturePolicy } from './policy'
 import { renderInspectionImage, renderInspectionRange, inspectCaptureQuality } from './camera'
 
 export const inspectionScenarios = ['nominal', 'wind', 'gnss-loss', 'structure-motion', 'camera-loss', 'wrong-ack', 'pause-resume', 'abort', 'rc-override'] as const
@@ -75,12 +76,9 @@ export function simulateInspection(options: { config?: unknown, scenario?: Inspe
         const angularRateRadS = Math.hypot(...rates), clockSeconds = config.calibration.timing.clockUncertaintyMs / 1000
         const attitudeSigmaRad = 0.003 + config.calibration.uncertainty.rotationSigmaRad + nowMs / 1000000 + 35 * clockSeconds
         const positionSigmaM = Math.sqrt(Math.max(...estimate.localPosition.covarianceBlocks.map(block => block.positionM2))) + config.calibration.uncertainty.translationSigmaM + velocityMps * clockSeconds + Math.hypot(...config.calibration.extrinsics.translationM) * attitudeSigmaRad
-        if (positionSigmaM > config.quality.maxPoseSigmaM || attitudeSigmaRad > config.quality.maxAttitudeSigmaRad) return fail('inspection-pose-uncertainty')
         const assetObservation = observeAsset(pose, positionSigmaM, attitudeSigmaRad, nowMs)
-        if (assetObservation.registrationDisplacementM > config.clearance.assetMotionBoundM + config.asset.registrationSigmaM + positionSigmaM) return fail('inspection-asset-moved')
-        const stopping = velocityMps * config.clearance.reactionMs / 1000 + velocityMps ** 2 / (2 * config.clearance.brakingAccelerationMps2)
-        const required = config.clearance.minSeparationM + config.clearance.bodyRadiusM + Math.max(config.clearance.positionBoundM, assetObservation.uncertaintyM) + config.clearance.assetMotionBoundM + stopping
-        if (assetObservation.cameraSeparationM < required) return fail('inspection-clearance-unqualified')
+        const policyFailure = inspectionCapturePolicy(config, { atMs: nowMs, velocityMps, positionSigmaM, attitudeSigmaRad, assetObservation })
+        if (policyFailure) return fail(policyFailure)
         if (pending) {
           const ack = camera.poll(nowMs)
           if (ack) {

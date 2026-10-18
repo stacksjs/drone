@@ -4,6 +4,7 @@ import { missionLimits, replayMission } from '../missions/engine'
 import { inspectCaptureQuality } from './camera'
 import { projectInspectionPixel } from './geometry'
 import { createInspectionPlan } from './planner'
+import { inspectionCapturePolicy } from './policy'
 
 export const inspectionEvidenceLimits = Object.freeze({ captures: 64, pixels: 65536, rawBytes: 64 * 1024 * 1024, recordingBytes: 8 * 1024 * 1024, manifestBytes: 16 * 1024 * 1024, reviews: 1024, acknowledgementMs: 80, clockUncertaintyMs: 5 })
 function fail(message: string): never { throw new TypeError(`Invalid inspection evidence: ${message}`) }
@@ -149,16 +150,13 @@ export function validateInspectionRun(input: unknown): InspectionRun {
     fields(original.pose, ['capturedAtMs', 'reference', 'positionM', 'quaternionWxyz', 'positionCapturedAtMs', 'positionPredictedToMs', 'attitudeCapturedAtMs', 'attitudePredictedToMs', 'gyroCapturedAtMs', 'attitudePrediction'])
     const pose = original.pose
     if (pose.capturedAtMs !== original.capturedAtMs || pose.reference !== observation.reference || !vector(pose.positionM, 3) || !near(pose.positionM, observation.positionM) || !vector(pose.quaternionWxyz, 4) || Math.abs(Math.hypot(...pose.quaternionWxyz) - 1) > 1e-6 || pose.attitudePrediction !== 'qualified-gyro-hold' || !timestamp(pose.positionCapturedAtMs) || pose.positionCapturedAtMs > pose.capturedAtMs || pose.capturedAtMs - pose.positionCapturedAtMs > 200 || pose.positionPredictedToMs !== pose.capturedAtMs || !timestamp(pose.attitudeCapturedAtMs) || pose.attitudeCapturedAtMs > pose.capturedAtMs || pose.capturedAtMs - pose.attitudeCapturedAtMs > 80 || pose.attitudePredictedToMs !== pose.capturedAtMs || !timestamp(pose.gyroCapturedAtMs) || pose.gyroCapturedAtMs > pose.capturedAtMs || pose.capturedAtMs - pose.gyroCapturedAtMs > 80 || !finite(original.positionSigmaM, Number.MIN_VALUE, 100) || !finite(original.attitudeSigmaRad, Number.MIN_VALUE, 0.5) || !vector(original.cameraPositionM, 3)) fail('stale or unqualified capture pose')
-    const calibration = plan.config.calibration, clockSeconds = original.clockUncertaintyMs / 1000
-    const minimumAttitudeSigma = calibration.uncertainty.rotationSigmaRad + 0.003 + original.capturedAtMs / 1000000 + 35 * clockSeconds
-    const minimumPositionSigma = calibration.uncertainty.translationSigmaM + Math.hypot(...observation.velocityMps) * clockSeconds + Math.hypot(...calibration.extrinsics.translationM) * original.attitudeSigmaRad
-    if (original.attitudeSigmaRad < minimumAttitudeSigma || original.positionSigmaM < minimumPositionSigma) fail('uncertainty undercuts declared synthetic model bounds')
     const offset = rotateBodyToNed(pose.quaternionWxyz, plan.config.calibration.extrinsics.translationM)
     if (!near(original.cameraPositionM, pose.positionM.map((n, i) => n + offset[i]!))) fail('optical center differs from calibrated pose')
     fields(original.assetObservation, ['sequence', 'capturedAtMs', 'receivedAtMs', 'reference', 'centerM', 'normalNed', 'uncertaintyM', 'registrationDisplacementM', 'cameraSeparationM'])
     const asset = original.assetObservation
     if (!Number.isSafeInteger(asset.sequence) || asset.sequence < 1 || !timestamp(asset.capturedAtMs) || !timestamp(asset.receivedAtMs) || asset.capturedAtMs > asset.receivedAtMs || asset.receivedAtMs > original.capturedAtMs || original.capturedAtMs - asset.capturedAtMs > 80 || asset.reference !== pose.reference || !vector(asset.centerM, 3) || !vector(asset.normalNed, 3) || !near(asset.normalNed, [-1, 0, 0], 0.05) || !finite(asset.uncertaintyM, Number.MIN_VALUE, 100) || !finite(asset.registrationDisplacementM, 0, 100) || !finite(asset.cameraSeparationM, 0, 100) || Math.abs(asset.registrationDisplacementM - Math.hypot(...asset.centerM.map((n, i) => n - plan.config.asset.centerM[i]!))) > 1e-6 || Math.abs(asset.cameraSeparationM - (original.cameraPositionM.reduce((sum, n, i) => sum + (n - asset.centerM[i]!) * asset.normalNed[i]!, 0))) > 1e-6) fail('invalid or stale measured asset registration')
-    if (asset.uncertaintyM < plan.config.asset.registrationSigmaM + original.positionSigmaM || asset.registrationDisplacementM > plan.config.clearance.assetMotionBoundM + plan.config.asset.registrationSigmaM + original.positionSigmaM) fail('asset uncertainty or registration violates declared bounds')
+    const policyFailure = inspectionCapturePolicy(plan.config, { atMs: original.capturedAtMs, velocityMps: Math.hypot(...observation.velocityMps), positionSigmaM: original.positionSigmaM, attitudeSigmaRad: original.attitudeSigmaRad, assetObservation: asset })
+    if (policyFailure) fail(policyFailure)
     qualityFields(original.quality)
     if (Math.abs(original.quality.velocityMps - Math.hypot(...observation.velocityMps)) > 1e-6) fail('capture motion differs from trace')
     const capture = { ...structuredClone(original), image: image(original.image, plan.config.calibration.output.width, plan.config.calibration.output.height) }

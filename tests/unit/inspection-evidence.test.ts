@@ -80,6 +80,9 @@ test('rejects inconsistent captures, unauthorized schema additions and invalid r
     run => { run.captures[0]!.cameraPositionM[0] += 0.1 },
     run => { run.captures[0]!.assetObservation.centerM[0] += 0.1 },
     run => { run.captures[0]!.assetObservation.capturedAtMs = 0 },
+    run => { run.captures[0]!.positionSigmaM = 0.2 },
+    run => { run.captures[0]!.attitudeSigmaRad = 0.11 },
+    run => { run.captures[0]!.assetObservation.uncertaintyM = 0.001 },
     run => { run.captures[0]!.quality.qualified = !run.captures[0]!.quality.qualified },
     run => { run.captures[0]!.quality.gsdM /= 2 },
     run => { run.captures[0]!.image.rgba = new Uint8Array(8) },
@@ -118,7 +121,7 @@ test('validates actual fault recordings while preserving abort, authority loss a
 
 test('camera uncertainty affects comparability and missing stations cannot masquerade as completed collection', () => {
   const before = simulateInspection({ visitId: 'before-uncertainty' }), after = simulateInspection({ visitId: 'after-uncertainty' })
-  for (const capture of after.captures) capture.assetObservation.uncertaintyM = 0.4
+  for (const capture of after.captures) capture.assetObservation.uncertaintyM = 0.32
   const comparison = compareInspectionVisits(before, after)
   expect(comparison.status).toBe('partial')
   expect(comparison.pairs.every(pair => pair.cameraOffsetM === 0 && pair.cameraOffsetUpperM > 0.5 && !pair.comparable)).toBe(true)
@@ -127,4 +130,15 @@ test('camera uncertainty affects comparability and missing stations cannot masqu
   expect(() => validateInspectionRun(incomplete)).toThrow('missing stations')
   incomplete.status = 'incomplete'; incomplete.reason = 'inspection-missing-stations'
   expect(validateInspectionRun(incomplete).status).toBe('incomplete')
+})
+
+test('recording validation and operator reviews reject capture uncertainty that exceeds actual stopping clearance', async () => {
+  const run = simulateInspection(), capture = run.captures[0]!
+  const input = declaration(capture.id), review = await createInspectionReview(run, input)
+  expect(capture.assetObservation.cameraSeparationM).toBeLessThan(2)
+  capture.assetObservation.uncertaintyM = 99
+  expect(capture.quality.qualified).toBe(true)
+  expect(() => { validateInspectionRun(run) }).toThrow('inspection-clearance-unqualified')
+  await expect(createInspectionReview(run, input)).rejects.toThrow('inspection-clearance-unqualified')
+  await expect(validateInspectionReview(run, review)).rejects.toThrow('inspection-clearance-unqualified')
 })
