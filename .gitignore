@@ -1,0 +1,193 @@
+# Dev tooling
+# (put individual local dev tooling stuff here)
+
+# Environment files
+.env
+.env.local
+.env.keys
+*.local
+.env.keys
+
+# Encrypted, safe to commit
+!.env.production
+!.env.staging
+!.env.ci
+
+# Dependencies
+node_modules
+/pantry
+# Locally packed tarballs. These are throwaway artifacts of `bun pm pack` /
+# `npm pack` used to test an unpublished dependency, and one committed by
+# accident ships to every project scaffolded from this template.
+*.tgz
+# Commit both lockfiles. Pantry owns the complete machine and project graph;
+# Bun's lock remains the runtime package-manager lock used by Bun commands.
+
+# QA
+test-results
+tests/unit/coverage
+dist*
+
+# IDE files
+.fleet
+.idea
+.vscode
+.cursor
+.zed
+
+# Git files
+!.gitkeep
+
+# Database files. Unanchored, because a package whose tests open a database
+# gets one in its own directory: `bun test` in core/queue leaves
+# core/queue/database/stacks.sqlite, which the root-relative form above missed,
+# so it showed as untracked after every run.
+**/database/stacks_testing.sqlite
+**/database/stacks.sqlite
+**/database/*.sqlite-wal
+**/database/*.sqlite-shm
+
+# OS files
+.DS_Store
+.DS_STORE
+
+# Build files
+.cache
+temp
+.temp
+data.ms
+generated/*
+bench/memory/results/
+.stx-serve
+custom-cli
+*bun-build
+discovered-packages.json
+
+# Runtime state. It all lives under storage/ now:
+#   storage/framework/stx      stx build cache + generated route manifest
+#   storage/framework/runtime  migration lock, temp bundles, CLI scratch
+#   storage/cloud              cloud driver state + dashboard credentials
+storage/framework/stx/
+storage/framework/runtime/
+# Site-mode markers written by `buddy down` / `buddy coming-soon` on THIS
+# machine. Committing one puts every checkout - and the next deploy - behind
+# the holding page, and taking it back off is a `git rm` rather than a command.
+storage/framework/down
+storage/framework/coming-soon
+storage/cloud/
+
+# Same cache, in the wrong place. stx falls back to `.stx` beside the working
+# directory when STX_DIR is unset, and a package's own `bun test` runs with
+# that set to the package root — so core/browser-extension grows a `.stx/`.
+# Ignored wherever it lands: an untracked directory after every test run is how
+# a real change gets overlooked, and how `git add -A` sweeps in build noise.
+**/.stx/
+
+# Pre-relocation names of the three directories above. stx and ts-cloud each
+# take their state directory from config now (`stateDir` in config/ui.ts and
+# config/cloud.ts), so nothing is left in the project root - but a checkout that
+# predates the move still has these until `ensureRuntimeDirectories()` migrates
+# them, and they should never be committed in the meantime.
+/.stx
+/.ts-cloud
+/.stacks
+
+# Opt-in convenience symlink to storage/framework, created by
+# `buddy generate:core-symlink`. Core developers only.
+/.framework
+
+# AI coding-agent setup, scaffolded by `buddy setup:ai` from the templates in
+# storage/framework/defaults/ai. Which agent you use is a personal choice, so
+# everything it generates stays out of the repo. AGENTS.md is the exception: it
+# is shared guidance every agent reads, so it is authored and committed, and
+# `setup:ai` only ever seeds it when it is missing.
+/.claude
+/.codex
+/.gemini
+/CLAUDE.md
+/GEMINI.md
+/.github/copilot-instructions.md
+
+# Stub workspace packages (temporary)
+/ts-auth
+/ts-cloud
+/ts-craft
+/ts-md
+/ts-open-api
+/ts-pantry
+/ts-security-crypto
+/bun-queue
+/headwind
+/bun-plugin-stx
+pantry
+
+# Build artifact directory used by docs/build steps — never tracked.
+storage/framework/cache/
+
+# Persisted by `buddy update` to remember whether the project is following the
+# `stable` or `canary` channel. Local preference only — the channel choice
+# doesn't need to be shared across team members or CI.
+.stacks-channel
+
+# Persisted by `buddy update`: last-synced channel + commit sha for the
+# up-to-date short-circuit. Local-only — like the channel, it's per-checkout.
+.stacks-version
+
+# Temp directory used during a `buddy update` GitHub fetch. Cleaned up by the
+# upgrade action on success but listed here to keep stray copies (e.g. from a
+# kill -9'd run) out of commits.
+.tmp-upgrade/
+/storage/framework/frontend-dist
+/storage/framework/desktop-dist
+# Output of `buddy build:dmg` (core/actions/src/build/dmg.ts writes here). Its
+# sibling desktop-dist was ignored from the start; this one was not, so a 28MB
+# Postline-0.1.0.dmg from a local July build was committed and has been in
+# every clone since.
+/storage/framework/desktop-dmg
+/storage/framework/mobile
+
+# Per-package runtime logs created when building a core package in place
+storage/framework/core/**/storage/logs/
+storage/framework/**/storage/logs/
+
+# Same, for the machine-local runtime state (migration lock, scheduler state,
+# temp bundles) a core package writes when it runs in place.
+storage/framework/core/**/storage/framework/runtime/
+
+# @stacksjs/defaults copies resources + app from storage/framework/defaults at build time
+# @stacksjs/defaults is a publish wrapper. Its generated scaffold is rebuilt
+# from storage/framework/defaults by core/defaults/build.ts.
+storage/framework/core/defaults/*
+!storage/framework/core/defaults/README.md
+!storage/framework/core/defaults/build.ts
+!storage/framework/core/defaults/package.json
+!storage/framework/core/defaults/tests/
+!storage/framework/core/defaults/tests/**
+/storage/framework/stacks/storage/framework/stx/bundle-tmp
+
+# Migration files set aside during a run: the SQLite quarantine
+# (stacksjs/stacks#2477) and the feature gate's own sidecars. All three are
+# restored when the run finishes, so one on disk means a run was killed.
+# Migrations are source: re-included so a machine-wide `*.sql` ignore (common,
+# to keep dumps out of repos) cannot silently leave one out of a commit.
+!database/migrations/*.sql
+database/migrations/*.sql.unsupported
+database/migrations/*.sql.disabled
+database/migrations/*.sql.ungated
+
+# The ERD `buddy generate:erd` writes (stacksjs/stacks#439). Generated on
+# demand from the models, so committing it here would add a 1500-line file
+# that goes stale the moment a model changes - the rot this framework's other
+# generated artifacts each carry a CI freshness check to avoid. An application
+# that wants it in review can un-ignore it and add its own check.
+docs/erd.md
+
+# bun-query-builder's default snapshot directory. `buddy migrate` never writes
+# here - it configures `storage/framework/database` instead, where the tracked
+# `model-snapshot.<dialect>.json` baseline lives, overridable with
+# DB_SNAPSHOT_PATH. This appears when the generator is driven directly, which
+# is what debugging it looks like, and it lands at whatever cwd that ran from:
+# the repository root. Derived state, so committing it would hand the next
+# person a previous-schema plan for a dialect and a database that are not
+# theirs.
+.qb/

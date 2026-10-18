@@ -1,0 +1,210 @@
+---
+name: stacks-security
+description: Use when implementing security in Stacks - password hashing (bcrypt/argon2), app key generation, AES encryption/decryption, hash verification, rehashing detection, security configuration (firewall, rate limiting, IP allowlists), or GDPR data-subject requests (access export, erasure, retention, the processing register). Covers @stacksjs/security, config/security.ts and the GDPR layer in @stacksjs/orm.
+license: MIT
+compatibility: Bun >= 1.3.0, TypeScript
+allowed-tools: Read Edit Write Bash Grep Glob
+---
+
+# Stacks Security
+
+## Key Paths
+- Core package: `storage/framework/core/security/src/`
+- Security config: `config/security.ts`
+- Hashing config: `config/hashing.ts`
+
+## Source Files
+```
+security/src/
+├── index.ts    # all exports
+├── key.ts      # generateAppKey()
+├── crypt.ts    # encrypt/decrypt (AES via APP_KEY)
+└── hash.ts     # password hashing (bcrypt/argon2)
+```
+
+## App Key Generation
+
+```typescript
+import { generateAppKey } from '@stacksjs/security'
+
+const key = generateAppKey()  // base64: followed by 32 random bytes encoded as base64
+// Run via CLI: buddy key:generate
+```
+
+## Encryption / Decryption
+
+```typescript
+import { encrypt, decrypt } from '@stacksjs/security'
+
+const encrypted = await encrypt('sensitive data')           // uses APP_KEY
+const encrypted = await encrypt('data', 'custom-passphrase')
+const decrypted = await decrypt(encrypted)
+const decrypted = await decrypt(encrypted, 'custom-passphrase')
+```
+
+## Password Hashing
+
+```typescript
+import { make, check, needsRehash, info, detectAlgorithm } from '@stacksjs/security'
+
+// Hash a password
+const hash = await make('password123')                          // bcrypt (default)
+const hash = await make('password123', { algorithm: 'argon2' })
+const hash = await make('password123', { rounds: 14 })          // bcrypt rounds
+
+// Verify
+const valid = await check('password123', hash)  // true/false
+
+// Check if rehash needed (e.g., after changing rounds)
+const needs = needsRehash(hash, { rounds: 14 })
+
+// Inspect hash
+const hashInfo = info(hash)         // { algorithm, options }
+const algo = detectAlgorithm(hash)  // 'bcrypt' | 'argon2' | 'argon2id' | ...
+```
+
+### Aliases
+- `hashMake` = `make`
+- `hashCheck` = `check`
+- `hashNeedsRehash` = `needsRehash`
+- `hashInfo` = `info`
+- `makeHash` = `make`
+- `verifyHash` = `check`
+
+### Algorithm-Specific Functions
+```typescript
+bcryptEncode(value, rounds?)     // bcrypt hash
+argon2Encode(value, options?)    // argon2 hash
+check(value, hash)               // verifies supported bcrypt/argon2 hashes
+base64Encode(value)               // base64
+```
+
+## HashMakeOptions
+```typescript
+interface HashMakeOptions {
+  algorithm?: 'bcrypt' | 'argon2' | 'argon2id' | 'argon2i' | 'argon2d'
+  rounds?: number      // bcrypt (default: 12)
+  memory?: number      // argon2 (default: 65536)
+  time?: number        // argon2 (default: 3)
+}
+```
+
+## config/hashing.ts
+```typescript
+{
+  driver: 'bcrypt',
+  bcrypt: { rounds: 12 },
+  argon2: { memory: 65536, time: 3 }
+}
+```
+
+## config/security.ts
+```typescript
+{
+  firewall: {
+    enabled: true,
+    countryCodes: [],                // block by country
+    ipAddresses: {
+      allowlist: [],
+      blocklist: []
+    },
+    rateLimitPerMinute: 500,
+    useIpReputationLists: true,
+    useKnownBadInputsRuleSet: true
+  }
+}
+```
+
+## Personal data and GDPR
+
+Data-subject requests are driven by model declarations, not by code you write per
+request: `personal: true` on an attribute and `traits.gdpr` on the model (see
+`stacks-models`, "Personal data (GDPR)", and `docs/guide/gdpr.md`).
+
+```bash
+buddy gdpr:export <id|email> --out file.json   # access (Art. 15/20)
+buddy gdpr:erase <id|email> --dry-run          # then without --dry-run, or --yes
+buddy gdpr:prune --dry-run                     # retention; PruneRetainedDataJob runs daily
+buddy gdpr:register && buddy gdpr:register:check
+```
+
+```typescript
+import { eraseSubject, exportSubjectData, pruneRetainedData } from '@stacksjs/orm'
+```
+
+- `GET /me/data-export` (auth bundle, `auth` middleware, 3/hour) is the
+  self-service export; the subject is always the caller.
+- Erasure runs in one transaction with its `gdpr_requests` audit row, writes only
+  rows it matched to the subject, then revokes tokens and destroys sessions.
+- Erasure of the `User` row anonymizes rather than deletes: orders, payments and
+  memberships still point at it. Consent and suppression records are kept by
+  declaration, since honouring an opt-out needs the address.
+- The audit ledger stores counts, never values. Do not log export payloads with
+  `log`, which writes to disk in production.
+
+## Gotchas
+- Default hashing is bcrypt with 12 rounds - sufficient for most applications
+- `needsRehash()` compares current hash options against provided options - useful after config changes
+- APP_KEY is used for `encrypt()`/`decrypt()` - generate via `buddy key:generate`
+- APP_KEY format is colon-separated (validated during deployment)
+- Argon2 requires more memory/time but is more resistant to GPU attacks
+- Base64 is encoding, not hashing. Never use `base64Encode()` for credentials.
+- MD5 and base64 password verification are intentionally absent from the main security API.
+- The firewall config is used by cloud deployment for WAF rules
+- Rate limiting is per-minute per-IP (500 default)
+
+
+## Encryption and webhook contracts
+
+New `encrypt()` ciphertext uses the versioned AES-256-GCM envelope and
+PBKDF2-SHA-256 derivation in `core/security/src/crypt.ts`; decrypt retains
+legacy formats for upgrades. The base64: APP_KEY prefix is normalized by that
+implementation. Encryption/hashing/encoding are distinct APIs; use the exported
+webhook helpers from `core/security/src/webhook.ts` for signed callback
+validation rather than inventing a string comparison. To SEND signed webhooks,
+`signWebhook(secret | secrets[], body, { timestamp? })` returns the
+`t=<unix>,v1=<hex>` header (HMAC-SHA256 of `${t}.${body}`, one `v1` per secret
+while rotating) and `verifySignedWebhook` / `verifyWebhook('signed', ...)` is
+the receiver's check (tolerance applies both ways). `generateWebhookSecret()`
+mints a `whsec_` secret; store it encrypted, since signing needs the plaintext.
+
+Outbound requests to a URL a user typed (webhook endpoints, import-from-URL)
+go through `await fetchPublicUrl(url, init?, opts?)`, which makes the request
+rather than blessing it: https only, no credentials, every resolved address
+public (`isPrivateAddress` covers loopback, RFC 1918, CGNAT, link-local
+metadata, IPv4-mapped/NAT64/6to4 forms), **every redirect hop re-checked by
+the same rules**, the connection pinned to an address that was checked (name
+kept in `Host` and TLS SNI), `Authorization`/`Cookie` dropped across an
+origin change, and the body and duration capped. It throws `OutboundUrlError`
+with a `reason`.
+
+`outboundUrlProblem(url, opts)` is the cheap check for when the URL is saved,
+and `assertPublicOutboundUrl(url, opts)` the check alone. **Checking is not
+fetching.** A caller that validates and then calls `fetch` has given the
+guarantee back: `fetch` defaults to `redirect: 'follow'`, so a validated host
+answering `302 Location: http://169.254.169.254/...` is followed unchecked,
+and `fetch` resolves the name a second time, so the address that was approved
+is not the address connected to (stacksjs/stacks#2909). Use `fetchPublicUrl`
+unless you know you want only the check.
+API keys handed to integrations: `generateApiKey('myapp_live_')` returns
+`{ key, hash, hint }`; show `key` once, store `hash` (`hashApiKey`), list `hint`.
+
+Configured or user-supplied regex patterns: `matchBoundedRegex(source, input, options)`
+accepts optional `flags` and `timeoutMs`, and returns `{ value, index }` for the first complete
+match, or `null`. Every call runs in an isolated Bun process with an OS-enforced
+deadline and `SIGKILL`, including process startup (25ms by default, integer
+1-1000ms). It requires `bun` on PATH. Timeouts throw `RegexTimeoutError`;
+invalid patterns throw `SyntaxError`. Do not treat either as a clean security
+scan. Source is capped at 8Ki UTF-16 code units, input at 64Ki, and flags at 8.
+The helper does not inherit app preloads, environment variables or .env files.
+It matches statelessly and does not return captures. Use ordinary RegExp for
+trusted application constants to avoid process startup for normal matching.
+Timing a synchronous match afterward or vetting one sample input cannot bound
+an untrusted expression on its next input.
+
+Generated model API exposure and ownership live under `config/security.ts`
+api settings. Read `stacks-models`/`stacks-router` before opening generated
+endpoints; a cloud WAF setting does not implement model row authorization.
+Capability/config validation and credential recovery have separate tests and
+failure contracts; propagate their real errors rather than interpreting an
+awaited call as proof that a security state transition persisted.

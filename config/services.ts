@@ -1,0 +1,208 @@
+import type { ServicesConfig } from '@stacksjs/types'
+import { env } from '@stacksjs/env'
+
+/**
+ * **Services**
+ *
+ * This configuration defines all of your services. Because Stacks is fully-typed, you may
+ * hover any of the options below and the definitions will be provided. In case you
+ * have any questions, feel free to reach out via Discord or GitHub Discussions.
+ */
+export default {
+  apns: {
+    teamId: String(env.APNS_TEAM_ID || ''),
+    keyId: String(env.APNS_KEY_ID || ''),
+    privateKey: String(env.APNS_PRIVATE_KEY || ''),
+    topic: String(env.APNS_TOPIC || ''),
+    sandbox: String(env.APNS_ENVIRONMENT || 'production') === 'sandbox',
+  },
+  algolia: {
+    appId: '',
+    apiKey: '',
+  },
+
+  aws: {
+    accountId: String(env.AWS_ACCOUNT_ID || ''),
+    appId: String(env.AWS_ACCESS_KEY_ID || ''),
+    apiKey: String(env.AWS_SECRET_ACCESS_KEY || ''),
+    region: String(env.AWS_DEFAULT_REGION || 'us-east-1'),
+  },
+
+  github: {
+    clientId: String(env.GITHUB_CLIENT_ID || ''),
+    clientSecret: String(env.GITHUB_CLIENT_SECRET || ''),
+    redirectUrl: String(env.GITHUB_REDIRECT_URL || 'http://localhost:3000/auth/github/callback'),
+    scopes: ['read:user', 'user:email'],
+  },
+
+  google: {
+    clientId: String(env.GOOGLE_CLIENT_ID || ''),
+    clientSecret: String(env.GOOGLE_CLIENT_SECRET || ''),
+    redirectUrl: String(env.GOOGLE_REDIRECT_URL || 'http://localhost:3000/auth/google/callback'),
+    scopes: ['profile', 'email'],
+  },
+
+  // Sign in with Apple has no static client secret — the AppleProvider
+  // signs a short-lived ES256 JWT from teamId + keyId + privateKey (the
+  // .p8 file's contents) on every token exchange.
+  apple: {
+    clientId: String(env.APPLE_CLIENT_ID || ''), // the Services ID, e.g. org.example.web
+    teamId: String(env.APPLE_TEAM_ID || ''),
+    keyId: String(env.APPLE_KEY_ID || ''),
+    privateKey: String(env.APPLE_PRIVATE_KEY || ''), // literal \n newlines allowed
+    redirectUrl: String(env.APPLE_REDIRECT_URL || 'http://localhost:3000/auth/apple/callback'),
+    scopes: ['name', 'email'],
+  },
+
+  facebook: {
+    clientId: String(env.FACEBOOK_CLIENT_ID || ''),
+    clientSecret: String(env.FACEBOOK_CLIENT_SECRET || ''),
+    redirectUrl: String(env.FACEBOOK_REDIRECT_URL || 'http://localhost:3000/auth/facebook/callback'),
+    scopes: ['email', 'public_profile'],
+  },
+
+  twitter: {
+    clientId: String(env.TWITTER_CLIENT_ID || ''),
+    clientSecret: String(env.TWITTER_CLIENT_SECRET || ''),
+    redirectUrl: String(env.TWITTER_REDIRECT_URL || 'http://localhost:3000/auth/twitter/callback'),
+    scopes: ['tweet.read', 'users.read', 'offline.access'],
+  },
+
+  digitalOcean: {
+    appId: '',
+    apiKey: '',
+  },
+
+  mailgun: {
+    apiKey: String(env.MAILGUN_API_KEY || ''),
+    domain: String(env.MAILGUN_DOMAIN || ''),
+    endpoint: String(env.MAILGUN_ENDPOINT || 'api.mailgun.net'),
+    maxRetries: Number(env.MAILGUN_MAX_RETRIES || 3),
+    retryTimeout: Number(env.MAILGUN_RETRY_TIMEOUT || 1000),
+  },
+
+  mailtrap: {
+    host: String(env.MAILTRAP_HOST || ''),
+    token: String(env.MAILTRAP_TOKEN || ''),
+    inboxId: String(env.MAILTRAP_INBOX_ID || ''),
+    maxRetries: Number(env.MAILTRAP_MAX_RETRIES || 3),
+    retryTimeout: Number(env.MAILTRAP_RETRY_TIMEOUT || 1000),
+  },
+
+  hetzner: {
+    appId: '',
+    apiKey: '',
+  },
+
+  meilisearch: {
+    appId: '',
+    apiKey: '',
+  },
+
+  sendgrid: {
+    apiKey: String(env.SENDGRID_API_KEY || ''),
+    maxRetries: Number(env.SENDGRID_MAX_RETRIES || 3),
+    retryTimeout: Number(env.SENDGRID_RETRY_TIMEOUT || 1000),
+  },
+
+  ses: {
+    region: String(env.AWS_SES_REGION || 'us-east-1'),
+    credentials: {
+      accessKeyId: String(env.AWS_ACCESS_KEY_ID || ''),
+      secretAccessKey: String(env.AWS_SECRET_ACCESS_KEY || ''),
+    },
+  },
+
+  /**
+   * SMTP.
+   *
+   * The defaults are the local mail catcher `buddy mail:dev` runs — the mail
+   * server itself, with delivery switched off — so an application with no
+   * `.env` at all still sends somewhere it can be read, at
+   * http://localhost:8025.
+   *
+   * 1025 rather than the mail server's own 2525, because that is the port
+   * every development mail trap has used for a decade and `.env.example` names
+   * it too. The two disagreed before this: the example said 1025 and the
+   * fallback said 2525, so an app that had not copied `.env.example` sent into
+   * a closed port and failed with ECONNREFUSED at the moment somebody was
+   * trying to test a password reset.
+   *
+   * Any third-party SMTP works the same way — point `MAIL_HOST`/`MAIL_PORT`
+   * wherever you like.
+   */
+  smtp: {
+    host: String(env.MAIL_HOST || '127.0.0.1'),
+    port: Number(env.MAIL_PORT || 1025),
+    // Handle "null" string from .env files (Laravel-style)
+    username: String((env.MAIL_USERNAME && env.MAIL_USERNAME !== 'null') ? env.MAIL_USERNAME : ''),
+    password: String((env.MAIL_PASSWORD && env.MAIL_PASSWORD !== 'null') ? env.MAIL_PASSWORD : ''),
+    encryption: (env.MAIL_ENCRYPTION && env.MAIL_ENCRYPTION !== 'null' ? env.MAIL_ENCRYPTION : null) as 'tls' | 'ssl' | null,
+    maxRetries: Number(env.MAIL_MAX_RETRIES || 3),
+    retryTimeout: Number(env.MAIL_RETRY_TIMEOUT || 1000),
+  },
+
+  // lemonSqueezy: {
+  //   appId: '',
+  //   apiKey: '',
+  // },
+
+  slack: {
+    appId: String(env.SLACK_APP_ID || ''),
+    clientId: String(env.SLACK_CLIENT_ID || ''),
+    secretKey: String(env.SLACK_SECRET_KEY || ''),
+    webhookUrl: String(env.SLACK_WEBHOOK_URL || ''),
+    botToken: String(env.SLACK_BOT_TOKEN || ''),
+    maxRetries: Number(env.SLACK_MAX_RETRIES || 3),
+    retryTimeout: Number(env.SLACK_RETRY_TIMEOUT || 1000),
+  },
+
+  discord: {
+    webhookUrl: String(env.DISCORD_WEBHOOK_URL || ''),
+    botToken: String(env.DISCORD_BOT_TOKEN || ''),
+    maxRetries: Number(env.DISCORD_MAX_RETRIES || 3),
+    retryTimeout: Number(env.DISCORD_RETRY_TIMEOUT || 1000),
+  },
+
+  teams: {
+    webhookUrl: String(env.TEAMS_WEBHOOK_URL || ''),
+    maxRetries: Number(env.TEAMS_MAX_RETRIES || 3),
+    retryTimeout: Number(env.TEAMS_RETRY_TIMEOUT || 1000),
+  },
+
+  // Push Notification Services
+  expo: {
+    accessToken: String(env.EXPO_ACCESS_TOKEN || ''),
+  },
+
+  fcm: {
+    projectId: String(env.FCM_PROJECT_ID || ''),
+    clientEmail: String(env.FCM_CLIENT_EMAIL || ''),
+    privateKey: String(env.FCM_PRIVATE_KEY || ''),
+  },
+
+  // AI Services
+  openai: {
+    apiKey: String(env.OPENAI_API_KEY || ''),
+    model: String(env.OPENAI_MODEL || 'gpt-4o'),
+    embeddingModel: String(env.OPENAI_EMBEDDING_MODEL || 'text-embedding-3-small'),
+    baseUrl: String(env.OPENAI_BASE_URL || 'https://api.openai.com/v1'),
+  },
+
+  anthropic: {
+    apiKey: String(env.ANTHROPIC_API_KEY || ''),
+    model: String(env.ANTHROPIC_MODEL || 'claude-sonnet-5-5'),
+    maxTokens: Number(env.ANTHROPIC_MAX_TOKENS || 4096),
+  },
+
+  ollama: {
+    host: String(env.OLLAMA_HOST || 'http://localhost:11434'),
+    model: String(env.OLLAMA_MODEL || 'llama3.2'),
+    embeddingModel: String(env.OLLAMA_EMBEDDING_MODEL || 'nomic-embed-text'),
+  },
+
+  stripe: {
+    secretKey: String(env.STRIPE_SECRET_KEY || ''),
+    publicKey: String(env.STRIPE_PUBLISHABLE_KEY || ''),
+  },
+} satisfies ServicesConfig

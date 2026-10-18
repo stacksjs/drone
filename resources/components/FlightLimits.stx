@@ -1,0 +1,6 @@
+<template>
+  <section aria-labelledby="limits-title" class="pt-8 border-neutral-700 border-t">
+    <h2 id="limits-title" class="font-semibold text-xl">The operating envelope</h2><p class="mt-2 max-w-2xl text-neutral-400 text-sm">Every behavior passes through the same checks. These software limits supplement the flight controller's independent failsafes.</p>
+    <dl class="grid gap-x-8 gap-y-6 grid-cols-2 md:grid-cols-4 mt-6 text-sm"><div><dt class="text-neutral-400">Launch-origin fence</dt><dd class="mt-1 font-mono">80 m radius</dd></div><div><dt class="text-neutral-400">Altitude envelope</dt><dd class="mt-1 font-mono">8 to 30 m</dd></div><div><dt class="text-neutral-400">Horizontal speed</dt><dd class="mt-1 font-mono">3 m/s maximum</dd></div><div><dt class="text-neutral-400">Battery reserve</dt><dd class="mt-1 font-mono">25% minimum</dd></div></dl>
+  </section>
+</template>

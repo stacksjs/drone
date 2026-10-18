@@ -1,0 +1,42 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v6
+        with:
+          # The changelog is generated from commits since the previous tag, so
+          # the full history has to be present.
+          fetch-depth: 0
+
+      - name: Setup Pantry
+        uses: pantry-pm/pantry/packages/action@cdb82193cb344c2b881a88ea79f88243f5522e0f # v0.11.75
+        with:
+          install: 'false'
+
+      - name: Use Cached node_modules
+        uses: actions/cache@v5
+        with:
+          path: node_modules
+          key: node-modules-${{ hashFiles('**/bun.lock') }}
+          restore-keys: |
+            node-modules-
+
+      - name: Install Dependencies
+        run: bun install
+
+      - name: Create GitHub Release
+        uses: stacksjs/action-releaser@v1.2.9
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

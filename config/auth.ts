@@ -1,0 +1,192 @@
+import type { AuthConfig } from '@stacksjs/types'
+import { env } from '@stacksjs/env'
+
+const tokenExpiry = env.AUTH_TOKEN_EXPIRY || 60 * 60 * 1000
+
+/**
+ * **Authentication Configuration**
+ *
+ * This configuration defines all of your authentication options. Because Stacks is fully-typed,
+ * you may hover any of the options below and the definitions will be provided. In case
+ * you have any questions, feel free to reach out via Discord or GitHub Discussions.
+ */
+export default {
+  /**
+   * Whether the framework's account models load (Team, Referral, Subscriber,
+   * Subscription, Site, ...). The auth routes are chosen separately, by
+   * `STACKS_DEFAULT_ROUTES` - `false` here does not take `/login` down.
+   */
+  enabled: true,
+
+  /**
+   * The authentication guard to use for your application.
+   */
+  default: 'api',
+
+  /**
+   * The authentication guards available for your application.
+   */
+  guards: {
+    api: {
+      driver: 'token',
+      provider: 'users',
+    },
+  },
+
+  /**
+   * The authentication providers available for your application.
+   */
+  providers: {
+    users: {
+      driver: 'database',
+      table: 'users',
+    },
+  },
+
+  /**
+   * The username field used for authentication.
+   */
+  username: env.AUTH_USERNAME_FIELD || 'email',
+
+  /**
+   * The password field used for authentication.
+   */
+  password: env.AUTH_PASSWORD_FIELD || 'password',
+
+  /**
+   * Access-token expiry in milliseconds (default: 1 hour).
+   *
+   * Access tokens are deliberately short-lived: a leaked bearer (logs,
+   * proxy, browser storage) is then usable for an hour, not a month. The
+   * paired refresh token (`refreshTokenExpiry`) carries the long-lived
+   * session and is rotated on use, so UX is unaffected.
+   */
+  tokenExpiry,
+
+  /**
+   * Refresh-token expiry in milliseconds (default: 30 days). This is the
+   * long-lived credential exchanged for fresh access tokens.
+   */
+  refreshTokenExpiry: env.AUTH_REFRESH_TOKEN_EXPIRY || 30 * 24 * 60 * 60 * 1000,
+
+  /**
+   * First-party browser-session policy. Lifetimes are absolute milliseconds.
+   *
+   * Matching the ordinary access-token lifetime preserves existing behavior.
+   * Apps can give the remember checkbox a longer tier, or set
+   * `withRefreshToken: false` for a fixed-lifetime cookie session.
+   */
+  browserSession: {
+    baselineLifetime: tokenExpiry,
+    rememberedLifetime: tokenExpiry,
+    withRefreshToken: true,
+  },
+
+  /**
+   * OAuth 2.0 authorization server. This is separate from social sign-in,
+   * where Stacks acts as a client of GitHub or another provider.
+   *
+   * Keep this disabled until the provider routes and persistence release gate
+   * are complete. When enabled, the profile supports authorization code with
+   * S256 PKCE and rotating refresh tokens. Set clientCredentials to true to
+   * allow confidential machine clients to mint access-only tokens. Set
+   * introspection to true to expose protected resource-server token
+   * introspection. Set subjectEligibility when the app has disabled or
+   * suspended account states beyond the existence of a users row. Implicit
+   * and password grants are not supported.
+   */
+  oauthProvider: {
+    enabled: false,
+    issuer: env.APP_URL,
+    clientCredentials: false,
+    introspection: false,
+    scopes: {},
+    resources: {},
+    clientTypes: ['confidential', 'public'],
+    lifetimes: {
+      authorizationRequest: 10 * 60 * 1000,
+      authorizationCode: 10 * 60 * 1000,
+      accessToken: tokenExpiry,
+      refreshToken: env.AUTH_REFRESH_TOKEN_EXPIRY || 30 * 24 * 60 * 60 * 1000,
+    },
+    consent: {
+      rememberFor: 0,
+      view: 'auth/oauth/consent',
+    },
+  },
+
+  /**
+   * Browser cookie attributes shared by issuance and logout.
+   *
+   * Leave `maxAge` unset for framework browser sessions: their actual issued
+   * token lifetime is authoritative. `secure` also defaults from APP_URL.
+   */
+  cookie: {
+    name: 'auth-token',
+    path: '/',
+    sameSite: 'Lax',
+    // domain: '.example.com',
+    // secure: true,
+  },
+
+  /**
+   * The token abilities that are granted by default.
+   */
+  defaultAbilities: ['*'],
+
+  /**
+   * The token name used when creating new tokens.
+   */
+  defaultTokenName: 'auth-token',
+
+  /**
+   * Password reset configuration.
+   */
+  passwordReset: {
+    /**
+     * Token expiration time in minutes.
+     * After this time, the reset link becomes invalid.
+     *
+     * @default 60
+     */
+    expire: env.AUTH_PASSWORD_RESET_EXPIRE ||60,
+
+    /**
+     * Throttle time in seconds between password reset requests.
+     * Users must wait this long before requesting another reset email.
+     *
+     * @default 60
+     */
+    throttle: env.AUTH_PASSWORD_RESET_THROTTLE ||60,
+  },
+
+  /**
+   * Magic-link (passwordless) sign-in. Off by default; parent-portal style
+   * apps flip it on so low-friction audiences never need a password.
+   */
+  magicLink: {
+    enabled: false,
+
+    /**
+     * Link expiration time in minutes.
+     *
+     * @default 15
+     */
+    expire: 15,
+
+    /**
+     * Render a "Continue" button instead of auto-submitting the consume
+     * request on the interstitial page.
+     *
+     * @default false
+     */
+    confirmInteraction: false,
+
+    /**
+     * Where a consumed link lands when the send didn't say.
+     *
+     * @default '/'
+     */
+    redirectDefault: '/',
+  },
+} satisfies AuthConfig

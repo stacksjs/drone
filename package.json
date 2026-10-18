@@ -1,0 +1,59 @@
+{
+  "name": "@stacksjs/drone",
+  "type": "module",
+  "version": "0.1.0",
+  "private": true,
+  "description": "A Stacks framework for drone companion logic, simulation, and Raspberry Pi telemetry.",
+  "license": "MIT",
+  "engines": {
+    "bun": "1.4.2"
+  },
+  "scripts": {
+    "dev": "./buddy dev",
+    "build": "./buddy build",
+    "lint": "./buddy lint",
+    "lint:fix": "./buddy lint:fix",
+    "typecheck": "./buddy typecheck",
+    "test": "./buddy test",
+    "simulate": "bun scripts/simulate.ts",
+    "telemetry": "bun scripts/telemetry.ts",
+    "buddy": "./buddy",
+    "check": "./buddy lint && ./buddy typecheck && ./buddy test",
+    "sitl": "bun scripts/sitl.ts",
+    "typecheck:views": "stx typecheck 'resources/**/*.stx'"
+  },
+  "dependencies": {
+    "stacks": "^0.75.221",
+    "@stacksjs/env": "^0.75.221",
+    "@stacksjs/path": "^0.75.221",
+    "@stacksjs/actions": "^0.75.221",
+    "@stacksjs/cli": "^0.75.221",
+    "@stacksjs/router": "^0.75.221",
+    "@stacksjs/testing": "^0.75.221"
+  },
+  "workspaces": [
+    "storage/framework",
+    "storage/framework/libs/*",
+    "storage/framework/views/*"
+  ],
+  "git-hooks": {
+    "pre-commit": {
+      "staged-lint": {
+        "*.{js,ts,json,yaml,yml,md}": "bun x --bun pickier lint --fix"
+      }
+    },
+    "commit-msg": "bun x gitlint --edit \"$1\""
+  },
+  "devDependencies": {
+    "better-dx": "^0.2.37"
+  },
+  "author": "Chris Breuer <chris@stacksjs.com>",
+  "homepage": "https://github.com/stacksjs/drone",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/stacksjs/drone.git"
+  },
+  "bugs": {
+    "url": "https://github.com/stacksjs/drone/issues"
+  }
+}

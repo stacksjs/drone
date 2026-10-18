@@ -1,0 +1,7 @@
+<template>
+  <section id="hardware" aria-labelledby="hardware-title" class="pt-8 border-neutral-700 border-t">
+    <div class="max-w-2xl"><h2 id="hardware-title" class="font-semibold text-xl">Build around the Pi you own.</h2><p class="mt-2 text-neutral-400 text-sm">Raspberry Pi 5, 8 GB. One computer for your logic, a dedicated controller for flight.</p></div>
+    <div class="grid gap-x-12 gap-y-5 md:grid-cols-2 mt-6 text-sm"><div><h3 class="font-medium">Holybro X500 v2 / Pixhawk 6C</h3><p class="mt-1 text-neutral-400">Airframe, propulsion, GPS, power module, and telemetry.</p></div><div><h3 class="font-medium">Raspberry Pi AI Camera</h3><p class="mt-1 text-neutral-400">On-sensor inference for a later vision-tracking adapter.</p></div><div><h3 class="font-medium">RadioMaster Pocket ELRS + RP1 V2</h3><p class="mt-1 text-neutral-400">An independent RC link and a physical mode switch.</p></div><div><h3 class="font-medium">Dedicated Pi power + cooling</h3><p class="mt-1 text-neutral-400">A regulated 5 V supply, Active Cooler, and secure mounting.</p></div></div>
+    <a href="https://github.com/stacksjs/drone/blob/main/docs/hardware.md" class="inline-block mt-6 text-emerald-200 text-sm underline underline-offset-4 focus-visible:outline-emerald-200">Full parts list, wiring, and purchase notes</a>
+  </section>
+</template>

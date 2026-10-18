@@ -1,0 +1,214 @@
+---
+name: stacks-testing
+description: Use when writing or running tests in Stacks - test setup, database test utilities (setup, refresh, truncate), DynamoDB testing, feature test patterns, the test CLI commands, test configuration in bunfig.toml, or test environment setup. Covers @stacksjs/testing and tests/.
+license: MIT
+compatibility: Bun >= 1.3.0, TypeScript
+allowed-tools: Read Edit Write Bash Grep Glob
+---
+
+# Stacks Testing
+
+Uses Bun's built-in test runner with Stacks-specific test utilities.
+
+This skill is the **mechanics**: the utilities, the setup, the CLI, the gotchas.
+`stacks-tdd` is the **discipline**: the red-green loop, which seam a test belongs
+at, and the anti-patterns that make a test worse than no test. Read that one
+before deciding what to test, and this one for how.
+
+## Key Paths
+- Core package: `storage/framework/core/testing/src/`
+- Test directory: `tests/`
+- Test setup: `tests/setup.ts`
+- Package: `@stacksjs/testing`
+
+## Test Setup
+
+```typescript
+import { setupTestEnvironment } from '@stacksjs/testing'
+import { refreshDatabase, setupDatabase, truncateMysql, truncateSqlite } from '@stacksjs/testing/database'
+
+// Set NODE_ENV and APP_ENV to 'test'
+setupTestEnvironment()
+
+// MySQL database setup; this helper does not initialize SQLite
+await setupDatabase()
+
+// Reset the configured test database, including the SQLite reset path
+await refreshDatabase()
+
+// Truncate tables
+await truncateSqlite()   // for SQLite
+await truncateMysql()    // for MySQL
+```
+
+The database subpath is intentional. Importing its fixtures from the root
+would eagerly load the database graph during test preload and can deadlock
+module loading. Set the test environment before database work and confirm the
+configured database points at disposable test data. `refreshDatabase()` follows
+the active configured driver; it is not a generic PostgreSQL reset utility.
+
+## DynamoDB Testing
+
+Point `AWS_ENDPOINT_URL` at a DynamoDB you started yourself - DynamoDB Local, or
+a real region. The framework cannot start one for you; a `launchServer()` that
+claimed to did not work and has been removed.
+
+```typescript
+import { createStacksTable, deleteStacksTable } from '@stacksjs/testing/dynamodb'
+
+// Create test table
+await createStacksTable()
+
+// Cleanup
+await deleteStacksTable()
+```
+
+These are table-level only. There are no item assertions (`assertDynamoHas` and
+friends have never existed): the `DynamoDBClient` in `@stacksjs/ts-cloud` covers
+`createTable` / `deleteTable` / `describeTable` and no data-plane operations.
+
+## Writing Tests
+
+```typescript
+import { describe, test, it, expect, beforeAll, afterAll, beforeEach } from 'bun:test'
+import { refreshDatabase } from '@stacksjs/testing/database'
+
+describe('User Model', () => {
+  beforeAll(async () => {
+    await refreshDatabase()
+  })
+
+  afterAll(async () => {
+    await refreshDatabase()
+  })
+
+  test('can create a user', async () => {
+    const user = await User.create({ name: 'John', email: 'john@test.com' })
+    expect(user.name).toBe('John')
+  })
+
+  test('validates email uniqueness', async () => {
+    await User.create({ name: 'First', email: 'duplicate@test.com' })
+    await expect(User.create({ email: 'duplicate@test.com' }))
+      .rejects.toThrow()
+  })
+})
+```
+
+## Queue Testing
+
+```typescript
+import { fake, restore, runTestJob, expectJobToFail } from '@stacksjs/queue'
+
+test('dispatches welcome email job', async () => {
+  const fakeQueue = fake()
+  await SendWelcomeEmail.dispatch({ email: 'test@test.com' })
+  fakeQueue.assertDispatched('SendWelcomeEmail')
+  restore()
+})
+```
+
+## HTTP, identity and boundary assertions
+
+`http` is a stateless client that calls the real in-process router pipeline.
+Wrap request bodies in its options. `featureTest()` returns a fluent client
+whose verb helpers instead accept a bare body. Both return response wrappers
+with status/headers, reusable JSON reads, `assertStatus`, `assertHeader` and
+`assertJson` (a top-level partial-object comparison).
+
+```ts
+import { http, actingAs } from '@stacksjs/testing'
+
+const response = await http.post('/api/posts', {
+  body: { title: 'Hello' },
+  actingAs: user,
+})
+response.assertStatus(201)
+await response.assertJson({ title: 'Hello' })
+
+const client = actingAs(user)
+await client.post('/api/posts', { title: 'Another post' })
+```
+
+`actingAs` requires a persisted user with a numeric id. It mints a real token
+through `Auth.loginUsingId`; it does not use a test-only authentication header.
+An explicit Authorization header wins over the acting identity. `http` supports
+query objects, repeated array query values, and multipart `formData`. A request
+has either JSON `body` or `formData`, never both.
+
+Database assertions and factory/transaction setup are imported from
+`@stacksjs/testing/database`: `assertDatabaseHas`, `assertDatabaseMissing`,
+`assertDatabaseCount`, `assertSoftDeleted`, `assertNotSoftDeleted`, `factory`,
+`useTransaction` and `useTransactionalTests`. Read their driver conditions
+before choosing transaction isolation for a suite. Database reset and clock
+state are process-wide boundaries; avoid parallel tests that share them.
+
+## Fakes, time and CLI tests
+
+The lightweight root also exports:
+
+- `eventFake`, `getDispatchedEvents`, `hasDispatchedEvent`, `restoreEvents`.
+  Event faking suppresses real listeners and automatically restores after each
+  test. Use separate listener tests for its side effects.
+- `mailFake`, `sentEmails`, `lastEmail`, `emailsTo`, `restoreMail`. These route
+  the real mail singleton through the capture driver and restore automatically.
+- `freezeTime`, `travelTo`, `useRealTime`. Explicitly register
+  `afterEach(useRealTime)`; frozen time is not restored implicitly.
+- `command(args)` returns an awaitable child-process builder with `withInput`,
+  `withEnv`, `withCwd` and `withTimeout`. Assert exitCode/output/timedOut. Run
+  file-writing commands in a disposable fixture project using `withCwd`.
+
+```ts
+import { afterEach, freezeTime, useRealTime, command } from '@stacksjs/testing'
+
+afterEach(useRealTime)
+freezeTime('2026-01-15T10:00:00Z')
+const result = await command(['list']).withTimeout(10_000)
+expect(result.exitCode).toBe(0)
+```
+
+Retained implementation evidence lives under `core/testing/tests/`:
+`http-client`, `acting-as`, `database-assertions`, `events`, `mail`, `time`
+and `console` test files. Fixture mechanics live in `core/testing/src/`;
+`package.json` declares the root and database/DynamoDB export boundaries.
+
+## CLI Commands
+
+```bash
+buddy test                    # run all tests
+buddy test --unit             # unit tests only
+buddy test --feature          # feature tests only
+bun run test                  # via npm script
+bun run test:ui               # UI tests
+bun run test:coverage         # with coverage
+bun run test:types            # type tests
+```
+
+## Configuration (bunfig.toml)
+
+```toml
+[test]
+preload = ["./tests/setup.ts"]
+```
+
+## Test File Conventions
+- Test files: `*.test.ts` or `*.spec.ts`
+- Located in `tests/` directory
+- Setup/teardown in `tests/setup.ts`
+- Unit tests in `tests/unit/`
+- Feature tests in `tests/feature/`
+
+## Gotchas
+- Uses Bun's native test runner, NOT Jest or Vitest
+- Test preload runs `tests/setup.ts` before each test file
+- SQLite testing database is at `database/stacks_testing.sqlite`
+- `refreshDatabase()` drops ALL tables - use in test setup only
+- DynamoDB Local must be installed for DynamoDB tests
+- Queue testing uses `fake()`/`restore()` pattern - affects global state
+- `@stacksjs/faker` provides test data generation
+- Coverage reports with `bun run test:coverage`
+
+## Downstream
+
+> Deciding what to test, or where? `/stacks-tdd`. Reviewing someone else's
+> tests? `/stacks-review` audits coverage as its third pass.

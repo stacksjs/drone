@@ -1,0 +1,70 @@
+<script client>
+import { createSimulator } from '../functions/drone/simulator'
+
+const simulation = createSimulator()
+const snapshot = state(simulation.snapshot())
+const distance = state(10)
+const altitude = state(12)
+const error = state('')
+const speed = derived(() => Math.hypot(snapshot().telemetry.velocity.north, snapshot().telemetry.velocity.east).toFixed(1))
+const separation = derived(() => Math.hypot(snapshot().telemetry.position.north - snapshot().target.position.north, snapshot().telemetry.position.east - snapshot().target.position.east).toFixed(1))
+const trail = derived(() => snapshot().trail.map(point => `${200 + point.east * 3},${200 - point.north * 3}`).join(' '))
+
+function command(value: Parameters<typeof simulation.command>[0]) { snapshot.set(simulation.command(value)) }
+function applySettings() {
+  try {
+    snapshot.set(simulation.configure({ distanceMeters: Number(distance()), altitudeMeters: Number(altitude()) }))
+    error.set('')
+  }
+  catch (failure) { error.set(failure instanceof Error ? failure.message : 'Unable to apply settings') }
+}
+useInterval(() => snapshot.set(simulation.step(200)), 200, { whileVisible: true })
+</script>
+
+<template>
+  <section id="simulation" class="grid gap-8 lg:grid-cols-[1.6fr_1fr]" aria-label="Flight simulator">
+    <div class="min-w-0">
+      <div class="flex flex-wrap gap-4 items-center justify-between mb-5"><h2 class="font-semibold text-xl">Flight field</h2><span class="font-mono text-neutral-400 text-xs">LOCAL NED / METRES</span></div>
+      <div class="overflow-hidden relative border border-neutral-700 rounded-lg flight-field">
+        <svg viewBox="0 0 400 400" class="block w-full" role="img" aria-label="Top-down simulation showing aircraft, selected target and flight trail">
+          <defs><pattern id="field-grid" width="30" height="30" patternUnits="userSpaceOnUse"><path d="M 30 0 L 0 0 0 30" fill="none" stroke="#303335" stroke-width="0.5" /></pattern></defs>
+          <rect width="400" height="400" fill="url(#field-grid)" />
+          <circle cx="200" cy="200" r="180" fill="none" stroke="#5c6264" stroke-dasharray="4 6" />
+          <line x1="200" y1="12" x2="200" y2="388" stroke="#484d4f" stroke-width="0.5" /><line x1="12" y1="200" x2="388" y2="200" stroke="#484d4f" stroke-width="0.5" />
+          <text x="207" y="22" fill="#b8bdbf" font-size="10" font-family="monospace">N</text><text x="380" y="194" fill="#b8bdbf" font-size="10" font-family="monospace">E</text>
+          <polyline :points="trail()" fill="none" stroke="#91c5a8" stroke-width="1.5" opacity="0.65" />
+          <line :x1="200 + snapshot().telemetry.position.east * 3" :y1="200 - snapshot().telemetry.position.north * 3" :x2="200 + snapshot().target.position.east * 3" :y2="200 - snapshot().target.position.north * 3" stroke="#91c5a8" stroke-dasharray="3 4" opacity="0.4" />
+          <circle :cx="200 + snapshot().target.position.east * 3" :cy="200 - snapshot().target.position.north * 3" r="6" fill="#e7e9e8" />
+          <circle :cx="200 + snapshot().target.position.east * 3" :cy="200 - snapshot().target.position.north * 3" r="13" fill="none" stroke="#e7e9e8" opacity="0.3" />
+          <circle :cx="200 + snapshot().telemetry.position.east * 3" :cy="200 - snapshot().telemetry.position.north * 3" r="7" fill="#91c5a8" stroke="#161a18" stroke-width="2" />
+          <text x="18" y="381" fill="#b8bdbf" font-size="10" font-family="monospace">RING: 60 M / FENCE: 80 M</text>
+        </svg>
+        <div class="flex absolute left-4 top-4 gap-2 items-center font-mono text-neutral-300 text-xs"><span class="size-2 rounded-full" :class="snapshot().running ? 'bg-emerald-300' : 'bg-neutral-500'"></span><span>{{ snapshot().running ? 'SIMULATION RUNNING' : 'SIMULATION PAUSED' }}</span></div>
+      </div>
+      <div class="flex flex-wrap gap-5 mt-4 text-neutral-400 text-xs"><span><span class="text-emerald-200">Aircraft</span> / green</span><span>Selected target / white</span><span>Origin / crosshair</span></div>
+      <dl class="grid gap-5 grid-cols-2 sm:grid-cols-4 mt-7 pt-6 border-neutral-700 border-t">
+        <div><dt class="text-neutral-400 text-sm">Altitude</dt><dd class="mt-1 font-mono text-2xl">{{ (-snapshot().telemetry.position.down).toFixed(1) }}<span class="ml-1 text-neutral-400 text-xs">m</span></dd></div>
+        <div><dt class="text-neutral-400 text-sm">Groundspeed</dt><dd class="mt-1 font-mono text-2xl">{{ speed() }}<span class="ml-1 text-neutral-400 text-xs">m/s</span></dd></div>
+        <div><dt class="text-neutral-400 text-sm">Separation</dt><dd class="mt-1 font-mono text-2xl">{{ separation() }}<span class="ml-1 text-neutral-400 text-xs">m</span></dd></div>
+        <div><dt class="text-neutral-400 text-sm">Battery</dt><dd class="mt-1 font-mono text-2xl">{{ snapshot().telemetry.batteryPercent }}<span class="ml-1 text-neutral-400 text-xs">%</span></dd></div>
+      </dl>
+    </div>
+    <div class="lg:pl-8 min-w-0 lg:border-l lg:border-neutral-700">
+      <h2 class="font-semibold text-xl">Follow behavior</h2><p class="mb-6 mt-2 text-neutral-400 text-sm">A selected target, a fixed launch origin, and your own logic.</p>
+      <form @submit.prevent="applySettings()" class="space-y-5">
+        <div><label for="distance" class="block mb-2 text-sm">Following distance <span class="text-neutral-400">/ metres</span></label><input id="distance" x-model.number="distance" type="number" min="8" max="25" required class="px-3 py-2.5 w-full font-mono bg-neutral-900 border border-neutral-600 rounded focus-visible:outline-emerald-200"></div>
+        <div><label for="altitude" class="block mb-2 text-sm">Flight altitude <span class="text-neutral-400">/ metres above origin</span></label><input id="altitude" x-model.number="altitude" type="number" min="8" max="25" required class="px-3 py-2.5 w-full font-mono bg-neutral-900 border border-neutral-600 rounded focus-visible:outline-emerald-200"></div>
+        <button type="submit" class="px-4 py-2.5 w-full font-medium text-sm hover:bg-neutral-800 border border-neutral-600 rounded focus-visible:outline-emerald-200">Apply simulation settings</button><p :if="error()" role="alert" class="text-neutral-200 text-sm">{{ error() }}</p>
+      </form>
+      <div class="grid gap-3 grid-cols-2 mt-6"><button type="button" @click="command('start')" :disabled="snapshot().running" class="px-3 py-3 font-semibold text-neutral-950 text-sm bg-emerald-200 rounded focus-visible:outline-white disabled:opacity-40">Run simulation</button><button type="button" @click="command('pause')" :disabled="!snapshot().running" class="px-3 py-3 text-sm hover:bg-neutral-800 border border-neutral-600 rounded focus-visible:outline-emerald-200 disabled:opacity-40">Pause</button></div>
+      <div class="mt-7 pt-6 border-neutral-700 border-t"><h3 class="mb-3 font-medium text-sm">Test a failure</h3><div class="flex flex-wrap gap-2"><button type="button" @click="command(snapshot().targetLost ? 'restore-target' : 'lose-target')" class="px-3 py-2 text-xs hover:bg-neutral-800 border border-neutral-600 rounded focus-visible:outline-emerald-200">{{ snapshot().targetLost ? 'Restore target' : 'Lose target' }}</button><button type="button" @click="command(snapshot().telemetry.batteryPercent < 25 ? 'restore-battery' : 'low-battery')" class="px-3 py-2 text-xs hover:bg-neutral-800 border border-neutral-600 rounded focus-visible:outline-emerald-200">{{ snapshot().telemetry.batteryPercent < 25 ? 'Restore battery' : 'Low battery' }}</button></div></div>
+      <div class="mt-6 p-4 border border-neutral-700 rounded" role="status" aria-live="polite"><p class="mb-1 text-neutral-400 text-xs">Controller decision</p><p class="font-mono text-emerald-200 text-sm">{{ snapshot().decision.kind.toUpperCase() }}</p><p class="mt-2 text-sm">{{ snapshot().decision.reason }}</p></div>
+      <p class="mt-4 leading-relaxed text-neutral-400 text-xs">This browser runs a kinematic simulation. It has no connection to motors or a physical aircraft.</p>
+    </div>
+  </section>
+</template>
+
+<style>
+.flight-field { background: #1b1f1d; aspect-ratio: 1; max-height: 590px; }
+.flight-field svg { height: 100%; }
+</style>

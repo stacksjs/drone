@@ -1,0 +1,130 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - main
+
+  pull_request:
+    branches:
+      - main
+
+  # So a maintainer can ship without pushing an empty commit.
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.head_ref || github.run_id }}
+  cancel-in-progress: true
+
+jobs:
+  lint:
+    strategy:
+      matrix:
+        os: [ubuntu-latest]
+      fail-fast: false
+
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup Pantry
+        uses: pantry-pm/pantry/packages/action@cdb82193cb344c2b881a88ea79f88243f5522e0f # v0.11.75
+        with:
+          install: 'false'
+
+      - name: Use cached node_modules
+        uses: actions/cache@v4
+        with:
+          path: node_modules
+          key: node-modules-${{ hashFiles('**/bun.lock') }}
+          restore-keys: |
+            node-modules-
+
+      - name: Install Dependencies
+        # Frozen: a lockfile that no longer matches package.json fails here,
+        # not in the deploy that installs from it.
+        run: bun install --frozen-lockfile
+
+      - name: Lint
+        run: bun buddy lint
+
+  typecheck:
+    runs-on: ${{ matrix.os }}
+
+    strategy:
+      matrix:
+        os: [ubuntu-latest]
+      fail-fast: false
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup Pantry
+        uses: pantry-pm/pantry/packages/action@cdb82193cb344c2b881a88ea79f88243f5522e0f # v0.11.75
+        with:
+          install: 'false'
+
+      - name: Use cached node_modules
+        uses: actions/cache@v4
+        with:
+          path: node_modules
+          key: node-modules-${{ hashFiles('**/bun.lock') }}
+          restore-keys: |
+            node-modules-
+
+      - name: Install dependencies
+        # Frozen: a lockfile that no longer matches package.json fails here,
+        # not in the deploy that installs from it.
+        run: bun install --frozen-lockfile
+
+      - name: Set Application Key
+        run: bun buddy key:generate
+
+      - name: Typecheck
+        run: bun buddy test:types
+
+  test:
+    runs-on: ${{ matrix.os }}
+
+    strategy:
+      matrix:
+        os: [ubuntu-latest]
+      fail-fast: false
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup Pantry
+        uses: pantry-pm/pantry/packages/action@cdb82193cb344c2b881a88ea79f88243f5522e0f # v0.11.75
+        with:
+          install: 'false'
+
+      - name: Use cached node_modules
+        uses: actions/cache@v4
+        with:
+          path: node_modules
+          key: node-modules-${{ hashFiles('**/bun.lock') }}
+          restore-keys: |
+            node-modules-
+
+      - name: Install Dependencies
+        # Frozen: a lockfile that no longer matches package.json fails here,
+        # not in the deploy that installs from it.
+        run: bun install --frozen-lockfile
+
+      - name: Set Application Key
+        run: bun buddy key:generate
+
+      # Feature tests query real tables, and a fresh checkout has no database
+      # file at all: it is gitignored, being machine-local state. Without this
+      # the suite fails in beforeAll with "no such table", which reads like a
+      # broken test rather than a missing schema.
+      - name: Migrate the database
+        run: bun buddy migrate
+
+      - name: Test Suite
+        run: bun run test
