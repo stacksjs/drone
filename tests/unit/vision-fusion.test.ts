@@ -290,3 +290,15 @@ test('sparse or malformed metric values never escape as a target', () => {
     expect(f.fusion.step({ nowMs: 120, tracking: f.tracking, vision: f.vision, fix: f.fix }).state).toBe('lost')
   }
 })
+
+test('changing source precision cannot create a faster than qualified fused target', () => {
+  const f = selected()
+  f.fix.positionM = [11, 0, 0]
+  f.fix.sigmaM = 1
+  f.fusion.pair(f.pairing, f.tracking, 120)
+  expect(f.fusion.step({ nowMs: 120, tracking: f.tracking, vision: f.vision, fix: f.fix }).state).toBe('tracking')
+  advance(f)
+  f.vision.sigmaM = 1
+  f.fix.sigmaM = 0.0001
+  expect(f.fusion.step({ nowMs: 130, tracking: f.tracking, vision: f.vision, fix: f.fix }).state).toBe('lost')
+})

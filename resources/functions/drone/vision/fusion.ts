@@ -156,13 +156,19 @@ export function createVisionTargetFusion() {
       const positionM = visual.map((v, i) => variance * (0.5 * v / a + 0.5 * fix.positionM[i]! / b)) as SensorVector
       const sigmaM = Math.sqrt(variance)
       if (!vector(positionM) || !bounded(sigmaM, 0.0001, 10)) return lose('Fused target exceeds metric bounds; clear and pair again')
+      const capturedAtMs = Math.min(vision.capturedAtMs, fix.capturedAtMs)
+      if (current.target) {
+        const displacementM = Math.hypot(...positionM.map((v, i) => v - current.target!.positionM[i]!))
+        const allowedM = 2 * (capturedAtMs - current.target.capturedAtMs) / 1000 + current.target.sigmaM + sigmaM
+        if (displacementM > allowedM) return lose('Fused target speed exceeded; clear and pair again')
+      }
       acceptedEvidence = vision.evidence
       previousVision = nextVision
       previousFix = nextFix
       previousDepthSequence = vision.depthSequence
       current = {
         ...current, state: 'tracking', reason: 'Paired metric target tracked', innovationM,
-        target: { id: current.pairing.targetId, reference: current.pairing.reference, positionM, capturedAtMs: Math.min(vision.capturedAtMs, fix.capturedAtMs), sigmaM },
+        target: { id: current.pairing.targetId, reference: current.pairing.reference, positionM, capturedAtMs, sigmaM },
       }
       return snapshot()
     },
