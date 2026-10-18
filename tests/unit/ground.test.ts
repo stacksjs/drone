@@ -39,12 +39,13 @@ test('raw encoder travel is calibrated and corrected using owned estimator data'
 })
 
 test('qualified wheel sensors reject stale, reordered, wrong calibration and unhealthy localization', () => {
-  for (const fault of ['stale', 'calibration', 'future', 'reference', 'localization']) {
+  for (const fault of ['stale', 'calibration', 'future', 'reference', 'localization', 'origin']) {
     const c = groundContext(), odometry = createGroundOdometry()
     if (fault === 'stale') c.measurement!.capturedAtMs = c.nowMs - 160
     if (fault === 'calibration') c.measurement!.values.calibration = 'wrong'
     if (fault === 'future') c.measurement!.receivedAtMs += 1
     if (fault === 'reference') c.measurement!.reference = '2:0,0,0,0,0'
+    if (fault === 'origin') c.estimate.localPosition!.origin!.ellipsoidHeightM = 101
     if (fault === 'localization') c.estimate.health.localPosition = false
     expect(odometry.step(c.measurement, c.estimate, c.nowMs).healthy).toBe(false)
   }
@@ -92,7 +93,8 @@ test('coverage strips cover the declared rectangle at measured-swath spacing wit
   const plan = planGroundCoverage(options)
   expect(plan.pointsM).toEqual([[3, 0, 0], [3, 0.8, 0], [0, 0.8, 0]])
   expect(plan.modeledStripAreaM2).toBeCloseTo(4.8, 10)
-  expect(plan.footprintM).toEqual({ minNorth: 0, maxNorth: 3, minEast: -0.4, maxEast: 1.2000000000000002 })
+  expect(plan.footprintM).toMatchObject({ minNorth: 0, maxNorth: 3, minEast: -0.4 })
+  expect(plan.footprintM.maxEast).toBeCloseTo(1.2, 10)
   options.swathM = 100
   expect(plan.swathM).toBe(0.8)
   expect(() => planGroundCoverage(options)).toThrow()
@@ -163,4 +165,28 @@ test('lateral slip consumes the contact friction budget instead of rotating velo
   }
   expect(lateral).toBeGreaterThan(0.01)
   expect(maximum).toBeGreaterThan(0.1)
+})
+
+test('material tray is consumed once and command position is checked before acknowledgement', () => {
+  const port = createGroundProfile('logistics').createPayload!(), c = groundContext()
+  port.observe!(c)
+  const command = { eventId: 'drop-1', taskId: 'drop', operation: 'material-drop' as const, containerId: 'tray-1', issuedAtMs: 1000, expiresAtMs: 1500, positionM: [0, 0, 0] as [number, number, number], reference: '1:0,0,0,0,0' }
+  port.request(command)
+  expect(port.poll(1060)).toMatchObject({ outcome: 'confirmed' })
+  port.request({ ...command, eventId: 'drop-2' })
+  expect(port.poll(1060)).toMatchObject({ outcome: 'rejected' })
+  expect(() => port.poll(1059)).toThrow()
+  const distant = createGroundProfile().createPayload!()
+  distant.observe!(c)
+  distant.request({ ...command, eventId: 'mower-away', operation: 'mower-enable', containerId: null, positionM: [10, 0, 0] })
+  expect(distant.poll(1060)).toMatchObject({ outcome: 'rejected' })
+})
+
+test('differential moment uses measured track and yaw inertia in the first force-producing step', () => {
+  const plant = createGroundPlant(), environment = { windMps: [0, 0, 0] as [number, number, number], currentMps: [0, 0, 0] as [number, number, number] }
+  plant.step([-0.1, 0.1, 0, 0], 0.004, environment)
+  const second = plant.step([-0.1, 0.1, 0, 0], 0.004, environment)
+  // First wheel speed +/-0.015rad/s gives +/-0.36N contact forces on step2.
+  // Moment=(.36-(-.36))*.3=.216Nm; deltaYawRate=.216/3*.004=.000288rad/s.
+  expect(second.angularRateRadS[2]).toBeCloseTo(0.000288, 12)
 })
