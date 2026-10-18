@@ -179,4 +179,6 @@ export function createEstimator(options: { origin?: GeodeticOrigin, gravityCorre
     },
   }
 }
-export type EstimatorSnapshot = ReturnType<ReturnType<typeof createEstimator>['snapshot']>
+type GnssEstimatorSnapshot = ReturnType<ReturnType<typeof createEstimator>['snapshot']>
+/** Normalized owned navigation snapshot. Pressure/DVL adapters retain their own datum. */
+export type EstimatorSnapshot = Omit<GnssEstimatorSnapshot, 'localPosition'> & { localPosition: (Omit<NonNullable<GnssEstimatorSnapshot['localPosition']>, 'altitudeDatum'> & { altitudeDatum: 'WGS84_ELLIPSOID' | 'LOCAL_WATER_SURFACE' }) | null }

@@ -7,10 +7,12 @@ const active = (s: AuthorityState) => s === 'armed-idle' || s === 'autonomous' |
 const integer = (n: number) => Number.isSafeInteger(n) && n >= 0 && n <= 0xFFFFFFFF
 const fresh = (at: number, now: number, age: number) => Number.isFinite(at) && at >= 0 && at <= now && now - at <= age
 /** Shared authority lifecycle. Wrappers own actuator units, limits and frame construction. */
-export function createAuthorityKernel<Output, Frame>(options: { sessionId: bigint, bootId: bigint, fence: { radiusM: number, minDownM: number, maxDownM: number }, interlockAgeMs?: number, validateOutput: (output: Output, atMs: number) => boolean, createFrame: (output: Output, metadata: AuthorityFrameMetadata) => Frame }) {
+export function createAuthorityKernel<Output, Frame>(options: { sessionId: bigint, bootId: bigint, fence: { radiusM: number, minDownM: number, maxDownM: number }, interlockAgeMs?: number, altitudeDatum?: 'WGS84_ELLIPSOID' | 'LOCAL_WATER_SURFACE', validateOutput: (output: Output, atMs: number) => boolean, createFrame: (output: Output, metadata: AuthorityFrameMetadata) => Frame }) {
   if (typeof options.sessionId !== 'bigint' || options.sessionId <= 0n || typeof options.bootId !== 'bigint' || options.bootId <= 0n) throw new TypeError('Positive simulation session and boot IDs required')
   const { sessionId, bootId, validateOutput, createFrame } = options, fence = { ...options.fence }, interlockAgeMs = options.interlockAgeMs ?? authorityPolicy.interlockAgeMs
   if (![fence.radiusM, fence.minDownM, fence.maxDownM].every(Number.isFinite) || fence.radiusM <= 0 || fence.radiusM > 5000 || fence.minDownM >= fence.maxDownM || !Number.isFinite(interlockAgeMs) || interlockAgeMs < 20 || interlockAgeMs > 200) throw new TypeError('Invalid authority profile bounds')
+  const altitudeDatum = options.altitudeDatum ?? 'WGS84_ELLIPSOID'
+  if (!['WGS84_ELLIPSOID', 'LOCAL_WATER_SURFACE'].includes(altitudeDatum)) throw new TypeError('Invalid authority altitude datum')
   const insideFence = (p: unknown) => validVector(p) && Math.hypot(p[0], p[1]) <= fence.radiusM && p[2] >= fence.minDownM && p[2] <= fence.maxDownM
   let state: AuthorityState = 'disarmed', epoch = 0, sequence = -1, outputSequence = 0
   let lastNow: number | null = null, lastGatedAt: number | null = null, leaseUntilMs: number | null = null, target: PositionTarget | null = null, reference: string | null = null
@@ -42,7 +44,7 @@ export function createAuthorityKernel<Output, Frame>(options: { sessionId: bigin
     if (o.battery.remainingPercent <= authorityPolicy.reservePercent) return 'battery-reserve'
     if (!e || e.evidence !== 'fixture' || e.physicalFlightEnabled !== false || e.nowMs !== now || !e.health.tilt || !e.health.localPosition || !a || !p || !Object.values(e.resets).every(integer)) return 'estimator-loss'
     if (a.capturedAtMs === null || !fresh(a.capturedAtMs, now, 60) || p.capturedAtMs === null || !fresh(p.capturedAtMs, now, 200) || !fresh(p.predictedToMs, now, 40)) return 'stale-estimator'
-    if (a.reference !== 'GRAVITY_ALIGNED_RELATIVE_YAW' || p.frame !== 'LOCAL_NED' || p.altitudeDatum !== 'WGS84_ELLIPSOID' || !validVector(p.velocityMps) || a.quaternionWxyz.length !== 4 || !a.quaternionWxyz.every(Number.isFinite) || Math.abs(Math.hypot(...a.quaternionWxyz) - 1) > 1e-6 || !p.origin || !Object.values(p.origin).every(Number.isFinite)) return 'invalid-estimator-frame'
+    if (a.reference !== 'GRAVITY_ALIGNED_RELATIVE_YAW' || p.frame !== 'LOCAL_NED' || p.altitudeDatum !== altitudeDatum || !validVector(p.velocityMps) || a.quaternionWxyz.length !== 4 || !a.quaternionWxyz.every(Number.isFinite) || Math.abs(Math.hypot(...a.quaternionWxyz) - 1) > 1e-6 || !p.origin || !Object.values(p.origin).every(Number.isFinite)) return 'invalid-estimator-frame'
     if (!insideFence(p.positionM)) return 'fence-breach'
     if (active(state) && reference !== null && JSON.stringify([e.resets, p.origin]) !== reference) return 'estimator-reference-changed'
     return null

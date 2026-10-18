@@ -15,7 +15,7 @@ export function vehicleMissionContains(plan: VehicleMissionPlan, p: unknown) {
 export function vehicleTaskTarget(plan: VehicleMissionPlan, task: VehicleMissionTask) { return task.kind === 'return' ? [...plan.rallyM] : 'positionM' in task ? [...task.positionM] : null }
 export function validateVehicleMission(input: unknown): { plan: VehicleMissionPlan, worstCaseMs: number, requiredWh: number } {
   const invalid = (): never => { throw new TypeError('Invalid vehicle mission or unsupported profile') }
-  if (!object(input) || !keys(input, ['version', 'vehicle', 'id', 'frame', 'altitude', 'terrain', 'origin', 'fence', 'rallyM', 'power', 'start', 'tasks']) || input.version !== 2 || !['fixed-wing', 'ground', 'surface'].includes(input.vehicle as string) || !id(input.id) || input.frame !== 'LOCAL_NED' || input.altitude !== 'ORIGIN_RELATIVE_DOWN' || input.terrain !== 'DECLARED_MODEL_SURFACE' || !id(input.start)) invalid()
+  if (!object(input) || !keys(input, ['version', 'vehicle', 'id', 'frame', 'altitude', 'terrain', 'origin', 'fence', 'rallyM', 'power', 'start', 'tasks']) || input.version !== 2 || !['fixed-wing', 'ground', 'surface', 'subsea'].includes(input.vehicle as string) || !id(input.id) || input.frame !== 'LOCAL_NED' || input.altitude !== 'ORIGIN_RELATIVE_DOWN' || input.terrain !== 'DECLARED_MODEL_SURFACE' || !id(input.start)) invalid()
   const p = input as unknown as VehicleMissionPlan
   if (!object(p.origin) || !keys(p.origin, ['latitudeDeg', 'longitudeDeg', 'ellipsoidHeightM']) || !number(p.origin.latitudeDeg, -90, 90) || !number(p.origin.longitudeDeg, -180, 180) || !number(p.origin.ellipsoidHeightM, -500, 10000)
     || !object(p.fence) || !keys(p.fence, ['radiusM', 'minDownM', 'maxDownM']) || !number(p.fence.radiusM, 1, 5000) || !number(p.fence.minDownM, -1000, 0) || !number(p.fence.maxDownM, 0, 10) || p.fence.minDownM >= p.fence.maxDownM || !vehicleMissionContains(p, p.rallyM)
@@ -33,7 +33,7 @@ export function validateVehicleMission(input: unknown): { plan: VehicleMissionPl
     }
     else if (t.kind === 'payload') {
       fields.push('operation', 'containerId', 'timeoutMs', 'next')
-      const supported = p.vehicle === 'fixed-wing' ? ['camera-still'] : p.vehicle === 'ground' ? ['camera-still', 'material-drop', 'mower-enable', 'mower-disable'] : ['camera-still', 'water-sample']
+      const supported = p.vehicle === 'fixed-wing' ? ['camera-still'] : p.vehicle === 'ground' ? ['camera-still', 'material-drop', 'mower-enable', 'mower-disable'] : p.vehicle === 'surface' ? ['camera-still', 'water-sample'] : ['camera-still', 'inspection-capture']
       if (!supported.includes(t.operation) || (t.containerId !== null && !id(t.containerId)) || (t.operation === 'water-sample' && !id(t.containerId)) || !number(t.timeoutMs, 100, 10000) || !id(t.next)) invalid()
       durationMs = t.timeoutMs; edges = [t.next]
     }
@@ -61,7 +61,7 @@ export function validateVehicleMission(input: unknown): { plan: VehicleMissionPl
 }
 export interface VehicleMissionTrace { version: 2, evidence: 'owned-vehicle-mission-simulation', plan: VehicleMissionPlan, rows: { observation: VehicleMissionObservation, action: VehicleMissionAction | null, result: VehicleMissionSnapshot }[] }
 function validAck(value: unknown): value is VehiclePayloadAck {
-  if (!object(value) || !keys(value, ['eventId', 'taskId', 'operation', 'containerId', 'capturedAtMs', 'reference', 'positionM', 'outcome', 'metadata']) || typeof value.eventId !== 'string' || value.eventId.length > 200 || !id(value.taskId) || !['camera-still', 'water-sample', 'material-drop', 'mower-enable', 'mower-disable'].includes(value.operation as string) || (value.containerId !== null && !id(value.containerId)) || !Number.isSafeInteger(value.capturedAtMs) || (value.capturedAtMs as number) < 0 || typeof value.reference !== 'string' || value.reference.length > 120 || !validVector(value.positionM) || !['confirmed', 'rejected', 'uncertain'].includes(value.outcome as string)) return false
+  if (!object(value) || !keys(value, ['eventId', 'taskId', 'operation', 'containerId', 'capturedAtMs', 'reference', 'positionM', 'outcome', 'metadata']) || typeof value.eventId !== 'string' || value.eventId.length > 200 || !id(value.taskId) || !['camera-still', 'water-sample', 'material-drop', 'mower-enable', 'mower-disable', 'inspection-capture'].includes(value.operation as string) || (value.containerId !== null && !id(value.containerId)) || !Number.isSafeInteger(value.capturedAtMs) || (value.capturedAtMs as number) < 0 || typeof value.reference !== 'string' || value.reference.length > 120 || !validVector(value.positionM) || !['confirmed', 'rejected', 'uncertain'].includes(value.outcome as string)) return false
   if (value.metadata !== undefined && (!object(value.metadata) || Object.keys(value.metadata).length > 32 || Object.entries(value.metadata).some(([key, item]) => !/^[a-zA-Z][a-zA-Z0-9_-]{0,39}$/.test(key) || !(typeof item === 'boolean' || (typeof item === 'number' && Number.isFinite(item)) || (typeof item === 'string' && item.length <= 160))))) return false
   return true
 }

@@ -39,14 +39,14 @@ const sameOrigin = (a: GeodeticOrigin, b: GeodeticOrigin) => a?.latitudeDeg === 
 const exactKeys = (o: object, fields: string[]) => Object.keys(o).length === fields.length && Object.keys(o).every(k => fields.includes(k))
 const active = (s: MissionState) => s === 'running' || s === 'paused'
 /** Normalize the actual estimator contract. No plant position is supplied to the mission policy. */
-export function observeMission(input: { estimate: EstimatorSnapshot, authority: AuthorityState, batteryPercent: number, onGround: boolean }): MissionObservation {
+export function observeMission(input: { estimate: EstimatorSnapshot, authority: AuthorityState, batteryPercent: number, onGround: boolean }, altitudeDatum: 'WGS84_ELLIPSOID' | 'LOCAL_WATER_SURFACE' = 'WGS84_ELLIPSOID'): MissionObservation {
   const e = input.estimate
   const p = e.localPosition
   const a = e.attitude
   const fresh = (at: number | null | undefined, limit: number) => at !== null && at !== undefined && Number.isFinite(at) && at <= e.nowMs && e.nowMs - at <= limit
   return {
     kind: 'simulation', nowMs: e.nowMs, reference: `${e.bootId}:${Object.values(e.resets).join(',')}`, origin: p?.origin ?? { latitudeDeg: NaN, longitudeDeg: NaN, ellipsoidHeightM: NaN },
-    healthy: e.evidence === 'fixture' && e.physicalFlightEnabled === false && e.health.tilt && e.health.localPosition && !!a && a.reference === 'GRAVITY_ALIGNED_RELATIVE_YAW' && p?.frame === 'LOCAL_NED' && p.altitudeDatum === 'WGS84_ELLIPSOID' && fresh(a.capturedAtMs, 60) && fresh(p.capturedAtMs, 200) && fresh(p.predictedToMs, 40),
+    healthy: e.evidence === 'fixture' && e.physicalFlightEnabled === false && e.health.tilt && e.health.localPosition && !!a && a.reference === 'GRAVITY_ALIGNED_RELATIVE_YAW' && p?.frame === 'LOCAL_NED' && p.altitudeDatum === altitudeDatum && fresh(a.capturedAtMs, 60) && fresh(p.capturedAtMs, 200) && fresh(p.predictedToMs, 40),
     positionM: p ? [...p.positionM] as SensorVector : [NaN, NaN, NaN], velocityMps: p ? [...p.velocityMps] as SensorVector : [NaN, NaN, NaN], authority: input.authority, batteryPercent: input.batteryPercent, onGround: input.onGround,
   }
 }

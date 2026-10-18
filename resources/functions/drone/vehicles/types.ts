@@ -3,7 +3,7 @@ import type { GeodeticOrigin, Quaternion } from '../estimation/frames'
 import type { SensorVector } from '../sensors/types'
 import type { MissionAction, MissionObservation, MissionState } from '../missions/engine'
 
-export type VehicleKind = 'fixed-wing' | 'ground' | 'surface'
+export type VehicleKind = 'fixed-wing' | 'ground' | 'surface' | 'subsea'
 export interface VehicleActuator { name: string, unit: 'normalized' | 'newton' | 'radian' | 'metres-per-second', min: number, max: number, neutral: number }
 export interface VehiclePlantState {
   positionM: SensorVector
@@ -27,7 +27,7 @@ export interface VehicleMeasurement {
   receivedAtMs: number
   values: Record<string, number | boolean | string | number[]>
 }
-export type VehiclePayloadOperation = 'camera-still' | 'material-drop' | 'water-sample' | 'mower-enable' | 'mower-disable'
+export type VehiclePayloadOperation = 'camera-still' | 'material-drop' | 'water-sample' | 'mower-enable' | 'mower-disable' | 'inspection-capture'
 export interface VehiclePayloadCommand { eventId: string, taskId: string, operation: VehiclePayloadOperation, containerId: string | null, issuedAtMs: number, expiresAtMs: number, positionM: SensorVector, reference: string }
 export interface VehiclePayloadAck { eventId: string, taskId: string, operation: VehiclePayloadOperation, containerId: string | null, capturedAtMs: number, reference: string, positionM: SensorVector, outcome: 'confirmed' | 'rejected' | 'uncertain', metadata?: Record<string, number | string | boolean> }
 export interface VehiclePayloadPort { observe?(context: VehicleControllerContext): void, request(command: VehiclePayloadCommand): void, poll(nowMs: number): VehiclePayloadAck | null, close(): void }
@@ -91,9 +91,12 @@ export interface VehicleFaults {
   hostLost?: boolean
   rcOverride?: boolean
   kill?: boolean
+  linkLost?: boolean
 }
 /** One execution owns its plant, controller, payload and measurement sequence. */
+export interface VehicleNavigation { update(base: EstimatorSnapshot, measurement: VehicleMeasurement | null, nowMs: number): EstimatorSnapshot }
 export interface VehicleSession {
+  createNavigation?(): VehicleNavigation
   createPlant(): VehiclePlant
   createController(): VehicleController
   createPayload?(): VehiclePayloadPort
