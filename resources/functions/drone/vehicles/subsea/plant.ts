@@ -10,6 +10,7 @@ export const subseaModel = Object.freeze({ massKg: 20, addedMassKg: 5, gravityMp
 function vector(v: unknown): v is SensorVector { return Array.isArray(v) && v.length === 3 && v.every(Number.isFinite) }
 function cross(a: SensorVector, b: SensorVector): SensorVector { return [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]] }
 export function createSubseaPlant(initial: { positionM?: SensorVector, velocityMps?: SensorVector, quaternionWxyz?: Quaternion, angularRateRadS?: SensorVector } = {}): VehiclePlant {
+  if (initial.quaternionWxyz !== undefined && (!Array.isArray(initial.quaternionWxyz) || initial.quaternionWxyz.length !== 4 || !initial.quaternionWxyz.every(Number.isFinite))) throw new RangeError('Invalid initial subsea quaternion')
   let positionM = [...(initial.positionM ?? [0, 0, 0])] as SensorVector, velocityMps = [...(initial.velocityMps ?? [0, 0, 0])] as SensorVector
   let quaternionWxyz = normalizeQuaternion([...(initial.quaternionWxyz ?? [1, 0, 0, 0])]), angularRateRadS = [...(initial.angularRateRadS ?? [0, 0, 0])] as SensorVector, accelerationMps2: SensorVector = [0, 0, 0]
   if (![positionM, velocityMps, angularRateRadS].every(vector) || positionM[2] < 0 || positionM[2] > 10 || Math.hypot(...positionM) > 20 || Math.hypot(...velocityMps) > 5 || Math.hypot(...angularRateRadS) > 5) throw new RangeError('Invalid initial subsea state')
