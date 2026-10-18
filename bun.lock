@@ -13,6 +13,7 @@
         "@stacksjs/storage": "^0.75.221",
         "@stacksjs/testing": "^0.75.221",
         "stacks": "^0.75.221",
+        "ts-images": "0.2.31",
       },
       "devDependencies": {
         "better-dx": "^0.2.37",
