@@ -5,7 +5,7 @@ import { createEstimator } from '../estimation/estimator'
 import { observeMission } from '../missions/engine'
 import { createVehicleMissionEngine, validateVehicleMission } from '../missions/vehicle'
 import { createVehicleAuthoritySupervisor, createVehicleOutputWatchdog } from '../authority/vehicle'
-import { createVehicleMeasurementQualifier, vehicleReference } from './measurements'
+import { createVehicleMeasurementQualifier, predictVehicleMeasurementPose, vehicleReference } from './measurements'
 export { vehicleReference } from './measurements'
 /** Owned raw sensor -> estimator -> mission -> vehicle policy -> authority -> independent board loop. */
 export function runVehicleSimulation(profileInput: VehicleProfile, options: { scenario?: string, seconds?: number } = {}) {
@@ -37,14 +37,16 @@ export function runVehicleSimulation(profileInput: VehicleProfile, options: { sc
         continue
       }
       feed.capture(truth, nowMs, faults.dropImu, faults.dropPosition)
-      estimate = estimator.update(feed.advanceTo(nowMs))
+      const sensors = feed.advanceTo(nowMs)
+      estimate = estimator.update(sensors)
       if (nowMs % 20 !== 0) continue
       const reference = vehicleReference(estimate)
-      if (estimate.health.tilt && estimate.health.localPosition && estimate.localPosition && estimate.attitude && !faults.dropVehicleSensor) {
+      const capturePose = predictVehicleMeasurementPose(estimate, sensors.sensors.find(s => s.kind === 'imu')?.observation, nowMs)
+      if (capturePose && !faults.dropVehicleSensor) {
         if (queue.length >= 8) throw new RangeError('Vehicle sensor queue exhausted')
         const packet = structuredClone(profileInput.renderMeasurement(truth, nowMs, reference))
         if (packet.capturedAtMs !== nowMs || !Number.isSafeInteger(packet.receivedAtMs) || packet.receivedAtMs < nowMs + 20 || packet.receivedAtMs > nowMs + 100) throw new TypeError('Vehicle renderer must declare capture and bounded receipt epochs')
-        queue.push({ measurement: packet, pose: { capturedAtMs: nowMs, reference, positionM: [...estimate.localPosition.positionM] as SensorVector, quaternionWxyz: [...estimate.attitude.quaternionWxyz] } })
+        queue.push({ measurement: packet, pose: capturePose })
         queue.sort((a, b) => a.measurement.receivedAtMs - b.measurement.receivedAtMs || a.measurement.sequence - b.measurement.sequence)
       }
       while (queue[0] && queue[0].measurement.receivedAtMs <= nowMs) { const entry = queue.shift()!; measurement = entry.measurement; measurementPose = entry.pose }

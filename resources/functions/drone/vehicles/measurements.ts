@@ -19,3 +19,18 @@ export function createVehicleMeasurementQualifier(vehicle: VehicleKind) {
     },
   }
 }
+
+import type { SensorObservation, ImuMeasurement } from '../sensors/types'
+import type { VehicleMeasurementPose } from './types'
+import { multiplyQuaternion, normalizeQuaternion } from '../estimation/frames'
+/** Capture-time extrapolation uses only the qualified raw gyro, never plant orientation. */
+export function predictVehicleMeasurementPose(estimate: EstimatorSnapshot, imu: SensorObservation | null | undefined, atMs: number): VehicleMeasurementPose | null {
+  const p = estimate.localPosition, a = estimate.attitude
+  const value = imu?.value as ImuMeasurement | undefined
+  if (estimate.evidence !== 'fixture' || !Number.isSafeInteger(atMs) || atMs < 0 || !estimate.health.tilt || !estimate.health.localPosition || !p || !a || estimate.nowMs !== atMs || p.capturedAtMs === null || a.capturedAtMs === null || p.predictedToMs !== atMs || a.capturedAtMs > atMs || atMs - a.capturedAtMs > 60 || !imu?.healthy || imu.kind !== 'imu' || imu.estimatedCaptureMs !== a.capturedAtMs || imu.measurementAgeUpperMs === null || !Number.isFinite(imu.measurementAgeUpperMs) || imu.measurementAgeUpperMs < atMs - imu.estimatedCaptureMs || imu.measurementAgeUpperMs > 80 || !Number.isFinite(imu.receivedAtMs) || imu.receivedAtMs < imu.estimatedCaptureMs || imu.receivedAtMs > atMs || imu.timeUncertaintyUs === null || !Number.isFinite(imu.timeUncertaintyUs) || imu.timeUncertaintyUs < 0 || imu.quality.some(flag => ['stream-overrun', 'timing-unvalidated', 'measurement-epoch-unaligned', 'stuck-suspected'].includes(flag)) || !value || value.frame !== 'BODY_FRD' || value.angularRateRadS.length !== 3 || value.angularRateRadS.some(n => !Number.isFinite(n)) || !value.angularRateVariance || value.angularRateVariance.length !== 3 || value.angularRateVariance.some(n => !Number.isFinite(n) || n <= 0) || Math.hypot(...value.angularRateRadS) > 35) return null
+  const dt = (atMs - a.capturedAtMs) / 1000, magnitude = Math.hypot(...value.angularRateRadS), angle = magnitude * dt
+  const scale = magnitude < 1e-10 ? dt / 2 : Math.sin(angle / 2) / magnitude
+  const rates = value.angularRateRadS
+  const q = normalizeQuaternion(multiplyQuaternion(a.quaternionWxyz, [Math.cos(angle / 2), rates[0] * scale, rates[1] * scale, rates[2] * scale]))
+  return { reference: vehicleReference(estimate), capturedAtMs: atMs, positionM: [...p.positionM] as [number, number, number], quaternionWxyz: q, positionCapturedAtMs: p.capturedAtMs, positionPredictedToMs: p.predictedToMs, attitudeCapturedAtMs: a.capturedAtMs, attitudePredictedToMs: atMs, gyroCapturedAtMs: imu.estimatedCaptureMs, attitudePrediction: 'qualified-gyro-hold' }
+}

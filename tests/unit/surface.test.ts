@@ -3,7 +3,7 @@ import { correctSurfaceSounding, exportSurfaceSurvey } from '../../resources/fun
 
 test('single beam reduction retains travel time, sound speed, draft, water level, datum and independent uncertainty', () => {
   const raw = { id: 'ping-1', reference: 'boot:1', capturedAtMs: 1000, receivedAtMs: 1060, twoWayTravelS: 0.01, soundSpeedMps: 1500, draftM: 0.3, waterLevelAboveDatumM: 1.2, datum: 'LOCAL_TEST_DATUM', timeSigmaS: 0.00001, soundSpeedSigmaMps: 2, draftSigmaM: 0.02, waterLevelSigmaM: 0.03, motionSigmaM: 0.01 }
-  const pose = { reference: raw.reference, atMs: 1000, positionM: [4, 2, 0] as [number, number, number], rollRad: 0, pitchRad: 0, positionSigmaM: 0.05, timeSigmaMs: 2, speedMps: 1 }
+  const pose = { reference: raw.reference, atMs: 1000, positionM: [4, 2, 0] as [number, number, number], rollRad: 0, pitchRad: 0, yawRad: 0, attitudeSigmaRad: 0, positionSigmaM: 0.05, timeSigmaMs: 2, speedMps: 1 }
   const reduced = correctSurfaceSounding(raw, pose)
   expect(reduced.depthBelowDatumM).toBeCloseTo(6.6, 10)
   // Independent worked sum: (1500/2*10us)^2 + (.01/2*2)^2 + .02^2 + .03^2 + .01^2.
@@ -93,18 +93,18 @@ test('surface controller rejects healthy-looking estimates from another boot and
 import { reduceSurfaceSurvey } from '../../resources/functions/drone/vehicles/surface/survey'
 test('survey reduction deduplicates received packets and rejects capture-pose mismatches', () => {
   const c = surfaceContext(), m = c.measurement!
-  const row = { atMs: c.nowMs, measurement: m, measurementPose: { capturedAtMs: m.capturedAtMs, reference: m.reference, positionM: [0, 0, 0] as [number, number, number], quaternionWxyz: [1, 0, 0, 0] as [number, number, number, number] } }
-  const exported = reduceSurfaceSurvey([row, row], { positionSigmaM: 0.05, timeSigmaMs: 2 })
+  const row = { atMs: c.nowMs, measurement: m, measurementPose: { capturedAtMs: m.capturedAtMs, reference: m.reference, positionCapturedAtMs: m.capturedAtMs, positionPredictedToMs: m.capturedAtMs, attitudeCapturedAtMs: m.capturedAtMs, attitudePredictedToMs: m.capturedAtMs, gyroCapturedAtMs: m.capturedAtMs, attitudePrediction: 'qualified-gyro-hold' as const, positionM: [0, 0, 0] as [number, number, number], quaternionWxyz: [1, 0, 0, 0] as [number, number, number, number] } }
+  const exported = reduceSurfaceSurvey([row, row], { positionSigmaM: 0.05, timeSigmaMs: 2, attitudeSigmaRad: 0.001 })
   expect(exported.soundings).toHaveLength(1)
   expect(exported.soundings[0]!.depthBelowDatumM).toBeCloseTo(5, 3)
   row.measurementPose.capturedAtMs--
-  expect(() => reduceSurfaceSurvey([row], { positionSigmaM: 0.05, timeSigmaMs: 2 })).toThrow('capture')
+  expect(() => reduceSurfaceSurvey([row], { positionSigmaM: 0.05, timeSigmaMs: 2, attitudeSigmaRad: 0.001 })).toThrow('capture')
 })
 
 test('survey export cannot relabel a reduced ping timestamp or acoustic identifier', () => {
   const c = surfaceContext(), m = c.measurement!
-  const row = { atMs: c.nowMs, measurement: m, measurementPose: { capturedAtMs: m.capturedAtMs, reference: m.reference, positionM: [0, 0, 0] as [number, number, number], quaternionWxyz: [1, 0, 0, 0] as [number, number, number, number] } }
-  const sounding = reduceSurfaceSurvey([row], { positionSigmaM: 0.05, timeSigmaMs: 2 }).soundings[0]!
+  const row = { atMs: c.nowMs, measurement: m, measurementPose: { capturedAtMs: m.capturedAtMs, reference: m.reference, positionCapturedAtMs: m.capturedAtMs, positionPredictedToMs: m.capturedAtMs, attitudeCapturedAtMs: m.capturedAtMs, attitudePredictedToMs: m.capturedAtMs, gyroCapturedAtMs: m.capturedAtMs, attitudePrediction: 'qualified-gyro-hold' as const, positionM: [0, 0, 0] as [number, number, number], quaternionWxyz: [1, 0, 0, 0] as [number, number, number, number] } }
+  const sounding = reduceSurfaceSurvey([row], { positionSigmaM: 0.05, timeSigmaMs: 2, attitudeSigmaRad: 0.001 }).soundings[0]!
   expect(() => exportSurfaceSurvey([{ ...sounding, capturedAtMs: sounding.capturedAtMs + 1 }])).toThrow()
   expect(() => exportSurfaceSurvey([{ ...sounding, id: 'different-ping' }])).toThrow()
 })
@@ -119,12 +119,26 @@ test('sampler does not confirm a sample from a stale position despite an asserte
 
 test('survey export preserves uncertainty inputs and rejects relabeling a horizontal sigma', () => {
   const c = surfaceContext(), m = c.measurement!
-  const row = { atMs: c.nowMs, measurement: m, measurementPose: { capturedAtMs: m.capturedAtMs, reference: m.reference, positionM: [0, 0, 0] as [number, number, number], quaternionWxyz: [1, 0, 0, 0] as [number, number, number, number] } }
-  const sounding = reduceSurfaceSurvey([row], { positionSigmaM: 0.05, timeSigmaMs: 2 }).soundings[0]!
+  const row = { atMs: c.nowMs, measurement: m, measurementPose: { capturedAtMs: m.capturedAtMs, reference: m.reference, positionCapturedAtMs: m.capturedAtMs, positionPredictedToMs: m.capturedAtMs, attitudeCapturedAtMs: m.capturedAtMs, attitudePredictedToMs: m.capturedAtMs, gyroCapturedAtMs: m.capturedAtMs, attitudePrediction: 'qualified-gyro-hold' as const, positionM: [0, 0, 0] as [number, number, number], quaternionWxyz: [1, 0, 0, 0] as [number, number, number, number] } }
+  const sounding = reduceSurfaceSurvey([row], { positionSigmaM: 0.05, timeSigmaMs: 2, attitudeSigmaRad: 0.001 }).soundings[0]!
   expect(() => exportSurfaceSurvey([{ ...sounding, horizontalSigmaM: 0.000001 }])).toThrow()
 })
 
 test('harbour return mission has an explicit reserve decision that can omit uncertain new collection work', () => {
   const plan = createSurfaceProfile('harbour-return').mission
   expect(plan.tasks.some(t => t.kind === 'branch' && t.otherwise === 'return')).toBe(true)
+})
+
+test('tilted single beam projects its acoustic footprint and propagates angular uncertainty', () => {
+  const c = surfaceContext(), m = c.measurement!
+  const pitch = 0.04
+  const row = { atMs: c.nowMs, measurement: m, measurementPose: { capturedAtMs: m.capturedAtMs, reference: m.reference, positionCapturedAtMs: m.capturedAtMs, positionPredictedToMs: m.capturedAtMs, attitudeCapturedAtMs: m.capturedAtMs, attitudePredictedToMs: m.capturedAtMs, gyroCapturedAtMs: m.capturedAtMs, attitudePrediction: 'qualified-gyro-hold' as const, positionM: [0, 0, 0] as [number, number, number], quaternionWxyz: [Math.cos(pitch / 2), 0, Math.sin(pitch / 2), 0] as [number, number, number, number] } }
+  const sounding = reduceSurfaceSurvey([row], { positionSigmaM: 0.05, timeSigmaMs: 2, attitudeSigmaRad: 0.001 }).soundings[0]!
+  // The rendered range is 5.10008m; a 0.04rad forward tilt projects about0.203949m north.
+  expect(sounding.positionM[0]).toBeCloseTo(0.20394880373, 7)
+  expect(sounding.positionM[2]).toBeCloseTo(5.39600047, 6)
+  expect(sounding.depthBelowDatumM).toBeCloseTo(4.99600047, 6)
+  expect(sounding.horizontalSigmaM).toBeGreaterThan(0.05)
+  const invalid = structuredClone(row); invalid.measurementPose.quaternionWxyz = [Math.cos(0.1), 0, Math.sin(0.1), 0]
+  expect(() => reduceSurfaceSurvey([invalid], { positionSigmaM: 0.05, timeSigmaMs: 2, attitudeSigmaRad: 0.001 })).toThrow()
 })

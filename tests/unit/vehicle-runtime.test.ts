@@ -36,3 +36,18 @@ test('host death expires independent vehicle output lease and sample uncertainty
     expect(new Set(run.trace.rows.flatMap(row => row.result.payload ? [row.result.payload.eventId] : [])).size).toBe(1)
   }
 }, 60000)
+
+import type { SensorObservation } from '../../resources/functions/drone/sensors/types'
+import { predictVehicleMeasurementPose } from '../../resources/functions/drone/vehicles/measurements'
+import { surfaceContext } from '../fixtures/surface/context'
+test('capture pose retains real estimator epochs and predicts attitude only with a qualified matching gyro', () => {
+  const e = surfaceContext(1000).estimate
+  e.attitude!.capturedAtMs = 980
+  const imu: SensorObservation = { kind: 'imu', deviceId: 'fixture-imu', sequence: 1, capturedUs: 980000n, receivedAtMs: 984, estimatedCaptureMs: 980, measurementAgeUpperMs: 20, transportAgeUpperMs: 4, timeUncertaintyUs: 0, quality: [], healthy: true, calibrationId: 'fixture', value: { frame: 'BODY_FRD', temperatureC: 25, specificForceMps2: [0, 0, -9.80665], angularRateRadS: [0, 0, 0.5], specificForceVariance: [0.001, 0.001, 0.001], angularRateVariance: [0.000001, 0.000001, 0.000001] } }
+  const pose = predictVehicleMeasurementPose(e, imu, 1000)!
+  expect(pose.attitudeCapturedAtMs).toBe(980); expect(pose.attitudePredictedToMs).toBe(1000)
+  expect(pose.quaternionWxyz[0]).toBeCloseTo(0.9999875000260416, 12)
+  expect(pose.quaternionWxyz[3]).toBeCloseTo(0.004999979166692708, 12)
+  expect(predictVehicleMeasurementPose(e, { ...imu, estimatedCaptureMs: 981 }, 1000)).toBeNull()
+  expect(predictVehicleMeasurementPose(e, { ...imu, quality: ['timing-unvalidated'] }, 1000)).toBeNull()
+})

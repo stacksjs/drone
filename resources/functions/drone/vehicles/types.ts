@@ -79,7 +79,7 @@ export interface VehicleControlOutput {
   physicalFlightEnabled: false
   boardOutputsInhibited: true
 }
-export interface VehicleMeasurementPose { capturedAtMs: number, reference: string, positionM: SensorVector, quaternionWxyz: Quaternion }
+export interface VehicleMeasurementPose { capturedAtMs: number, reference: string, positionM: SensorVector, quaternionWxyz: Quaternion, positionCapturedAtMs: number, positionPredictedToMs: number, attitudeCapturedAtMs: number, attitudePredictedToMs: number, gyroCapturedAtMs: number, attitudePrediction: 'qualified-gyro-hold' }
 export interface VehicleControllerContext { nowMs: number, enabled: boolean, estimate: EstimatorSnapshot, measurement: VehicleMeasurement | null, measurementPose?: VehicleMeasurementPose | null, mission: VehicleMissionSnapshot }
 export interface VehicleController { step(context: VehicleControllerContext): VehicleControlOutput }
 export interface VehicleFaults {
