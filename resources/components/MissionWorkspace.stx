@@ -23,7 +23,9 @@ const plot = derived(() => missionWorkspacePlot(definition(), rows()))
 const computation = useTimeout(() => {
   try {
     const completed = runMissionWorkspace(profile(), scenario())
-    result.set(completed); offset.set(completed.maximumTimeMs)
+    result.set(completed)
+    // Mount the playback controls and their dynamic bounds before assigning the value.
+    void nextTick(() => { if (result() === completed) offset.set(completed.maximumTimeMs) })
   }
   catch (failure) { error.set(failure instanceof Error ? failure.message : 'Mission simulation failed') }
   finally { busy.set(false) }
