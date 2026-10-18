@@ -29,8 +29,8 @@ export interface VehicleMeasurement {
 }
 export type VehiclePayloadOperation = 'camera-still' | 'material-drop' | 'water-sample' | 'mower-enable' | 'mower-disable'
 export interface VehiclePayloadCommand { eventId: string, taskId: string, operation: VehiclePayloadOperation, containerId: string | null, issuedAtMs: number, expiresAtMs: number, positionM: SensorVector, reference: string }
-export interface VehiclePayloadAck { eventId: string, taskId: string, operation: VehiclePayloadOperation, containerId: string | null, capturedAtMs: number, reference: string, positionM: SensorVector, outcome: 'confirmed' | 'rejected' | 'uncertain' }
-export interface VehiclePayloadPort { request(command: VehiclePayloadCommand): void, poll(nowMs: number): VehiclePayloadAck | null, close(): void }
+export interface VehiclePayloadAck { eventId: string, taskId: string, operation: VehiclePayloadOperation, containerId: string | null, capturedAtMs: number, reference: string, positionM: SensorVector, outcome: 'confirmed' | 'rejected' | 'uncertain', metadata?: Record<string, number | string | boolean> }
+export interface VehiclePayloadPort { observe?(context: VehicleControllerContext): void, request(command: VehiclePayloadCommand): void, poll(nowMs: number): VehiclePayloadAck | null, close(): void }
 export type VehicleMissionTask =
   | { id: string, kind: 'start', next: string }
   | { id: string, kind: 'takeoff' | 'waypoint' | 'land' | 'stop', positionM: SensorVector, acceptanceM: number, maxArrivalSpeedMps: number, settleMs: number, timeoutMs: number, next?: string }
@@ -79,12 +79,14 @@ export interface VehicleControlOutput {
   physicalFlightEnabled: false
   boardOutputsInhibited: true
 }
-export interface VehicleControllerContext { nowMs: number, enabled: boolean, estimate: EstimatorSnapshot, measurement: VehicleMeasurement | null, mission: VehicleMissionSnapshot }
+export interface VehicleMeasurementPose { capturedAtMs: number, reference: string, positionM: SensorVector, quaternionWxyz: Quaternion }
+export interface VehicleControllerContext { nowMs: number, enabled: boolean, estimate: EstimatorSnapshot, measurement: VehicleMeasurement | null, measurementPose?: VehicleMeasurementPose | null, mission: VehicleMissionSnapshot }
 export interface VehicleController { step(context: VehicleControllerContext): VehicleControlOutput }
 export interface VehicleFaults {
   windMps?: SensorVector
   currentMps?: SensorVector
   dropImu?: boolean
+  dropPosition?: boolean
   dropVehicleSensor?: boolean
   hostLost?: boolean
   rcOverride?: boolean
