@@ -85,7 +85,7 @@ export function simulateInspection(options: { config?: unknown, scenario?: Inspe
           const ack = camera.poll(nowMs)
           if (ack) {
             if (ack.sessionId !== pending.sessionId || ack.sequence !== pending.sequence || ack.reference !== pending.pose.reference || ack.issuedAtMs !== pending.issuedAtMs || ack.capturedAtMs !== pending.capturedAtMs || ack.acknowledgedAtMs > pending.issuedAtMs + 80 || ack.acknowledgedAtMs > nowMs || !ack.thermalCentiKelvin || ack.rgba.length !== config.calibration.output.width * config.calibration.output.height * 4) return fail('inspection-camera-ack-scope-or-timing')
-            const capture = { ...pending, acknowledgedAtMs: ack.acknowledgedAtMs, image: { ...config.calibration.output, rgba: ack.rgba, thermalCentiKelvin: ack.thermalCentiKelvin } }
+            const capture = { ...pending, acknowledgedAtMs: ack.acknowledgedAtMs, image: { width: config.calibration.output.width, height: config.calibration.output.height, rgba: ack.rgba, thermalCentiKelvin: ack.thermalCentiKelvin } }
             captures.push({ ...capture, quality: inspectCaptureQuality(plan, capture, pendingMotion) }); pending = null
           }
           else if (nowMs >= pending.issuedAtMs + 80) return fail('inspection-camera-ack-deadline')

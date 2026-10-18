@@ -12,6 +12,7 @@ test('asset stations execute on the owned sensor estimator authority mission and
   expect(new Set(run.captures.map(frame => Array.from(frame.image.rgba).join(','))).size).toBe(3)
   for (const capture of run.captures) {
     expect(capture.quality.qualified).toBe(true)
+    expect(Object.keys(capture.image).sort()).toEqual(['height', 'rgba', 'thermalCentiKelvin', 'width'])
     expect(capture.pose.reference).toBe(capture.assetObservation.reference)
     expect(capture.acknowledgedAtMs).toBe(capture.capturedAtMs + 20)
     expect(capture.image.thermalCentiKelvin.some(n => n > 0)).toBe(true)
