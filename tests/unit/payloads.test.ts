@@ -143,7 +143,9 @@ test('malformed capabilities are closed before issuing any trigger', () => {
 })
 
 const worker = resolve(import.meta.dir, '../fixtures/payloads/worker.ts')
-const openPeer = (fault = 'none') => openCameraPayloadProcess({ command: [process.execPath, worker, fault], evidence: 'fixture' })
+const workerConfig = resolve(import.meta.dir, '../fixtures/process/bunfig.toml')
+const peerCommand = (fault: string, ...args: string[]) => [process.execPath, '--no-env-file', `--config=${workerConfig}`, worker, fault, ...args]
+const openPeer = (fault = 'none') => openCameraPayloadProcess({ command: peerCommand(fault), evidence: 'fixture' })
 test('bounded child IPC handles fragmented records and maps the child monotonic clock', async () => {
   const adapter = await openPeer(), session = createPayloadCaptureSession({ adapter, poses: createPayloadPoseTimeline() })
   try {
@@ -228,7 +230,7 @@ test('camera startup silence expires and an ignored SIGTERM is escalated after c
   const directory = await mkdtemp(join(tmpdir(), 'drone-payload-kill-')), marker = join(directory, 'phase.json')
   // Clock qualification has its own real-clock test; isolate cancellation and escalation here.
   const now = () => 1000
-  const adapter = await openCameraPayloadProcess({ command: [process.execPath, worker, 'ignore-term', marker], evidence: 'fixture', now })
+  const adapter = await openCameraPayloadProcess({ command: peerCommand('ignore-term', marker), evidence: 'fixture', now })
   const session = createPayloadCaptureSession({ adapter, poses: createPayloadPoseTimeline(), now }), controller = new AbortController()
   try {
     const capture = session.capture({ signal: controller.signal }).then(() => null, error => error as Error)
@@ -246,3 +248,11 @@ test('camera startup silence expires and an ignored SIGTERM is escalated after c
   }
   finally { session.close(); await rm(directory, { recursive: true, force: true }) }
 }, 60000)
+
+test('a generated two-second capture deadline is accepted across a floating-point exponent boundary', async () => {
+  const now = () => 48.00063504046358
+  const adapter = createReplayCameraPayload({ now, captureAt: now })
+  const session = createPayloadCaptureSession({ adapter, poses: createPayloadPoseTimeline(), now })
+  try { expect((await session.capture()).command.deadlineMs).toBe(2048.0006350404637) }
+  finally { session.close() }
+})

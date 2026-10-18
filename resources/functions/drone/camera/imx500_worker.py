@@ -61,7 +61,7 @@ def payload_command(value, session, boot_id, previous_sequence, now_ms):
     start, deadline = value.get("notBeforeMonotonicMs"), value.get("deadlineMonotonicMs")
     if (type(sequence) is not int or sequence <= previous_sequence or sequence > 0xFFFFFFFF
             or not all(type(v) in (int, float) and math.isfinite(v) for v in (start, deadline, now_ms))
-            or start < 0 or start > now_ms + 5 or deadline <= now_ms or deadline - start > 2000):
+            or start < 0 or start > now_ms + 5 or deadline <= now_ms or deadline > start + 2000):
         raise ValueError("Capture sequence/deadline invalid")
     return sequence, start, deadline
 

@@ -72,6 +72,9 @@ class PayloadContract(unittest.TestCase):
 
     def test_bounded_scoped_commands_and_no_replayed_sequence(self):
         self.assertEqual(bridge.payload_command(self.command(), "session", "boot", 0, 1000), (1, 1000, 2000))
+        at = 48.00063504046358
+        self.assertEqual(bridge.payload_command(self.command(notBeforeMonotonicMs=at, deadlineMonotonicMs=at + 2000),
+                                               "session", "boot", 0, at), (1, at, at + 2000))
         for changes in [{"sequence": True}, {"sequence": 0}, {"sequence": 2**32}, {"sessionId": "other"},
                         {"bootId": "other"}, {"notBeforeMonotonicMs": math.nan}, {"deadlineMonotonicMs": 999},
                         {"deadlineMonotonicMs": 4000}, {"notBeforeMonotonicMs": 1010}, {"version": 2}]:

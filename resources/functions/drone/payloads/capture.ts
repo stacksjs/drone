@@ -20,7 +20,7 @@ export function jpegDimensions(bytes: Uint8Array) {
   throw new PayloadCaptureError('invalid', 'JPEG dimensions unavailable')
 }
 export function validateCaptureCommand(c: PayloadCaptureCommand, descriptor: CameraPayloadDescriptor, nowMs: number) {
-  if (!c || c.version !== 1 || c.sessionId !== descriptor.sessionId || c.bootId !== descriptor.bootId || !Number.isSafeInteger(c.sequence) || c.sequence < 1 || c.sequence > 0xFFFFFFFF || !Number.isFinite(nowMs) || !Number.isFinite(c.issuedAtMs) || c.issuedAtMs < 0 || c.issuedAtMs > nowMs || nowMs - c.issuedAtMs > 100 || !Number.isFinite(c.deadlineMs) || c.deadlineMs <= nowMs || c.deadlineMs - c.issuedAtMs > payloadLimits.captureTimeoutMs) throw new PayloadCaptureError('invalid', 'Capture scope, sequence or deadline invalid')
+  if (!c || c.version !== 1 || c.sessionId !== descriptor.sessionId || c.bootId !== descriptor.bootId || !Number.isSafeInteger(c.sequence) || c.sequence < 1 || c.sequence > 0xFFFFFFFF || !Number.isFinite(nowMs) || !Number.isFinite(c.issuedAtMs) || c.issuedAtMs < 0 || c.issuedAtMs > nowMs || nowMs - c.issuedAtMs > 100 || !Number.isFinite(c.deadlineMs) || c.deadlineMs <= nowMs || c.deadlineMs > c.issuedAtMs + payloadLimits.captureTimeoutMs) throw new PayloadCaptureError('invalid', 'Capture scope, sequence or deadline invalid')
 }
 export function validateCaptureAck(ack: PayloadCaptureAck, c: PayloadCaptureCommand, d: CameraPayloadDescriptor, nowMs: number) {
   if (!ack || ack.version !== 1 || ack.sessionId !== c.sessionId || ack.bootId !== c.bootId || ack.sequence !== c.sequence || ack.issuedAtMs !== c.issuedAtMs || ack.deadlineMs !== c.deadlineMs || ack.deviceId !== d.deviceId || ack.evidence !== d.evidence

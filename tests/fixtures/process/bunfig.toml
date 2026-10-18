@@ -1,0 +1,2 @@
+# Protocol child fixtures use explicit imports and never boot the application preloader.
+preload = []
