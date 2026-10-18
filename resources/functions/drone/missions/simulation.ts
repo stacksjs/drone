@@ -1,4 +1,4 @@
-import type { ImuMeasurement } from '../sensors/types'
+import type { SensorVector, ImuMeasurement } from '../sensors/types'
 import type { Motors } from '../controls/model'
 import type { MissionAction, MissionSnapshot } from './engine'
 import type { EstimatorSnapshot } from '../estimation/estimator'
@@ -17,6 +17,7 @@ export const missionScenarios = ['nominal', 'pause-resume', 'recovery', 'abort',
 export type MissionScenario = typeof missionScenarios[number]
 /** Simulation instrumentation keeps model rendering separate from estimated collection decisions. */
 export interface MissionSimulationInstrument {
+  disturbance?(nowMs: number): { windMps?: SensorVector, forceN?: SensorVector, torqueNm?: SensorVector }
   dropSensors?(nowMs: number): { imu?: boolean, position?: boolean }
   render(state: RigidBodyState, nowMs: number): void
   observe(context: { nowMs: number, estimate: EstimatorSnapshot, sensors: SensorSnapshot, mission: MissionSnapshot, authority: AuthorityState }): 'abort' | undefined
@@ -49,7 +50,7 @@ export function simulateMission(options: { plan?: unknown, scenario?: MissionSce
   const triggers: { atMs: number, taskId: string, channel: string, evidence: 'simulated-event' }[] = []
   try { for (let nowMs = 0; nowMs <= seconds * 1000; nowMs += 4) {
     command = board.tick(nowMs).motorsN
-    if (nowMs > 600) truth = body.step(command, 0.004)
+    if (nowMs > 600) truth = body.step(command, 0.004, options.instrument?.disturbance?.(nowMs))
     const dropped = options.instrument?.dropSensors?.(nowMs)
     feed.capture(truth, nowMs, dropped?.imu, dropped?.position)
     sensors = feed.advanceTo(nowMs)
