@@ -61,6 +61,22 @@ test('paired loss latches until clear and a new operator pairing', () => {
   expect(f.fusion.step({ nowMs: 120, tracking: f.tracking, vision: f.vision, fix: f.fix }).state).toBe('tracking')
 })
 
+test('malformed unrelated candidates revoke a published target and latch loss without throwing', () => {
+  for (const malformed of [null, {}, { ...person(), id: 'unrelated', box: null }, 'sparse']) {
+    const f = selected()
+    f.fusion.pair(f.pairing, f.tracking, 120)
+    expect(f.fusion.step({ nowMs: 120, tracking: f.tracking, vision: f.vision, fix: f.fix }).state).toBe('tracking')
+    if (malformed === 'sparse') f.tracking.candidates.length++
+    else (f.tracking.candidates as unknown[]).push(malformed)
+    const result = f.fusion.step({ nowMs: 120, tracking: f.tracking, vision: f.vision, fix: f.fix })
+    expect(result.state).toBe('lost')
+    expect(result.target).toBeNull()
+    f.tracking = f.tracker.snapshot(120)
+    expect(f.fusion.step({ nowMs: 120, tracking: f.tracking, vision: f.vision, fix: f.fix }).state).toBe('lost')
+    expect(f.fusion.pair(f.pairing, f.tracking, 120).target).toBeNull()
+  }
+})
+
 test('operator pairing rejects unconfirmed, stale, legacy and mismatched visual selection', () => {
   for (const change of [
     (f: ReturnType<typeof selected>) => { f.tracking.confirmed = false },
