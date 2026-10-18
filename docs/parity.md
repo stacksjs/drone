@@ -62,7 +62,7 @@ The run does not promote its evidence environment or change support classificati
 Refresh resolves each requested ref once to a full commit SHA. All subsequent API listings use that
 immutable revision. It reads only the selected roots, rejects ambiguous/truncated listings, and emits
 a separate candidate snapshot. It never overwrites accepted inventory, issue ownership, behavior
-classifications or support claims. It refuses to overwrite an existing candidate file.
+classifications or support claims. It creates the output exclusively after fetching, so existing files and concurrent writers cannot be overwritten. GitHub process stdout is capped at 2,000,000 bytes and stderr at 65,536 bytes while streaming. Overflow or the 20-second deadline kills the child, cancels both readers and awaits cleanup before returning.
 
 Comparison reports added, removed and changed directory trees and changed upstream revisions. New
 ArduPilot root directories also require classification so a new vehicle family cannot disappear

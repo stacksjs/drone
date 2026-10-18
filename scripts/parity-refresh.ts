@@ -1,3 +1,4 @@
+import { open } from 'node:fs/promises'
 import inventory from '../docs/roadmap/upstream-inventory.json'
 import audit from '../docs/parity-audit.json'
 import { entryId } from './parity'
@@ -10,15 +11,49 @@ export interface UpstreamSnapshot {
 }
 export type GitHubReader = (endpoint: string) => Promise<unknown>
 const pinned = /^[a-f\d]{40}$/
-export async function readGitHub(endpoint: string): Promise<unknown> {
+export interface GitHubProcessOptions { env?: Record<string, string | undefined>, timeoutMs?: number }
+export async function readGitHub(endpoint: string, options: GitHubProcessOptions = {}): Promise<unknown> {
+  const timeoutMs = options.timeoutMs ?? 20000
+  if (!Number.isSafeInteger(timeoutMs) || timeoutMs < 1 || timeoutMs > 20000) throw new Error('Invalid GitHub request timeout')
   // gh supplies account authentication without copying credentials into process arguments or reports.
-  const child = Bun.spawn(['gh', 'api', endpoint], { stdout: 'pipe', stderr: 'pipe' })
-  const timeout = setTimeout(() => child.kill(), 20000)
-  const [code, stdout, stderr] = await Promise.all([child.exited, new Response(child.stdout).text(), new Response(child.stderr).text()])
-  clearTimeout(timeout)
-  if (code !== 0) throw new Error(`GitHub inventory request failed: ${stderr.slice(-500)}`)
-  if (stdout.length > 2_000_000) throw new Error('GitHub response exceeds inventory limit')
-  return JSON.parse(stdout)
+  const child = Bun.spawn(['gh', 'api', endpoint], { stdout: 'pipe', stderr: 'pipe', env: options.env ?? process.env })
+  const readers = [child.stdout.getReader(), child.stderr.getReader()]
+  const cancellations: Promise<unknown>[] = []
+  let failure: Error | undefined
+  function stop(error: Error) {
+    failure ??= error
+    try { child.kill('SIGKILL') }
+    catch { /* The process may already have exited. Stream cleanup is still required. */ }
+    for (const reader of readers) cancellations.push(reader.cancel().catch(() => {}))
+  }
+  async function consume(reader: ReadableStreamDefaultReader<Uint8Array>, limit: number, label: string) {
+    const chunks: Uint8Array[] = []
+    let bytes = 0
+    try {
+      while (true) {
+        const { done, value } = await reader.read()
+        if (done) return Buffer.concat(chunks, bytes).toString('utf8')
+        if (value.byteLength > limit - bytes) throw new Error(`GitHub ${label} exceeds inventory byte limit`)
+        bytes += value.byteLength
+        chunks.push(value)
+      }
+    }
+    catch (error) { stop(error instanceof Error ? error : new Error(String(error))); throw error }
+  }
+  const timeout = setTimeout(() => stop(new Error('GitHub inventory request timed out')), timeoutMs)
+  const stdout = consume(readers[0]!, 2_000_000, 'stdout'), stderr = consume(readers[1]!, 65536, 'stderr')
+  try {
+    const [code, output, diagnostic] = await Promise.all([child.exited, stdout, stderr])
+    if (failure) throw failure
+    if (code !== 0) throw new Error(`GitHub inventory request failed: ${diagnostic.slice(-500)}`)
+    return JSON.parse(output)
+  }
+  finally {
+    clearTimeout(timeout)
+    if (child.exitCode === null) stop(new Error('GitHub inventory request interrupted'))
+    await Promise.allSettled([child.exited, stdout, stderr, ...cancellations])
+    for (const reader of readers) reader.releaseLock()
+  }
 }
 export async function refreshUpstreamSnapshot(input: Inventory, refs: Record<string, string> = {}, read: GitHubReader = readGitHub): Promise<UpstreamSnapshot> {
   for (const key of Object.keys(refs)) if (!input.upstreams.some(u => u.id === key)) throw new Error(`Unknown upstream: ${key}`)
@@ -78,6 +113,16 @@ export function compareUpstreamSnapshot(input: Inventory, details: ParityAudit, 
   return { reviewRequired: !!(errors.length || added.length || removed.length || changed.length || revisions.length), added, removed, changed, revisions, errors }
 }
 
+export async function writeUpstreamSnapshot(output: string, snapshot: UpstreamSnapshot) {
+  const payload = `${JSON.stringify(snapshot, null, 2)}\n`
+  const file = await open(output, 'wx', 0o600).catch(error => {
+    if ((error as { code?: string }).code === 'EEXIST') throw new Error('Candidate output already exists')
+    throw error
+  })
+  try { await file.writeFile(payload, 'utf8') }
+  finally { await file.close() }
+}
+
 if (import.meta.main) {
   try {
     const args = process.argv.slice(2), refs: Record<string, string> = {}
@@ -89,9 +134,8 @@ if (import.meta.main) {
       else throw new Error(`Unknown argument: ${args[i]}`)
     }
     if (!output) throw new Error('Provide --output for a reviewable candidate snapshot')
-    if (await Bun.file(output).exists()) throw new Error('Candidate output already exists')
     const snapshot = await refreshUpstreamSnapshot(inventory, refs)
-    await Bun.write(output, `${JSON.stringify(snapshot, null, 2)}\n`)
+    await writeUpstreamSnapshot(output, snapshot)
     const comparison = compareUpstreamSnapshot(inventory, audit as ParityAudit, snapshot)
     console.log(JSON.stringify({ output, ...comparison }, null, 2))
     process.exitCode = comparison.reviewRequired ? 1 : 0

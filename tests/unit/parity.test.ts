@@ -118,3 +118,80 @@ test('a remote issue redirect, deleted issue placeholder or pull request cannot 
   expect(await verifyParityIssueLinks([{ url }], async () => ({ number: 29, html_url: url, state: 'closed' }))).toHaveLength(1)
   expect(await verifyParityIssueLinks([{ url }], async () => ({ number: 28, html_url: url, state: 'open', pull_request: {} }))).toHaveLength(1)
 })
+
+import { mkdtemp, chmod, readFile, rm } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
+import { readGitHub } from '../../scripts/parity-refresh'
+
+// Public process seam uses a real executable and pipes; it catches byte limits and child cleanup.
+async function withFakeGitHub(run: (pidFile: string, env: Record<string, string | undefined>) => Promise<void>) {
+  const directory = await mkdtemp(join(tmpdir(), 'drone-parity-gh-'))
+  const executable = join(directory, 'gh'), program = join(directory, 'fixture.ts'), config = join(directory, 'bunfig.toml'), pidFile = join(directory, 'child.pid')
+  await Bun.write(config, 'preload = []\n')
+  await Bun.write(program, `await Bun.write(process.env.PARITY_GH_PID!, String(process.pid))
+const mode = process.argv[3]
+if (mode === 'valid') console.log(JSON.stringify({ okay: true }))
+else if (mode === 'stdout-overflow') { await new Promise<void>(resolve => process.stdout.write(JSON.stringify('😀'.repeat(500001)), () => resolve())); await Bun.sleep(60000) }
+else if (mode === 'stderr-overflow') { await new Promise<void>(resolve => process.stderr.write('x'.repeat(65537), () => resolve())); await Bun.sleep(60000) }
+else if (mode === 'timeout') { process.on('SIGTERM', () => {}); await Bun.sleep(60000) }
+else { console.error('fixture failure'); process.exitCode = 3 }
+`)
+  const quote = (path: string) => `'${path.replaceAll("'", "'\\''")}'`
+  await Bun.write(executable, `#!/bin/sh\nexec ${quote(process.execPath)} --no-env-file ${quote(`--config=${config}`)} ${quote(program)} "$@"\n`)
+  await chmod(executable, 0o700)
+  const env = { ...process.env, PATH: `${directory}:${process.env.PATH ?? ''}`, PARITY_GH_PID: pidFile }
+  try { await run(pidFile, env) }
+  finally { await rm(directory, { recursive: true, force: true }) }
+}
+
+test('GitHub stdout is bounded by bytes, including multibyte JSON below the old character limit', async () => {
+  await withFakeGitHub(async (pidFile, env) => {
+    await expect(readGitHub('stdout-overflow', { env })).rejects.toThrow('stdout exceeds inventory byte limit')
+    const pid = Number(await readFile(pidFile, 'utf8'))
+    expect(() => process.kill(pid, 0)).toThrow()
+  })
+})
+
+test('GitHub stderr overflow and a deadline kill the real child and finish pipe cleanup before rejection', async () => {
+  await withFakeGitHub(async (pidFile, env) => {
+    for (const [mode, message, timeoutMs] of [
+      ['stderr-overflow', 'stderr exceeds inventory byte limit', 20000],
+      ['timeout', 'request timed out', 1000],
+    ] as const) {
+      await expect(readGitHub(mode, { env, timeoutMs })).rejects.toThrow(message)
+      const pid = Number(await readFile(pidFile, 'utf8'))
+      expect(() => process.kill(pid, 0)).toThrow()
+    }
+  })
+}, 30000)
+
+test('the bounded GitHub process returns valid JSON and retains bounded diagnostics for nonzero exit', async () => {
+  await withFakeGitHub(async (pidFile, env) => {
+    expect(await readGitHub('valid', { env })).toEqual({ okay: true })
+    const successPid = Number(await readFile(pidFile, 'utf8'))
+    expect(() => process.kill(successPid, 0)).toThrow()
+    await expect(readGitHub('failed', { env })).rejects.toThrow('fixture failure')
+    const pid = Number(await readFile(pidFile, 'utf8'))
+    expect(() => process.kill(pid, 0)).toThrow()
+  })
+}, 15000)
+
+import { writeUpstreamSnapshot } from '../../scripts/parity-refresh'
+
+// Public output seam exercises the filesystem race, not an existence-check stand-in.
+test('candidate snapshots use exclusive creation so existing files and racing writers cannot be overwritten', async () => {
+  const directory = await mkdtemp(join(tmpdir(), 'drone-parity-output-'))
+  try {
+    const output = join(directory, 'candidate.json'), first = retainedSnapshot(), second = retainedSnapshot()
+    second.upstreams[0]!.revision = 'b'.repeat(40)
+    const race = await Promise.allSettled([writeUpstreamSnapshot(output, first), writeUpstreamSnapshot(output, second)])
+    expect(race.filter(result => result.status === 'fulfilled')).toHaveLength(1)
+    expect(race.filter(result => result.status === 'rejected')).toHaveLength(1)
+    const winner = await readFile(output, 'utf8')
+    expect([first, second]).toContainEqual(JSON.parse(winner))
+    await expect(writeUpstreamSnapshot(output, first)).rejects.toThrow('Candidate output already exists')
+    expect(await readFile(output, 'utf8')).toBe(winner)
+  }
+  finally { await rm(directory, { recursive: true, force: true }) }
+})
