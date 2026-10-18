@@ -62,7 +62,7 @@ ranges, pose and source epochs. These checks detect inconsistent local records;
 they do not authenticate a maliciously rewritten recording.
 
 Each frame retains a synthetic 4 by 4 luminance image, a P5 header plus 16 pixel
-bytes, forward and bottom sonar ranges, LOCAL_NED capture pose, quaternion,
+bytes, a BODY_FRD forward sonar wall hit, vertical LOCAL_NED down seabed clearance, LOCAL_NED capture pose, quaternion,
 source/prediction epochs, raw packet and declared uncertainty. This is a small
 modeled fixture. It is not photographic inspection evidence, imaging sonar,
 photogrammetry, area coverage, defect detection, a point cloud, or a globally

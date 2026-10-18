@@ -9,7 +9,7 @@ function captureContext(command: VehiclePayloadCommand, nowMs = command.issuedAt
   c.estimate.localPosition!.altitudeDatum = 'LOCAL_WATER_SURFACE'
   c.estimate.localPosition!.positionM = [2, 0, 2]
   const capturedAtMs = nowMs - 60
-  c.measurement = { version: 1, evidence: 'modeled-vehicle-sensors', vehicle: 'subsea', sequence: capturedAtMs / 20, reference: command.reference, capturedAtMs, receivedAtMs: nowMs, values: { onSurface: false, stopped: true, calibration: 'subsea-dvl-pressure-v1', clockSigmaMs: 1, pressurePa: 121435.5, surfacePressurePa: 101325, waterDensityKgM3: 1025, dvlVelocityBodyMps: [0, 0, 0], angularRateBodyRadS: [0, 0, 0], dvlLocked: true, leak: false, tetherLengthM: 4, tetherTensionN: 2, linkConnected: true, emergency: false, bottomRangeM: 8, structureRangeM: 2, cameraLuma: Array.from({ length: 16 }, (_, i) => i * 16), cameraFrameId: `subsea-model-${capturedAtMs / 20}-${capturedAtMs}` } }
+  c.measurement = { version: 1, evidence: 'modeled-vehicle-sensors', vehicle: 'subsea', sequence: capturedAtMs / 20, reference: command.reference, capturedAtMs, receivedAtMs: nowMs, values: { onSurface: false, stopped: true, calibration: 'subsea-dvl-pressure-v1', clockSigmaMs: 1, pressurePa: 121435.5, surfacePressurePa: 101325, waterDensityKgM3: 1025, dvlVelocityBodyMps: [0, 0, 0], angularRateBodyRadS: [0, 0, 0], dvlLocked: true, leak: false, tetherLengthM: 4, tetherTensionN: 2, linkConnected: true, emergency: false, bottomRangeM: 8, structureRangeM: 2, structureHit: true, cameraLuma: Array.from({ length: 16 }, (_, i) => i * 16), cameraFrameId: `subsea-model-${capturedAtMs / 20}-${capturedAtMs}` } }
   c.measurementPose = { capturedAtMs, reference: command.reference, positionM: [2, 0, 2], quaternionWxyz: [1, 0, 0, 0], positionCapturedAtMs: capturedAtMs - 60, positionPredictedToMs: capturedAtMs, attitudeCapturedAtMs: capturedAtMs, attitudePredictedToMs: capturedAtMs, gyroCapturedAtMs: capturedAtMs, attitudePrediction: 'qualified-gyro-hold' }
   return c
 }
@@ -55,6 +55,7 @@ test('inspection latches intervening authority and command-scope loss, and rejec
     (c: VehicleControllerContext) => { c.estimate.localPosition!.velocityMps[0] = NaN },
     (c: VehicleControllerContext) => { c.estimate.localPosition!.positionM = [1, 2] as unknown as [number, number, number] },
     (c: VehicleControllerContext) => { c.measurement!.values.leak = true },
+    (c: VehicleControllerContext) => { c.measurement!.values.structureHit = false },
     (c: VehicleControllerContext) => { c.measurement!.values.linkConnected = false },
     (c: VehicleControllerContext) => { c.measurement!.values.tetherTensionN = 40 },
     (c: VehicleControllerContext) => { c.measurement!.values.dvlLocked = false },
@@ -102,6 +103,7 @@ test('inspection export rejects unacknowledged, relabeled or conflicting capture
   for (const change of [
     (r: ReturnType<typeof inspectionRecording>) => { r.path[0]!.measurement!.values.cameraFrameId = 'subsea-model-99-1040' },
     (r: ReturnType<typeof inspectionRecording>) => { r.path[0]!.measurement!.values.structureRangeM = 3 },
+    (r: ReturnType<typeof inspectionRecording>) => { r.path[0]!.measurement!.values.structureHit = false },
     (r: ReturnType<typeof inspectionRecording>) => { (r.path[0]!.measurement!.values.cameraLuma as number[])[0] = 255 },
     (r: ReturnType<typeof inspectionRecording>) => { r.path[0]!.measurementPose!.quaternionWxyz = [0, 0, 0, 1] },
     (r: ReturnType<typeof inspectionRecording>) => { r.path[0]!.measurementPose!.positionM[0] += 0.1 },
@@ -180,3 +182,16 @@ test('native subsea command exports scoped synthetic inspection evidence from ou
   }
   finally { await rm(directory, { recursive: true, force: true }) }
 }, 70000)
+
+test('inspection cannot recover an intervening sensor or navigation loss into a confirmed frame', () => {
+  for (const change of [
+    (c: VehicleControllerContext) => { c.measurement = null },
+    (c: VehicleControllerContext) => { c.estimate.health.localPosition = false },
+    (c: VehicleControllerContext) => { c.measurement!.values.dvlLocked = false },
+    (c: VehicleControllerContext) => { c.measurement!.values.leak = true },
+  ]) {
+    const port = createSubseaCapture(); port.observe!(captureContext(command)); port.request(command)
+    const lost = captureContext(command, 1020); change(lost); port.observe!(lost)
+    port.observe!(captureContext(command, 1060)); expect(port.poll(1060)!.outcome).toBe('uncertain')
+  }
+})
