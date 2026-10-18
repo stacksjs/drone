@@ -137,6 +137,7 @@ test('nonfinite or reversed clocks latch loss while retaining finite inspectable
     const failed = nav.update(base(badTime), packet, badTime)
     expect(failed.health.localPosition).toBe(false)
     expect(failed.nowMs).toBe(60)
+    expect(failed.health.pressureHeight).toBe(false)
     expect(failed.localPosition!.positionM.every(Number.isFinite)).toBe(true)
     expect(nav.update(base(80), renderSubseaMeasurement(truth(), 20, reference, 2), 80).health.localPosition).toBe(false)
   }
@@ -200,4 +201,49 @@ test('sensor rendering rejects malformed model truth without replacing nonfinite
     const state = truth(); change(state)
     expect(() => renderSubseaMeasurement(state, 0, reference, 1)).toThrow()
   }
+})
+
+test('pressure publication rejects mutated and reordered packets while retaining the last accepted capture epoch', () => {
+  for (const fault of ['mutation', 'same-capture', 'reorder', 'reference', 'clock', 'base-clock'] as const) {
+    const nav = createSubseaNavigation()
+    for (let t = 0; t <= 60; t += 4) nav.update(base(t), null, t)
+    const first = renderSubseaMeasurement(truth(), 0, reference, 1)
+    nav.update(base(60), first, 60)
+    let at = 64, previousDepth = 0, previousCapture = 0
+    if (fault === 'reorder') {
+      for (let t = 64; t <= 80; t += 4) nav.update(base(t), null, t)
+      const accepted = renderSubseaMeasurement(moving(), 20, reference, 2)
+      nav.update(base(80), accepted, 80); at = 84; previousDepth = 2; previousCapture = 20
+    }
+    let b = base(at), packet = structuredClone(first)
+    if (fault === 'mutation') packet.values.pressurePa = 121428.6325
+    if (fault === 'same-capture') packet = renderSubseaMeasurement(moving(), 0, reference, 2)
+    if (fault === 'reference') { b.resets.boot = 1; packet = renderSubseaMeasurement(moving(), 4, '55:0,0,1,0,0', 2) }
+    if (fault === 'clock') { at = 59; b = base(at) }
+    if (fault === 'base-clock') b.nowMs++
+    const failed = nav.update(b, packet, at)
+    expect(failed.health.localPosition).toBe(false)
+    expect(failed.health.pressureHeight).toBe(false)
+    expect(failed.pressureHeight?.downM).toBeCloseTo(previousDepth, 7)
+    expect(failed.pressureHeight?.capturedAtMs).toBe(previousCapture)
+  }
+})
+
+test('fresh pressure advances independently after latched DVL loss and rejects later pressure replay', () => {
+  const nav = createSubseaNavigation()
+  for (let t = 0; t <= 60; t += 4) nav.update(base(t), null, t)
+  nav.update(base(60), renderSubseaMeasurement(truth(), 0, reference, 1), 60)
+  for (let t = 64; t <= 80; t += 4) nav.update(base(t), null, t)
+  const lossPacket = renderSubseaMeasurement(moving(), 20, reference, 2); lossPacket.values.dvlLocked = false
+  expect(nav.update(base(80), lossPacket, 80).health.pressureHeight).toBe(true)
+  for (let t = 84; t <= 100; t += 4) nav.update(base(t), null, t)
+  const deeper = moving(); deeper.positionM[2] = 3
+  const next = renderSubseaMeasurement(deeper, 40, reference, 3); next.values.dvlLocked = false
+  const fresh = nav.update(base(100), next, 100)
+  expect(fresh.health.localPosition).toBe(false); expect(fresh.health.pressureHeight).toBe(true)
+  expect(fresh.pressureHeight?.downM).toBeCloseTo(3, 7); expect(fresh.pressureHeight?.capturedAtMs).toBe(40)
+  const mutated = structuredClone(next); mutated.values.pressurePa = 121428.6325
+  const rejected = nav.update(base(104), mutated, 104)
+  expect(rejected.health.pressureHeight).toBe(false)
+  expect(rejected.pressureHeight?.downM).toBeCloseTo(3, 7); expect(rejected.pressureHeight?.capturedAtMs).toBe(40)
 })

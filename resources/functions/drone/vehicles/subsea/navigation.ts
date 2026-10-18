@@ -21,6 +21,7 @@ export function createSubseaNavigation(): VehicleNavigation {
   let now = -Infinity, reference: string | null = null, fault = '', last: VehicleMeasurement | null = null, signature = ''
   let position: SensorVector = [0, 0, 0], velocity: SensorVector = [0, 0, 0], initializedAt = 0, distanceM = 0
   let pressureHealthy = false, pressure: { depth: number, at: number } | null = null
+  let pressureLast: VehicleMeasurement | null = null, pressureSignature = '', pressureContextLost = false
   const history: { at: number, q: Quaternion }[] = []
   function attitudeAt(at: number): Quaternion | null {
     const exact = history.find(row => Math.abs(row.at - at) < 0.001)
@@ -48,8 +49,17 @@ export function createSubseaNavigation(): VehicleNavigation {
         while (history.length > 140 || history.length > 1 && nowMs - history[0]!.at > 500) history.shift()
       }
       const checked = qualifySubseaMeasurement(measurement, nowMs, ref)
-      pressureHealthy = checked !== null
-      if (checked) pressure = { depth: pressureDepthM(Number(checked.values.pressurePa), Number(checked.values.surfacePressurePa), Number(checked.values.waterDensityKgM3)), at: checked.capturedAtMs }
+      // Pressure is independent of bottom lock, but never independent of packet identity or clock scope.
+      if (pressureLast && (!validTime || ref !== pressureLast.reference)) pressureContextLost = true
+      pressureHealthy = false
+      if (checked && validTime && !pressureContextLost) {
+        const encoded = JSON.stringify(checked)
+        const replay = pressureLast && (checked.sequence < pressureLast.sequence || checked.sequence === pressureLast.sequence && encoded !== pressureSignature || checked.sequence > pressureLast.sequence && checked.capturedAtMs <= pressureLast.capturedAtMs)
+        if (!replay) {
+          pressure = { depth: pressureDepthM(Number(checked.values.pressurePa), Number(checked.values.surfacePressurePa), Number(checked.values.waterDensityKgM3)), at: checked.capturedAtMs }
+          pressureLast = checked; pressureSignature = encoded; pressureHealthy = true
+        }
+      }
       if (started && measurement !== null && !checked) fault ||= 'subsea-sensor-unqualified'
       if (started && last && nowMs - last.capturedAtMs + 1 > 120) fault ||= 'subsea-sensor-stale'
       if (checked && !fault && validAttitude) {
