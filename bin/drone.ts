@@ -22,6 +22,8 @@ import DiagnosticsExport from '../app/Commands/DiagnosticsExport'
 import MissionsSimulate from '../app/Commands/MissionsSimulate'
 import MissionsValidate from '../app/Commands/MissionsValidate'
 import MissionsReplay from '../app/Commands/MissionsReplay'
+import MissionsCheckpoint from '../app/Commands/MissionsCheckpoint'
+import MissionsRecover from '../app/Commands/MissionsRecover'
 
 import NavigationSimulate from '../app/Commands/NavigationSimulate'
 
@@ -61,6 +63,8 @@ DiagnosticsExport(app)
 MissionsSimulate(app)
 MissionsValidate(app)
 MissionsReplay(app)
+MissionsCheckpoint(app)
+MissionsRecover(app)
 NavigationSimulate(app)
 AntennaBench(app)
 AirSimulate(app)

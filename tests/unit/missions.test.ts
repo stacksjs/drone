@@ -28,9 +28,31 @@ test('operator start is required and cancellation cannot restart or emit another
   expect(engine.step(observation(660), 'start').targetM).toBeNull()
 })
 
-import { parseMissionTrace, recoverMission, replayMission } from '../../resources/functions/drone/missions/engine'
+import { checkpointMission, parseMissionTrace, recoverMission, replayMission } from '../../resources/functions/drone/missions/engine'
 import { simulateMission } from '../../resources/functions/drone/missions/simulation'
 import { createRigidBody } from '../../resources/functions/drone/controls/physics'
+
+test('portable checkpoints verify the entire source and retain an exact active decision prefix', () => {
+  const run = simulateMission({ scenario: 'recovery' })
+  const checkpoint = checkpointMission(run.trace, 4980)
+  expect(checkpoint.rows.at(-1)!.observation.nowMs).toBe(4980)
+  expect(replayMission(checkpoint).snapshot().state).toBe('running')
+  expect(checkpoint.rows).toEqual(run.trace.rows.filter(row => row.observation.nowMs <= 4980))
+  checkpoint.rows[0]!.observation.positionM[0] = 123
+  expect(run.trace.rows[0]!.observation.positionM[0]).not.toBe(123)
+  for (const at of [0, 4981, NaN, Infinity, -1, run.trace.rows.at(-1)!.observation.nowMs])
+    expect(() => checkpointMission(run.trace, at)).toThrow()
+  const corrupt = structuredClone(run.trace)
+  corrupt.rows.at(-1)!.result.reason = 'forged-future'
+  expect(() => checkpointMission(corrupt, 4980)).toThrow('mismatch')
+  const photo = run.trace.rows.find(row => row.result.payload)!
+  const afterPhoto = checkpointMission(run.trace, photo.observation.nowMs)
+  const fresh = run.trace.rows.find(row => row.observation.nowMs > photo.observation.nowMs)!.observation
+  const recovered = recoverMission(afterPhoto, fresh)
+  expect(recovered.snapshot().state).toBe('paused')
+  expect(recovered.snapshot().payload).toBeNull()
+  expect(recovered.trace().rows.filter(row => row.result.payload)).toHaveLength(1)
+})
 
 test('owned raw sensors, estimator, controls and authority complete the graph and land', () => {
   const run = simulateMission()
@@ -124,6 +146,50 @@ import { mkdtemp, rm, stat, symlink, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { readMissionFile, writeMissionTrace } from '../../resources/functions/drone/missions/files'
+test('native checkpoint and recovery commands persist verified paused artifacts and reject unsafe recovery', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'drone-mission-checkpoint-'))
+  try {
+    const run = simulateMission({ scenario: 'recovery' })
+    const source = await writeMissionTrace(join(root, 'source'), run.trace)
+    const original = await readMissionFile(source)
+    const saved = await cliCommand(['missions:checkpoint', source, '--at-ms', '4980', '--output', join(root, 'checkpoint')]).withTimeout(60000)
+    expect(saved.exitCode).toBe(0)
+    const checkpointPath = JSON.parse(saved.stdout).tracePath
+    const prefix = parseMissionTrace(await readMissionFile(checkpointPath))
+    expect(prefix.rows.at(-1)!.observation.nowMs).toBe(4980)
+    const fresh = structuredClone(run.trace.rows.find(row => row.observation.nowMs === 6000)!.observation)
+    const observationPath = join(root, 'observation.json')
+    await writeFile(observationPath, JSON.stringify(fresh))
+    const args = ['missions:recover', checkpointPath, observationPath, '--output', join(root, 'recovered')]
+    const recovered = await cliCommand(args).withTimeout(60000)
+    expect(recovered.exitCode).toBe(0)
+    const result = JSON.parse(recovered.stdout)
+    expect(result.state).toBe('paused')
+    expect(result.physicalFlightEnabled).toBe(false)
+    expect(result.reason).toBe('checkpoint-recovered-awaiting-resume')
+    const recoveredTrace = parseMissionTrace(await readMissionFile(result.tracePath))
+    expect(recoveredTrace.rows.at(-1)!.action).toBe('recover')
+    expect(recoveredTrace.rows.at(-1)!.observation.nowMs).toBe(6000)
+    expect((await stat(result.tracePath)).mode & 0o777).toBe(0o600)
+    expect((await stat(join(root, 'recovered'))).mode & 0o777).toBe(0o700)
+    expect(await readMissionFile(source)).toBe(original)
+    expect((await cliCommand(args).withTimeout(60000)).exitCode).toBe(1)
+    for (const change of [{ authority: 'manual' }, { healthy: false }, { reference: '56:0,0,0,0,0' }, { nowMs: 4980 }, { batteryPercent: 0 }]) {
+      await writeFile(observationPath, JSON.stringify({ ...fresh, ...change }))
+      const rejected = await cliCommand(['missions:recover', checkpointPath, observationPath, '--output', join(root, 'rejected')]).withTimeout(60000)
+      expect(rejected.exitCode).toBe(1)
+      expect(await stat(join(root, 'rejected')).catch(() => null)).toBeNull()
+    }
+    await writeFile(observationPath, '{private-invalid-observation')
+    const invalid = await cliCommand(['missions:recover', checkpointPath, observationPath, '--output', join(root, 'invalid')]).withTimeout(60000)
+    expect(invalid.exitCode).toBe(1)
+    expect(invalid.stderr).toContain('Invalid mission observation JSON')
+    expect(invalid.stderr).not.toContain('private-invalid-observation')
+    expect((await cliCommand(['missions:checkpoint', source, '--at-ms', '4981', '--output', join(root, 'between')]).withTimeout(60000)).exitCode).toBe(1)
+    expect((await cliCommand(['missions:recover', checkpointPath, observationPath]).withTimeout(60000)).exitCode).toBe(1)
+  }
+  finally { await rm(root, { recursive: true, force: true }) }
+}, 240000)
 test('private recorded traces survive the native CLI validate, simulate and replay round trip', async () => {
   const root = await mkdtemp(join(tmpdir(), 'drone-mission-'))
   try {

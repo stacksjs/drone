@@ -24,6 +24,12 @@ simulation trace files use bounded regular-file reads, exclusive creation and fs
 local evidence rationale in ADR 9. They are separate from runtime diagnostic journals because they
 contain local positions. They are neither authenticated nor crash-prefix recoverable.
 
+Expose portable mission-process exercises through native `missions:checkpoint` and
+`missions:recover` commands. Verify the full source before extracting an exact active prefix;
+require an explicit fresh compatible simulation observation for recovery. Persist the recovered
+paused decision trace separately with no source overwrite and no automatic resume. This does not
+extend the checkpoint to estimator, controller, authority, board or hardware payload state.
+
 The first release does not claim physical execution, terrain following, hardware exactly-once
 payload delivery or parity with external autopilot mission systems. The detailed contract,
 evidence and remaining gates are in [the mission guide](../missions.md).

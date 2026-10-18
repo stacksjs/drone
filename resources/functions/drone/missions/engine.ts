@@ -150,6 +150,14 @@ export function parseMissionTrace(text: string): MissionTrace {
   catch { throw new TypeError('Invalid mission trace JSON') }
   return replayMission(trace).trace()
 }
+/** Extract an exact active decision prefix after verifying the entire source recording. */
+export function checkpointMission(trace: MissionTrace, atMs: number): MissionTrace {
+  const verified = replayMission(trace).trace()
+  if (!Number.isSafeInteger(atMs) || atMs < 0 || !verified.rows.some(row => row.observation.nowMs === atMs)) throw new RangeError('Checkpoint epoch must match a recorded observation')
+  verified.rows = verified.rows.filter(row => row.observation.nowMs <= atMs)
+  if (!active(replayMission(verified).snapshot().state)) throw new TypeError('Mission checkpoint is not resumable')
+  return verified
+}
 /** Recovery verifies a prefix and requires a new operator resume on a fresh compatible observation. */
 export function recoverMission(trace: MissionTrace, observation: MissionObservation): MissionEngine {
   const engine = replayMission(trace)

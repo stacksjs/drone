@@ -92,7 +92,7 @@ export type { SurveyScenario } from '../../../resources/functions/drone/mapping/
 export type { SurveyPoint, SurveyConfig, SurveyLane, SurveyPlan, SurveyPose, SurveyCapture, SurveyRun } from '../../../resources/functions/drone/mapping/types'
 export { encodeFrame, encodeFrameV2, decodeDatagram, encodeVelocity } from '../../../resources/functions/drone/mavlink'
 export type { MavlinkFrame } from '../../../resources/functions/drone/mavlink'
-export { observeMission, createMissionEngine, replayMission, parseMissionTrace, recoverMission, missionLimits } from '../../../resources/functions/drone/missions/engine'
+export { observeMission, createMissionEngine, replayMission, parseMissionTrace, checkpointMission, recoverMission, missionLimits } from '../../../resources/functions/drone/missions/engine'
 export type { MissionAction, MissionState, MissionObservation, MissionSnapshot, MissionTraceRow, MissionTrace, MissionEngine } from '../../../resources/functions/drone/missions/engine'
 export { readMissionFile, writeMissionTrace } from '../../../resources/functions/drone/missions/files'
 export { missionGraphBudget } from '../../../resources/functions/drone/missions/graph'
