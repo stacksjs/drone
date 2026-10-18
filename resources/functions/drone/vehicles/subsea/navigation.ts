@@ -1,4 +1,3 @@
-import type { EstimatorSnapshot } from '../../estimation/estimator'
 import type { Quaternion } from '../../estimation/frames'
 import type { SensorVector } from '../../sensors/types'
 import type { VehicleMeasurement, VehicleNavigation } from '../types'
@@ -36,6 +35,8 @@ export function createSubseaNavigation(): VehicleNavigation {
       const out = structuredClone(base), started = last !== null
       const validTime = Number.isSafeInteger(nowMs) && nowMs >= 0 && base.nowMs === nowMs && nowMs >= now && (!started || nowMs - now <= 40)
       if (!validTime) fault ||= 'subsea-clock-discontinuity'
+      nowMs = Number.isSafeInteger(nowMs) && nowMs >= 0 ? Math.max(nowMs, Number.isFinite(now) ? now : 0) : Number.isFinite(now) ? now : 0
+      out.nowMs = nowMs
       now = nowMs
       const ref = vehicleReference(base), attitude = base.attitude
       const validAttitude = base.evidence === 'fixture' && typeof base.bootId === 'bigint' && base.bootId > 0n && base.health.tilt && attitude && attitude.capturedAtMs !== null && Number.isFinite(attitude.capturedAtMs) && attitude.capturedAtMs <= nowMs && nowMs - attitude.capturedAtMs <= 60 && attitude.quaternionWxyz.length === 4 && attitude.quaternionWxyz.every(Number.isFinite) && Math.abs(Math.hypot(...attitude.quaternionWxyz) - 1) < 1e-6

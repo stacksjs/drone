@@ -127,3 +127,17 @@ test('local horizontal origin cannot initialize from an underwater or moving una
   alteredId.values.cameraFrameId = 'subsea-model-2-0'
   expect(qualifySubseaMeasurement(alteredId, 60)).toBe(null)
 })
+
+test('nonfinite or reversed clocks latch loss while retaining finite inspectable navigation state', () => {
+  for (const badTime of [NaN, Infinity, 59]) {
+    const nav = createSubseaNavigation()
+    for (let t = 0; t <= 60; t += 4) nav.update(base(t), null, t)
+    const packet = renderSubseaMeasurement(truth(), 0, reference, 1)
+    expect(nav.update(base(60), packet, 60).health.localPosition).toBe(true)
+    const failed = nav.update(base(badTime), packet, badTime)
+    expect(failed.health.localPosition).toBe(false)
+    expect(failed.nowMs).toBe(60)
+    expect(failed.localPosition!.positionM.every(Number.isFinite)).toBe(true)
+    expect(nav.update(base(80), renderSubseaMeasurement(truth(), 20, reference, 2), 80).health.localPosition).toBe(false)
+  }
+})
