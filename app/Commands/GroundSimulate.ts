@@ -13,7 +13,11 @@ export default defineCommand({
   async handle(options) {
     try {
       if (!/^\d+$/.test(options.seconds) || Number(options.seconds) < 2 || Number(options.seconds) > 180) throw new RangeError('Ground simulation seconds must be an integer from 2 to 180')
-      print(JSON.stringify(await runVehicleSimulation(createGroundProfile(options.scenario), { scenario: options.scenario, seconds: Number(options.seconds) }), null, 2))
+      const result = await runVehicleSimulation(createGroundProfile(options.scenario), { scenario: options.scenario, seconds: Number(options.seconds) })
+      const { trace, path, ...report } = result
+      print(JSON.stringify({ ...report, recordedMissionRows: trace.rows.length, evaluatedPathRows: path.length }, (_key, value) => typeof value === 'bigint' ? String(value) : value, 2))
+      const expected = ['nominal', 'logistics'].includes(options.scenario) ? 'completed' : options.scenario === 'host-loss' ? 'host-lost' : 'blocked'
+      if (result.status !== expected) process.exitCode = 1
     }
     catch (error) { printError(error instanceof Error ? error.message : String(error)); process.exitCode = 1 }
   },

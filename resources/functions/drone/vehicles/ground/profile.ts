@@ -36,7 +36,7 @@ export function createGroundProfile(scenario: string = 'nominal'): VehicleProfil
       observe(next) { context = structuredClone(next) },
       request(command) {
         if (closed || seen.has(command.eventId) || seen.size >= 32 || queue.length > 0) throw new Error('Ground payload event already consumed or closed')
-        if (!/^[A-Za-z0-9:_-]{1,120}$/.test(command.eventId) || !/^[A-Za-z0-9:_-]{1,120}$/.test(command.taskId) || !Number.isSafeInteger(command.issuedAtMs) || !Number.isSafeInteger(command.expiresAtMs) || command.expiresAtMs <= command.issuedAtMs || command.expiresAtMs - command.issuedAtMs > 5000 || !Array.isArray(command.positionM) || command.positionM.length !== 3 || !command.positionM.every(Number.isFinite)) throw new TypeError('Invalid ground payload command')
+        if (!/^[A-Za-z0-9:,_-]{1,200}$/.test(command.eventId) || !/^[A-Za-z0-9:_-]{1,120}$/.test(command.taskId) || !Number.isSafeInteger(command.issuedAtMs) || !Number.isSafeInteger(command.expiresAtMs) || command.expiresAtMs <= command.issuedAtMs || command.expiresAtMs - command.issuedAtMs > 5000 || !Array.isArray(command.positionM) || command.positionM.length !== 3 || !command.positionM.every(Number.isFinite)) throw new TypeError('Invalid ground payload command')
         seen.add(command.eventId)
         const c = context, v = c?.measurement?.values
         const qualified = c ? payloadOdometry.step(c.measurement, c.estimate, c.nowMs).healthy : false

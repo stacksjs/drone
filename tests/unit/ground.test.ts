@@ -70,10 +70,10 @@ test('proximity and implement hazards latch and revoke mower and drive outputs',
 test('payload acknowledgement is scoped once and mower requires stationary guarded surface', () => {
   const profile = createGroundProfile(), port = profile.createPayload!(), controller = profile.createController(), c = groundContext()
   port.observe!(c)
-  const command = { eventId: 'mower-1', taskId: 'enable', operation: 'mower-enable' as const, containerId: null, issuedAtMs: 1000, expiresAtMs: 1500, positionM: [0, 0, 0] as [number, number, number], reference: c.measurement!.reference }
+  const command = { eventId: 'ground-mowing-coverage:1:0,0,0,0,0:enable', taskId: 'enable', operation: 'mower-enable' as const, containerId: null, issuedAtMs: 1000, expiresAtMs: 1500, positionM: [0, 0, 0] as [number, number, number], reference: c.measurement!.reference }
   port.request(command)
   expect(port.poll(1059)).toBe(null)
-  expect(port.poll(1060)).toMatchObject({ eventId: 'mower-1', outcome: 'confirmed' })
+  expect(port.poll(1060)).toMatchObject({ eventId: 'ground-mowing-coverage:1:0,0,0,0,0:enable', outcome: 'confirmed' })
   expect(controller.step(c).actuators[2]).toBe(1)
   expect(() => port.request(command)).toThrow()
   c.enabled = false
@@ -139,4 +139,12 @@ test('normally engaged neutral brake stops modeled nominal motion inside declare
   expect(elapsed).toBeLessThan(speed / 0.5)
   expect(plant.snapshot().velocityMps[0]).toBeLessThan(0.02)
   expect(createGroundProfile().actuators.map(a => a.neutral)).toEqual([0, 0, 0, 1])
+})
+
+test('implement port rejects superficially safe booleans without qualified wheel calibration', () => {
+  const profile = createGroundProfile(), port = profile.createPayload!(), c = groundContext()
+  c.measurement!.values.calibration = 'unverified-radius'
+  port.observe!(c)
+  port.request({ eventId: 'bad-calibration', taskId: 'enable', operation: 'mower-enable', containerId: null, issuedAtMs: 1000, expiresAtMs: 1500, positionM: [0, 0, 0], reference: '1:0,0,0,0,0' })
+  expect(port.poll(1060)).toMatchObject({ outcome: 'rejected' })
 })
