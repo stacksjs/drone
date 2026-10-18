@@ -7,7 +7,6 @@ export const surfaceScenarios = ['nominal', 'harbour-return', 'current', 'collis
 export type SurfaceScenario = typeof surfaceScenarios[number]
 export function createSurfaceProfile(scenario: SurfaceScenario = 'nominal'): VehicleProfile {
   if (!surfaceScenarios.includes(scenario)) throw new RangeError('Unknown surface scenario')
-  let sequence = 0
   const move = { acceptanceM: 0.35, maxArrivalSpeedMps: 0.25, settleMs: 400, timeoutMs: 25000 }
   const mission: VehicleMissionPlan = { version: 2, vehicle: 'surface', id: 'harbour-survey-sample-return', frame: 'LOCAL_NED', altitude: 'ORIGIN_RELATIVE_DOWN', terrain: 'DECLARED_MODEL_SURFACE', origin: { latitudeDeg: 0, longitudeDeg: 0, ellipsoidHeightM: 100 }, fence: { radiusM: 15, minDownM: -0.5, maxDownM: 0.5 }, rallyM: [0, 0, 0], power: { availableWh: 60, maxW: 120, reservePercent: 30 }, start: 'start', tasks: [
     { id: 'start', kind: 'start', next: 'survey-a' },
@@ -20,9 +19,15 @@ export function createSurfaceProfile(scenario: SurfaceScenario = 'nominal'): Veh
   if (scenario === 'harbour-return') mission.tasks.push({ id: 'energy-check', kind: 'branch', batteryAtLeast: 100, then: 'survey-b', otherwise: 'return' })
   return { vehicle: 'surface', name: 'Owned planar vector-thrust harbour vessel', evidence: 'modeled-vehicle-profile', physicalFlightEnabled: false,
     actuators: [{ name: 'body-surge', unit: 'normalized', min: -1, max: 1, neutral: 0 }, { name: 'body-sway', unit: 'normalized', min: -1, max: 1, neutral: 0 }, { name: 'body-yaw', unit: 'normalized', min: -1, max: 1, neutral: 0 }], authorityFence: { ...mission.fence }, mission,
-    scenarios: surfaceScenarios, createPlant: createSurfacePlant, createController: createSurfaceController,
-    createPayload: () => createSurfaceSampler(scenario === 'sample-uncertain' ? 'uncertain' : scenario === 'sample-loss' ? 'loss' : 'confirmed'),
-    renderMeasurement: (state, atMs, reference) => renderSurfaceMeasurement(state, atMs, reference, ++sequence, scenario === 'collision'),
+    scenarios: surfaceScenarios,
+    createSession() {
+      let sequence = 0
+      return {
+        createPlant: createSurfacePlant, createController: createSurfaceController,
+        createPayload: () => createSurfaceSampler(scenario === 'sample-uncertain' ? 'uncertain' : scenario === 'sample-loss' ? 'loss' : 'confirmed'),
+        renderMeasurement: (state, atMs, reference) => renderSurfaceMeasurement(state, atMs, reference, ++sequence, scenario === 'collision'),
+      }
+    },
     faults(name, atMs) {
       if (!surfaceScenarios.includes(name as SurfaceScenario)) throw new RangeError('Unknown surface fault fixture')
       if (atMs < 600) return {}

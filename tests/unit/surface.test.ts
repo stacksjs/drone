@@ -242,3 +242,27 @@ test('surface survey rejects missing or understated clock budgets and retains th
   changed.pose.timeSigmaMs = 1
   expect(() => exportSurfaceSurvey([changed])).toThrow()
 })
+
+
+test('surface profile creates isolated sensor sequences and sampler container sessions for every run', () => {
+  const profile = createSurfaceProfile()
+  const first = profile.createSession(), second = profile.createSession()
+  const state = createSurfacePlant().snapshot(), reference = surfaceContext().measurement!.reference
+  expect(first.renderMeasurement(state, 1000, reference).sequence).toBe(1)
+  expect(first.renderMeasurement(state, 1020, reference).sequence).toBe(2)
+  expect(second.renderMeasurement(state, 1000, reference).sequence).toBe(1)
+  const command = { eventId: 'isolated-sample', taskId: 'sample', operation: 'water-sample' as const, containerId: 'shared-bottle-name', issuedAtMs: 1000, expiresAtMs: 2000, positionM: [0, 0, 0] as [number, number, number], reference }
+  const firstSampler = first.createPayload!(), secondSampler = second.createPayload!()
+  try {
+    for (const port of [firstSampler, secondSampler]) {
+      port.observe!(surfacePayloadContext(command)); port.request(command)
+      port.observe!(surfacePayloadContext(command, 1200))
+      expect(port.poll(1200)!.outcome).toBe('confirmed')
+    }
+  }
+  finally { firstSampler.close(); secondSampler.close() }
+  const one = runVehicleSimulation(profile, { seconds: 120 })
+  const two = runVehicleSimulation(profile, { seconds: 120 })
+  expect(one.status).toBe('completed'); expect(two.status).toBe('completed')
+  expect(two.trace).toEqual(one.trace)
+})
