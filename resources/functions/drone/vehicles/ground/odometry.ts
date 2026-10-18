@@ -51,7 +51,8 @@ export function createGroundOdometry() {
         position = position.map((n, i) => 0.8 * n + 0.2 * p.positionM[i]!) as [number, number, number]
       }
       previous = structuredClone(packet); signature = nextSignature
-      if (Math.abs(wheelSpeed - speed) > 0.55) slipSince ??= nowMs
+      const lateralSpeed = -p.velocityMps[0]! * Math.sin(yaw) + p.velocityMps[1]! * Math.cos(yaw)
+      if (Math.abs(wheelSpeed - speed) > 0.55 || Math.abs(lateralSpeed) > 0.3) slipSince ??= nowMs
       else slipSince = null
       const uncertainty = Math.sqrt(Math.max(...p.covarianceBlocks.slice(0, 2).map(c => c.positionM2))) * 3 + 0.03
       if (!Number.isFinite(uncertainty) || uncertainty > 1) return invalid('ground-localization-uncertainty')

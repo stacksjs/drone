@@ -148,3 +148,19 @@ test('implement port rejects superficially safe booleans without qualified wheel
   port.request({ eventId: 'bad-calibration', taskId: 'enable', operation: 'mower-enable', containerId: null, issuedAtMs: 1000, expiresAtMs: 1500, positionM: [0, 0, 0], reference: '1:0,0,0,0,0' })
   expect(port.poll(1060)).toMatchObject({ outcome: 'rejected' })
 })
+
+test('lateral slip consumes the contact friction budget instead of rotating velocity without force', () => {
+  const mu = 0.04, plant = createGroundPlant({ friction: mu }), environment = { windMps: [0, 0, 0] as [number, number, number], currentMps: [0, 0, 0] as [number, number, number] }
+  for (let i = 0; i < 1000; i++) plant.step([1, 1, 0, 0], 0.004, environment)
+  let maximum = 0, lateral = 0
+  for (let i = 0; i < 1000; i++) {
+    const before = plant.snapshot(), after = plant.step([-0.5, 1, 0, 0], 0.004, environment)
+    const acceleration = Math.hypot((after.velocityMps[0] - before.velocityMps[0]) / 0.004, (after.velocityMps[1] - before.velocityMps[1]) / 0.004)
+    const dragBound = Math.abs(Number(before.details.speedMps)) * 4 / 25
+    expect(acceleration).toBeLessThanOrEqual(mu * 9.80665 + dragBound + 1e-10)
+    maximum = Math.max(maximum, acceleration)
+    lateral = Math.max(lateral, Math.abs(Number(after.details.lateralMps)))
+  }
+  expect(lateral).toBeGreaterThan(0.01)
+  expect(maximum).toBeGreaterThan(0.1)
+})
