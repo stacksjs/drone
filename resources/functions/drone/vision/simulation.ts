@@ -189,6 +189,6 @@ export function simulateVision(options: { scenario?: VisionScenario, seconds?: n
     }
   }
   if (!paired) blocked ??= 'operator-selection-or-qualified-metric-target-unavailable'
-  if (scenario !== 'follow' && seconds < 10) blocked ??= 'authored-fault-not-reached'
+  if (scenario !== 'follow' && fusion.snapshot().state !== 'lost') blocked ??= 'authored-fault-not-observed'
   return { evidence: 'owned-vision-physics-simulation' as const, physicalFlightEnabled: false as const, boardOutputsInhibited: true as const, status: blocked ? 'blocked' as const : 'completed' as const, reason: blocked ?? 'authored-follow-complete-outputs-released', scenario, calibration: localizer.report, fusion: fusion.snapshot(), metrics: { maxTargetErrorM, maxThreeSigmaRatio, maxVisualErrorM, maxVisualThreeSigmaRatio, minSeparationM, followTravelM: followingStartedM && followEndM ? Math.hypot(...followEndM.map((n, i) => n - followingStartedM[i]!)) : 0, maxTrackingGapMs, maxHeadingDriftRad }, path, authority: supervisor.snapshot(), board: board.snapshot(), finalTruthPositionM: [...truth.positionM] as SensorVector }
 }

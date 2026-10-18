@@ -59,3 +59,10 @@ test('a restored camera stream cannot resume motors or replace an explicitly los
   expect(run.board.motorsN).toEqual([0, 0, 0, 0])
   expect(run.authority.state).not.toBe('autonomous')
 }, 60000)
+
+test('ending before the delayed fault arrives cannot report a completed hazard demonstration', () => {
+  const run = simulateVision({ scenario: 'depth-loss', seconds: 10 })
+  expect(run.status).toBe('blocked')
+  expect(run.reason).toBe('authored-fault-not-observed')
+  expect(run.board.motorsN).toEqual([0, 0, 0, 0])
+}, 60000)
