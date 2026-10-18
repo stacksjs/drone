@@ -58,6 +58,13 @@ jobs:
         working-directory: ${{ runner.temp }}
       - run: $GITHUB_WORKSPACE/storage/runtime-build/cli/drone missions:replay "$RUNNER_TEMP/mission-recording/mission.json" --at-ms 6000
         working-directory: ${{ runner.temp }}
+      - name: Exercise portable mission-process recovery outside the checkout
+        working-directory: ${{ runner.temp }}
+        run: |
+          "$GITHUB_WORKSPACE/storage/runtime-build/cli/drone" missions:checkpoint "$RUNNER_TEMP/mission-recording/mission.json" --at-ms 4980 --output "$RUNNER_TEMP/mission-checkpoint"
+          bun -e 'const root = process.env.RUNNER_TEMP; const trace = await Bun.file(`${root}/mission-recording/mission.json`).json(); const observation = trace.rows.find(row => row.observation.nowMs === 6000).observation; await Bun.write(`${root}/mission-observation.json`, JSON.stringify(observation))'
+          "$GITHUB_WORKSPACE/storage/runtime-build/cli/drone" missions:recover "$RUNNER_TEMP/mission-checkpoint/mission.json" "$RUNNER_TEMP/mission-observation.json" --output "$RUNNER_TEMP/mission-recovered"
+          "$GITHUB_WORKSPACE/storage/runtime-build/cli/drone" missions:replay "$RUNNER_TEMP/mission-recovered/mission.json"
       - run: $GITHUB_WORKSPACE/storage/runtime-build/cli/drone navigation:simulate --scenario avoid-land
         working-directory: ${{ runner.temp }}
       - run: $GITHUB_WORKSPACE/storage/runtime-build/cli/drone navigation:simulate --scenario replan

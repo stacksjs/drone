@@ -9,6 +9,8 @@ and independent modeled output watchdog. ArduPilot and PX4 are not required.
 ./buddy missions:simulate --scenario nominal
 ./buddy missions:simulate --scenario recovery --output /tmp/new-mission-recording
 ./buddy missions:replay /tmp/new-mission-recording/mission.json --at-ms 6000
+./buddy missions:checkpoint /tmp/new-mission-recording/mission.json --at-ms 4980 --output /tmp/new-mission-checkpoint
+./buddy missions:recover /tmp/new-mission-checkpoint/mission.json /tmp/fresh-mission-observation.json --output /tmp/new-mission-recovery
 ```
 
 Open `/missions` for native stx scenario execution and recorded state/task inspection. The scenarios
@@ -89,6 +91,39 @@ authenticate observations. Limits are 6,001 rows and 8 MiB, with no overwrite or
 uses a new private directory and exclusive 0600 file, followed by fsync. Torn JSON is rejected.
 Mission traces contain synthetic local positions and must not be treated as the runtime-only,
 location-free diagnostics v1 format.
+
+### Portable mission-process checkpoints
+
+For the synthetic recovery scenario above, create the explicit observation file from its recorded
+6000 ms fixture epoch before running `missions:recover`:
+
+```sh
+bun -e 'const trace = await Bun.file("/tmp/new-mission-recording/mission.json").json(); const row = trace.rows.find(row => row.observation.nowMs === 6000); await Bun.write("/tmp/fresh-mission-observation.json", JSON.stringify(row.observation))'
+```
+
+This deliberately exercises recovery against recorded simulation data. A running simulation must
+instead supply its current supervised observation.
+
+`missions:checkpoint` verifies the entire source recording before extracting its active decision
+prefix at an exact recorded observation epoch. Ready, completed, blocked and aborted prefixes are
+not resumable. It writes a separate private `mission.json` without modifying the source. This also
+allows extracting a running prefix from a completed simulation for a deliberate recovery exercise.
+
+`missions:recover` reads that checkpoint and an explicit simulation `MissionObservation` JSON
+file. The observation must come from the current modeled estimator and authority supervisor and
+contain `kind`, `nowMs`, `reference`, `origin`, `healthy`, `positionM`, `velocityMps`, `authority`,
+`batteryPercent` and `onGround`, as defined in `missions/engine.ts`. It must have a later monotonic
+epoch, the same boot/reset reference and origin, healthy estimates, autonomous authority, a position
+inside the fence, and remaining reserve/endurance. Invalid or stale inputs fail before creating the
+output directory. Malformed JSON errors do not echo observation contents.
+
+Successful recovery appends a replayable `recover` decision, saves it in a new private directory,
+and reports `paused` with `checkpoint-recovered-awaiting-resume`. Neither command arms, resumes,
+connects to a vehicle, nor restores another subsystem's state. A simulation caller may load the
+recovered trace through `replayMission` and explicitly submit `resume` using its next fresh
+supervised observation. File declarations are unsigned: checking `authority: autonomous` does not
+authenticate a supervisor. This is a v1 owned quadcopter mission-process exercise, not durable
+whole-runtime recovery or a command to restart a physical aircraft.
 
 ## Evidence and next work
 

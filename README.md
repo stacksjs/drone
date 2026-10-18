@@ -213,10 +213,14 @@ a native stx scenario viewer at `/missions`. Physical outputs remain inhibited.
 ./buddy missions:validate examples/local-mission.json
 ./buddy missions:simulate --scenario recovery --output /tmp/new-mission-recording
 ./buddy missions:replay /tmp/new-mission-recording/mission.json --at-ms 6000
+./buddy missions:checkpoint /tmp/new-mission-recording/mission.json --at-ms 4980 --output /tmp/new-mission-checkpoint
+./buddy missions:recover /tmp/new-mission-checkpoint/mission.json /tmp/fresh-mission-observation.json --output /tmp/new-mission-recovery
 ```
 
 Read the [mission semantics, evidence and remaining work](docs/missions.md). Camera tasks emit
 simulated events. Recovery requires retained supervised authority and explicit operator resume.
+The recovery command saves a paused, verified simulation trace using an explicit fresh observation
+file. It does not restore whole-runtime state or connect to hardware.
 
 ## Owned range-backed navigation
 

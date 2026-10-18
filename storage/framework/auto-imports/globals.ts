@@ -149,6 +149,7 @@ declare global {
   const createMissionEngine: typeof autoImports.createMissionEngine
   const replayMission: typeof autoImports.replayMission
   const parseMissionTrace: typeof autoImports.parseMissionTrace
+  const checkpointMission: typeof autoImports.checkpointMission
   const recoverMission: typeof autoImports.recoverMission
   const missionLimits: typeof autoImports.missionLimits
   const readMissionFile: typeof autoImports.readMissionFile
