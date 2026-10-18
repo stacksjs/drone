@@ -108,3 +108,11 @@ test('survey export cannot relabel a reduced ping timestamp or acoustic identifi
   expect(() => exportSurfaceSurvey([{ ...sounding, capturedAtMs: sounding.capturedAtMs + 1 }])).toThrow()
   expect(() => exportSurfaceSurvey([{ ...sounding, id: 'different-ping' }])).toThrow()
 })
+
+test('sampler does not confirm a sample from a stale position despite an asserted healthy flag', () => {
+  const c = surfaceContext(1200), port = createSurfaceSampler()
+  port.request({ eventId: 'stale-sample', taskId: 'sample', operation: 'water-sample', containerId: 'bottle-stale', issuedAtMs: 1000, expiresAtMs: 2000, positionM: [0, 0, 0], reference: c.measurement!.reference })
+  c.estimate.localPosition!.capturedAtMs = 1
+  port.observe!(c)
+  expect(port.poll(1200)!.outcome).toBe('uncertain')
+})

@@ -20,6 +20,7 @@ export function createSurfaceSampler(mode: 'confirmed' | 'uncertain' | 'loss' = 
       let position = p ? [...p.positionM] as [number, number, number] : [...command.positionM] as [number, number, number]
       try {
         if (!observed || observed.nowMs !== atMs || !observed.estimate.health.localPosition || !p || observed.estimate.nowMs !== atMs || atMs > command.expiresAtMs || `${observed.estimate.bootId}:${Object.values(observed.estimate.resets).join(',')}` !== command.reference) throw new Error('Sampler observation lost')
+        if (p.capturedAtMs === null || !Number.isFinite(p.capturedAtMs) || p.capturedAtMs > atMs || atMs - p.capturedAtMs > 200 || !Number.isFinite(p.predictedToMs) || p.predictedToMs > atMs || atMs - p.predictedToMs > 40 || p.positionM.length !== 3 || p.velocityMps.length !== 3 || [...p.positionM, ...p.velocityMps].some(n => !Number.isFinite(n))) throw new Error('Sampler position epoch unqualified')
         const m = qualifySurfaceMeasurement(observed.measurement, atMs, command.reference)
         if (!m.values.onSurface || !m.values.stopped || Math.hypot(...p.velocityMps) > 0.25 || Math.hypot(...position.map((n, i) => n - command.positionM[i]!)) > 0.4) throw new Error('Sampler moved outside capture envelope')
       }
