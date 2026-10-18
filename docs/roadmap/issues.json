@@ -511,6 +511,28 @@
       4,
       11,
       8
+    ],
+    "implementationStatus": "simulation-implemented-validation-pending",
+    "implemented": [
+      "Fixed Brown5 lens/crop/mount import and independent held-out correspondence validation",
+      "Exact selected-frame registered-depth localization and capture-pose uncertainty",
+      "Explicit visual/GNSS source pairing, covariance intersection and latched loss",
+      "Owned raw-sensor/estimator/navigation/authority/control follow simulation, native Stacks CLI and stx playback"
+    ],
+    "evidence": [
+      "resources/functions/drone/vision/",
+      "tests/unit/vision-geometry.test.ts",
+      "tests/unit/vision-fusion.test.ts",
+      "tests/unit/vision-runtime.test.ts",
+      "tests/unit/vision-cli.test.ts",
+      "docs/vision-evidence.json",
+      "docs/vision.md"
+    ],
+    "remaining": [
+      "Independent measured Pi lens/mount/ROI, synchronization and registered depth qualification",
+      "Surveyed heading and capture-pose error campaign with physical ground truth",
+      "Physical depth/camera adapters, on-Pi failure/reselection, HIL and vehicle evidence",
+      "Broader identity/appearance tracking only with measured privacy and accuracy evidence"
     ]
   },
   {
