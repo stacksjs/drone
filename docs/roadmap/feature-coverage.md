@@ -6,7 +6,7 @@ means there is no native implementation yet. A protocol-compatible transport is 
 | Feature area | Framework now | External driver exposure | Native work |
 | --- | --- | --- | --- |
 | Pi AI Camera and selected-person image tracking | Implemented acquisition bridge, geometric tracking, UI and loss guard. Pi execution unvalidated. | No upstream camera-control exposure | [#29](https://github.com/stacksjs/drone/issues/29) |
-| Native board HAL, scheduler, watchdog, boot and memory | Planned; Pi Bun process is not motor timing authority | External firmware owns these today | [#2](https://github.com/stacksjs/drone/issues/2) |
+| Native board HAL, scheduler, watchdog, boot and memory | Neutral-only C++ kernel, host HAL and cross-compiled Pico 2 HAL; board boot/timing/watchdog validation pending | External firmware owns these today | [#2](https://github.com/stacksjs/drone/issues/2) |
 | Calibration, sensor timing and quality | GPS-target normalization only | Local position/battery telemetry subset | [#3](https://github.com/stacksjs/drone/issues/3) |
 | Attitude, navigation estimation, EKF, VIO, RTK and redundancy | Planned | Estimator output subset; no health-fusion parity | [#4](https://github.com/stacksjs/drone/issues/4) |
 | Rate, attitude, velocity, position, allocation and tuning | Ideal kinematics only; physical controls planned | Velocity-only quadcopter SITL | [#5](https://github.com/stacksjs/drone/issues/5) |

@@ -73,3 +73,10 @@ The wire codec is a small experimental subset, not a replacement for a mature fu
 Both external stacks are optional drivers. The [owned-stack ADR](adr/0001-owned-autonomy.md) and
 [feature roadmap](roadmap/README.md) define the replacement path. A future physical adapter needs verified estimator status, source identity, sequence/replay handling,
 authenticated transport, link supervision, flight-controller configuration and hardware validation.
+
+## Native runtime bench slice
+
+The owned kernel and Pico 2 HAL live in `firmware/runtime/`, with the explicit C++17 exception in
+[ADR 2](adr/0002-bench-runtime.md). Stacks owns the [CLI and protocol tools](runtime.md) under
+`resources/functions/drone/runtime/`. The first profile is synthetic-sensor and neutral-output
+only. It has no physical flight command path and does not replace estimation or vehicle controls.

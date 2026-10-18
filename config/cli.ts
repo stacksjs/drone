@@ -8,9 +8,8 @@ import type { BinaryConfig } from '@stacksjs/types'
  * you have any questions, feel free to reach out via Discord or GitHub Discussions.
  */
 export default {
-  name: 'My Custom CLI',
-  command: 'custom-cli', // enables `custom-cli <command> <options>`
-  description:
-    'This is an example command to illustrate how to create your own commands. Check out `../app/commands` for more.',
-  deploy: true, // deploys CLI setup endpoint (./bootstrap)
+  name: 'Drone',
+  command: 'drone',
+  description: 'Owned vehicle runtime development and bench tools',
+  deploy: false,
 } satisfies BinaryConfig

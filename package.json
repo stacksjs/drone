@@ -22,7 +22,11 @@
     "sitl": "bun scripts/sitl.ts",
     "typecheck:views": "stx typecheck 'resources/**/*.stx'",
     "sitl:px4": "bun scripts/px4-sitl.ts",
-    "roadmap:check": "bun scripts/check-roadmap.ts"
+    "roadmap:check": "bun scripts/check-roadmap.ts",
+    "runtime:build": "./buddy runtime:build",
+    "runtime:bench": "./buddy runtime:bench",
+    "runtime:cli": "bun scripts/build-runtime-cli.ts",
+    "typecheck:runtime": "tsc --noEmit -p tests/tsconfig.runtime.json"
   },
   "dependencies": {
     "stacks": "^0.75.221",

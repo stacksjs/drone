@@ -37,6 +37,20 @@ declare global {
   const encodeFrame: typeof autoImports.encodeFrame
   const decodeDatagram: typeof autoImports.decodeDatagram
   const encodeVelocity: typeof autoImports.encodeVelocity
+  const runRuntimeBench: typeof autoImports.runRuntimeBench
+  const runtimeBenchFaults: typeof autoImports.runtimeBenchFaults
+  const buildRuntime: typeof autoImports.buildRuntime
+  const picoSdkRevision: typeof autoImports.picoSdkRevision
+  const inspectRuntimeCapture: typeof autoImports.inspectRuntimeCapture
+  const maxRuntimeCaptureBytes: typeof autoImports.maxRuntimeCaptureBytes
+  const openRuntimeHarness: typeof autoImports.openRuntimeHarness
+  const runtimeCrc32: typeof autoImports.runtimeCrc32
+  const commandFrame: typeof autoImports.commandFrame
+  const encodeRuntimeFrame: typeof autoImports.encodeRuntimeFrame
+  const decodeRuntimeFrame: typeof autoImports.decodeRuntimeFrame
+  const runtimeProtocol: typeof autoImports.runtimeProtocol
+  const runtimeFlags: typeof autoImports.runtimeFlags
+  const createRuntimeSession: typeof autoImports.createRuntimeSession
   const validateLimits: typeof autoImports.validateLimits
   const decide: typeof autoImports.decide
   const defaultLimits: typeof autoImports.defaultLimits

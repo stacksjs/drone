@@ -13,7 +13,20 @@
     "number": 2,
     "id": 5906642396,
     "url": "https://github.com/stacksjs/drone/issues/2",
-    "nativeDependencies": []
+    "nativeDependencies": [],
+    "implementationStatus": "in-progress",
+    "evidence": [
+      "firmware/runtime/",
+      "resources/functions/drone/runtime/",
+      "docs/runtime.md",
+      "tests/unit/runtime.test.ts"
+    ],
+    "remaining": [
+      "Physical Pico 2 boot/flash evidence",
+      "Logic-analyser loop/deadline and neutral-output measurements",
+      "Measured stack high-water and hardware watchdog/reset behavior",
+      "Physical Pi-to-Pico UART freshness and reset campaign"
+    ]
   },
   {
     "key": "sensors",

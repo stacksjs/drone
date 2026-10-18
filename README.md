@@ -39,6 +39,24 @@ replay for a hardware-free test, or Pi AI Camera on the Pi. Explicit selection c
 lock; ambiguity, stale inference and lost detections invalidate it until reselection.
 See [camera setup and limits](docs/camera-tracking.md). Image-space tracking is not metric navigation.
 
+## Owned runtime and CLI
+
+The first native kernel now builds for a host harness and a Pico 2 development board. It provides
+synthetic timestamped samples, bounded scheduling/protocol state and a neutral-only GPIO profile.
+Board timing, stack and watchdog-reset measurements remain open in issue #2.
+
+```sh
+./buddy runtime:bench --ticks 1000
+./buddy runtime:bench --fault deadline
+./buddy runtime:build --target pico2 --sdk /path/to/pico-sdk
+bun run runtime:cli
+./storage/runtime-build/cli/drone --help
+```
+
+Read the [runtime build and bench guide](docs/runtime.md) and [wire contract](docs/runtime-protocol.md).
+The standalone CLI uses the same native Stacks command definitions as Buddy. It does not flash or
+control hardware. Keep your Pi 5 for Stacks mission/camera logic; the Pico 2 is a separate bench board.
+
 ## Owned autopilot and roadmap
 
 The [dependency-linked roadmap](docs/roadmap/README.md) and [feature matrix](docs/roadmap/feature-coverage.md)

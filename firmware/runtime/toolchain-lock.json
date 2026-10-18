@@ -1,0 +1,34 @@
+{
+  "sdk": {
+    "repository": "https://github.com/raspberrypi/pico-sdk.git",
+    "version": "2.3.1",
+    "revision": "079c6f39023649b154152db30f1d781e884879bc",
+    "license": "BSD-3-Clause"
+  },
+  "compiler": {
+    "version": "Arm GNU 14.3.Rel1 (GCC 14.3.1)",
+    "source": "https://gitlab.arm.com/tooling/gnu-toolchains-for-arm/-/tree/releases/14.3.rel1",
+    "artifacts": [
+      {
+        "platform": "darwin-arm64",
+        "url": "https://armkeil.blob.core.windows.net/developer/Files/downloads/gnu/14.3.rel1/binrel/arm-gnu-toolchain-14.3.rel1-darwin-arm64-arm-none-eabi.tar.xz",
+        "sha256": "30f4d08b219190a37cded6aa796f4549504902c53cfc3c7e044a8490b6eba1f7"
+      },
+      {
+        "platform": "x86_64",
+        "url": "https://armkeil.blob.core.windows.net/developer/Files/downloads/gnu/14.3.rel1/binrel/arm-gnu-toolchain-14.3.rel1-x86_64-arm-none-eabi.tar.xz",
+        "sha256": "8f6903f8ceb084d9227b9ef991490413014d991874a1e34074443c2a72b14dbd"
+      },
+      {
+        "platform": "aarch64",
+        "url": "https://armkeil.blob.core.windows.net/developer/Files/downloads/gnu/14.3.rel1/binrel/arm-gnu-toolchain-14.3.rel1-aarch64-arm-none-eabi.tar.xz",
+        "sha256": "2d465847eb1d05f876270494f51034de9ace9abe87a4222d079f3360240184d3"
+      }
+    ]
+  },
+  "picotool": {
+    "repository": "https://github.com/raspberrypi/picotool.git",
+    "revision": "2041936441b48a3cc53ae3da9e805229fe8f4e18",
+    "license": "BSD-3-Clause"
+  }
+}

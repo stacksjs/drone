@@ -195,3 +195,6 @@ docs/erd.md
 # Python vendor-camera bridge runtime caches
 __pycache__/
 *.pyc
+
+# Owned runtime build products and local external SDK checkouts
+/storage/runtime-build/

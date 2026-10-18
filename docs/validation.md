@@ -1,5 +1,27 @@
 # Validation evidence
 
+## Owned runtime slice, October 17, 2026
+
+- Native CMake/CTest contract passes for the same kernel used by the Pico HAL, including synthetic
+  timestamps, state bounds, neutral state, lease expiry, stale/replayed/wrong-identity commands,
+  timing boundaries, execution/lateness faults, clock rollback and safe reset state.
+- Shared UART state-machine tests cover fragmented/noisy/corrupt input, bounded RX/TX work,
+  nonblocking transmit and pending-frame preservation.
+- TypeScript tests exchange actual wire frames with the native host process. The host uses a
+  virtual clock; its reported zero execution time is not measured MCU latency.
+- Independent Python struct/zlib fixtures verify CRC32 and little-endian wire fields.
+- Stacks `runtime:build`, `runtime:bench` and `runtime:inspect` executed. The standalone CLI was
+  compiled and exercised outside the repository with `--project`, including a recorded test fixture.
+- Normal and deliberate watchdog-stall Pico 2 UF2 images cross-compiled using the retained SDK,
+  picotool and Arm GNU compiler pins. Linker flash/static RAM assertions passed.
+- `./buddy lint`, `./buddy typecheck`, `bun run typecheck:runtime`, view typecheck and roadmap
+  check passed. The full suite passed 73 Bun tests with 12,282 assertions, plus native CTest and
+  five Picamera2 bridge tests. Fourteen Bun tests cover the new runtime boundaries.
+- Physical Pico boot/flash, actual UART operation, GPIO timing, stack high-water and watchdog
+  reset measurements remain open in [#2](https://github.com/stacksjs/drone/issues/2).
+
+## Previous camera and driver release
+
 Camera and driver release, October 17, 2026. Local development used Bun 1.4.3 on macOS ARM64.
 The initial simulator release had 31 tests; the checks below cover the expanded release.
 
@@ -46,7 +68,7 @@ are not applicable. Newly authored visible copy uses no em-dash or separator en-
   Local UDP/protocol tests do not establish complete simulator integration.
 - Firmware flashing, sensor calibration, RC link, actuator outputs or physical airworthiness tests.
 - Authenticated paired GNSS transport or calibrated metric visual-position fusion.
-- Native board runtime, estimation/controls and the domain workflows listed in the
+- Board-validated runtime, estimation/controls and the domain workflows listed in the
   [replacement matrix](roadmap/feature-coverage.md). They remain planned work.
 
 The scaffold warns that feature-stripped defaults differ from the installed full defaults. Build

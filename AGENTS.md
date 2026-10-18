@@ -29,6 +29,9 @@ This is the `stacksjs/drone` Stacks application. Read `README.md` for implemente
 - ArduPilot and PX4 remain optional drivers. Do not make domain workflows depend on either firmware.
 - `docs/roadmap/` distinguishes actual support from planned work and maps pinned upstream entries to issues.
 - The only Python application exception is the small Picamera2 hardware acquisition helper. Keep tracking policy and application logic in TypeScript.
+- The board runtime under `firmware/runtime/` uses allocation-free C++17 and the pinned Pico SDK.
+  This is the firmware-language exception recorded before implementation in `docs/adr/0002-bench-runtime.md`.
+  Stacks owns CLI orchestration and Pi protocol logic under `resources/functions/drone/runtime/`.
 
 ## Flight boundaries
 

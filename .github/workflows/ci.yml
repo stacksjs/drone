@@ -20,8 +20,41 @@ jobs:
       - run: ./buddy key:generate
       - run: ./buddy lint
       - run: ./buddy typecheck
+      - run: bun run typecheck:runtime
       - run: bun run typecheck:views
       - run: bun run roadmap:check
       - run: python3 -m py_compile resources/functions/drone/camera/imx500_worker.py
       - run: python3 -m unittest discover -s tests/hardware
       - run: ./buddy test
+      - run: bun run runtime:cli
+      - run: $GITHUB_WORKSPACE/storage/runtime-build/cli/drone runtime:bench --project "$GITHUB_WORKSPACE" --ticks 100 --fault deadline
+        working-directory: ${{ runner.temp }}
+  firmware:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Fetch the recorded compiler and SDK
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl -fsSL https://armkeil.blob.core.windows.net/developer/Files/downloads/gnu/14.3.rel1/binrel/arm-gnu-toolchain-14.3.rel1-x86_64-arm-none-eabi.tar.xz -o "$RUNNER_TEMP/arm.tar.xz"
+          echo "8f6903f8ceb084d9227b9ef991490413014d991874a1e34074443c2a72b14dbd  $RUNNER_TEMP/arm.tar.xz" | sha256sum -c -
+          tar -xf "$RUNNER_TEMP/arm.tar.xz" -C "$RUNNER_TEMP"
+          git clone --depth 1 --branch 2.3.1 https://github.com/raspberrypi/pico-sdk.git "$RUNNER_TEMP/pico-sdk"
+      - name: Cross-compile the neutral-only Pico 2 image
+        shell: bash
+        run: |
+          set -euo pipefail
+          export PICO_SDK_PATH="$RUNNER_TEMP/pico-sdk"
+          export PICO_TOOLCHAIN_PATH="$RUNNER_TEMP/arm-gnu-toolchain-14.3.rel1-x86_64-arm-none-eabi"
+          cmake -S firmware/runtime -B storage/runtime-build/pico2 -DDRONE_PICO2=ON -DCMAKE_BUILD_TYPE=Release
+          cmake --build storage/runtime-build/pico2 --parallel 2
+          "$PICO_TOOLCHAIN_PATH/bin/arm-none-eabi-size" storage/runtime-build/pico2/drone_runtime.elf
+      - uses: actions/upload-artifact@v4
+        with:
+          name: pico2-neutral-only-bench
+          path: |
+            storage/runtime-build/pico2/drone_runtime.uf2
+            storage/runtime-build/pico2/drone_runtime.elf
+            storage/runtime-build/pico2/drone_runtime.elf.map
+            storage/runtime-build/pico2/**/*.su

@@ -1,0 +1,38 @@
+{
+  "date": "2026-10-17",
+  "evidenceLevel": "host-tests-and-cross-compilation-only",
+  "host": "macOS ARM64",
+  "bun": "1.4.3",
+  "toolchainLock": "../firmware/runtime/toolchain-lock.json",
+  "nativeHost": {
+    "kernelStateBytes": 88,
+    "virtualClock": true,
+    "physicalMeasurements": false
+  },
+  "pico2CrossBuild": {
+    "compiler": "Arm GNU 14.3.Rel1, GCC 14.3.1",
+    "profile": "rp2350-arm-s, neutral-only, UART0 115200",
+    "textBytes": 14796,
+    "dataBytes": 0,
+    "bssBytes": 836,
+    "mainStaticStackFrameBytes": 368,
+    "measuredStackHighWaterBytes": null,
+    "normalUf2Sha256": "e6e89f4789ceec51037b0fef7a490c124b804c1e4ae24c47675e33263cf06b4d",
+    "watchdogTestUf2Sha256": "fa3ac4d548af321e39b526aba4856793bff7a5d47a48c00f6d1c84caff2feb8c",
+    "boardFlashed": false,
+    "gpioTimingMeasured": false,
+    "watchdogResetMeasured": false
+  },
+  "checks": {
+    "bunTests": 73,
+    "bunAssertions": 12282,
+    "nativeCTest": true,
+    "picameraBridgeTests": 5,
+    "applicationTypecheck": true,
+    "runtimeToolTypecheck": true,
+    "lint": true,
+    "viewTypecheck": true,
+    "roadmapCheck": true
+  },
+  "remainingIssue": "https://github.com/stacksjs/drone/issues/2"
+}
