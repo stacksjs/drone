@@ -30,6 +30,13 @@ companion application and simulator, not a native board autopilot.
   Scripted UDP conformance passes; firmware SITL, transports and sub-services remain open in [#7](https://github.com/stacksjs/drone/issues/7).
 - PX4 Offboard preparation with a rate-checked zero-velocity stream. Both hardware drivers remain receive-only.
 
+- Range-backed avoidance, terrain-clearance, RTL and selected-site landing through owned physics,
+  with metric follow/orbit goal interfaces. Physical calibration and broader campaigns remain in [#11](https://github.com/stacksjs/drone/issues/11).
+- Selected-target antenna geometry, bounded mount tracking and simulated pointing/RF evidence.
+  Physical mount acceptance remains in [#16](https://github.com/stacksjs/drone/issues/16).
+- An [executable behavior audit](../parity.md) with source-backed cases, evidence selectors and upstream refresh.
+  Unclassified dimensions and unsupported cases remain explicit in [#28](https://github.com/stacksjs/drone/issues/28).
+
 ## Sequence
 
 1. Deliver one deterministic board sensor-to-neutral-output loop and versioned Pi/runtime handshake.

@@ -10,6 +10,13 @@ Object.assign(globalThis, autoImports)
 
 // TypeScript declarations
 declare global {
+  const antennaBenchConfig: typeof autoImports.antennaBenchConfig
+  const runAntennaBench: typeof autoImports.runAntennaBench
+  const antennaBenchScenarios: typeof autoImports.antennaBenchScenarios
+  const antennaPointing: typeof autoImports.antennaPointing
+  const unwrapPan: typeof autoImports.unwrapPan
+  const validateAntennaConfig: typeof autoImports.validateAntennaConfig
+  const createAntennaTracker: typeof autoImports.createAntennaTracker
   const createAuthorityHarness: typeof autoImports.createAuthorityHarness
   const authorityScenarios: typeof autoImports.authorityScenarios
   const validMotors: typeof autoImports.validMotors
@@ -129,6 +136,18 @@ declare global {
   const parseMissionPlan: typeof autoImports.parseMissionPlan
   const simulateMission: typeof autoImports.simulateMission
   const missionScenarios: typeof autoImports.missionScenarios
+  const navigationGoal: typeof autoImports.navigationGoal
+  const createNavigator: typeof autoImports.createNavigator
+  const detectNavigationMap: typeof autoImports.detectNavigationMap
+  const validateNavigationMap: typeof autoImports.validateNavigationMap
+  const terrainDownAt: typeof autoImports.terrainDownAt
+  const navigationEnvelope: typeof autoImports.navigationEnvelope
+  const planNavigationPath: typeof autoImports.planNavigationPath
+  const navigationSegmentClear: typeof autoImports.navigationSegmentClear
+  const navigationPolicy: typeof autoImports.navigationPolicy
+  const createNavigationSensorFeed: typeof autoImports.createNavigationSensorFeed
+  const simulateNavigation: typeof autoImports.simulateNavigation
+  const navigationScenarios: typeof autoImports.navigationScenarios
   const savePayloadCapture: typeof autoImports.savePayloadCapture
   const runPayloadBench: typeof autoImports.runPayloadBench
   const payloadJson: typeof autoImports.payloadJson

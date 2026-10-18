@@ -23,6 +23,7 @@ jobs:
       - run: bun run typecheck:runtime
       - run: bun run typecheck:views
       - run: bun run roadmap:check
+      - run: bun run parity:check
       - run: python3 -m py_compile resources/functions/drone/camera/imx500_worker.py
       - run: python3 -m unittest discover -s tests/hardware
       - run: ./buddy test
@@ -56,6 +57,10 @@ jobs:
       - run: $GITHUB_WORKSPACE/storage/runtime-build/cli/drone missions:simulate --scenario recovery --output "$RUNNER_TEMP/mission-recording"
         working-directory: ${{ runner.temp }}
       - run: $GITHUB_WORKSPACE/storage/runtime-build/cli/drone missions:replay "$RUNNER_TEMP/mission-recording/mission.json" --at-ms 6000
+        working-directory: ${{ runner.temp }}
+      - run: $GITHUB_WORKSPACE/storage/runtime-build/cli/drone navigation:simulate --scenario avoid-land
+        working-directory: ${{ runner.temp }}
+      - run: $GITHUB_WORKSPACE/storage/runtime-build/cli/drone antenna:bench --scenario nominal --seconds 10
         working-directory: ${{ runner.temp }}
   firmware:
     runs-on: ubuntu-latest

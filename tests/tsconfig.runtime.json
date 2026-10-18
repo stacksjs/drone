@@ -30,6 +30,11 @@
     "../resources/functions/drone/missions/**/*.ts",
     "./unit/missions.test.ts",
     "../resources/functions/drone/navigation/**/*.ts",
-    "./unit/navigation.test.ts"
+    "./unit/navigation.test.ts",
+    "../resources/functions/drone/antenna/**/*.ts",
+    "./unit/antenna.test.ts",
+    "./fixtures/antenna/**/*.ts",
+    "../scripts/parity*.ts",
+    "./unit/parity.test.ts"
   ]
 }

@@ -182,6 +182,31 @@ and optional strict MAVLink 2 signing behind both driver factories. Physical wri
 See the [protocol contract and remaining firmware SITL gates](docs/driver-protocols.md).
 These commands use scripted UDP peers, with no autopilot firmware or flight simulated.
 
+## Antenna tracking
+
+Issue #16 adds owned selected-vehicle pointing, calibration, travel/cable limits, manual control
+and loss handling with a lagged mount simulation. Physical mount and RF measurements remain open.
+
+```sh
+./buddy antenna:bench --scenario nominal
+./buddy antenna:bench --scenario stale-target
+```
+
+Read [antenna interfaces, modeled evidence and remaining acceptance](docs/antenna.md).
+
+## Behavior-level parity audit
+
+Issue #28 adds source-backed behavior cases, executable evidence selectors, provenance/license
+checks and bounded upstream refresh. It reports unclassified and unsupported work explicitly;
+a valid audit is not full feature parity.
+
+```sh
+bun run parity:check
+bun run parity:check --run-evidence
+```
+
+See the [coverage matrix and upstream review commands](docs/parity.md).
+
 ## Owned autopilot and roadmap
 
 The [dependency-linked roadmap](docs/roadmap/README.md) and [feature matrix](docs/roadmap/feature-coverage.md)

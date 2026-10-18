@@ -15,12 +15,12 @@ means there is no native implementation yet. A protocol-compatible transport is 
 | Payloads, buses, camera triggers, ESCs, power, gimbals and winches | Owned still-capture ACKs, bounded clock sync and estimator-pose association, Pi IMX500 adapter, replay and bus contracts; physical validation and other payload drivers pending | No payload actuator exposure | [#8](https://github.com/stacksjs/drone/issues/8) |
 | Diagnostics, logs, replay, firmware update and configuration provenance | Owned runtime journal, loss accounting, hash verification, crash-prefix recovery, pure replay, CLI and local stx viewer; full mission correlation, hardware storage/crash evidence and signed updates pending | No log/FTP/parameter management | [#9](https://github.com/stacksjs/drone/issues/9) |
 | Missions, tasks, waypoints, terrain, rally and resume | Owned versioned graph, flat-terrain/fence/rally/energy validation, physics execution, pause/resume, recorded recovery, CLI and stx viewer; correlated durable checkpoints, driver translation and hardware evidence pending | No mission upload or mission-mode control | [#10](https://github.com/stacksjs/drone/issues/10) |
-| Avoidance, route planning, precision landing, follow and orbit | Basic follow; obstacle/range/navigation stack planned | No avoidance/landing integration | [#11](https://github.com/stacksjs/drone/issues/11) |
+| Avoidance, route planning, precision landing, follow and orbit | Owned modeled range detection, inflated route planning, terrain-clearance/RTL/selected-site landing physics; metric follow/orbit goals; physical calibration and dynamic obstacle campaigns pending | No avoidance/landing integration | [#11](https://github.com/stacksjs/drone/issues/11) |
 | Fixed-wing, VTOL, heli, blimp and experimental airframes | Planned vehicle-specific controls | Current drivers reject non-quadcopter heartbeats | [#12](https://github.com/stacksjs/drone/issues/12) |
 | Rovers, mowing, logistics and materials handling | Planned | Not exposed | [#13](https://github.com/stacksjs/drone/issues/13) |
 | Surface vessels, bathymetry, water sampling and harbours | Planned | Not exposed | [#14](https://github.com/stacksjs/drone/issues/14) |
 | Subsea ROV, depth hold, tether and leak handling | Planned | Not exposed | [#15](https://github.com/stacksjs/drone/issues/15) |
-| Antenna pan/tilt and telemetry pointing | Planned | Not exposed | [#16](https://github.com/stacksjs/drone/issues/16) |
+| Antenna pan/tilt and telemetry pointing | Owned selected-target tracking, calibrated geometry, bounded trajectories and modeled mount bench; physical/RF validation pending | Not exposed | [#16](https://github.com/stacksjs/drone/issues/16) |
 | Calibrated 3D visual position and paired target fusion | 2D observations intentionally cannot supply metric Target | Not exposed | [#17](https://github.com/stacksjs/drone/issues/17) |
 | Aerial survey, overlap/GSD, photogrammetry collection and georeferencing | Planned | Not exposed | [#18](https://github.com/stacksjs/drone/issues/18) |
 | LiDAR, surface processing and stockpile volume/uncertainty | Planned; collection/reconstruction/measurement distinguished | Not exposed | [#19](https://github.com/stacksjs/drone/issues/19) |
@@ -47,3 +47,6 @@ Primary sources: [PX4 modules](https://github.com/PX4/PX4-Autopilot/tree/ddcaad6
 [ArduPilot libraries](https://github.com/ArduPilot/ardupilot/tree/afeb9c4941543d97f3e04fecf257b8f598f49a6a/libraries),
 [PX4 vehicle overview](https://github.com/PX4/PX4-Autopilot),
 [ArduPilot vehicle/documentation overview](https://ardupilot.org/ardupilot/).
+
+Behavior-level coverage is tracked by the [executable parity audit](../parity.md). Its structural
+gate passes only audit integrity; it reports full parity and source review as incomplete.

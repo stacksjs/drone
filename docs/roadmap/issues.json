@@ -473,6 +473,21 @@
     "nativeDependencies": [
       7,
       8
+    ],
+    "implementationStatus": "simulation-implemented-hardware-validation-pending",
+    "implemented": [
+      "Selected telemetry WGS84/NED antenna geometry, true north and elevation calibration",
+      "Scoped tracker authority, monotonic replay/freshness gates, cable/travel/rate/acceleration limits and manual/emergency handling",
+      "Lagged pan-tilt physics bench, independent pointing comparison, explicitly synthetic RF model and native Buddy command"
+    ],
+    "evidence": [
+      "resources/functions/drone/antenna/",
+      "tests/unit/antenna.test.ts",
+      "docs/antenna.md"
+    ],
+    "remaining": [
+      "Measured physical mount calibration, pointing, mechanical braking/cable limits and RF correlation",
+      "Physical mount hardware adapter and independent interlocks"
     ]
   },
   {
@@ -747,7 +762,24 @@
     "number": 28,
     "id": 5906650703,
     "url": "https://github.com/stacksjs/drone/issues/28",
-    "nativeDependencies": []
+    "nativeDependencies": [],
+    "implementationStatus": "behavior-audit-in-progress",
+    "implemented": [
+      "Pinned directory and six-vehicle-family assignments with per-dimension reviewed/unclassified status",
+      "59 source-backed behavior cases, bounded subset claims and explicit unsupported behaviors",
+      "Executable evidence selectors, pinned source hash/license/citation verification, issue link checks and upstream snapshot refresh/diff gates"
+    ],
+    "evidence": [
+      "docs/parity-audit.json",
+      "scripts/parity-check.ts",
+      "scripts/parity-refresh.ts",
+      "tests/unit/parity.test.ts",
+      "docs/parity.md"
+    ],
+    "remaining": [
+      "Complete 1,347 currently unclassified parameter/mode/protocol/hardware/failure dimensions and deeper review inside sampled dimensions",
+      "Expand executable coverage from bounded subsets to behavior-level parity with retained firmware/SITL/HIL/vehicle evidence"
+    ]
   },
   {
     "key": "camera-hardware",
