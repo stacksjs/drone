@@ -142,3 +142,41 @@ test('tilted single beam projects its acoustic footprint and propagates angular 
   const invalid = structuredClone(row); invalid.measurementPose.quaternionWxyz = [Math.cos(0.1), 0, Math.sin(0.1), 0]
   expect(() => reduceSurfaceSurvey([invalid], { positionSigmaM: 0.05, timeSigmaMs: 2, attitudeSigmaRad: 0.001 })).toThrow()
 })
+
+import { runVehicleSimulation } from '../../resources/functions/drone/vehicles/runtime'
+test('owned harbour return and disturbance finish while collision and sensor/authority hazards release output', () => {
+  for (const scenario of ['harbour-return', 'current', 'collision', 'sensor-loss', 'position-loss', 'rc-override', 'kill'] as const) {
+    const run = runVehicleSimulation(createSurfaceProfile(scenario), { scenario, seconds: 120 })
+    expect(run.status).toBe(['harbour-return', 'current'].includes(scenario) ? 'completed' : 'blocked')
+    expect(run.board.actuators).toEqual([0, 0, 0])
+    if (scenario === 'harbour-return') {
+      expect(run.trace.rows.some(r => r.result.reason === 'battery-branch')).toBe(true)
+      expect(run.trace.rows.some(r => r.result.payload !== null)).toBe(false)
+      expect(Math.hypot(run.finalTruthPositionM[0], run.finalTruthPositionM[1])).toBeLessThan(0.35)
+    }
+    if (scenario === 'collision') expect(run.fault).toBe('surface-collision-envelope')
+  }
+}, 60000)
+
+import { mkdtemp, readFile, rm } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
+import { join, resolve } from 'node:path'
+test('native surface command writes a self-describing modeled survey artifact', async () => {
+  const directory = await mkdtemp(join(tmpdir(), 'drone-surface-cli-'))
+  try {
+    const file = join(directory, 'harbour.json')
+    const proc = Bun.spawn([process.execPath, '--no-env-file', `--config=${resolve('tests/fixtures/process/bunfig.toml')}`, resolve('tests/fixtures/surface/cli.ts'), 'surface:simulate', '--scenario', 'nominal', '--seconds', '120', '--survey', file], { cwd: directory, stdout: 'pipe', stderr: 'pipe' })
+    const timer = setTimeout(() => proc.kill('SIGKILL'), 170000)
+    try {
+      const [stdout, stderr, code] = await Promise.all([new Response(proc.stdout).text(), new Response(proc.stderr).text(), proc.exited])
+      expect(stderr).toBe(''); expect(code).toBe(0)
+      const report = JSON.parse(stdout)
+      expect(report.status).toBe('completed'); expect(report.exportedSoundings).toBeGreaterThan(1000)
+      const survey = JSON.parse(await readFile(file, 'utf8'))
+      expect(survey.metadata.physicalValidation).toBe(false)
+      expect(survey.soundings[0].pose.provenance.attitudePrediction).toBe('qualified-gyro-hold')
+    }
+    finally { clearTimeout(timer); proc.kill('SIGKILL'); await proc.exited }
+  }
+  finally { await rm(directory, { recursive: true, force: true }) }
+}, 180000)

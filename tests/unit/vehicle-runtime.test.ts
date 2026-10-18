@@ -1,7 +1,7 @@
 import { expect, test } from 'bun:test'
 import { runVehicleSimulation } from '../../resources/functions/drone/vehicles/runtime'
 import { createVehicleMeasurementQualifier } from '../../resources/functions/drone/vehicles/measurements'
-import { createSurfaceProfile } from '../../resources/functions/drone/vehicles/surface/index'
+import { createSurfaceProfile, reduceSurfaceSurvey } from '../../resources/functions/drone/vehicles/surface/index'
 import { replayVehicleMission } from '../../resources/functions/drone/missions/vehicle'
 
 test('vehicle measurement envelope permits retained identical packets and rejects changed replay or fabricated contact', () => {
@@ -25,6 +25,11 @@ test('surface survey executes on raw sensors and owned estimator through shared 
   expect(run.path.filter(r => r.measurementPose).every(r => r.measurementPose!.capturedAtMs === r.measurement!.capturedAtMs)).toBe(true)
   expect(replayVehicleMission(run.trace).snapshot()).toEqual(run.mission)
   expect(run.board.actuators).toEqual([0, 0, 0])
+  const survey = reduceSurfaceSurvey(run.path, { positionSigmaM: 0.05, timeSigmaMs: 2, attitudeSigmaRad: 0.001 })
+  expect(survey.soundings.length).toBeGreaterThan(1000)
+  expect(Math.min(...survey.soundings.map(s => s.depthBelowDatumM))).toBeGreaterThan(4.99)
+  expect(Math.max(...survey.soundings.map(s => s.depthBelowDatumM))).toBeLessThan(5.14)
+  expect(survey.soundings.every(s => s.pose.provenance!.attitudeCapturedAtMs <= s.capturedAtMs && s.pose.provenance!.attitudePredictedToMs === s.capturedAtMs)).toBe(true)
 }, 60000)
 
 test('host death expires independent vehicle output lease and sample uncertainty never produces mission completion', () => {
