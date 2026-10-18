@@ -147,7 +147,8 @@ test('valid leak observations latch during authority inhibition and a surface pa
   const surfaced = subseaContext()
   surfaced.estimate.localPosition!.positionM[2] = 0; surfaced.mission.targetM = [0, 0, 0]; surfaced.mission.state = 'paused'
   surfaced.measurement!.values.pressurePa = 101325; surfaced.measurement!.values.onSurface = true
-  expect(createSubseaController().step(surfaced).actuators).toEqual(Array(8).fill(0))
+  const paused = createSubseaController().step(surfaced)
+  expect(paused.actuators).toEqual(Array(8).fill(0)); expect(paused.inhibited).toBe(false)
 })
 
 import { multiplyQuaternion, quaternionEuler } from '../../resources/functions/drone/estimation/frames'
@@ -173,4 +174,18 @@ test('six-axis estimated-pose control recovers roll, pitch and yaw while holding
   expect(Math.hypot(...quaternionEuler(final.quaternionWxyz))).toBeLessThan(0.001)
   expect(Math.hypot(...final.angularRateRadS)).toBeLessThan(0.001)
   expect(Math.hypot(final.positionM[0], final.positionM[1], final.positionM[2] - 2)).toBeLessThan(0.03)
+})
+
+test('subsea control rejects incompatible mission and attitude contexts and gaps exceeding the 40 ms contract', () => {
+  for (const mismatch of ['mission', 'attitude', 'physical-estimator', 'physical-mission', 'mission-evidence'] as const) {
+    const c = subseaContext()
+    if (mismatch === 'mission') c.mission.vehicle = 'surface'
+    if (mismatch === 'attitude') Object.assign(c.estimate.attitude!, { reference: 'ABSOLUTE_HEADING' })
+    if (mismatch === 'physical-estimator') Object.assign(c.estimate, { physicalFlightEnabled: true })
+    if (mismatch === 'physical-mission') Object.assign(c.mission, { physicalFlightEnabled: true })
+    if (mismatch === 'mission-evidence') Object.assign(c.mission, { evidence: 'physical-vehicle-mission' })
+    expect(createSubseaController().step(c).inhibited).toBe(true)
+  }
+  const controller = createSubseaController(); controller.step(subseaContext())
+  expect(controller.step(subseaContext(1060)).reason).toBe('subsea-control-clock-gap')
 })

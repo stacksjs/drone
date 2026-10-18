@@ -12,7 +12,7 @@ export function createSubseaController(): VehicleController {
   function result(c: VehicleControllerContext, actuators: number[], reason: string, inhibited: boolean): VehicleControlOutput { return { kind: 'simulated-vehicle-control', vehicle: 'subsea', atMs: c.nowMs, actuators: [...actuators], inhibited, reason, physicalFlightEnabled: false, boardOutputsInhibited: true } }
   return { step(c) {
     const neutral = Array(8).fill(0)
-    if (!Number.isFinite(c.nowMs) || c.nowMs < now || now !== -Infinity && c.nowMs - now > 60) latched ||= 'subsea-control-clock-gap'
+    if (!Number.isFinite(c.nowMs) || c.nowMs < now || now !== -Infinity && c.nowMs - now > 40) latched ||= 'subsea-control-clock-gap'
     now = c.nowMs
     const observation = qualifySubseaMeasurement(c.measurement, c.nowMs, `${c.estimate.bootId}:${Object.values(c.estimate.resets).join(',')}`)
     if (observation && (observation.values.leak || Number(observation.values.tetherTensionN) >= 40 || !observation.values.linkConnected || observation.values.emergency)) latched ||= 'subsea-leak-tether-or-emergency'
@@ -21,8 +21,9 @@ export function createSubseaController(): VehicleController {
     if (!c.mission.targetM || !['running', 'paused'].includes(c.mission.state)) return result(c, neutral, 'subsea-no-active-target', true)
     try {
       const e = c.estimate, p = e.localPosition, a = e.attitude
+      if (c.mission.version !== 2 || c.mission.vehicle !== 'subsea' || c.mission.evidence !== 'owned-vehicle-mission-simulation' || c.mission.physicalFlightEnabled !== false || e.physicalFlightEnabled !== false) throw new Error('subsea-context-incompatible')
       const fresh = (at: number | null | undefined, max: number) => at !== null && at !== undefined && Number.isFinite(at) && at <= c.nowMs && c.nowMs - at <= max
-      if (!e.health.tilt || !e.health.localPosition || !p || !a || e.evidence !== 'fixture' || e.nowMs !== c.nowMs || p.frame !== 'LOCAL_NED' || p.altitudeDatum !== 'LOCAL_WATER_SURFACE' || !fresh(a.capturedAtMs, 60) || !fresh(p.capturedAtMs, 120) || p.predictedToMs !== c.nowMs || !vector(p.positionM) || !vector(p.velocityMps) || !vector(a.eulerRad) || !Array.isArray(a.quaternionWxyz) || a.quaternionWxyz.length !== 4 || !a.quaternionWxyz.every(Number.isFinite) || Math.abs(Math.hypot(...a.quaternionWxyz) - 1) > 0.001) throw new Error('subsea-estimate-unavailable')
+      if (!e.health.tilt || !e.health.localPosition || !p || !a || a.reference !== 'GRAVITY_ALIGNED_RELATIVE_YAW' || e.evidence !== 'fixture' || e.nowMs !== c.nowMs || p.frame !== 'LOCAL_NED' || p.altitudeDatum !== 'LOCAL_WATER_SURFACE' || !fresh(a.capturedAtMs, 60) || !fresh(p.capturedAtMs, 120) || p.predictedToMs !== c.nowMs || !vector(p.positionM) || !vector(p.velocityMps) || !vector(a.eulerRad) || !Array.isArray(a.quaternionWxyz) || a.quaternionWxyz.length !== 4 || !a.quaternionWxyz.every(Number.isFinite) || Math.abs(Math.hypot(...a.quaternionWxyz) - 1) > 0.001) throw new Error('subsea-estimate-unavailable')
       const estimateReference = `${e.bootId}:${Object.values(e.resets).join(',')}`
       const m = observation
       if (!m) throw new Error('subsea-sensor-invalid')
@@ -37,7 +38,7 @@ export function createSubseaController(): VehicleController {
       const speed = Math.hypot(...p.velocityMps)
       const stoppingM = speed * speed + speed * 0.24 + 0.25
       if (Number(m.values.structureRangeM) <= stoppingM || Number(m.values.bottomRangeM) <= stoppingM) throw new Error('subsea-clearance-envelope')
-      if (c.mission.state === 'paused' && m.values.onSurface && p.positionM[2] <= 0.02 && c.mission.targetM[2] <= 0.02) return result(c, neutral, 'subsea-surface-pause-neutral', true)
+      if (c.mission.state === 'paused' && m.values.onSurface && p.positionM[2] <= 0.02 && c.mission.targetM[2] <= 0.02) return result(c, neutral, 'subsea-surface-pause-neutral', false)
       const error = c.mission.targetM.map((n, i) => n - p.positionM[i]!) as SensorVector
       const distance = Math.hypot(...error), desiredSpeed = Math.min(0.6, distance * 0.9)
       const desiredVelocity = error.map(n => distance > 1e-9 ? n / distance * desiredSpeed : 0) as SensorVector

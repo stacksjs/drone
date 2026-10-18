@@ -1,7 +1,8 @@
 import type { VehicleControllerContext } from '../../../resources/functions/drone/vehicles/types'
+import type { EstimatorSnapshot } from '../../../resources/functions/drone/estimation/estimator'
 import { createEstimator } from '../../../resources/functions/drone/estimation/estimator'
 export function subseaContext(nowMs = 1000): VehicleControllerContext {
-  const estimate = createEstimator().snapshot(nowMs)
+  const estimate: EstimatorSnapshot = createEstimator().snapshot(nowMs)
   estimate.bootId = 1n; estimate.evidence = 'fixture'; estimate.health.tilt = true; estimate.health.localPosition = true
   estimate.attitude = { reference: 'GRAVITY_ALIGNED_RELATIVE_YAW', quaternionWxyz: [1, 0, 0, 0], eulerRad: [0, 0, 0], capturedAtMs: nowMs, covarianceRad2: null, absoluteHeadingObserved: false }
   estimate.localPosition = { frame: 'LOCAL_NED', origin: { latitudeDeg: 0, longitudeDeg: 0, ellipsoidHeightM: 100 }, altitudeDatum: 'LOCAL_WATER_SURFACE', positionM: [0, 0, 2], velocityMps: [0, 0, 0], covarianceBlocks: [0, 1, 2].map(() => ({ positionM2: 0.001, positionVelocityM2S: 0, velocityM2S2: 0.001 })), capturedAtMs: nowMs - 60, predictedToMs: nowMs }
