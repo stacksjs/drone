@@ -71,6 +71,21 @@ synchronized depth and surveyed capture pose are available.
 Read the [measurement, pairing and uncertainty contract](docs/vision.md). The included calibration,
 depth and target source are synthetic; physical calibration is unverified.
 
+## Aerial survey collection
+
+Open `/mapping` to inspect clipped lanes, terrain-relative footprints, acknowledged exposures and
+recorded collection faults on the owned runtime. The export includes PNG imagery, ODM-style
+`geo.txt`, capture pose/calibration metadata and a quality report. Collection is synthetic;
+reconstruction, physical accuracy and measured RTK/PPK/GCP evidence remain unverified.
+
+```sh
+./buddy mapping:plan --config examples/survey.json
+./buddy mapping:simulate --scenario nominal --output /tmp/new-survey-dataset
+./buddy mapping:simulate --scenario crosshatch
+```
+
+Read the [survey collection and export contract](docs/mapping.md).
+
 ## Camera and payload adapters
 
 Issue #8 adds an owned Pi AI Camera still adapter, bounded command/ACK and clock synchronization,

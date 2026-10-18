@@ -35,6 +35,7 @@ declare global {
   const createSimulatedOutputWatchdog: typeof autoImports.createSimulatedOutputWatchdog
   const follow: typeof autoImports.follow
   const defineBehavior: typeof autoImports.defineBehavior
+  const createCalibratedCamera: typeof autoImports.createCalibratedCamera
   const cameraRequest: typeof autoImports.cameraRequest
   const createVisualLockGuard: typeof autoImports.createVisualLockGuard
   const cameraCommand: typeof autoImports.cameraCommand
@@ -115,6 +116,7 @@ declare global {
   const normalizeQuaternion: typeof autoImports.normalizeQuaternion
   const quaternionFromTilt: typeof autoImports.quaternionFromTilt
   const quaternionEuler: typeof autoImports.quaternionEuler
+  const nedToGeodetic: typeof autoImports.nedToGeodetic
   const predictAxis: typeof autoImports.predictAxis
   const correctAxis: typeof autoImports.correctAxis
   const createEstimatorReplay: typeof autoImports.createEstimatorReplay
@@ -123,6 +125,20 @@ declare global {
   const zero: typeof autoImports.zero
   const finiteVector: typeof autoImports.finiteVector
   const horizontalDistance: typeof autoImports.horizontalDistance
+  const surveyWorldColour: typeof autoImports.surveyWorldColour
+  const renderSurveyImage: typeof autoImports.renderSurveyImage
+  const createSurveyCamera: typeof autoImports.createSurveyCamera
+  const writeSurveyDataset: typeof autoImports.writeSurveyDataset
+  const exampleSurveyConfig: typeof autoImports.exampleSurveyConfig
+  const intersectSurveyRay: typeof autoImports.intersectSurveyRay
+  const projectSurveyFootprint: typeof autoImports.projectSurveyFootprint
+  const createSurveyPlan: typeof autoImports.createSurveyPlan
+  const validateSurveyDataset: typeof autoImports.validateSurveyDataset
+  const surveyQuality: typeof autoImports.surveyQuality
+  const surveyDatasetLimits: typeof autoImports.surveyDatasetLimits
+  const compileSurveyMission: typeof autoImports.compileSurveyMission
+  const simulateSurvey: typeof autoImports.simulateSurvey
+  const surveyScenarios: typeof autoImports.surveyScenarios
   const encodeFrame: typeof autoImports.encodeFrame
   const encodeFrameV2: typeof autoImports.encodeFrameV2
   const decodeDatagram: typeof autoImports.decodeDatagram

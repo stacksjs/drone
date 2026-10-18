@@ -48,6 +48,8 @@
     "./unit/subsea-navigation.test.ts",
     "./unit/subsea.test.ts",
     "../resources/functions/drone/vision/**/*.ts",
-    "./unit/vision-*.test.ts"
+    "./unit/vision-*.test.ts",
+    "../resources/functions/drone/mapping/**/*.ts",
+    "./unit/mapping-*.test.ts"
   ]
 }

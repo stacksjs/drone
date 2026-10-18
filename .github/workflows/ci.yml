@@ -80,6 +80,14 @@ jobs:
         working-directory: ${{ runner.temp }}
       - run: $GITHUB_WORKSPACE/storage/runtime-build/cli/drone vision:simulate --scenario identity-drift
         working-directory: ${{ runner.temp }}
+      - run: $GITHUB_WORKSPACE/storage/runtime-build/cli/drone mapping:plan --config "$GITHUB_WORKSPACE/examples/survey.json"
+        working-directory: ${{ runner.temp }}
+      - run: $GITHUB_WORKSPACE/storage/runtime-build/cli/drone mapping:simulate --scenario nominal --output "$RUNNER_TEMP/mapping-dataset"
+        working-directory: ${{ runner.temp }}
+      - run: $GITHUB_WORKSPACE/storage/runtime-build/cli/drone mapping:simulate --scenario crosshatch
+        working-directory: ${{ runner.temp }}
+      - run: $GITHUB_WORKSPACE/storage/runtime-build/cli/drone mapping:simulate --scenario camera-loss
+        working-directory: ${{ runner.temp }}
   firmware:
     runs-on: ubuntu-latest
     steps:

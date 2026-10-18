@@ -70,7 +70,7 @@ function clear() { computation.stop(); result.set(null); resultScenario.set(null
         <dl class="grid gap-5 grid-cols-2 mt-5 text-sm">
           <div><dt class="text-neutral-400">Area of interest</dt><dd class="mt-1">{{ recording()?.plan.areaM2.toFixed(2) }} m²</dd></div>
           <div><dt class="text-neutral-400">Survey lanes</dt><dd class="mt-1">{{ recording()?.plan.lanes.length }}{{ recording()?.plan.config.crosshatch ? ' / crosshatch' : '' }}</dd></div>
-          <div><dt class="text-neutral-400">Nominal AGL</dt><dd class="mt-1">{{ recording()?.plan.config.altitudeAglM.toFixed(2) }} m</dd></div>
+          <div><dt class="text-neutral-400">Planned body AGL</dt><dd class="mt-1">{{ recording()?.plan.config.altitudeAglM.toFixed(2) }} m</dd></div>
           <div><dt class="text-neutral-400">Planned GSD bound</dt><dd class="mt-1">{{ ((recording()?.plan.gsdM ?? 0) * 100).toFixed(2) }} cm/pixel</dd></div>
           <div><dt class="text-neutral-400">Front / side overlap</dt><dd class="mt-1">{{ ((recording()?.plan.config.overlap.front ?? 0) * 100).toFixed(0) }}% / {{ ((recording()?.plan.config.overlap.side ?? 0) * 100).toFixed(0) }}%</dd></div>
           <div><dt class="text-neutral-400">Minimum trigger interval</dt><dd class="mt-1">{{ recording()?.plan.config.minTriggerIntervalMs }} ms</dd></div>

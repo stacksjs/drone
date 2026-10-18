@@ -32,6 +32,8 @@ import SurfaceSimulate from '../app/Commands/SurfaceSimulate'
 import SubseaSimulate from '../app/Commands/SubseaSimulate'
 import VisionValidate from '../app/Commands/VisionValidate'
 import VisionSimulate from '../app/Commands/VisionSimulate'
+import MappingPlan from '../app/Commands/MappingPlan'
+import MappingSimulate from '../app/Commands/MappingSimulate'
 
 const app = cli('drone')
 RuntimeBuild(app)
@@ -60,6 +62,8 @@ SurfaceSimulate(app)
 SubseaSimulate(app)
 VisionValidate(app)
 VisionSimulate(app)
+MappingPlan(app)
+MappingSimulate(app)
 app.help()
 app.version('0.1.0')
 try { await app.parse(process.argv) }
