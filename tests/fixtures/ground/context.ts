@@ -11,3 +11,12 @@ export function groundContext(nowMs = 1000): VehicleControllerContext {
 export function groundPacket(nowMs = 1000): VehicleMeasurement {
   return { version: 1, evidence: 'modeled-vehicle-sensors', vehicle: 'ground', sequence: Math.round(nowMs / 20), reference: '1:0,0,0,0,0', capturedAtMs: nowMs - 40, receivedAtMs: nowMs, values: { calibration: 'ground-4096-015-060-v1', clockUncertaintyMs: 1, encoderCounts: [0, 0], onSurface: true, stopped: true, obstacleMm: 20000, personMm: 20000, guardClosed: true, emergency: false, bumper: false } }
 }
+
+import type { VehiclePayloadCommand } from '../../../resources/functions/drone/vehicles/types'
+export function groundPayloadContext(context: VehicleControllerContext, command: VehiclePayloadCommand): VehicleControllerContext {
+  const result = structuredClone(context)
+  result.mission.taskId = command.taskId
+  result.mission.taskKind = 'payload'
+  result.mission.payload = structuredClone(command)
+  return result
+}

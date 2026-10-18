@@ -29,32 +29,35 @@ export function groundMission(mode: 'mowing' | 'logistics' = 'mowing'): VehicleM
 
 export function createGroundProfile(scenario: string = 'nominal'): VehicleProfile {
   if (!groundScenarios.includes(scenario as GroundScenario)) throw new RangeError('Unknown ground scenario')
-  let sequence = 0, mowerEnabled = false, context: VehicleControllerContext | null = null, closed = false, lastPoll = -Infinity
-  const queue: VehiclePayloadAck[] = [], seen = new Set<string>(), consumedContainers = new Set<string>(), payloadOdometry = createGroundOdometry()
+  let sequence = 0, mowerEnabled = false, context: VehicleControllerContext | null = null, closed = false, lastPoll = -Infinity, payloadHealthy = false
+  const queue: { deliverAtMs: number, ack: VehiclePayloadAck }[] = [], seen = new Set<string>(), consumedContainers = new Set<string>(), payloadOdometry = createGroundOdometry()
   function payloadPort(): VehiclePayloadPort {
     return {
-      observe(next) { context = structuredClone(next) },
+      observe(next) { context = structuredClone(next); payloadHealthy = payloadOdometry.step(context.measurement, context.estimate, context.nowMs).healthy },
       request(command) {
         if (closed || seen.has(command.eventId) || seen.size >= 32 || queue.length > 0) throw new Error('Ground payload event already consumed or closed')
         if (!/^[A-Za-z0-9:,_-]{1,200}$/.test(command.eventId) || !/^[A-Za-z0-9:_-]{1,120}$/.test(command.taskId) || !Number.isSafeInteger(command.issuedAtMs) || command.issuedAtMs < 0 || !Number.isSafeInteger(command.expiresAtMs) || command.expiresAtMs <= command.issuedAtMs || command.expiresAtMs - command.issuedAtMs > 5000 || !Array.isArray(command.positionM) || command.positionM.length !== 3 || !command.positionM.every(Number.isFinite)) throw new TypeError('Invalid ground payload command')
         seen.add(command.eventId)
         const c = context, v = c?.measurement?.values
-        const qualified = c ? payloadOdometry.step(c.measurement, c.estimate, c.nowMs).healthy : false
+        const qualified = payloadHealthy
         const fresh = !!c && !!c.measurement && c.enabled && c.nowMs >= command.issuedAtMs && c.nowMs <= command.expiresAtMs && c.measurement.reference === command.reference && c.nowMs - c.measurement.capturedAtMs <= 140 && c.measurement.receivedAtMs <= c.nowMs
         const stationary = !!c?.estimate.localPosition && Math.hypot(...c.estimate.localPosition.velocityMps) <= 0.16 && v?.stopped === true
         const located = !!c?.estimate.localPosition && Math.hypot(...command.positionM.map((n, i) => n - c.estimate.localPosition!.positionM[i]!)) <= 0.25
-        const safe = located && qualified && fresh && stationary && v?.onSurface === true && v?.guardClosed === true && v?.emergency === false && v?.bumper === false && Number(v?.personMm) > 2000 && Number(v?.obstacleMm) > 1000
+        const pending = c?.mission.payload
+        const scoped = c?.mission.state === 'running' && c.mission.taskKind === 'payload' && c.mission.taskId === command.taskId && pending?.eventId === command.eventId && pending.reference === command.reference && pending.operation === command.operation && pending.containerId === command.containerId && pending.issuedAtMs === command.issuedAtMs && pending.expiresAtMs === command.expiresAtMs && pending.positionM.every((n, i) => n === command.positionM[i])
+        const safe = scoped && located && qualified && fresh && stationary && v?.onSurface === true && v?.guardClosed === true && v?.emergency === false && v?.bumper === false && Number(v?.personMm) > 2000 && Number(v?.obstacleMm) > 1000
         const supported = (command.operation === 'mower-enable' || command.operation === 'mower-disable') ? command.containerId === null : command.operation === 'material-drop' && command.containerId === 'tray-1' && !consumedContainers.has(command.containerId) && !mowerEnabled
-        const confirmed = safe && supported
+        const confirmed = safe && supported && c!.nowMs + 60 < command.expiresAtMs
         if (confirmed && command.operation === 'material-drop') consumedContainers.add(command.containerId!)
         if (confirmed && command.operation === 'mower-enable') mowerEnabled = true
         if (command.operation === 'mower-disable') mowerEnabled = false
-        queue.push({ eventId: command.eventId, taskId: command.taskId, operation: command.operation, containerId: command.containerId, reference: command.reference, capturedAtMs: command.issuedAtMs + 60, positionM: c?.estimate.localPosition ? [...c.estimate.localPosition.positionM] as [number, number, number] : [...command.positionM], outcome: confirmed ? 'confirmed' : 'rejected', metadata: { modeledOnly: true, implement: command.operation, container: command.containerId ?? 'none' } })
+        const capturedAtMs = c?.nowMs ?? command.issuedAtMs
+        queue.push({ deliverAtMs: capturedAtMs + 60, ack: { eventId: command.eventId, taskId: command.taskId, operation: command.operation, containerId: command.containerId, reference: command.reference, capturedAtMs, positionM: c?.estimate.localPosition ? [...c.estimate.localPosition.positionM] as [number, number, number] : [...command.positionM], outcome: confirmed ? 'confirmed' : 'rejected', metadata: { modeledOnly: true, implement: command.operation, container: command.containerId ?? 'none' } } })
       },
       poll(nowMs) {
         if (!Number.isSafeInteger(nowMs) || nowMs < 0 || nowMs < lastPoll) throw new RangeError('Ground payload clock must be monotonic')
         lastPoll = nowMs
-        return queue[0] && queue[0].capturedAtMs <= nowMs ? structuredClone(queue.shift()!) : null },
+        return queue[0] && queue[0].deliverAtMs <= nowMs ? structuredClone(queue.shift()!.ack) : null },
       close() { closed = true; mowerEnabled = false; queue.length = 0; context = null },
     }
   }

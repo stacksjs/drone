@@ -21,7 +21,7 @@ describe('owned ground vehicle', () => {
 
 import { createGroundOdometry, groundStoppingEnvelope } from '../../resources/functions/drone/vehicles/ground/odometry'
 import { createGroundProfile, groundMission } from '../../resources/functions/drone/vehicles/ground/profile'
-import { groundContext, groundPacket } from '../fixtures/ground/context'
+import { groundContext, groundPacket, groundPayloadContext } from '../fixtures/ground/context'
 
 test('raw encoder travel is calibrated and corrected using owned estimator data', () => {
   const odometry = createGroundOdometry()
@@ -70,18 +70,19 @@ test('proximity and implement hazards latch and revoke mower and drive outputs',
 
 test('payload acknowledgement is scoped once and mower requires stationary guarded surface', () => {
   const profile = createGroundProfile(), port = profile.createPayload!(), controller = profile.createController(), c = groundContext()
-  port.observe!(c)
   const command = { eventId: 'ground-mowing-coverage:1:0,0,0,0,0:enable', taskId: 'enable', operation: 'mower-enable' as const, containerId: null, issuedAtMs: 1000, expiresAtMs: 1500, positionM: [0, 0, 0] as [number, number, number], reference: c.measurement!.reference }
+  port.observe!(groundPayloadContext(c, command))
   port.request(command)
   expect(port.poll(1059)).toBe(null)
-  expect(port.poll(1060)).toMatchObject({ eventId: 'ground-mowing-coverage:1:0,0,0,0,0:enable', outcome: 'confirmed' })
+  expect(port.poll(1060)).toMatchObject({ eventId: 'ground-mowing-coverage:1:0,0,0,0,0:enable', capturedAtMs: 1000, outcome: 'confirmed' })
   expect(controller.step(c).actuators[2]).toBe(1)
   expect(() => port.request(command)).toThrow()
   c.enabled = false
   expect(controller.step(c).actuators).toEqual([0, 0, 0, 1])
   const moving = groundContext(1100); moving.measurement!.values.stopped = false
-  port.observe!(moving)
-  port.request({ ...command, eventId: 'mower-2', issuedAtMs: 1100 })
+  const movingCommand = { ...command, eventId: 'mower-2', issuedAtMs: 1100 }
+  port.observe!(groundPayloadContext(moving, movingCommand))
+  port.request(movingCommand)
   expect(port.poll(1160)).toMatchObject({ outcome: 'rejected' })
   const plan = groundMission('logistics')
   expect(plan.tasks.find(t => t.kind === 'payload')).toMatchObject({ operation: 'material-drop', containerId: 'tray-1' })
@@ -146,8 +147,9 @@ test('normally engaged neutral brake stops modeled nominal motion inside declare
 test('implement port rejects superficially safe booleans without qualified wheel calibration', () => {
   const profile = createGroundProfile(), port = profile.createPayload!(), c = groundContext()
   c.measurement!.values.calibration = 'unverified-radius'
-  port.observe!(c)
-  port.request({ eventId: 'bad-calibration', taskId: 'enable', operation: 'mower-enable', containerId: null, issuedAtMs: 1000, expiresAtMs: 1500, positionM: [0, 0, 0], reference: '1:0,0,0,0,0' })
+  const command = { eventId: 'bad-calibration', taskId: 'enable', operation: 'mower-enable' as const, containerId: null, issuedAtMs: 1000, expiresAtMs: 1500, positionM: [0, 0, 0] as [number, number, number], reference: '1:0,0,0,0,0' }
+  port.observe!(groundPayloadContext(c, command))
+  port.request(command)
   expect(port.poll(1060)).toMatchObject({ outcome: 'rejected' })
 })
 
@@ -169,16 +171,19 @@ test('lateral slip consumes the contact friction budget instead of rotating velo
 
 test('material tray is consumed once and command position is checked before acknowledgement', () => {
   const port = createGroundProfile('logistics').createPayload!(), c = groundContext()
-  port.observe!(c)
   const command = { eventId: 'drop-1', taskId: 'drop', operation: 'material-drop' as const, containerId: 'tray-1', issuedAtMs: 1000, expiresAtMs: 1500, positionM: [0, 0, 0] as [number, number, number], reference: '1:0,0,0,0,0' }
+  port.observe!(groundPayloadContext(c, command))
   port.request(command)
   expect(port.poll(1060)).toMatchObject({ outcome: 'confirmed' })
-  port.request({ ...command, eventId: 'drop-2' })
+  const again = { ...command, eventId: 'drop-2' }
+  port.observe!(groundPayloadContext(c, again))
+  port.request(again)
   expect(port.poll(1060)).toMatchObject({ outcome: 'rejected' })
   expect(() => port.poll(1059)).toThrow()
   const distant = createGroundProfile().createPayload!()
-  distant.observe!(c)
-  distant.request({ ...command, eventId: 'mower-away', operation: 'mower-enable', containerId: null, positionM: [10, 0, 0] })
+  const distantCommand = { ...command, eventId: 'mower-away', operation: 'mower-enable' as const, containerId: null, positionM: [10, 0, 0] as [number, number, number] }
+  distant.observe!(groundPayloadContext(c, distantCommand))
+  distant.request(distantCommand)
   expect(distant.poll(1060)).toMatchObject({ outcome: 'rejected' })
 })
 
@@ -189,4 +194,53 @@ test('differential moment uses measured track and yaw inertia in the first force
   // First wheel speed +/-0.015rad/s gives +/-0.36N contact forces on step2.
   // Moment=(.36-(-.36))*.3=.216Nm; deltaYawRate=.216/3*.004=.000288rad/s.
   expect(second.angularRateRadS[2]).toBeCloseTo(0.000288, 12)
+})
+
+test('mowing and materials logistics execute through the common owned sensor estimator mission runtime', async () => {
+  const { runVehicleSimulation } = await import('../../resources/functions/drone/vehicles/runtime')
+  for (const scenario of ['nominal', 'logistics']) {
+    const result = runVehicleSimulation(createGroundProfile(scenario), { scenario, seconds: 120 })
+    expect(result.status).toBe('completed')
+    expect(result.mission.state).toBe('completed')
+    expect(result.path.some(row => row.truthPositionM[0] > 2.7)).toBe(true)
+    expect(result.path.some(row => row.truthPositionM[1] > 0.7)).toBe(true)
+    expect(Math.hypot(...result.finalTruthPositionM)).toBeLessThan(0.25)
+    expect(result.board.actuators).toEqual([0, 0, 0, 1])
+    expect(result.trace.rows.some(row => row.observation.payloadAck?.outcome === 'confirmed')).toBe(true)
+    expect(result.trace.rows.at(-1)!.observation.onGround).toBe(true)
+    expect(Math.hypot(...result.trace.rows.at(-1)!.observation.velocityMps)).toBeLessThanOrEqual(0.1)
+  }
+}, 60000)
+
+test('ground runtime revokes every declared hazard and keeps manual and host failures independent', async () => {
+  const { runVehicleSimulation } = await import('../../resources/functions/drone/vehicles/runtime')
+  for (const scenario of ['low-traction', 'obstacle', 'people', 'manual', 'localization-loss', 'emergency', 'implement-open', 'sensor-loss', 'host-loss']) {
+    const result = runVehicleSimulation(createGroundProfile(scenario), { scenario, seconds: 15 })
+    expect(result.status).toBe(scenario === 'host-loss' ? 'host-lost' : 'blocked')
+  }
+}, 60000)
+
+import { join } from 'node:path'
+test('native GroundSimulate command parses real options and reports a bounded modeled mission', async () => {
+  const command = (args: string[]) => Bun.spawn([process.execPath, '--no-env-file', `--config=${join(import.meta.dir, '../fixtures/process/bunfig.toml')}`, join(import.meta.dir, '../fixtures/ground/cli.ts'), ...args], { stdout: 'pipe', stderr: 'pipe' })
+  const child = command(['ground:simulate', '--scenario', 'logistics', '--seconds', '120'])
+  const [stdout, stderr, code] = await Promise.all([new Response(child.stdout).text(), new Response(child.stderr).text(), child.exited])
+  expect(stderr).toBe('')
+  expect(code).toBe(0)
+  const result = JSON.parse(stdout)
+  expect(result.status).toBe('completed')
+  expect(result.recordedMissionRows).toBeGreaterThan(10)
+  const invalid = command(['ground:simulate', '--seconds', '1.5'])
+  const [, invalidError, invalidCode] = await Promise.all([new Response(invalid.stdout).text(), new Response(invalid.stderr).text(), invalid.exited])
+  expect(invalidCode).toBe(1)
+  expect(invalidError).toContain('integer from 2 to 180')
+}, 180000)
+
+test('implement commands must match the current pending mission event before an action can occur', () => {
+  const profile = createGroundProfile(), port = profile.createPayload!(), c = groundContext()
+  const authorized = { eventId: 'scoped-enable', taskId: 'enable', operation: 'mower-enable' as const, containerId: null, issuedAtMs: 1000, expiresAtMs: 1500, positionM: [0, 0, 0] as [number, number, number], reference: '1:0,0,0,0,0' }
+  port.observe!(groundPayloadContext(c, authorized))
+  port.request({ ...authorized, operation: 'material-drop', containerId: 'tray-1' })
+  expect(port.poll(1060)).toMatchObject({ outcome: 'rejected' })
+  expect(profile.createController().step(c).actuators[2]).toBe(0)
 })
