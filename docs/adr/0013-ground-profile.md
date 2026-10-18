@@ -2,7 +2,7 @@
 
 Status: Accepted for simulation, physical acceptance open.
 
-The reusable profile owns immutable configuration; a required `createSession()` factory groups mutable plant, controller, encoder sequence and implement state for one execution. Reusing a profile creates a fresh session rather than resetting consumed events or reopening a closed payload port. Separate sessions may run concurrently without sharing mower authority. Standalone physics APIs remain public.
+The reusable profile declares vehicle configuration; a required `createSession()` factory groups mutable plant, controller, encoder sequence and implement state for one execution. Reusing a profile creates a fresh session rather than resetting consumed events or reopening a closed payload port. Separate sessions may run concurrently without sharing mower authority. Standalone physics APIs remain public.
 
 The ground vehicle reuses the common raw sensor pipeline, owned estimator, vehicle mission v2, authority and independent watchdog. Its profile provides a dynamic differential-drive plant, qualified raw wheel/contact/proximity measurements, estimator-corrected odometry, stopping-envelope controller and simulated acknowledged implement port. There is one mission executor and no ArduPilot/PX4 dependency.
 
