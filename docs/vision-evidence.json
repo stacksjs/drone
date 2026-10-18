@@ -84,7 +84,7 @@
       "scenario": "camera-loss",
       "status": "blocked",
       "fusion": "lost",
-      "reason": "Selected visual lock lost or changed; clear and pair again",
+      "reason": "Invalid measurement scope, evidence, synchronization or freshness; clear and pair again",
       "calibration": {
         "calibrationId": "synthetic-brown5",
         "evidence": "synthetic",
@@ -100,9 +100,9 @@
       "maxVisualErrorM": 0.038854240699244806,
       "maxVisualThreeSigmaRatio": 0.019591432071716514,
       "minSeparationM": 3.221395401970734,
-      "followTravelM": 3.7309511179983157,
-      "maxTrackingGapMs": 200,
-      "maxHeadingDriftRad": 0.00184772100777722,
+      "followTravelM": 3.726027294997482,
+      "maxTrackingGapMs": 180,
+      "maxHeadingDriftRad": 0.001872518767690415,
       "boardNeutral": true
     },
     {
