@@ -50,7 +50,8 @@ Every metric observation requires all of the following:
 - Capture-time local pose, camera mounting, compatible evidence and a declared heading alignment.
   Missing pose or depth fails measurement production. The local origin/reference must match the paired target.
 - One local monotonic clock, camera/depth/pose synchronization within the configured maximum of
-  20 ms including declared clock uncertainty, and measurement age no greater than 200 ms.
+  20 ms including declared clock uncertainty. Age is the oldest camera/depth/pose capture's age
+  plus all three clock uncertainty terms and must fit the configured maximum of 200 ms.
 - Conservative uncertainty covering pixel/depth error, pose position and attitude, extrinsic
   translation/rotation, model residual and motion during timing uncertainty. Depth must stay
   within the held-out calibration interval. Lens inverses, folds, declared numeric bounds and
