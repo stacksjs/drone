@@ -20,6 +20,7 @@ export interface VisionCalibration {
 /** Held-out correspondences, acquired independently of the calibration fit. Assertions are not provenance authentication. */
 export interface VisionValidationSample {
   id: string
+  /** Pixels in the calibrated output image, not normalized box coordinates. */
   pixel: [number, number]
   opticalDepthM: number
   bodyPointM: SensorVector
@@ -53,6 +54,7 @@ export interface VisionDepthObservation {
   candidateId: string
   capturedAtMs: number
   receivedAtMs: number
+  /** Pixels in the calibrated output image, exactly at the normalized selected box centre scaled to that image. */
   pixel: [number, number]
   opticalDepthM: number
   sigmaM: number

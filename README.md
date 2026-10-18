@@ -56,6 +56,21 @@ replay for a hardware-free test, or Pi AI Camera on the Pi. Explicit selection c
 lock; ambiguity, stale inference and lost detections invalidate it until reselection.
 See [camera setup and limits](docs/camera-tracking.md). Image-space tracking is not metric navigation.
 
+## Calibrated target fusion
+
+Open `/vision` for recorded explicit visual/GNSS pairing, registered-depth localization and owned
+physics follow scenarios. The live Pi camera stays image-only until measured calibration,
+synchronized depth and surveyed capture pose are available.
+
+```sh
+./buddy vision:validate examples/vision-calibration.json
+./buddy vision:simulate --scenario follow
+./buddy vision:simulate --scenario depth-loss
+```
+
+Read the [measurement, pairing and uncertainty contract](docs/vision.md). The included calibration,
+depth and target source are synthetic; physical calibration is unverified.
+
 ## Camera and payload adapters
 
 Issue #8 adds an owned Pi AI Camera still adapter, bounded command/ACK and clock synchronization,

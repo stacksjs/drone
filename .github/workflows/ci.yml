@@ -74,6 +74,12 @@ jobs:
         working-directory: ${{ runner.temp }}
       - run: $GITHUB_WORKSPACE/storage/runtime-build/cli/drone subsea:simulate --scenario tether-loss --seconds 120
         working-directory: ${{ runner.temp }}
+      - run: $GITHUB_WORKSPACE/storage/runtime-build/cli/drone vision:validate "$GITHUB_WORKSPACE/examples/vision-calibration.json"
+        working-directory: ${{ runner.temp }}
+      - run: $GITHUB_WORKSPACE/storage/runtime-build/cli/drone vision:simulate --scenario follow
+        working-directory: ${{ runner.temp }}
+      - run: $GITHUB_WORKSPACE/storage/runtime-build/cli/drone vision:simulate --scenario identity-drift
+        working-directory: ${{ runner.temp }}
   firmware:
     runs-on: ubuntu-latest
     steps:

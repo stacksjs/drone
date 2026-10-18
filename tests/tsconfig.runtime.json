@@ -46,6 +46,8 @@
     "./unit/mission-workspace.test.ts",
     "./unit/subsea-controls.test.ts",
     "./unit/subsea-navigation.test.ts",
-    "./unit/subsea.test.ts"
+    "./unit/subsea.test.ts",
+    "../resources/functions/drone/vision/**/*.ts",
+    "./unit/vision-*.test.ts"
   ]
 }

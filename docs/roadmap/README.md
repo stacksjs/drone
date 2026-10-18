@@ -34,6 +34,9 @@ companion application and simulator, not a native board autopilot.
   with metric follow/orbit goal interfaces. Physical calibration and broader campaigns remain in [#11](https://github.com/stacksjs/drone/issues/11).
 - Selected-target antenna geometry, bounded mount tracking and simulated pointing/RF evidence.
   Physical mount acceptance remains in [#16](https://github.com/stacksjs/drone/issues/16).
+- Calibrated selected-point localization with explicit depth/pose association, GNSS pairing,
+  conservative fusion and owned sensor-to-control physics. Measured calibration, depth adapters,
+  surveyed heading and hardware campaigns remain in [#17](https://github.com/stacksjs/drone/issues/17).
 - An [executable behavior audit](../parity.md) with source-backed cases, evidence selectors and upstream refresh.
   Unclassified dimensions and unsupported cases remain explicit in [#28](https://github.com/stacksjs/drone/issues/28).
 
