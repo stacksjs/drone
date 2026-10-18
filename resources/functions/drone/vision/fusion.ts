@@ -53,13 +53,14 @@ function evidence(value: unknown) {
   return value === 'synthetic' || value === 'declared-bench'
 }
 function validVision(vision: VisionMetricObservation, pairing: VisionPairing, tracking: TrackingSnapshot, nowMs: number) {
-  return keys(vision, ['evidence', 'calibrationId', 'cameraSessionId', 'lockId', 'candidateId', 'frameSequence', 'depthSourceId', 'depthSequence', 'reference', 'capturedAtMs', 'receivedAtMs', 'positionM', 'sigmaM', 'physicalFlightEnabled'])
+  return keys(vision, ['evidence', 'calibrationId', 'cameraSessionId', 'lockId', 'candidateId', 'frameSequence', 'depthSourceId', 'depthSequence', 'reference', 'capturedAtMs', 'receivedAtMs', 'validUntilMs', 'positionM', 'sigmaM', 'physicalFlightEnabled'])
     && evidence(vision.evidence) && vision.physicalFlightEnabled === false
     && vision.calibrationId === pairing.calibrationId && vision.cameraSessionId === pairing.cameraSessionId
     && vision.lockId === pairing.lockId && vision.depthSourceId === pairing.depthSourceId && vision.reference === pairing.reference
     && vision.frameSequence === tracking.association!.frameSequence && vision.candidateId === tracking.association!.candidateId
     && vision.capturedAtMs === tracking.association!.capturedAtMs
     && Number.isSafeInteger(vision.depthSequence) && vision.depthSequence >= 0
+    && bounded(vision.validUntilMs, vision.capturedAtMs, Math.min(Number.MAX_SAFE_INTEGER, vision.capturedAtMs + 200)) && nowMs <= vision.validUntilMs
     && fresh(vision.capturedAtMs, vision.receivedAtMs, nowMs) && vector(vision.positionM) && bounded(vision.sigmaM, 0.0001, 10)
 }
 function validFix(fix: VisionTargetFix, pairing: VisionPairing, nowMs: number) {
@@ -87,7 +88,7 @@ function compatible(previous: AcceptedMeasurement | null, next: AcceptedMeasurem
 function visionSignature(vision: VisionMetricObservation, tracking: TrackingSnapshot) {
   return JSON.stringify([
     vision.evidence, vision.calibrationId, vision.cameraSessionId, vision.lockId, vision.candidateId, vision.frameSequence,
-    vision.depthSourceId, vision.depthSequence, vision.reference, vision.capturedAtMs, vision.receivedAtMs, vision.positionM, vision.sigmaM, vision.physicalFlightEnabled,
+    vision.depthSourceId, vision.depthSequence, vision.reference, vision.capturedAtMs, vision.receivedAtMs, vision.validUntilMs, vision.positionM, vision.sigmaM, vision.physicalFlightEnabled,
     tracking.selected!.id, tracking.selected!.lastSeenAtMs, tracking.selected!.confirmations,
     tracking.candidates.map(candidate => [candidate.id, candidate.label, candidate.confidence, candidate.box.x, candidate.box.y, candidate.box.width, candidate.box.height]),
   ])
@@ -168,7 +169,7 @@ export function createVisionTargetFusion() {
       previousDepthSequence = vision.depthSequence
       current = {
         ...current, state: 'tracking', reason: 'Paired metric target tracked', innovationM,
-        target: { id: current.pairing.targetId, reference: current.pairing.reference, positionM, capturedAtMs, sigmaM },
+        target: { id: current.pairing.targetId, reference: current.pairing.reference, positionM, capturedAtMs, validUntilMs: Math.min(vision.validUntilMs, fix.capturedAtMs + 200), sigmaM },
       }
       return snapshot()
     },

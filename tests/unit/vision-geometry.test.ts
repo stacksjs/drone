@@ -189,6 +189,19 @@ describe('calibrated selected-point localization', () => {
     expect(() => createVisionLocalizer(calibration, exampleVisionValidation()).localize(packet)).toThrow(/age uncertainty/)
   })
 
+  test('metric output carries its calibration and oldest capture expiry for retained consumers', () => {
+    const packet = input()
+    const observation = createVisionLocalizer(exampleVisionCalibration(), exampleVisionValidation()).localize(packet)
+    expect(observation).toHaveProperty('validUntilMs', 1197)
+    const calibration = exampleVisionCalibration(); calibration.timing.maxAgeMs = 80
+    packet.depth!.capturedAtMs = 999; packet.pose!.capturedAtMs = 998
+    const shorter = createVisionLocalizer(calibration, exampleVisionValidation()).localize(packet)
+    expect(shorter).toHaveProperty('validUntilMs', 1075)
+    expect(shorter.capturedAtMs).toBe(1000)
+    packet.nowMs = 1076
+    expect(() => createVisionLocalizer(calibration, exampleVisionValidation()).localize(packet)).toThrow(/age uncertainty/)
+  })
+
   test('detaches accepted calibration, reports and output arrays from caller mutation', () => {
     const calibration = exampleVisionCalibration(), validation = exampleVisionValidation(), localizer = createVisionLocalizer(calibration, validation)
     calibration.extrinsics.translationM[0] = 2; calibration.intrinsics.fx = 1; validation[0]!.bodyPointM[0] = -99

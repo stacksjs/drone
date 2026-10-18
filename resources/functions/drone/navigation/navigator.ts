@@ -10,7 +10,7 @@ export type NavigationIntent =
   | { mode: 'land', siteId: string, expectedM: SensorVector }
   | { mode: 'follow', targetId: string, offsetM: SensorVector, clearanceM: number }
   | { mode: 'orbit', targetId: string, radiusM: number, radiansPerSecond: number, phaseRad: number, startedAtMs: number, clearanceM: number }
-export interface NavigationTarget { id: string, reference: string, positionM: SensorVector, capturedAtMs: number }
+export interface NavigationTarget { id: string, reference: string, positionM: SensorVector, capturedAtMs: number, validUntilMs?: number }
 export interface NavigationDecision {
   state: 'navigating' | 'blocked' | 'released'
   reason: string
@@ -40,6 +40,8 @@ export function navigationGoal(intent: NavigationIntent, o: MissionObservation, 
   }
   else {
     if (typeof intent.targetId !== 'string' || !/^[a-z][a-z0-9-]{0,39}$/.test(intent.targetId) || !target || target.id !== intent.targetId || target.reference !== o.reference || !validVector(target.positionM) || !Number.isFinite(target.capturedAtMs) || target.capturedAtMs > o.nowMs || o.nowMs - target.capturedAtMs > 200) throw new TypeError('Selected navigation target lost')
+    const validUntilMs = 'validUntilMs' in target ? target.validUntilMs : target.capturedAtMs + 200
+    if (typeof validUntilMs !== 'number' || !Number.isFinite(validUntilMs) || validUntilMs < target.capturedAtMs || validUntilMs > Math.min(Number.MAX_SAFE_INTEGER, target.capturedAtMs + 200) || o.nowMs > validUntilMs) throw new TypeError('Selected navigation target lost')
     if (intent.mode === 'follow') {
       if (!validVector(intent.offsetM) || Math.hypot(...intent.offsetM) < 1 || Math.hypot(...intent.offsetM) > 5) throw new RangeError('Invalid selected-target offset')
       goal = target.positionM.map((n, i) => n + intent.offsetM[i]!) as SensorVector
