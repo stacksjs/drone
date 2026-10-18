@@ -98,6 +98,19 @@ assumed initial heading. Physical commands remain disabled.
 
 See the [control equations, simulation assumptions and remaining work](docs/controls.md).
 
+## Simulated authority and failsafes
+
+Issue #6 adds explicit arming/engagement, RC takeover, scoped command leases, latched faults
+and an independent modeled output watchdog on the owned control harness.
+
+```sh
+./buddy authority:simulate --scenario nominal --seconds 20
+./buddy authority:simulate --scenario pi-loss --seconds 8
+```
+
+See the [state machine, failure policies and hardware completion gates](docs/authority.md).
+Physical kill/RC wiring and HIL validation remain open. Zero simulated thrust is not a landing.
+
 ## Owned autopilot and roadmap
 
 The [dependency-linked roadmap](docs/roadmap/README.md) and [feature matrix](docs/roadmap/feature-coverage.md)

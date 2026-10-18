@@ -10,6 +10,15 @@ Object.assign(globalThis, autoImports)
 
 // TypeScript declarations
 declare global {
+  const createAuthorityHarness: typeof autoImports.createAuthorityHarness
+  const authorityScenarios: typeof autoImports.authorityScenarios
+  const validMotors: typeof autoImports.validMotors
+  const createAuthoritySupervisor: typeof autoImports.createAuthoritySupervisor
+  const authorityVersion: typeof autoImports.authorityVersion
+  const authorityStates: typeof autoImports.authorityStates
+  const authorityTransitions: typeof autoImports.authorityTransitions
+  const authorityPolicy: typeof autoImports.authorityPolicy
+  const createSimulatedOutputWatchdog: typeof autoImports.createSimulatedOutputWatchdog
   const follow: typeof autoImports.follow
   const defineBehavior: typeof autoImports.defineBehavior
   const cameraRequest: typeof autoImports.cameraRequest

@@ -35,6 +35,8 @@ jobs:
         working-directory: ${{ runner.temp }}
       - run: $GITHUB_WORKSPACE/storage/runtime-build/cli/drone controls:simulate --scenario hover --seconds 3
         working-directory: ${{ runner.temp }}
+      - run: $GITHUB_WORKSPACE/storage/runtime-build/cli/drone authority:simulate --scenario pi-loss --seconds 4
+        working-directory: ${{ runner.temp }}
   firmware:
     runs-on: ubuntu-latest
     steps:

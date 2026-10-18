@@ -96,3 +96,8 @@ The [owned control physics harness](controls.md), recorded in [ADR 5](adr/0005-s
 feeds modeled raw sensor records through the existing sensor pipeline and estimator into bounded
 quad-X control. It declares initial simulation heading alignment and has no physical transport.
 Plant truth is retained only for sensor synthesis and independent response evaluation.
+
+The [owned authority supervisor](authority.md), recorded in [ADR 6](adr/0006-simulated-authority.md),
+adds explicit arm/engage, fault revocation and a separate modeled output watchdog above that same
+control path. A host-loss run stops all host execution while the modeled board clock continues.
+Physical firmware and external adapters remain separate from these simulation-only frames.

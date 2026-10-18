@@ -1,5 +1,28 @@
 # Validation evidence
 
+## Simulated authority and failsafe slice
+
+- 146 Bun tests pass with 16,781 assertions, including 15 authority tests. The two native CTest
+  contracts and five Python bridge tests also pass. Lint, application/runtime/view typechecks
+  and roadmap validation passed. Both independent review axes passed after priority/replay fixes.
+- All 36 state/action pairs, pre-arm/reset interlocks, command scope/epoch/replay/age, lease
+  boundaries, RC override/disarm, fault priority, estimator/reference changes, fence and reserve
+  guards are tested. Independent transitions take priority over a pending operator renewal.
+- Controller output timestamps and a persistent gate high-water reject old/duplicate feedback,
+  including same-timestamp disarm/rearm. The independent modeled board rejects replay, old boot,
+  invalid vectors/leases and reversed clocks; new synthetic boot IDs must increase.
+- Thirteen physics scenarios exercise the existing raw sensor pipeline, owned estimator and
+  controller under supervision. The Pi-loss campaign freezes all host processing at 3000 ms:
+  last estimator/authority check 2996 ms, last controller output 2980 ms. Only physics/evaluation
+  and the modeled board continue; the board expires output at 3040 ms without a final host command.
+- Native Stacks `authority:simulate` runs through Buddy and the compiled standalone CLI outside
+  the checkout. The retained authority report is reproducible, and regeneration of the isolated
+  control baseline still matches its previous report. See [authority evidence](authority-evidence.json).
+- Physical kill/RC/disarm, board supervisor port, measured HIL failures and recovery controllers
+  remain open in [#6](https://github.com/stacksjs/drone/issues/6). Zero modeled thrust is not a
+  landing controller. Parachute, rally/emergency landing and redundant links are explicitly deferred
+  in [the authority contract](authority.md). Physical outputs remain inhibited.
+
 ## Simulated multirotor control slice
 
 - 131 Bun tests pass with 16,326 assertions, including 15 control/physics tests. The two native

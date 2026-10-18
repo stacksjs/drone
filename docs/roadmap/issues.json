@@ -152,6 +152,20 @@
       2,
       4,
       5
+    ],
+    "implementationStatus": "in-progress",
+    "evidence": [
+      "resources/functions/drone/authority/",
+      "app/Commands/AuthoritySimulate.ts",
+      "docs/authority.md",
+      "docs/authority-evidence.json",
+      "tests/unit/authority.test.ts"
+    ],
+    "remaining": [
+      "Native board supervisor port after physical #2/#3/#4/#5 prerequisites",
+      "Measured physical RC/kill/disarm and independent output isolation on a disabled-load harness",
+      "HIL Pi termination, board reset, sensor/link faults and battery reserve campaign",
+      "Manual sticks, emergency landing/rally/recovery, parachute and redundant-link integrations with independent evidence"
     ]
   },
   {

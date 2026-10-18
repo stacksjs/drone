@@ -1,0 +1,1006 @@
+{
+  "evidence": "deterministic-software-simulation",
+  "physicalFlightEnabled": false,
+  "boardOutputsInhibited": true,
+  "hardwareInLoop": false,
+  "policy": {
+    "commandAgeMs": 100,
+    "maxLeaseMs": 100,
+    "outputLeaseMs": 60,
+    "schedulerGapMs": 40,
+    "rcAgeMs": 100,
+    "linkAgeMs": 150,
+    "batteryAgeMs": 500,
+    "runtimeAgeMs": 20,
+    "interlockAgeMs": 20,
+    "reservePercent": 25,
+    "fenceRadiusM": 20,
+    "minDownM": -10,
+    "maxDownM": 0
+  },
+  "injectionAtMs": 3000,
+  "scenarios": [
+    {
+      "scenario": "nominal",
+      "evidence": "modeled-authority-and-output-watchdog",
+      "hostAlive": true,
+      "lastHostCheckMs": 20000,
+      "supervisor": {
+        "version": 1,
+        "state": "autonomous",
+        "epoch": 2,
+        "sessionId": "123",
+        "bootId": "55",
+        "sequence": 972,
+        "lastCheckedAtMs": 20000,
+        "reason": "operator-renew",
+        "commandAccepted": true,
+        "leaseUntilMs": 20100,
+        "target": {
+          "positionM": [
+            2,
+            1,
+            -1.5
+          ],
+          "yawRad": 0
+        },
+        "physicalFlightEnabled": false,
+        "boardOutputsInhibited": true,
+        "events": [
+          {
+            "atMs": 600,
+            "from": "disarmed",
+            "to": "armed-idle",
+            "reason": "operator-arm",
+            "epoch": 1
+          },
+          {
+            "atMs": 600,
+            "from": "armed-idle",
+            "to": "autonomous",
+            "reason": "operator-engage",
+            "epoch": 2
+          }
+        ]
+      },
+      "board": {
+        "bootId": "55",
+        "lastCheckedAtMs": 20000,
+        "sequence": 971,
+        "epoch": 2,
+        "expiresAtMs": 20060,
+        "motorsN": [
+          3.677913082063117,
+          3.6775588224090687,
+          3.6775680282394974,
+          3.6775076028921716
+        ],
+        "fault": null,
+        "physicalFlightEnabled": false,
+        "boardOutputsInhibited": true
+      },
+      "firstRevocationMs": null,
+      "firstZeroMs": null,
+      "hardwareInLoop": false,
+      "physicalKillVerified": false,
+      "recoveryAction": "zero-modeled-thrust-no-landing-or-manual-stick-controller",
+      "lastEstimatorAtMs": 20000,
+      "lastControllerAtMs": 20000,
+      "finalPositionErrorM": 0.011531726167509825,
+      "groundContacts": 0,
+      "finalCommandN": [
+        3.677913082063117,
+        3.6775588224090687,
+        3.6775680282394974,
+        3.6775076028921716
+      ]
+    },
+    {
+      "scenario": "rc-override",
+      "evidence": "modeled-authority-and-output-watchdog",
+      "hostAlive": true,
+      "lastHostCheckMs": 8000,
+      "supervisor": {
+        "version": 1,
+        "state": "failsafe",
+        "epoch": 4,
+        "sessionId": "123",
+        "bootId": "55",
+        "sequence": 121,
+        "lastCheckedAtMs": 8000,
+        "reason": "fence-breach",
+        "commandAccepted": false,
+        "leaseUntilMs": null,
+        "target": null,
+        "physicalFlightEnabled": false,
+        "boardOutputsInhibited": true,
+        "events": [
+          {
+            "atMs": 600,
+            "from": "disarmed",
+            "to": "armed-idle",
+            "reason": "operator-arm",
+            "epoch": 1
+          },
+          {
+            "atMs": 600,
+            "from": "armed-idle",
+            "to": "autonomous",
+            "reason": "operator-engage",
+            "epoch": 2
+          },
+          {
+            "atMs": 3000,
+            "from": "autonomous",
+            "to": "manual",
+            "reason": "rc-override",
+            "epoch": 3
+          },
+          {
+            "atMs": 3596,
+            "from": "manual",
+            "to": "failsafe",
+            "reason": "fence-breach",
+            "epoch": 4
+          }
+        ]
+      },
+      "board": {
+        "bootId": "55",
+        "lastCheckedAtMs": 8000,
+        "sequence": 120,
+        "epoch": 2,
+        "expiresAtMs": null,
+        "motorsN": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "fault": null,
+        "physicalFlightEnabled": false,
+        "boardOutputsInhibited": true
+      },
+      "firstRevocationMs": 3000,
+      "firstZeroMs": 3000,
+      "hardwareInLoop": false,
+      "physicalKillVerified": false,
+      "recoveryAction": "zero-modeled-thrust-no-landing-or-manual-stick-controller",
+      "lastEstimatorAtMs": 8000,
+      "lastControllerAtMs": 8000,
+      "finalPositionErrorM": 4.247908387199604,
+      "groundContacts": 1104,
+      "finalCommandN": [
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "scenario": "rc-loss",
+      "evidence": "modeled-authority-and-output-watchdog",
+      "hostAlive": true,
+      "lastHostCheckMs": 8000,
+      "supervisor": {
+        "version": 1,
+        "state": "failsafe",
+        "epoch": 3,
+        "sessionId": "123",
+        "bootId": "55",
+        "sequence": 121,
+        "lastCheckedAtMs": 8000,
+        "reason": "rc-loss",
+        "commandAccepted": false,
+        "leaseUntilMs": null,
+        "target": null,
+        "physicalFlightEnabled": false,
+        "boardOutputsInhibited": true,
+        "events": [
+          {
+            "atMs": 600,
+            "from": "disarmed",
+            "to": "armed-idle",
+            "reason": "operator-arm",
+            "epoch": 1
+          },
+          {
+            "atMs": 600,
+            "from": "armed-idle",
+            "to": "autonomous",
+            "reason": "operator-engage",
+            "epoch": 2
+          },
+          {
+            "atMs": 3000,
+            "from": "autonomous",
+            "to": "failsafe",
+            "reason": "rc-loss",
+            "epoch": 3
+          }
+        ]
+      },
+      "board": {
+        "bootId": "55",
+        "lastCheckedAtMs": 8000,
+        "sequence": 120,
+        "epoch": 2,
+        "expiresAtMs": null,
+        "motorsN": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "fault": null,
+        "physicalFlightEnabled": false,
+        "boardOutputsInhibited": true
+      },
+      "firstRevocationMs": 3000,
+      "firstZeroMs": 3000,
+      "hardwareInLoop": false,
+      "physicalKillVerified": false,
+      "recoveryAction": "zero-modeled-thrust-no-landing-or-manual-stick-controller",
+      "lastEstimatorAtMs": 8000,
+      "lastControllerAtMs": 8000,
+      "finalPositionErrorM": 4.247908387199604,
+      "groundContacts": 1104,
+      "finalCommandN": [
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "scenario": "link-loss",
+      "evidence": "modeled-authority-and-output-watchdog",
+      "hostAlive": true,
+      "lastHostCheckMs": 8000,
+      "supervisor": {
+        "version": 1,
+        "state": "failsafe",
+        "epoch": 3,
+        "sessionId": "123",
+        "bootId": "55",
+        "sequence": 121,
+        "lastCheckedAtMs": 8000,
+        "reason": "link-loss",
+        "commandAccepted": false,
+        "leaseUntilMs": null,
+        "target": null,
+        "physicalFlightEnabled": false,
+        "boardOutputsInhibited": true,
+        "events": [
+          {
+            "atMs": 600,
+            "from": "disarmed",
+            "to": "armed-idle",
+            "reason": "operator-arm",
+            "epoch": 1
+          },
+          {
+            "atMs": 600,
+            "from": "armed-idle",
+            "to": "autonomous",
+            "reason": "operator-engage",
+            "epoch": 2
+          },
+          {
+            "atMs": 3000,
+            "from": "autonomous",
+            "to": "failsafe",
+            "reason": "link-loss",
+            "epoch": 3
+          }
+        ]
+      },
+      "board": {
+        "bootId": "55",
+        "lastCheckedAtMs": 8000,
+        "sequence": 120,
+        "epoch": 2,
+        "expiresAtMs": null,
+        "motorsN": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "fault": null,
+        "physicalFlightEnabled": false,
+        "boardOutputsInhibited": true
+      },
+      "firstRevocationMs": 3000,
+      "firstZeroMs": 3000,
+      "hardwareInLoop": false,
+      "physicalKillVerified": false,
+      "recoveryAction": "zero-modeled-thrust-no-landing-or-manual-stick-controller",
+      "lastEstimatorAtMs": 8000,
+      "lastControllerAtMs": 8000,
+      "finalPositionErrorM": 4.247908387199604,
+      "groundContacts": 1104,
+      "finalCommandN": [
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "scenario": "pi-loss",
+      "evidence": "modeled-authority-and-output-watchdog",
+      "hostAlive": false,
+      "lastHostCheckMs": 2996,
+      "supervisor": {
+        "version": 1,
+        "state": "autonomous",
+        "epoch": 2,
+        "sessionId": "123",
+        "bootId": "55",
+        "sequence": 121,
+        "lastCheckedAtMs": 2996,
+        "reason": "operator-renew",
+        "commandAccepted": false,
+        "leaseUntilMs": 3080,
+        "target": {
+          "positionM": [
+            2,
+            1,
+            -1.5
+          ],
+          "yawRad": 0
+        },
+        "physicalFlightEnabled": false,
+        "boardOutputsInhibited": true,
+        "events": [
+          {
+            "atMs": 600,
+            "from": "disarmed",
+            "to": "armed-idle",
+            "reason": "operator-arm",
+            "epoch": 1
+          },
+          {
+            "atMs": 600,
+            "from": "armed-idle",
+            "to": "autonomous",
+            "reason": "operator-engage",
+            "epoch": 2
+          }
+        ]
+      },
+      "board": {
+        "bootId": "55",
+        "lastCheckedAtMs": 8000,
+        "sequence": 120,
+        "epoch": 2,
+        "expiresAtMs": null,
+        "motorsN": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "fault": "output-lease-expired",
+        "physicalFlightEnabled": false,
+        "boardOutputsInhibited": true
+      },
+      "firstRevocationMs": null,
+      "firstZeroMs": 3040,
+      "hardwareInLoop": false,
+      "physicalKillVerified": false,
+      "recoveryAction": "zero-modeled-thrust-no-landing-or-manual-stick-controller",
+      "lastEstimatorAtMs": 2996,
+      "lastControllerAtMs": 2980,
+      "finalPositionErrorM": 4.41713569090406,
+      "groundContacts": 1095,
+      "finalCommandN": [
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "scenario": "board-reset",
+      "evidence": "modeled-authority-and-output-watchdog",
+      "hostAlive": true,
+      "lastHostCheckMs": 8000,
+      "supervisor": {
+        "version": 1,
+        "state": "failsafe",
+        "epoch": 3,
+        "sessionId": "123",
+        "bootId": "55",
+        "sequence": 121,
+        "lastCheckedAtMs": 8000,
+        "reason": "board-boot-changed",
+        "commandAccepted": false,
+        "leaseUntilMs": null,
+        "target": null,
+        "physicalFlightEnabled": false,
+        "boardOutputsInhibited": true,
+        "events": [
+          {
+            "atMs": 600,
+            "from": "disarmed",
+            "to": "armed-idle",
+            "reason": "operator-arm",
+            "epoch": 1
+          },
+          {
+            "atMs": 600,
+            "from": "armed-idle",
+            "to": "autonomous",
+            "reason": "operator-engage",
+            "epoch": 2
+          },
+          {
+            "atMs": 3000,
+            "from": "autonomous",
+            "to": "failsafe",
+            "reason": "board-boot-changed",
+            "epoch": 3
+          }
+        ]
+      },
+      "board": {
+        "bootId": "56",
+        "lastCheckedAtMs": 8000,
+        "sequence": 0,
+        "epoch": -1,
+        "expiresAtMs": null,
+        "motorsN": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "fault": null,
+        "physicalFlightEnabled": false,
+        "boardOutputsInhibited": true
+      },
+      "firstRevocationMs": 3000,
+      "firstZeroMs": 3000,
+      "hardwareInLoop": false,
+      "physicalKillVerified": false,
+      "recoveryAction": "zero-modeled-thrust-no-landing-or-manual-stick-controller",
+      "lastEstimatorAtMs": 8000,
+      "lastControllerAtMs": 8000,
+      "finalPositionErrorM": 4.227387652469224,
+      "groundContacts": 1106,
+      "finalCommandN": [
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "scenario": "estimator-loss",
+      "evidence": "modeled-authority-and-output-watchdog",
+      "hostAlive": true,
+      "lastHostCheckMs": 8000,
+      "supervisor": {
+        "version": 1,
+        "state": "failsafe",
+        "epoch": 3,
+        "sessionId": "123",
+        "bootId": "55",
+        "sequence": 124,
+        "lastCheckedAtMs": 8000,
+        "reason": "stale-estimator",
+        "commandAccepted": false,
+        "leaseUntilMs": null,
+        "target": null,
+        "physicalFlightEnabled": false,
+        "boardOutputsInhibited": true,
+        "events": [
+          {
+            "atMs": 600,
+            "from": "disarmed",
+            "to": "armed-idle",
+            "reason": "operator-arm",
+            "epoch": 1
+          },
+          {
+            "atMs": 600,
+            "from": "armed-idle",
+            "to": "autonomous",
+            "reason": "operator-engage",
+            "epoch": 2
+          },
+          {
+            "atMs": 3044,
+            "from": "autonomous",
+            "to": "failsafe",
+            "reason": "stale-estimator",
+            "epoch": 3
+          }
+        ]
+      },
+      "board": {
+        "bootId": "55",
+        "lastCheckedAtMs": 8000,
+        "sequence": 123,
+        "epoch": 2,
+        "expiresAtMs": null,
+        "motorsN": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "fault": null,
+        "physicalFlightEnabled": false,
+        "boardOutputsInhibited": true
+      },
+      "firstRevocationMs": 3044,
+      "firstZeroMs": 3044,
+      "hardwareInLoop": false,
+      "physicalKillVerified": false,
+      "recoveryAction": "zero-modeled-thrust-no-landing-or-manual-stick-controller",
+      "lastEstimatorAtMs": 8000,
+      "lastControllerAtMs": 8000,
+      "finalPositionErrorM": 4.451488865248575,
+      "groundContacts": 1093,
+      "finalCommandN": [
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "scenario": "battery-reserve",
+      "evidence": "modeled-authority-and-output-watchdog",
+      "hostAlive": true,
+      "lastHostCheckMs": 8000,
+      "supervisor": {
+        "version": 1,
+        "state": "failsafe",
+        "epoch": 3,
+        "sessionId": "123",
+        "bootId": "55",
+        "sequence": 121,
+        "lastCheckedAtMs": 8000,
+        "reason": "battery-reserve",
+        "commandAccepted": false,
+        "leaseUntilMs": null,
+        "target": null,
+        "physicalFlightEnabled": false,
+        "boardOutputsInhibited": true,
+        "events": [
+          {
+            "atMs": 600,
+            "from": "disarmed",
+            "to": "armed-idle",
+            "reason": "operator-arm",
+            "epoch": 1
+          },
+          {
+            "atMs": 600,
+            "from": "armed-idle",
+            "to": "autonomous",
+            "reason": "operator-engage",
+            "epoch": 2
+          },
+          {
+            "atMs": 3000,
+            "from": "autonomous",
+            "to": "failsafe",
+            "reason": "battery-reserve",
+            "epoch": 3
+          }
+        ]
+      },
+      "board": {
+        "bootId": "55",
+        "lastCheckedAtMs": 8000,
+        "sequence": 120,
+        "epoch": 2,
+        "expiresAtMs": null,
+        "motorsN": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "fault": null,
+        "physicalFlightEnabled": false,
+        "boardOutputsInhibited": true
+      },
+      "firstRevocationMs": 3000,
+      "firstZeroMs": 3000,
+      "hardwareInLoop": false,
+      "physicalKillVerified": false,
+      "recoveryAction": "zero-modeled-thrust-no-landing-or-manual-stick-controller",
+      "lastEstimatorAtMs": 8000,
+      "lastControllerAtMs": 8000,
+      "finalPositionErrorM": 4.247908387199604,
+      "groundContacts": 1104,
+      "finalCommandN": [
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "scenario": "fence-target",
+      "evidence": "modeled-authority-and-output-watchdog",
+      "hostAlive": true,
+      "lastHostCheckMs": 8000,
+      "supervisor": {
+        "version": 1,
+        "state": "failsafe",
+        "epoch": 3,
+        "sessionId": "123",
+        "bootId": "55",
+        "sequence": 122,
+        "lastCheckedAtMs": 8000,
+        "reason": "invalid-target-or-lease",
+        "commandAccepted": false,
+        "leaseUntilMs": null,
+        "target": null,
+        "physicalFlightEnabled": false,
+        "boardOutputsInhibited": true,
+        "events": [
+          {
+            "atMs": 600,
+            "from": "disarmed",
+            "to": "armed-idle",
+            "reason": "operator-arm",
+            "epoch": 1
+          },
+          {
+            "atMs": 600,
+            "from": "armed-idle",
+            "to": "autonomous",
+            "reason": "operator-engage",
+            "epoch": 2
+          },
+          {
+            "atMs": 3000,
+            "from": "autonomous",
+            "to": "failsafe",
+            "reason": "invalid-target-or-lease",
+            "epoch": 3
+          }
+        ]
+      },
+      "board": {
+        "bootId": "55",
+        "lastCheckedAtMs": 8000,
+        "sequence": 120,
+        "epoch": 2,
+        "expiresAtMs": null,
+        "motorsN": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "fault": null,
+        "physicalFlightEnabled": false,
+        "boardOutputsInhibited": true
+      },
+      "firstRevocationMs": 3000,
+      "firstZeroMs": 3000,
+      "hardwareInLoop": false,
+      "physicalKillVerified": false,
+      "recoveryAction": "zero-modeled-thrust-no-landing-or-manual-stick-controller",
+      "lastEstimatorAtMs": 8000,
+      "lastControllerAtMs": 8000,
+      "finalPositionErrorM": 4.247908387199604,
+      "groundContacts": 1104,
+      "finalCommandN": [
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "scenario": "kill",
+      "evidence": "modeled-authority-and-output-watchdog",
+      "hostAlive": true,
+      "lastHostCheckMs": 8000,
+      "supervisor": {
+        "version": 1,
+        "state": "killed",
+        "epoch": 3,
+        "sessionId": "123",
+        "bootId": "55",
+        "sequence": 121,
+        "lastCheckedAtMs": 8000,
+        "reason": "kill-input",
+        "commandAccepted": false,
+        "leaseUntilMs": null,
+        "target": null,
+        "physicalFlightEnabled": false,
+        "boardOutputsInhibited": true,
+        "events": [
+          {
+            "atMs": 600,
+            "from": "disarmed",
+            "to": "armed-idle",
+            "reason": "operator-arm",
+            "epoch": 1
+          },
+          {
+            "atMs": 600,
+            "from": "armed-idle",
+            "to": "autonomous",
+            "reason": "operator-engage",
+            "epoch": 2
+          },
+          {
+            "atMs": 2996,
+            "from": "autonomous",
+            "to": "killed",
+            "reason": "kill-input",
+            "epoch": 3
+          }
+        ]
+      },
+      "board": {
+        "bootId": "55",
+        "lastCheckedAtMs": 8000,
+        "sequence": 120,
+        "epoch": 2,
+        "expiresAtMs": null,
+        "motorsN": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "fault": null,
+        "physicalFlightEnabled": false,
+        "boardOutputsInhibited": true
+      },
+      "firstRevocationMs": 3000,
+      "firstZeroMs": 3000,
+      "hardwareInLoop": false,
+      "physicalKillVerified": false,
+      "recoveryAction": "zero-modeled-thrust-no-landing-or-manual-stick-controller",
+      "lastEstimatorAtMs": 8000,
+      "lastControllerAtMs": 8000,
+      "finalPositionErrorM": 4.247908387199604,
+      "groundContacts": 1104,
+      "finalCommandN": [
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "scenario": "disarm",
+      "evidence": "modeled-authority-and-output-watchdog",
+      "hostAlive": true,
+      "lastHostCheckMs": 8000,
+      "supervisor": {
+        "version": 1,
+        "state": "disarmed",
+        "epoch": 3,
+        "sessionId": "123",
+        "bootId": "55",
+        "sequence": 121,
+        "lastCheckedAtMs": 8000,
+        "reason": "rc-disarm",
+        "commandAccepted": false,
+        "leaseUntilMs": null,
+        "target": null,
+        "physicalFlightEnabled": false,
+        "boardOutputsInhibited": true,
+        "events": [
+          {
+            "atMs": 600,
+            "from": "disarmed",
+            "to": "armed-idle",
+            "reason": "operator-arm",
+            "epoch": 1
+          },
+          {
+            "atMs": 600,
+            "from": "armed-idle",
+            "to": "autonomous",
+            "reason": "operator-engage",
+            "epoch": 2
+          },
+          {
+            "atMs": 3000,
+            "from": "autonomous",
+            "to": "disarmed",
+            "reason": "rc-disarm",
+            "epoch": 3
+          }
+        ]
+      },
+      "board": {
+        "bootId": "55",
+        "lastCheckedAtMs": 8000,
+        "sequence": 120,
+        "epoch": 2,
+        "expiresAtMs": null,
+        "motorsN": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "fault": null,
+        "physicalFlightEnabled": false,
+        "boardOutputsInhibited": true
+      },
+      "firstRevocationMs": 3000,
+      "firstZeroMs": 3000,
+      "hardwareInLoop": false,
+      "physicalKillVerified": false,
+      "recoveryAction": "zero-modeled-thrust-no-landing-or-manual-stick-controller",
+      "lastEstimatorAtMs": 8000,
+      "lastControllerAtMs": 8000,
+      "finalPositionErrorM": 4.247908387199604,
+      "groundContacts": 1104,
+      "finalCommandN": [
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "scenario": "watchdog",
+      "evidence": "modeled-authority-and-output-watchdog",
+      "hostAlive": true,
+      "lastHostCheckMs": 8000,
+      "supervisor": {
+        "version": 1,
+        "state": "failsafe",
+        "epoch": 3,
+        "sessionId": "123",
+        "bootId": "55",
+        "sequence": 121,
+        "lastCheckedAtMs": 8000,
+        "reason": "runtime-watchdog",
+        "commandAccepted": false,
+        "leaseUntilMs": null,
+        "target": null,
+        "physicalFlightEnabled": false,
+        "boardOutputsInhibited": true,
+        "events": [
+          {
+            "atMs": 600,
+            "from": "disarmed",
+            "to": "armed-idle",
+            "reason": "operator-arm",
+            "epoch": 1
+          },
+          {
+            "atMs": 600,
+            "from": "armed-idle",
+            "to": "autonomous",
+            "reason": "operator-engage",
+            "epoch": 2
+          },
+          {
+            "atMs": 3000,
+            "from": "autonomous",
+            "to": "failsafe",
+            "reason": "runtime-watchdog",
+            "epoch": 3
+          }
+        ]
+      },
+      "board": {
+        "bootId": "55",
+        "lastCheckedAtMs": 8000,
+        "sequence": 120,
+        "epoch": 2,
+        "expiresAtMs": null,
+        "motorsN": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "fault": "board-watchdog",
+        "physicalFlightEnabled": false,
+        "boardOutputsInhibited": true
+      },
+      "firstRevocationMs": 3000,
+      "firstZeroMs": 3000,
+      "hardwareInLoop": false,
+      "physicalKillVerified": false,
+      "recoveryAction": "zero-modeled-thrust-no-landing-or-manual-stick-controller",
+      "lastEstimatorAtMs": 8000,
+      "lastControllerAtMs": 8000,
+      "finalPositionErrorM": 4.227387652469224,
+      "groundContacts": 1106,
+      "finalCommandN": [
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "scenario": "lease-loss",
+      "evidence": "modeled-authority-and-output-watchdog",
+      "hostAlive": true,
+      "lastHostCheckMs": 8000,
+      "supervisor": {
+        "version": 1,
+        "state": "failsafe",
+        "epoch": 3,
+        "sessionId": "123",
+        "bootId": "55",
+        "sequence": 121,
+        "lastCheckedAtMs": 8000,
+        "reason": "runtime-watchdog",
+        "commandAccepted": false,
+        "leaseUntilMs": null,
+        "target": null,
+        "physicalFlightEnabled": false,
+        "boardOutputsInhibited": true,
+        "events": [
+          {
+            "atMs": 600,
+            "from": "disarmed",
+            "to": "armed-idle",
+            "reason": "operator-arm",
+            "epoch": 1
+          },
+          {
+            "atMs": 600,
+            "from": "armed-idle",
+            "to": "autonomous",
+            "reason": "operator-engage",
+            "epoch": 2
+          },
+          {
+            "atMs": 3080,
+            "from": "autonomous",
+            "to": "failsafe",
+            "reason": "runtime-watchdog",
+            "epoch": 3
+          }
+        ]
+      },
+      "board": {
+        "bootId": "55",
+        "lastCheckedAtMs": 8000,
+        "sequence": 124,
+        "epoch": 2,
+        "expiresAtMs": null,
+        "motorsN": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "fault": "output-lease-expired",
+        "physicalFlightEnabled": false,
+        "boardOutputsInhibited": true
+      },
+      "firstRevocationMs": 3080,
+      "firstZeroMs": 3080,
+      "hardwareInLoop": false,
+      "physicalKillVerified": false,
+      "recoveryAction": "zero-modeled-thrust-no-landing-or-manual-stick-controller",
+      "lastEstimatorAtMs": 8000,
+      "lastControllerAtMs": 8000,
+      "finalPositionErrorM": 4.572949918454018,
+      "groundContacts": 1085,
+      "finalCommandN": [
+        0,
+        0,
+        0,
+        0
+      ]
+    }
+  ]
+}

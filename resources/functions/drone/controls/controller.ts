@@ -24,7 +24,7 @@ export function createSimulatedMultirotorController(options: { headingAlignment:
   function inhibit(reason: string, latch = reference !== null) {
     if (latch) fault = reason
     clear()
-    return { kind: 'simulated-control' as const, inhibited: true, reason, physicalFlightEnabled: false as const, boardOutputsInhibited: true as const, motorsN: [...previous] as Motors, limited: false, desiredVelocityMps: null, desiredAccelerationMps2: null, desiredRatesRadS: null, desiredWrench: null, achievedWrench: null, integrals: { velocity: velocityPid.map(p => p.state().integral), rate: ratePid.map(p => p.state().integral) } }
+    return { kind: 'simulated-control' as const, atMs: lastNow, inhibited: true, reason, physicalFlightEnabled: false as const, boardOutputsInhibited: true as const, motorsN: [...previous] as Motors, limited: false, desiredVelocityMps: null, desiredAccelerationMps2: null, desiredRatesRadS: null, desiredWrench: null, achievedWrench: null, integrals: { velocity: velocityPid.map(p => p.state().integral), rate: ratePid.map(p => p.state().integral) } }
   }
   return {
     reset() { clear(); lastNow = null; reference = null; fault = null },
@@ -71,7 +71,7 @@ export function createSimulatedMultirotorController(options: { headingAlignment:
       const allocation = allocateQuadX(desiredWrench, previous, dt)
       for (let i = 0; i < 3; i++) ratePid[i]!.track(allocation.achieved.torqueNm[i]! - torque[i]!, dt)
       previous = allocation.motorsN
-      return { kind: 'simulated-control' as const, inhibited: false, reason: 'simulation-feedback', physicalFlightEnabled: false as const, boardOutputsInhibited: true as const, motorsN: [...previous] as Motors, limited: allocation.limited, desiredVelocityMps: velocity, desiredAccelerationMps2: acceleration, desiredRatesRadS: rates, desiredWrench, achievedWrench: allocation.achieved, integrals: { velocity: velocityPid.map(p => p.state().integral), rate: ratePid.map(p => p.state().integral) } }
+      return { kind: 'simulated-control' as const, atMs: lastNow, inhibited: false, reason: 'simulation-feedback', physicalFlightEnabled: false as const, boardOutputsInhibited: true as const, motorsN: [...previous] as Motors, limited: allocation.limited, desiredVelocityMps: velocity, desiredAccelerationMps2: acceleration, desiredRatesRadS: rates, desiredWrench, achievedWrench: allocation.achieved, integrals: { velocity: velocityPid.map(p => p.state().integral), rate: ratePid.map(p => p.state().integral) } }
     },
   }
 }
