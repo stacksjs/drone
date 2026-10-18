@@ -9,7 +9,7 @@ const gravity = 9.80665
 const limits = { imu: 80, gnss: 1500, barometer: 300 }
 const vector = (v: unknown): v is SensorVector => Array.isArray(v) && v.length === 3 && v.every(n => Number.isFinite(n) && Math.abs(n) < 1e6)
 const variance = (v: unknown): v is SensorVector => vector(v) && v.every(n => n > 0)
-interface Source { sequence: number, capturedUs: bigint, deviceId: string, calibrationId: string | null }
+interface Source { sequence: number, capturedUs: bigint, deviceId: string, calibrationId: string | null, pressureHeight: (Omit<NonNullable<GnssEstimatorSnapshot['pressureHeight']>, 'varianceM2'> & { varianceM2: number | null }) | null }
 /** Bench estimator, consuming qualified sensor snapshots. Never produces control Telemetry. */
 export function createEstimator(options: { origin?: GeodeticOrigin, gravityCorrection?: 'norm-gated' | 'initialization-only' } = {}) {
   const gravityMode = options.gravityCorrection ?? 'norm-gated'
@@ -181,4 +181,4 @@ export function createEstimator(options: { origin?: GeodeticOrigin, gravityCorre
 }
 type GnssEstimatorSnapshot = ReturnType<ReturnType<typeof createEstimator>['snapshot']>
 /** Normalized owned navigation snapshot. Pressure/DVL adapters retain their own datum. */
-export type EstimatorSnapshot = Omit<GnssEstimatorSnapshot, 'localPosition'> & { localPosition: (Omit<NonNullable<GnssEstimatorSnapshot['localPosition']>, 'altitudeDatum'> & { altitudeDatum: 'WGS84_ELLIPSOID' | 'LOCAL_WATER_SURFACE' }) | null }
+export type EstimatorSnapshot = Omit<GnssEstimatorSnapshot, 'localPosition' | 'pressureHeight'> & { localPosition: (Omit<NonNullable<GnssEstimatorSnapshot['localPosition']>, 'altitudeDatum'> & { altitudeDatum: 'WGS84_ELLIPSOID' | 'LOCAL_WATER_SURFACE' }) | null, pressureHeight: (Omit<NonNullable<GnssEstimatorSnapshot['pressureHeight']>, 'varianceM2'> & { varianceM2: number | null }) | null }
