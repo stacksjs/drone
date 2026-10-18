@@ -86,3 +86,8 @@ The optional [sensor bench profile](sensors.md), recorded in [ADR 3](adr/0003-se
 adds original SPI/I2C/UART acquisition and a receive-only DS stream. TypeScript applies units,
 calibration, clock uncertainty and independent health checks. The same pipeline runs against
 recordings on the simulator clock. Replay snapshots are diagnostic; estimator fusion is issue #4.
+
+The [owned estimator](estimation.md), recorded in [ADR 4](adr/0004-owned-estimator.md), consumes
+qualified sensor events on their capture epochs. It exposes tilt/relative-yaw, GNSS local NED and
+separate pressure height with health/reset counters. It is independent of both external autopilots
+and remains separate from control telemetry until heading, fusion and hardware validation exist.

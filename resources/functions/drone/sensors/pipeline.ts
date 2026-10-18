@@ -144,7 +144,8 @@ export function createSensorPipeline(options: { anchor: SensorClockAnchor, calib
         observation.healthy = !invalidAnchor && !observation.quality.some(q => faults.includes(q))
         return { kind, healthy: observation.healthy, quality: observation.quality, observation }
       })
-      return { sensors: result, rejected, physicalFlightEnabled: false as const, evidence: anchor.source }
+      return { sensors: result, rejected, physicalFlightEnabled: false as const, evidence: anchor.source, bootId: anchor.bootId, nowMs }
     },
   }
 }
+export type SensorSnapshot = ReturnType<ReturnType<typeof createSensorPipeline>['snapshot']>

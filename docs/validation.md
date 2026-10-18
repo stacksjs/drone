@@ -1,5 +1,28 @@
 # Validation evidence
 
+## Owned estimator software slice
+
+- 116 Bun tests pass with 14,892 assertions, including 19 estimator tests. The two native CTest
+  contracts and five Python bridge tests also pass. Lint, application/runtime/view typechecks and
+  roadmap validation passed.
+- Native Stacks `estimator:replay` executes through Buddy and the compiled standalone CLI outside
+  the checkout, including playback beyond EOF. Simulator playback is deterministic across chunk
+  sizes and pause; estimator outputs stay separate from ideal flight telemetry.
+- Published GeographicLib ECEF/local examples verify frame, ellipsoid height and NED sign
+  conventions to the precision printed by the reference. Coupled analytic raw-register motion
+  independently quantifies maximum/RMS errors; regeneration reproduces fixture files and report.
+- The scripted six-second trajectory reports maximum Euler error norm 0.0061411 rad and maximum
+  NED position error 0.0025786 m across 276 checks. These are synthetic-software regression values,
+  not sensor accuracy or flight evidence. See [the retained report](estimator-evidence.json).
+- Fault tests cover gyro yaw bias, IMU gaps/stationary realignment, invalid source/mount/noise,
+  GNSS jumps/outage/reacquisition, altitude datum isolation, pressure reference reset, positive
+  covariance blocks and board/consumer-clock resets. Qualified anchor corrections preserve board
+  integration intervals while tightening mapped sample expiry.
+- Absolute heading/navigation remain unavailable. Physical reference and compass-failure campaigns,
+  full inertial EKF/fusion and a measured board port remain open in [#4](https://github.com/stacksjs/drone/issues/4),
+  with issue #3 hardware calibration/timing prerequisites still open.
+
+
 ## Sensor bench slice
 
 - Stacks replay/inspection commands and standalone CLI executed, including replay outside the checkout.

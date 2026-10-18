@@ -1,6 +1,7 @@
 import type { SensorCalibrationSet, SensorClockAnchor } from './types'
 import { validateSensorCalibrations } from './calibration'
 import { createSensorPipeline, validateSensorAnchor } from './pipeline'
+import type { SensorSnapshot } from './pipeline'
 export const maxSensorDatasetBytes = 1048576
 type RecordedAnchor = Omit<SensorClockAnchor, 'bootId' | 'boardUs'> & { bootId: string, boardUs: string }
 export interface SensorDataset {
@@ -44,7 +45,7 @@ export function parseSensorDataset(input: unknown): SensorDataset {
   }
   return dataset
 }
-export function createSensorReplay(input: unknown) {
+export function createSensorReplay(input: unknown, options: { onUpdate?: (snapshot: SensorSnapshot) => void } = {}) {
   const dataset = parseSensorDataset(input)
   const offsetMs = dataset.anchor.localMs
   const pipeline = createSensorPipeline({ anchor: { ...dataset.anchor, localMs: 0, bootId: BigInt(dataset.anchor.bootId), boardUs: BigInt(dataset.anchor.boardUs) }, calibrations: dataset.calibrations })
@@ -62,13 +63,16 @@ export function createSensorReplay(input: unknown) {
         if (refresh && anchorAt <= recordAt) {
           const next = restoreAnchor(refresh.anchor, dataset.anchor.source)
           pipeline.reanchor({ ...next, localMs: next.localMs - offsetMs }, anchorAt); anchorCursor++
+          options.onUpdate?.(pipeline.snapshot(anchorAt))
         }
         else if (item) {
           if (pipeline.ingest(Uint8Array.fromHex(item.hex), recordAt).accepted) accepted++
+          options.onUpdate?.(pipeline.snapshot(recordAt))
           cursor++
         }
       }
       now = nowMs
+      options.onUpdate?.(pipeline.snapshot(now))
       return snapshot()
     },
   }

@@ -1,0 +1,10 @@
+{
+  "evidence": "analytic-synthetic-truth-only",
+  "count": 276,
+  "eulerErrorMaxRad": 0.006141053056739621,
+  "eulerErrorRmsRad": 0.0054038786693201965,
+  "positionErrorMaxM": 0.0025785092614455385,
+  "positionErrorRmsM": 0.0016164782014153128,
+  "absoluteHeadingObserved": false,
+  "hardwareValidated": false
+}

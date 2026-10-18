@@ -5,6 +5,9 @@
     "../scripts/build-runtime-cli.ts",
     "../resources/functions/drone/runtime/**/*.ts",
     "../resources/functions/drone/sensors/**/*.ts",
+    "../resources/functions/drone/estimation/**/*.ts",
+    "./fixtures/estimation/**/*.ts",
+    "./unit/estimation.test.ts",
     "./fixtures/sensors/generate.ts",
     "./unit/runtime.test.ts",
     "./unit/sensors.test.ts"

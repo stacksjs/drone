@@ -3,10 +3,14 @@ import { follow } from './behaviors'
 import { decide } from './safety'
 import { zero } from './geometry'
 import type { SensorReplay } from './sensors/replay'
+import type { EstimatorReplay } from './estimation/replay'
 
-export function createSimulator(options: { behavior?: Behavior, sensorReplay?: SensorReplay } = {}) {
+export function createSimulator(options: { behavior?: Behavior, sensorReplay?: SensorReplay, estimatorReplay?: EstimatorReplay } = {}) {
   const customBehavior = options.behavior ? { ...options.behavior } : undefined
   const sensorReplay = options.sensorReplay
+  const estimatorReplay = options.estimatorReplay
+  if (sensorReplay && estimatorReplay) throw new RangeError('Attach one sensor or estimator replay')
+  if (estimatorReplay && estimatorReplay.snapshot().sensors.nowMs !== 0) throw new RangeError('Attach a fresh estimator replay at simulation time zero')
   if (sensorReplay && sensorReplay.snapshot().nowMs !== 0) throw new RangeError('Attach a fresh sensor replay at simulation time zero')
   let nowMs = 0
   let running = false
@@ -32,7 +36,8 @@ export function createSimulator(options: { behavior?: Behavior, sensorReplay?: S
     close() { running = false; velocity = zero() },
   }
   function snapshot() {
-    return structuredClone({ mode: 'simulation' as const, running, nowMs, distanceMeters, altitudeMeters, targetLost, telemetry: telemetry(), target: target(), decision, trail, events, sensors: sensorReplay?.snapshot() ?? null })
+    const estimation = estimatorReplay?.snapshot()
+    return structuredClone({ mode: 'simulation' as const, running, nowMs, distanceMeters, altitudeMeters, targetLost, telemetry: telemetry(), target: target(), decision, trail, events, sensors: estimation?.sensors ?? sensorReplay?.snapshot() ?? null, estimate: estimation?.estimate ?? null })
   }
   return {
     adapter,
@@ -60,6 +65,7 @@ export function createSimulator(options: { behavior?: Behavior, sensorReplay?: S
       if (!running) return snapshot()
       nowMs += deltaMs
       sensorReplay?.advanceTo(nowMs)
+      estimatorReplay?.advanceTo(nowMs)
       const next = decide({ telemetry: telemetry(), target: target(), targetId: 'pilot', enabled: true, nowMs, behavior: customBehavior ?? follow({ distanceMeters, altitudeMeters, gain: 0.7 }) })
       if (next.reason !== decision.reason) { events.unshift({ atMs: nowMs, reason: next.reason }); events.splice(20) }
       adapter.send(next)

@@ -29,6 +29,17 @@ declare global {
   const createPx4Driver: typeof autoImports.createPx4Driver
   const decodeAutopilotMode: typeof autoImports.decodeAutopilotMode
   const driverProfiles: typeof autoImports.driverProfiles
+  const createEstimator: typeof autoImports.createEstimator
+  const geodeticToEcef: typeof autoImports.geodeticToEcef
+  const geodeticToNed: typeof autoImports.geodeticToNed
+  const nedRotation: typeof autoImports.nedRotation
+  const multiplyQuaternion: typeof autoImports.multiplyQuaternion
+  const normalizeQuaternion: typeof autoImports.normalizeQuaternion
+  const quaternionFromTilt: typeof autoImports.quaternionFromTilt
+  const quaternionEuler: typeof autoImports.quaternionEuler
+  const predictAxis: typeof autoImports.predictAxis
+  const correctAxis: typeof autoImports.correctAxis
+  const createEstimatorReplay: typeof autoImports.createEstimatorReplay
   const clampVelocity: typeof autoImports.clampVelocity
   const gpsToLocal: typeof autoImports.gpsToLocal
   const zero: typeof autoImports.zero

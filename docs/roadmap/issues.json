@@ -79,6 +79,21 @@
     "url": "https://github.com/stacksjs/drone/issues/4",
     "nativeDependencies": [
       3
+    ],
+    "implementationStatus": "in-progress",
+    "evidence": [
+      "resources/functions/drone/estimation/",
+      "app/Commands/EstimatorReplay.ts",
+      "docs/estimation.md",
+      "docs/estimator-evidence.json",
+      "tests/fixtures/estimation/",
+      "tests/unit/estimation.test.ts"
+    ],
+    "remaining": [
+      "Issue #3 physical capture/calibration/timing prerequisites and independent estimator reference campaign",
+      "Absolute-heading sensor and disturbance/failure validation",
+      "Full-covariance inertial EKF, biases, height-datum fusion and delay compensation",
+      "VIO, optical flow, RTK, redundancy and measured native-board estimator port"
     ]
   },
   {

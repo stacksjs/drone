@@ -70,7 +70,20 @@ The retained dataset is synthetic. Physical capture, calibration and timing evid
 ```
 
 See the [sensor wiring, calibration and clock guide](docs/sensors.md). Sensor replay is diagnostic;
-it does not yet supply an owned attitude/position estimator. That is issue #4.
+the owned estimator below consumes it separately from flight control telemetry.
+
+## Owned estimator
+
+Issue #4 adds gyro/gravity tilt, GNSS position/velocity in a fixed NED frame, separate
+pressure-relative height and explicit health/reset reporting. Absolute heading remains unavailable.
+
+```sh
+./buddy estimator:replay tests/fixtures/estimation/motion-v1.json --at-ms 6040
+```
+
+Read the [estimator guide and remaining work](docs/estimation.md). Replay uses every sensor event;
+this Pi-side bench estimator is separate from ideal simulator control telemetry. Physical estimator
+validation and a tightly coupled inertial EKF remain open.
 
 ## Owned autopilot and roadmap
 
@@ -88,6 +101,7 @@ See [the ownership decision](docs/adr/0001-owned-autonomy.md) and [driver contra
 | `resources/functions/drone/mavlink.ts` | Small verified MAVLink v1/v2 common-message codec |
 | `resources/functions/drone/udp.ts` | Bun UDP adapter, imported explicitly on the server only |
 | `resources/functions/drone/camera/` | TypeScript tracker, session, API and a small Picamera2 acquisition helper |
+| `resources/functions/drone/estimation/` | Owned tilt, GNSS local-position filter, pressure height, health and replay |
 | `resources/functions/drone/sensors/` | Typed sensor stream, calibration, clocks, health and capture/replay |
 | `resources/functions/drone/drivers/` | Explicit ArduPilot/PX4 factories and mode profiles |
 | `resources/components/` | Reusable stx simulator, operating-envelope and hardware components |
