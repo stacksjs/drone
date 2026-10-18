@@ -72,7 +72,7 @@ export function runVehicleSimulation(profileInput: VehicleProfile, options: { sc
       mission = engine.step(missionObservation, nowMs === 600 ? 'start' : undefined)
       if (mission.payload && !requested.has(mission.payload.eventId)) {
         if (!payload) { fault ??= 'missing-vehicle-payload-port'; send('disarm') }
-        else { payload.request(structuredClone(mission.payload)); requested.add(mission.payload.eventId) }
+        else { payload.observe?.(structuredClone({ ...context, mission })); payload.request(structuredClone(mission.payload)); requested.add(mission.payload.eventId) }
       }
       const active = mission.state === 'running' || mission.state === 'paused'
       if (active && mission.targetM && !fault) send('renew')
