@@ -105,10 +105,11 @@ Custody projections explicitly report `purgeImplemented: false` and
 `contentDeletionPerformed: false`. Retention declarations and hold decisions remain alongside the
 current stored source, annotation and review data. This history has no automatic deletion job yet.
 
-The next tracer needs an opt-in private artifact registry, actual registered binary and derivative
-files, resumable deletion progress, a system actor ledger and exact receipts for controlled files
-and database rows. There is no atomic transaction between SQLite and the filesystem. Failures must
-remain visible, and interrupted work must resume against the same owned inventory.
+The managed registry now records explicitly requested binary and derivative files. The next tracer
+needs separate inventory-bound purge acceptance, resumable deletion progress, a system actor ledger
+and exact receipts for controlled files and database rows. There is no atomic transaction between
+SQLite and the filesystem. Failures must remain visible, and interrupted work must resume against
+the same owned inventory. Existing enrollment never grants destructive acceptance.
 
 Existing offline `--output` directories, downloads, external logs, backups and uncontrolled copies
 are not enrolled by these APIs. Future receipts must distinguish application row removal and
