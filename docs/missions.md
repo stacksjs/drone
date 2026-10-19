@@ -11,6 +11,7 @@ and independent modeled output watchdog. ArduPilot and PX4 are not required.
 ./buddy missions:replay /tmp/new-mission-recording/mission.json --at-ms 6000
 ./buddy missions:checkpoint /tmp/new-mission-recording/mission.json --at-ms 4980 --output /tmp/new-mission-checkpoint
 ./buddy missions:recover /tmp/new-mission-checkpoint/mission.json /tmp/fresh-mission-observation.json --output /tmp/new-mission-recovery
+./buddy missions:resume /tmp/new-mission-recovery/mission.json /tmp/next-mission-observation.json --output /tmp/new-mission-resume
 ```
 
 Open `/missions` for native stx scenario execution and recorded state/task inspection. The scenarios
@@ -121,9 +122,37 @@ Successful recovery appends a replayable `recover` decision, saves it in a new p
 and reports `paused` with `checkpoint-recovered-awaiting-resume`. Neither command arms, resumes,
 connects to a vehicle, nor restores another subsystem's state. A simulation caller may load the
 recovered trace through `replayMission` and explicitly submit `resume` using its next fresh
-supervised observation. File declarations are unsigned: checking `authority: autonomous` does not
+supervised observation, or use `missions:resume` as described below. File declarations are unsigned: checking `authority: autonomous` does not
 authenticate a supervisor. This is a v1 owned quadcopter mission-process exercise, not durable
 whole-runtime recovery or a command to restart a physical aircraft.
+
+### Explicit portable resume
+
+`missions:resume <checkpoint> <observation> --output <new-directory>` accepts a verified paused
+v1 mission trace and the next explicit supervised simulation observation. It replays the entire
+prefix, checks authority, estimator health, reference, origin, fence, reserve and endurance through
+the same engine, then appends one operator `resume` decision. A duplicate or backward clock is
+invalid; a gap over 40 ms blocks resume. After a longer mission-process outage, run
+`missions:recover` with the current observation first, then resume at the next fresh epoch.
+Running, ready and terminal traces are rejected rather than treated as implicit recovery.
+
+For the recorded simulation exercise above, extract its 6020 ms observation:
+
+```sh
+bun -e 'const trace = await Bun.file("/tmp/new-mission-recording/mission.json").json(); const row = trace.rows.find(row => row.observation.nowMs === 6020); await Bun.write("/tmp/next-mission-observation.json", JSON.stringify(row.observation))'
+./buddy missions:resume /tmp/new-mission-recovery/mission.json /tmp/next-mission-observation.json --output /tmp/new-mission-resume
+./buddy missions:replay /tmp/new-mission-resume/mission.json
+```
+
+The result is a separate private replayable trace. Its state is `running`, or `aborted` if resuming
+executes a planned abort task immediately; that legitimate terminal decision releases the target.
+The source is preserved,
+existing output directories are rejected, and rejected inputs create no output directory. A
+simulation caller can continue stepping the returned `resumeMission` engine with current owned
+runtime observations. The CLI records a single mission-policy decision; it does not keep a
+vehicle loop alive, restore a whole runtime, arm hardware or execute a physical payload. Retained
+payload identities prevent duplicate pure-policy events in the continued trace, without claiming
+exactly-once physical delivery. These unsigned files do not authenticate a supervisor.
 
 ## Evidence and next work
 

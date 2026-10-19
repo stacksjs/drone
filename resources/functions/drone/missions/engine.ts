@@ -166,3 +166,12 @@ export function recoverMission(trace: MissionTrace, observation: MissionObservat
   if (result.state !== 'paused') throw new TypeError('Mission checkpoint reference or authority is no longer valid')
   return engine
 }
+/** Explicit operator resume. A scheduling outage requires recovery first, then a fresh resume epoch. */
+export function resumeMission(trace: MissionTrace, observation: MissionObservation): MissionEngine {
+  const engine = replayMission(trace)
+  if (engine.snapshot().state !== 'paused') throw new TypeError('Mission resume requires a paused checkpoint')
+  const result = engine.step(observation, 'resume')
+  const plannedAbort = result.state === 'aborted' && result.reason === 'mission-abort-task'
+  if (result.state !== 'running' && !plannedAbort) throw new TypeError(`Mission resume rejected: ${result.reason}`)
+  return engine
+}

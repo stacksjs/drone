@@ -243,6 +243,7 @@ a native stx scenario viewer at `/missions`. Physical outputs remain inhibited.
 ./buddy missions:replay /tmp/new-mission-recording/mission.json --at-ms 6000
 ./buddy missions:checkpoint /tmp/new-mission-recording/mission.json --at-ms 4980 --output /tmp/new-mission-checkpoint
 ./buddy missions:recover /tmp/new-mission-checkpoint/mission.json /tmp/fresh-mission-observation.json --output /tmp/new-mission-recovery
+./buddy missions:resume /tmp/new-mission-recovery/mission.json /tmp/next-mission-observation.json --output /tmp/new-mission-resume
 ```
 
 Read the [mission semantics, evidence and remaining work](docs/missions.md). Camera tasks emit

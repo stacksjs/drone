@@ -24,6 +24,7 @@ import MissionsValidate from '../app/Commands/MissionsValidate'
 import MissionsReplay from '../app/Commands/MissionsReplay'
 import MissionsCheckpoint from '../app/Commands/MissionsCheckpoint'
 import MissionsRecover from '../app/Commands/MissionsRecover'
+import MissionsResume from '../app/Commands/MissionsResume'
 
 import NavigationSimulate from '../app/Commands/NavigationSimulate'
 
@@ -69,6 +70,7 @@ MissionsValidate(app)
 MissionsReplay(app)
 MissionsCheckpoint(app)
 MissionsRecover(app)
+MissionsResume(app)
 NavigationSimulate(app)
 AntennaBench(app)
 AirSimulate(app)

@@ -30,6 +30,12 @@ require an explicit fresh compatible simulation observation for recovery. Persis
 paused decision trace separately with no source overwrite and no automatic resume. This does not
 extend the checkpoint to estimator, controller, authority, board or hardware payload state.
 
+Expose the following operator decision through `missions:resume` and `resumeMission`.
+Require an already paused verified prefix and a fresh compatible observation within the normal
+scheduler gap. Reuse the mission engine's existing interlocks and persist the resumed decision
+in a new private trace. A later observation after an outage must go through paused recovery
+first. The CLI records one policy decision without starting or restoring a vehicle loop.
+
 The first release does not claim physical execution, terrain following, hardware exactly-once
 payload delivery or parity with external autopilot mission systems. The detailed contract,
 evidence and remaining gates are in [the mission guide](../missions.md).

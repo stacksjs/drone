@@ -199,6 +199,7 @@ declare global {
   const parseMissionTrace: typeof autoImports.parseMissionTrace
   const checkpointMission: typeof autoImports.checkpointMission
   const recoverMission: typeof autoImports.recoverMission
+  const resumeMission: typeof autoImports.resumeMission
   const missionLimits: typeof autoImports.missionLimits
   const readMissionFile: typeof autoImports.readMissionFile
   const writeMissionTrace: typeof autoImports.writeMissionTrace

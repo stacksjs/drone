@@ -29,6 +29,7 @@
     "./fixtures/diagnostics/**/*.ts",
     "../resources/functions/drone/missions/**/*.ts",
     "./unit/missions.test.ts",
+    "./unit/mission-resume.test.ts",
     "../resources/functions/drone/navigation/**/*.ts",
     "./unit/navigation.test.ts",
     "../resources/functions/drone/antenna/**/*.ts",
