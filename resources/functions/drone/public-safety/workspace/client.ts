@@ -41,10 +41,11 @@ export function openIncidentWorkspace(settings: WorkspaceClientOptions = {}) {
   let poll: ReturnType<typeof setInterval> | undefined, expiry: ReturnType<typeof setTimeout> | undefined
   let retry: { scope: string, path: string, body: HandoverOfferInput | HandoverDecisionInput } | null = null
   const pending = new Set<AbortController>()
-  let reviewSelection = 0, authority = ''
+  let reviewSelection = 0, authority = '', fieldRefusal = false
   const publish = (patch: Partial<WorkspaceClientView>) => { view = { ...view, ...patch }; for (const listener of listeners) listener(view) }
   const base = () => `/api/public-safety/incidents/${incident}`
   function discard(clearDrafts = true) {
+    if (clearDrafts) fieldRefusal = false
     activity++
     reviewSelection++
     for (const request of pending) request.abort()
@@ -120,7 +121,7 @@ export function openIncidentWorkspace(settings: WorkspaceClientOptions = {}) {
           authority = nextAuthority
           scope = snapshot.scope; accountId = snapshot.viewer.accountId
           deadline(snapshot)
-          publish({ snapshot, status: 'current', error: view.confirmationRequired ? view.error : '', notice: view.confirmationRequired ? view.notice : '' })
+          publish({ snapshot, status: 'current', error: view.confirmationRequired || fieldRefusal ? view.error : '', notice: view.confirmationRequired ? view.notice : '' })
         }
         catch (failure) {
           if (generation !== identity || version !== activity) continue
@@ -155,6 +156,7 @@ export function openIncidentWorkspace(settings: WorkspaceClientOptions = {}) {
   }
   function selectSource(digest: string) {
     if (!/^[a-f0-9]{64}$/.test(digest) || !view.snapshot?.sources.entries.some(source => source.digest === digest)) return
+    fieldRefusal = false
     activity++; options = { ...options, sourceDigest: digest, contextCursor: undefined }
     retry = null
     publish({ snapshot: null, source: null, reviewTarget: null, reviewObservation: null, reviews: null, confirmationRequired: false, canRetryHandover: false, reset: view.reset + 1, status: 'synchronizing' })
@@ -171,6 +173,7 @@ export function openIncidentWorkspace(settings: WorkspaceClientOptions = {}) {
   }
   function selectOffer(key: string) {
     if (!/^[a-f0-9-]{36}$/.test(key)) return
+    fieldRefusal = false
     activity++; options = { ...options, offerKey: key, handoverAfterSequence: undefined }
     retry = null
     publish({ confirmationRequired: false, canRetryHandover: false, reset: view.reset + 1, snapshot: null, status: 'synchronizing' })
@@ -204,6 +207,7 @@ export function openIncidentWorkspace(settings: WorkspaceClientOptions = {}) {
   async function command(path: string, body: object, handover = false): Promise<boolean> {
     if (!ready()) return false
     const generation = identity, version = activity, binding = scope
+    fieldRefusal = false
     publish({ busy: true, error: '', notice: '' })
     if (handover && binding) retry = { scope: binding, path, body: body as HandoverOfferInput | HandoverDecisionInput }
     try {
@@ -218,6 +222,7 @@ export function openIncidentWorkspace(settings: WorkspaceClientOptions = {}) {
     catch (failure) {
       if (generation !== identity || version !== activity) return false
       const ambiguous = !(failure instanceof WireFailure) || failure.status >= 500
+      fieldRefusal = failure instanceof WireFailure && failure.status === 422
       if (!ambiguous) retry = null
       publish({ busy: false, confirmationRequired: ambiguous || failure instanceof WireFailure && failure.status === 409, canRetryHandover: ambiguous && handover, error: failure instanceof WireFailure && failure.status === 422 ? 'The fields were refused. Check your declaration.' : failure instanceof WireFailure && failure.status === 409 ? 'The context changed. Review fresh records before explicitly submitting again.' : 'Outcome unknown. Inspect current records before making another declaration.', notice: '' })
       await refresh()

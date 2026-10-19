@@ -289,3 +289,30 @@ test('HTTP 5xx outcomes preserve warning and explicit confirmation for every dec
     finally { model.close() }
   }
 })
+
+test('known field refusals remain visible after successful reads without unknown-outcome confirmation', async () => {
+  let events!: BroadcastStreamClientOptions, writes = 0
+  const data = snapshot(), digest = 'a'.repeat(64)
+  data.actions.canObserve = true
+  data.selected = { source: { digest } } as unknown as WorkspaceSnapshot['selected']
+  const model = openIncidentWorkspace({ request: async (path, init) => {
+    if (path.endsWith(`/sources/${digest}`)) return Response.json({ source: { digest }, recording: null })
+    if (init?.method === 'POST') { writes++; return Response.json({ error: 'Invalid declaration' }, { status: 422 }) }
+    return Response.json(data)
+  }, stream: options => { events = options; return { close() {} } }, refreshMs: 60000 })
+  try {
+    model.connect('incident-a', 'private'); events.onConnected?.(); await settle(); await model.loadSource()
+    const note = '😀'.repeat(600)
+    expect(note.length).toBeLessThan(2048)
+    expect(new TextEncoder().encode(note).byteLength).toBeGreaterThan(2048)
+    expect(await model.observe({ captureId: 'photo-0001', modality: 'visible', x: 0, y: 0, note, uncertaintyNote: 'Unresolved' })).toBe(false)
+    expect(model.get().confirmationRequired).toBe(false)
+    expect(model.get().error).toContain('fields were refused')
+    await model.refresh()
+    expect(model.get().error).toContain('fields were refused')
+    expect(writes).toBe(1)
+    model.disconnect()
+    expect(model.get().error).toBe('')
+  }
+  finally { model.close() }
+})
