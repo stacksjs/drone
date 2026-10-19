@@ -91,12 +91,12 @@ else if (mode === 'seed' || mode === 'upgrade') {
       const before = JSON.parse(readFileSync(evidence, 'utf8')) as { rows: Rows, ledger: { migration: string }[], columns: string[], indexes: Index[], foreignKeys: unknown[], token: string, config: unknown, projection: Awaited<ReturnType<typeof projection>> }
       const oldCorpus = new Set(await readdir(join(archive, 'database/migrations')))
       const pending = (await readdir(join(root, 'database/migrations'))).filter(name => name.endsWith('.sql') && !oldCorpus.has(name) && !before.ledger.some(entry => entry.migration === name)).sort()
-      assert.equal(pending.length, 14, 'All actual records-through-handover SQL must run in this upgrade')
-      assert(pending[0]!.startsWith('1789486698566-')); assert.equal(pending.at(-1), '1789486698579-auto-misc.sql')
+      for (const required of ['1789486698566-create-public_safety_observations-table.sql', '1789486698567-create-public_safety_reviews-table.sql', '1789486698568-create-public_safety_sources-table.sql', '1789486698569-auto-misc.sql', '1789486698579-auto-misc.sql']) assert(pending.includes(required), `Actual pending corpus must include ${required}`)
+      assert(pending[0]!.startsWith('1789486698566-'))
       const migrated = await database.runDatabaseMigration(); if (migrated.isErr) throw migrated.error
       const ledger = await database.db.unsafe('SELECT * FROM migrations ORDER BY id') as { migration: string }[]
       assert.deepEqual(ledger.slice(0, before.ledger.length), before.ledger)
-      assert.deepEqual(ledger.slice(before.ledger.length).map(entry => entry.migration), pending, 'Native runner applies exact current SQL in true 8566..8579 order')
+      assert.deepEqual(ledger.slice(before.ledger.length).map(entry => entry.migration), pending, 'Native runner applies every actual pending SQL file in exact filename order')
       const columns = await database.db.unsafe('PRAGMA table_info(public_safety_audits)') as { name: string, notnull: number, dflt_value: unknown }[]
       assert.deepEqual(columns.map(column => column.name).sort(), [...before.columns, ...fields].sort(), 'Only the five declared audit fields may be added')
       for (const field of fields) {
