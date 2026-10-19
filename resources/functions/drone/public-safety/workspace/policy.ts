@@ -9,7 +9,10 @@ import { requireIncidentAccess, validateIncidentKey } from '../access/policy'
 import { projection } from '../access/mutations'
 import { associateIncidentDeadline, checkedIncidentResult } from '../access/deadline'
 
-const incarnationProcess = randomUUID()
+// Native app builds bundle Actions independently. Keep the process incarnation
+// shared across those module copies, as native request/transaction stores do.
+const incarnationKey = Symbol.for('@stacksjs/drone:incident-workspace-incarnation:v1')
+const incarnationProcess = ((globalThis as Record<symbol, unknown>)[incarnationKey] ??= randomUUID()) as string
 /** Internal seam shared by the coherent snapshot and content-free stream checks. */
 export async function workspaceAccess(tx: TransactionHandle, key: string, expectedScope?: string) {
   validateIncidentKey(key)
