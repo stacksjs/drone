@@ -69,8 +69,18 @@ function verifyStoredSource(row: SourceRow): PublicSafetyRun {
   }
   catch { return inconsistent() }
 }
-function matchConfig(run: PublicSafetyRun, incident: IncidentRow): void {
-  if (publicSafetyRecordingData(run.plan.config) !== incident.config_json) throw new PublicSafetyAccessError(422, 'Source does not match this incident scope')
+function matchConfig(run: PublicSafetyRun, incident: IncidentRow, incoming = false): void {
+  const config = run.plan.config
+  if (publicSafetyRecordingData(config) !== incident.config_json) {
+    if (incoming) throw new PublicSafetyAccessError(422, 'Source does not match this incident scope')
+    inconsistent()
+  }
+  if (config.id !== incident.incident_key || config.revision !== incident.revision || config.purpose !== incident.purpose || config.retention.expiresAt !== incident.retain_until) inconsistent()
+}
+async function recordReadAccess(key: string, tx: TransactionHandle) {
+  const access = await requireIncidentAccess(key, 'view', tx)
+  projection(access.incident, access.member)
+  return access
 }
 async function unchangedSource(tx: TransactionHandle, key: string, staged: SourceRow, run: PublicSafetyRun, incident: IncidentRow): Promise<void> {
   const current = await scopedSource(tx, key, staged.digest)
@@ -86,7 +96,7 @@ export async function registerPublicSafetySource(key: string, input: unknown): P
   catch { throw new PublicSafetyAccessError(422, 'Invalid owned incident recording') }
   const hash = digestOf(canonical), byteLength = bytes(canonical)
   return mutation(key, 'source-register', expected, async (tx, access) => {
-    matchConfig(run, access.incident)
+    matchConfig(run, access.incident, true)
     if (await tx.selectFrom('public_safety_sources').select('id').where('incident_id', '=', access.incident.id).where('digest', '=', hash).executeTakeFirst()) throw new PublicSafetyAccessError(409, 'Incident source already exists')
     const incident = await advance(tx, access.incident), at = new Date().toISOString()
     await tx.insertInto('public_safety_sources').values({ incident_id: incident.id, digest: hash, byte_length: byteLength, canonical_json: canonical, replay_profile: run.replayProfile, evidence: run.evidence, uploader_id: access.principal.userId, uploaded_at_iso: at, created_sequence: incident.version, created_at: at, updated_at: at }).execute()
@@ -99,7 +109,7 @@ export async function readPublicSafetySource(key: string, hash: string): Promise
   digest(hash)
   await authorizePublicSafetyIncident(key, 'view')
   const { row, incident } = await transaction(async tx => {
-    const { incident } = await requireIncidentAccess(key, 'view', tx)
+    const { incident } = await recordReadAccess(key, tx)
     return { row: await scopedSource(tx, key, hash), incident }
   })
   const run = verifyStoredSource(row)
@@ -110,7 +120,7 @@ export async function listPublicSafetySources(key: string, options: RecordPageOp
   const { after, limit } = pagination(options)
   await authorizePublicSafetyIncident(key, 'view')
   return transaction(async tx => {
-    const { incident } = await requireIncidentAccess(key, 'view', tx)
+    const { incident } = await recordReadAccess(key, tx)
     // Metadata only: neither load nor serialize canonical source planes for a catalog.
     const fields = sourceFields.filter(field => field !== 'canonical_json')
     const rows = asRows<SourceRow>(await tx.selectFrom('public_safety_sources').select(fields).where('incident_id', '=', incident.id).where('created_sequence', '>', after).orderBy('created_sequence', 'asc').limit(limit + 1).execute())
@@ -145,7 +155,7 @@ export async function readPublicSafetyObservation(key: string, id: number): Prom
   rowId(id)
   await authorizePublicSafetyIncident(key, 'view')
   return transaction(async tx => {
-    await requireIncidentAccess(key, 'view', tx)
+    await recordReadAccess(key, tx)
     return observationProjection(await scopedObservation(tx, key, id))
   })
 }
@@ -153,7 +163,7 @@ export async function listPublicSafetyObservations(key: string, options: RecordP
   const { after, limit } = pagination(options)
   await authorizePublicSafetyIncident(key, 'view')
   return transaction(async tx => {
-    const { incident } = await requireIncidentAccess(key, 'view', tx)
+    const { incident } = await recordReadAccess(key, tx)
     const rows = asRows<ObservationRow>(await tx.selectFrom('public_safety_observations').innerJoin('public_safety_sources', 'public_safety_sources.id', '=', 'public_safety_observations.source_id').select([...observationFields.map(field => `public_safety_observations.${field}`), 'public_safety_sources.digest as source_digest']).where('public_safety_sources.incident_id', '=', incident.id).where('public_safety_observations.created_sequence', '>', after).orderBy('public_safety_observations.created_sequence', 'asc').limit(limit + 1).execute())
     return page(rows.map(observationProjection), after, limit)
   })
@@ -188,7 +198,7 @@ export async function listPublicSafetyReviews(key: string, observationId: number
   const { after, limit } = pagination(options)
   await authorizePublicSafetyIncident(key, 'view')
   return transaction(async tx => {
-    await requireIncidentAccess(key, 'view', tx)
+    await recordReadAccess(key, tx)
     const observation = await scopedObservation(tx, key, observationId)
     const rows = asRows<ReviewRow>(await tx.selectFrom('public_safety_reviews').selectAll().where('observation_id', '=', observation.id).where('created_sequence', '>', after).orderBy('created_sequence', 'asc').limit(limit + 1).execute())
     return page(rows.map(row => reviewProjection(row, observation)), after, limit)

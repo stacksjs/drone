@@ -33,3 +33,13 @@ test('native observation migrations preserve existing incident data and constrai
   }
   finally { await rm(directory, { recursive: true, force: true }) }
 }, 180000)
+
+// One byte-bound stress case exercises the canonical source interface without repeating maximum replay work.
+test('canonical source encoding accepts exactly 16 MiB and refuses one additional UTF-8 byte', async () => {
+  const { publicSafetyRecordingData } = await import('../../resources/functions/drone/public-safety/evidence')
+  // 4093 strings of length4096 plus a final5-byte string encode to exactly16777216 bytes.
+  const input = [...Array.from({ length: 4093 }, () => 'a'.repeat(4096)), 'aaaaa']
+  expect(new TextEncoder().encode(publicSafetyRecordingData(input)).length).toBe(16777216)
+  input[input.length - 1] += 'a'
+  expect(() => publicSafetyRecordingData(input)).toThrow('source exceeds 16 MiB')
+})
