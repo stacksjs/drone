@@ -32,6 +32,23 @@ bun run sitl --enable-sitl # 30-second local simulator experiment; read docs/sit
 ./buddy test
 ```
 
+## Owned incident collection
+
+The public-safety foundation executes a bounded incident sector through the owned survey runtime,
+collecting scoped visible and numeric synthetic thermal evidence. Link/battery observations enter
+the actual supervisor; incident revisions stop the accepted plan and require a new pilot decision.
+
+```sh
+./buddy public-safety:plan examples/public-safety.json
+./buddy public-safety:simulate --output /tmp/incident-collected
+./buddy public-safety:simulate --scenario link-loss
+./buddy public-safety:replay /tmp/incident-collected/recording.json --at-ms 600
+```
+
+The full coordinated workflow remains in progress under #23: authenticated incident roles,
+source-bound annotations/review, retention enforcement and two-phase team handover are still required.
+See [public-safety collection and remaining scope](docs/public-safety.md). Physical outputs are inhibited.
+
 ## Owned vehicle missions
 
 Open `/missions` to select quadcopter, fixed-wing, ground, surface or subsea simulation. One workspace shows

@@ -52,6 +52,9 @@ import ApplicationPlan from '../app/Commands/ApplicationPlan'
 import ApplicationSimulate from '../app/Commands/ApplicationSimulate'
 import ApplicationProcess from '../app/Commands/ApplicationProcess'
 import ApplicationReplay from '../app/Commands/ApplicationReplay'
+import PublicSafetyPlan from '../app/Commands/PublicSafetyPlan'
+import PublicSafetySimulate from '../app/Commands/PublicSafetySimulate'
+import PublicSafetyReplay from '../app/Commands/PublicSafetyReplay'
 
 const app = cli('drone')
 RuntimeBuild(app)
@@ -100,6 +103,9 @@ ApplicationPlan(app)
 ApplicationSimulate(app)
 ApplicationProcess(app)
 ApplicationReplay(app)
+PublicSafetyPlan(app)
+PublicSafetySimulate(app)
+PublicSafetyReplay(app)
 app.help()
 app.version('0.1.0')
 try { await app.parse(process.argv) }

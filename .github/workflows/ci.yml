@@ -154,6 +154,18 @@ jobs:
         working-directory: ${{ runner.temp }}
       - run: $GITHUB_WORKSPACE/storage/runtime-build/cli/drone application:simulate --mode apply --authorize-implement --scenario master-stuck
         working-directory: ${{ runner.temp }}
+      - run: $GITHUB_WORKSPACE/storage/runtime-build/cli/drone public-safety:plan "$GITHUB_WORKSPACE/examples/public-safety.json"
+        working-directory: ${{ runner.temp }}
+      - run: $GITHUB_WORKSPACE/storage/runtime-build/cli/drone public-safety:simulate --output "$RUNNER_TEMP/public-safety-collected"
+        working-directory: ${{ runner.temp }}
+      - run: $GITHUB_WORKSPACE/storage/runtime-build/cli/drone public-safety:replay "$RUNNER_TEMP/public-safety-collected/recording.json" --at-ms 600
+        working-directory: ${{ runner.temp }}
+      - run: $GITHUB_WORKSPACE/storage/runtime-build/cli/drone public-safety:simulate --purpose fire-observation --scenario link-loss
+        working-directory: ${{ runner.temp }}
+      - run: $GITHUB_WORKSPACE/storage/runtime-build/cli/drone public-safety:simulate --purpose disaster-assessment --scenario boundary-change
+        working-directory: ${{ runner.temp }}
+      - run: $GITHUB_WORKSPACE/storage/runtime-build/cli/drone public-safety:simulate --scenario wrong-ack
+        working-directory: ${{ runner.temp }}
   firmware:
     runs-on: ubuntu-latest
     steps:

@@ -109,12 +109,10 @@ export function simulateMission(options: { plan?: unknown, scenario?: MissionSce
     let supplied: MissionSimulationObservation = {}, instrumentInvalid = false
     try {
       const provider = options.instrument?.observation
-      if (provider !== undefined) {
-        const update = qualifiedObservation(synchronousResult(provider(nowMs)), nowMs, nominalBattery, previousObservation)
-        // Omission is not a new measurement and cannot restore a depleted resource or refresh its age.
-        supplied = qualifiedObservation({ ...previousObservation, ...update }, nowMs, 100, previousObservation)
-        previousObservation = supplied
-      }
+      const update = provider === undefined ? {} : qualifiedObservation(synchronousResult(provider(nowMs)), nowMs, nominalBattery, previousObservation)
+      // Omission or withdrawal is not a new measurement and cannot restore a resource or refresh its age.
+      supplied = qualifiedObservation({ ...previousObservation, ...update }, nowMs, 100, previousObservation)
+      previousObservation = supplied
     }
     catch { instrumentInvalid = true }
     const batteryPercent = instrumentInvalid ? 0 : Math.min(supplied.battery?.remainingPercent ?? nominalBattery, nominalBattery)

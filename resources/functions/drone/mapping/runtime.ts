@@ -21,6 +21,8 @@ export interface SurveySimulationOptions {
   config?: unknown
   scenario?: SurveyScenario
   seconds?: number
+  /** Actual raw IMU/position dropout onset on a 20 ms epoch; defaults preserve the original fixture. */
+  sensorLossAfterMs?: number
   /** Bound to the actual shutter request and every correlated ACK. */
   sessionId?: string
   cameraFactory?: (plan: SurveyPlan, fault: 'none' | 'loss' | 'wrong-ack') => SurveyCamera
@@ -60,6 +62,8 @@ export function compileSurveyMission(input: SurveyPlan): MissionPlan {
 /** Owned raw sensor, estimator, mission and quad physics collection. Camera truth never supplies a geotag. */
 export function simulateSurvey(options: SurveySimulationOptions = {}): SurveyRun {
   const scenario = options.scenario ?? 'nominal', seconds = options.seconds ?? 100
+  const sensorLossAfterMs = options.sensorLossAfterMs === undefined ? 7000 : options.sensorLossAfterMs
+  if (!Number.isSafeInteger(sensorLossAfterMs) || sensorLossAfterMs < 600 || sensorLossAfterMs > 120000 || sensorLossAfterMs % 20 !== 0) throw new RangeError('Invalid survey sensor loss onset (600..120000 ms on a 20 ms epoch)')
   const sessionId = options.sessionId === undefined ? 'mapping-session-1' : options.sessionId
   if (typeof sessionId !== 'string' || !/^[a-z][a-z0-9-]{0,63}$/.test(sessionId)) throw new TypeError('Invalid survey session identity')
   if (!surveyScenarios.includes(scenario) || !Number.isInteger(seconds) || seconds < 8 || seconds > 120) throw new RangeError('Invalid survey scenario or duration (8..120 seconds)')
@@ -77,7 +81,7 @@ export function simulateSurvey(options: SurveySimulationOptions = {}): SurveyRun
   const fail = (message: string): 'abort' => { reason ??= message; pending = null; camera.close(); return 'abort' }
   const instrument: MissionSimulationInstrument = {
     observation: options.observation,
-    dropSensors(nowMs) { return { imu: scenario === 'imu-loss' && nowMs >= 7000 && nowMs < 9000, position: scenario === 'position-loss' && nowMs >= 7000 && nowMs < 9000 } },
+    dropSensors(nowMs) { return { imu: scenario === 'imu-loss' && nowMs >= sensorLossAfterMs && nowMs < sensorLossAfterMs + 2000, position: scenario === 'position-loss' && nowMs >= sensorLossAfterMs && nowMs < sensorLossAfterMs + 2000 } },
     render: camera.render,
     observe(context) {
       const { nowMs, estimate, sensors, mission: state, authority } = context

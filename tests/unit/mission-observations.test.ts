@@ -1,6 +1,6 @@
 import { expect, test } from 'bun:test'
 import { simulateMission } from '../../resources/functions/drone/missions/simulation'
-import type { MissionSimulationObservation } from '../../resources/functions/drone/missions/simulation'
+import type { MissionSimulationInstrument, MissionSimulationObservation } from '../../resources/functions/drone/missions/simulation'
 
 // Public function seam: actual owned supervisor, engine and board outputs, without physical flight evidence.
 test('observed control-link loss reaches actual authority and neutral board at the same epoch', () => {
@@ -81,6 +81,28 @@ test('an omitted observation cannot erase an earlier resource constraint or refr
   expect(run.trace.rows.at(-1)!.observation.nowMs).toBe(1120)
   expect(run.mission.state).toBe('blocked')
   expect(run.board.motorsN).toEqual([0, 0, 0, 0])
+})
+
+test('withdrawing an observation provider cannot restore resources or refresh original sample clocks', () => {
+  for (const kind of ['battery', 'link'] as const) {
+    const seen: { atMs: number, battery: number, capturedAtMs: number }[] = []
+    const instrument: MissionSimulationInstrument = {
+      observation(nowMs) { return kind === 'battery' ? { battery: { capturedAtMs: nowMs, remainingPercent: 80 } } : { link: { capturedAtMs: nowMs, connected: true } } },
+      render() {},
+      observe(context) {
+        seen.push({ atMs: context.nowMs, battery: context.battery.remainingPercent, capturedAtMs: context[kind].capturedAtMs })
+        if (context.nowMs === 600) delete instrument.observation
+        return undefined
+      },
+    }
+    const run = simulateMission({ instrument })
+    expect(seen.find(row => row.atMs === 620)!.capturedAtMs).toBe(600)
+    if (kind === 'battery') expect(seen.find(row => row.atMs === 620)!.battery).toBe(80)
+    expect(run.trace.rows.at(-1)!.observation.nowMs).toBe(kind === 'battery' ? 1120 : 760)
+    expect(run.mission.state).toBe('blocked')
+    expect(run.authority.state).toBe('failsafe')
+    expect(run.board.motorsN).toEqual([0, 0, 0, 0])
+  }
 })
 
 test('instrument cancellation and callback failure take priority over scripted pause and recovery', () => {

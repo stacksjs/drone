@@ -65,6 +65,8 @@
     "./unit/raster-preview.test.ts",
     "./unit/modeled-shutter.test.ts",
     "../resources/functions/drone/application/**/*.ts",
-    "./unit/application-*.test.ts"
+    "./unit/application-*.test.ts",
+    "../resources/functions/drone/public-safety/**/*.ts",
+    "./unit/public-safety-*.test.ts"
   ]
 }

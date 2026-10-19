@@ -274,6 +274,20 @@ declare global {
   const payloadLimits: typeof autoImports.payloadLimits
   const PayloadCaptureError: typeof autoImports.PayloadCaptureError
   const rasterPreviewDataUri: typeof autoImports.rasterPreviewDataUri
+  const renderPublicSafetyImage: typeof autoImports.renderPublicSafetyImage
+  const createPublicSafetyCamera: typeof autoImports.createPublicSafetyCamera
+  const publicSafetyRecordingData: typeof autoImports.publicSafetyRecordingData
+  const validatePublicSafetyRun: typeof autoImports.validatePublicSafetyRun
+  const publicSafetyRecordingJson: typeof autoImports.publicSafetyRecordingJson
+  const parsePublicSafetyRecording: typeof autoImports.parsePublicSafetyRecording
+  const publicSafetyEvidenceLimits: typeof autoImports.publicSafetyEvidenceLimits
+  const writePublicSafetyDataset: typeof autoImports.writePublicSafetyDataset
+  const examplePublicSafetyConfig: typeof autoImports.examplePublicSafetyConfig
+  const publicSafetySegmentInside: typeof autoImports.publicSafetySegmentInside
+  const publicSafetySessionId: typeof autoImports.publicSafetySessionId
+  const planPublicSafetyMission: typeof autoImports.planPublicSafetyMission
+  const publicSafetyScenarios: typeof autoImports.publicSafetyScenarios
+  const simulatePublicSafety: typeof autoImports.simulatePublicSafety
   const runRuntimeBench: typeof autoImports.runRuntimeBench
   const runtimeBenchFaults: typeof autoImports.runtimeBenchFaults
   const buildRuntime: typeof autoImports.buildRuntime

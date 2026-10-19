@@ -74,6 +74,22 @@ test('survey rejects invalid session scope before constructing the camera', () =
   expect(constructed).toBe(false)
 })
 
+test('sensor loss onset is a bounded real epoch and omission preserves the existing survey profile', () => {
+  let constructed = false
+  for (const sensorLossAfterMs of [599, 601, 120020, -20, NaN, Infinity, null]) {
+    expect(() => simulateSurvey({ sensorLossAfterMs: sensorLossAfterMs as number, cameraFactory(plan, fault) { constructed = true; return createSurveyCamera(plan, fault) } })).toThrow('sensor loss')
+  }
+  expect(constructed).toBe(false)
+  const defaults = simulateSurvey({ scenario: 'position-loss' })
+  expect(defaults.trace.rows.at(-1)!.observation.nowMs).toBe(7120)
+  expect(defaults.captures).toHaveLength(0)
+  expect(defaults.boardNeutral).toBe(true)
+  const delayed = simulateSurvey({ scenario: 'position-loss', sensorLossAfterMs: 12000 })
+  expect(delayed.captures.length).toBeGreaterThan(0)
+  expect(delayed.trace.rows.at(-1)!.observation.nowMs).toBe(12120)
+  expect(delayed.boardNeutral).toBe(true)
+})
+
 test('asynchronous or malformed notification returns cannot silently continue an owned collection', () => {
   const asyncRun = simulateSurvey({ onCapture() { return Promise.reject(new Error('late capture failure')) } })
   expect(asyncRun.captures).toHaveLength(1)
