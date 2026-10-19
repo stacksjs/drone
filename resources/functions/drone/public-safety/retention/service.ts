@@ -38,7 +38,7 @@ function scopeProjection(scope: ScopeRow, access: Access): RetentionScopeProject
     reviewOverdue: (scope.hold_state === 'held' || scope.hold_state === 'pending-review') && scope.review_due_at !== null && Date.parse(scope.review_due_at) <= Date.now(),
     caseReference: scope.case_reference, reviewDueAt: scope.review_due_at, reviewerUserId: scope.reviewer_user_id, reviewedAt: scope.reviewed_at_iso,
     enrolledByUserId: scope.enrolled_by_user_id, enrolledAt: scope.enrolled_at_iso,
-    capabilities: { canManageHold: true, canRevokeMembers: access.member.role === 'coordinator' && access.member.user_id === access.incident.coordinator_id }, ...flags,
+    capabilities: { canManageHold: access.principal.canCoordinate, canRevokeMembers: access.principal.canCoordinate && access.member.role === 'coordinator' && access.member.user_id === access.incident.coordinator_id }, ...flags,
   }
 }
 function eventProjection(row: EventRow): RetentionEventProjection {

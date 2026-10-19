@@ -26,5 +26,5 @@ export async function requirePublicSafetyPrincipal(scope: 'read' | 'coordinate',
   if (!has('public-safety:access') || creating && !has('public-safety:create')) throw new PublicSafetyAccessError(403, 'Incident platform permission is required')
   const gateUser = withRbac(user)
   // Native Gate's legacy user declaration has an open unknown-field index; retain the real authenticated instance.
-  return { userId, tokenId: token.id, user: gateUser as typeof gateUser & Record<string, unknown> }
+  return { userId, tokenId: token.id, canCoordinate: token.scopes.includes('*') || token.scopes.includes('public-safety:coordinate'), user: gateUser as typeof gateUser & Record<string, unknown> }
 }
