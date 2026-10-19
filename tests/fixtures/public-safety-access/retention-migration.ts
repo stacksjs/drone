@@ -97,13 +97,20 @@ else if (mode === 'seed' || mode === 'upgrade') {
       const before = JSON.parse(readFileSync(evidence, 'utf8')) as { rows: Record<string, unknown[]>, ledger: { migration: string }[], token: string, digest: string, observation: number, review: unknown, projection: Awaited<ReturnType<typeof projection>> }
       const oldCorpus = new Set(await readdir(join(archive, 'database/migrations')))
       // The native runner selects active models; unrelated default SQL in the corpus is not pending.
-      // Include the two genuinely deferred old files plus actual new committed corpus additions.
-      const pending = (await readdir(join(root, 'database/migrations'))).filter(name => name.endsWith('.sql') && (!oldCorpus.has(name) || /^178948669857[01]-/.test(name)) && !before.ledger.some(entry => entry.migration === name)).sort()
+      // Include the genuinely deferred old files plus actual new committed corpus additions.
+      const deferred = new Set(await readdir(join(root, 'pending-custody-migrations')))
+      const pending = (await readdir(join(root, 'database/migrations'))).filter(name => name.endsWith('.sql') && (!oldCorpus.has(name) || deferred.has(name)) && !before.ledger.some(entry => entry.migration === name)).sort()
       assert(pending.some(name => /^1789486698570-/.test(name)))
       assert(pending.some(name => /^1789486698571-/.test(name)))
       assert(pending.some(name => /^1789486698578-/.test(name)))
+      assert(pending.includes('1789486698579-auto-misc.sql'), 'Actual handover audit rebuild must apply to this historical schema')
       const migrated = await database.runDatabaseMigration(); if (migrated.isErr) throw migrated.error
-      assert.deepEqual(Object.fromEntries(await Promise.all(tables.map(async table => [table, await database.db.primary.selectFrom(table).selectAll().orderBy('id', 'asc').execute()]))), before.rows, 'Every historical row ID and value survives actual custody+C migration')
+      const preserved = Object.fromEntries(await Promise.all(tables.map(async table => {
+        const rows = await database.db.primary.selectFrom(table).selectAll().orderBy('id', 'asc').execute() as Record<string, unknown>[]
+        if (table === 'public_safety_audits') for (const row of rows) for (const field of ['handover_key', 'handover_step', 'handover_assignment_version', 'request_id', 'request_digest']) { assert.equal(row[field], null, `${field} must remain NULL on historical audit rows`); delete row[field] }
+        return [table, rows]
+      })))
+      assert.deepEqual(preserved, before.rows, 'Every historical row ID and value survives actual custody+C+handover migration')
       const ledger = await database.db.unsafe('SELECT * FROM migrations ORDER BY id') as { migration: string }[]
       assert.deepEqual(ledger.slice(0, before.ledger.length), before.ledger)
       assert.deepEqual(ledger.slice(before.ledger.length).map(entry => entry.migration).sort(), pending, 'Actual pending SQL names match the real native ledger additions')

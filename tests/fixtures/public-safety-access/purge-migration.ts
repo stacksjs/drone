@@ -109,11 +109,15 @@ else if (mode === 'upgrade') {
   // A fresh process gives the native registry the actual current C model definitions.
   const { database } = await setupIncidentDatabase({ reuseDatabase: true })
   try {
-    const before = JSON.parse(readFileSync(beforePath, 'utf8')) as { rows: Record<string, Record<string, unknown>[]>, tree: ReturnType<typeof tree>, ledger: { id: number, name: string }[] }
+    const before = JSON.parse(readFileSync(beforePath, 'utf8')) as { rows: Record<string, Record<string, unknown>[]>, tree: ReturnType<typeof tree>, ledger: { id: number, migration: string }[] }
+    const oldCorpus = new Set(readdirSync(join(archive, 'database/migrations')))
+    const pending = readdirSync(join(root, 'database/migrations')).filter(name => name.endsWith('.sql') && !oldCorpus.has(name) && !before.ledger.some(entry => entry.migration === name)).sort()
+    assert(pending.includes('1789486698579-auto-misc.sql'), 'Actual handover audit rebuild must apply to this historical schema')
     const migration = await database.runDatabaseMigration(); if (migration.isErr) throw migration.error
     for (const table of oldTables) {
       const rows = await database.db.primary.selectFrom(table).selectAll().orderBy('id', 'asc').execute() as Record<string, unknown>[]
       if (table === 'public_safety_retention_scopes') for (const row of rows) { assert.equal(row.freeze_state, 'retained'); delete row.freeze_state }
+      if (table === 'public_safety_audits') for (const row of rows) for (const field of ['handover_key', 'handover_step', 'handover_assignment_version', 'request_id', 'request_digest']) { assert.equal(row[field], null, `${field} must remain NULL on historical audit rows`); delete row[field] }
       assert.deepEqual(rows, before.rows[table], `${table} identity and every old value must survive native C migration`)
     }
     assert.deepEqual(tree(), before.tree, 'Migration must preserve exact registered and unregistered filesystem identities and bytes')
@@ -145,12 +149,13 @@ else if (mode === 'upgrade') {
     for (const table of oldTables) {
       const rows = await database.db.primary.selectFrom(table).selectAll().orderBy('id', 'asc').execute() as Record<string, unknown>[]
       if (table === 'public_safety_retention_scopes') for (const row of rows) { assert.equal(row.freeze_state, 'retained'); delete row.freeze_state }
+      if (table === 'public_safety_audits') for (const row of rows) for (const field of ['handover_key', 'handover_step', 'handover_assignment_version', 'request_id', 'request_digest']) { assert.equal(row[field], null, `${field} must remain NULL on historical audit rows`); delete row[field] }
       assert.deepEqual(rows, before.rows[table], 'Native rollback preserves every old row after SET NULL/nullable/freeze probes')
     }
     assert.deepEqual(await database.db.unsafe('PRAGMA foreign_key_check'), [])
-    const ledger = await database.db.unsafe('SELECT * FROM migrations ORDER BY id') as { id: number, name: string }[]
+    const ledger = await database.db.unsafe('SELECT * FROM migrations ORDER BY id') as { id: number, migration: string }[]
     assert.deepEqual(ledger.slice(0, before.ledger.length), before.ledger)
-    assert.equal(ledger.length - before.ledger.length, 4)
+    assert.deepEqual(ledger.slice(before.ledger.length).map(entry => entry.migration).sort(), pending, 'Exact new corpus SQL names match actual native ledger additions')
     const snapshot = readFileSync(join(root, snapshotPath), 'utf8'), files = readdirSync(join(root, 'database/migrations')).sort()
     assert.equal(snapshot, readFileSync(join(source, snapshotPath), 'utf8'))
     for (let pass = 0; pass < 2; pass++) {

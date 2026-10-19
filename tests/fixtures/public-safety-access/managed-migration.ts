@@ -71,12 +71,21 @@ else if (mode === 'upgrade') {
   assert.equal(process.env.MANAGED_OLD_SCHEMA, '0')
   const { database, as, managed, retention } = await import('./managed-context')
   try {
-    const before = JSON.parse(readFileSync(evidence, 'utf8')) as { rows: Record<string, unknown[]>, ledger: unknown[], token: string, sourceDigest: string }
+    const before = JSON.parse(readFileSync(evidence, 'utf8')) as { rows: Record<string, unknown[]>, ledger: { migration: string }[], token: string, sourceDigest: string }
+    const oldCorpus = new Set(await readdir(join(archive, 'database/migrations')))
+    const deferred = new Set(await readdir(join(root, 'pending-managed-migrations')))
+    const pending = (await readdir(join(root, 'database/migrations'))).filter(name => name.endsWith('.sql') && (!oldCorpus.has(name) || deferred.has(name)) && !before.ledger.some(entry => entry.migration === name)).sort()
+    assert(pending.includes('1789486698579-auto-misc.sql'), 'Actual handover audit rebuild must apply to this historical schema')
     const result = await database.runDatabaseMigration(); if (result.isErr) throw result.error
-    assert.deepEqual(Object.fromEntries(await Promise.all(tables.map(async table => [table, await database.db.primary.selectFrom(table).selectAll().orderBy('id', 'asc').execute()]))), before.rows, 'Actual B+C upgrade preserves all historical row IDs and values')
-    const ledger = await database.db.unsafe('SELECT * FROM migrations ORDER BY id')
+    const preserved = Object.fromEntries(await Promise.all(tables.map(async table => {
+      const rows = await database.db.primary.selectFrom(table).selectAll().orderBy('id', 'asc').execute() as Record<string, unknown>[]
+      if (table === 'public_safety_audits') for (const row of rows) for (const field of ['handover_key', 'handover_step', 'handover_assignment_version', 'request_id', 'request_digest']) { assert.equal(row[field], null, `${field} must remain NULL on historical audit rows`); delete row[field] }
+      return [table, rows]
+    })))
+    assert.deepEqual(preserved, before.rows, 'Actual B+C+handover upgrade preserves all historical row IDs and values')
+    const ledger = await database.db.unsafe('SELECT * FROM migrations ORDER BY id') as { migration: string }[]
     assert.deepEqual(ledger.slice(0, before.ledger.length), before.ledger)
-    assert.equal(ledger.length - before.ledger.length, 7, 'All three B and four C pending generated migrations actually apply')
+    assert.deepEqual(ledger.slice(before.ledger.length).map(entry => entry.migration).sort(), pending, 'Exact deferred B and new corpus SQL names match actual native ledger additions')
     assert.deepEqual(await database.db.unsafe('PRAGMA foreign_key_check'), [])
     assert.deepEqual(await database.db.unsafe('PRAGMA integrity_check'), [{ integrity_check: 'ok' }])
     assert.deepEqual(await database.db.unsafe('PRAGMA foreign_keys'), [{ foreign_keys: 1 }])
