@@ -40,6 +40,15 @@ test.skipIf(process.env.PUBLIC_SAFETY_PURGE_NAMESPACE_TEST !== '1')('accepted pu
   expect(result.stdout).toContain('FK-safe units before public key reuse')
 }, 180000)
 
+test.skipIf(process.env.PUBLIC_SAFETY_PURGE_NAMESPACE_TEST !== '1')('accepted purge freezes actual mixed public writes and canonical retries', async () => {
+  requireQualifiedNamespace()
+  const { runPurgeQualificationFixture } = await import('../helpers/public-safety-purge-fixture')
+  const { code, stdout, stderr } = await runPurgeQualificationFixture('purge-mixed', 165000)
+  expect(code, `${stdout}\n${stderr}`).toBe(0)
+  expect(stdout).toContain('PASS actual mixed public source records member hold managed changes require fresh purge consent and freeze defeats controlled clock rollback')
+  expect(stdout).toContain('PASS actual canonical reordered duplicate retry replays one committed human event and stale new operation refuses')
+}, 180000)
+
 test.skipIf(process.env.PUBLIC_SAFETY_PURGE_NAMESPACE_TEST !== '1')('accepted purge recovers genuine SIGKILL after namespace unlink', async () => {
   requireQualifiedNamespace()
   await qualifyPurgeProcessRecovery()
