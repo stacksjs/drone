@@ -223,7 +223,7 @@ function result(slot: ExecutionSlot, message: Extract<ExecutionWorkerMessage, { 
   try {
     const bytes = new Uint8Array(message.buffer)
     if (executionDigest(bytes) !== message.digest) throw new TypeError('Execution digest mismatch')
-    const recording = new TextDecoder('utf-8', { fatal: true }).decode(bytes)
+    const recording = new TextDecoder('utf-8', { fatal: true, ignoreBOM: true }).decode(bytes)
     // Full unchanged canonical validator/replay is deliberately retained in the parent.
     // Native authority is rechecked after this synchronous work and after finished ACK.
     const run = validatePublicSafetyRun(JSON.parse(recording))
