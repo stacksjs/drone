@@ -25,6 +25,8 @@ try {
   assert.equal(access.accountId, f.sender.id)
   assert.equal(access.scope, desk.scope)
   assert.equal(access.deadline, Date.parse(desk.availableUntil))
+  await assert.rejects(() => f.as(f.senderToken, () => readIncidentWorkspace(seeded.key, { sourceDigest: `${seeded.source.digest}\n` })), f.status(422))
+  await assert.rejects(() => f.as(f.senderToken, () => readWorkspaceAccess(seeded.key, `${desk.scope}\n`)), f.status(422))
   await f.as(f.recipientToken, async () => {
     const recipient = await readIncidentWorkspace(seeded.key)
     assert.equal(recipient.selected, null)
