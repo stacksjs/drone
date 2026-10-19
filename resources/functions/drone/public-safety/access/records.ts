@@ -89,7 +89,19 @@ async function unchangedSource(tx: TransactionHandle, key: string, staged: Sourc
   matchConfig(run, incident)
 }
 
+type RegistrationCheck = (tx: TransactionHandle, access: Awaited<ReturnType<typeof requireIncidentAccess>>) => Promise<number>
+
 export async function registerPublicSafetySource(key: string, input: unknown): Promise<SourceRegistration> {
+  return registerSource(key, input)
+}
+/** Trusted application-only precondition on the sole writer's actual mutation handle.
+ * The returned finite deadline applies before writing and after the actual COMMIT.
+ * This seam is intentionally absent from public barrels, routes and input schemas.
+ */
+export async function registerPublicSafetySourceChecked(key: string, input: unknown, check: RegistrationCheck): Promise<SourceRegistration> {
+  return registerSource(key, input, check)
+}
+async function registerSource(key: string, input: unknown, check?: RegistrationCheck): Promise<SourceRegistration> {
   const body = exactRecord(input, ['expectedVersion', 'recording']), expected = expectedVersion(body.expectedVersion)
   await authorizePublicSafetyIncident(key, 'source-register')
   let run: PublicSafetyRun, canonical: string
@@ -98,12 +110,29 @@ export async function registerPublicSafetySource(key: string, input: unknown): P
   const hash = digestOf(canonical), byteLength = bytes(canonical)
   return mutation(key, 'source-register', expected, async (tx, access) => {
     matchConfig(run, access.incident, true)
+    let deadline: number | undefined
+    if (check) {
+      const checkedDeadline = await check(tx, access)
+      if (!Number.isFinite(checkedDeadline) || checkedDeadline <= Date.now()) throw new PublicSafetyAccessError(404, 'Incident is unavailable')
+      deadline = Math.min(checkedDeadline, access.principal.tokenDeadline, Date.parse(access.incident.retain_until))
+      if (deadline <= Date.now()) throw new PublicSafetyAccessError(404, 'Incident is unavailable')
+    }
     if (await tx.selectFrom('public_safety_sources').select('id').where('incident_id', '=', access.incident.id).where('digest', '=', hash).executeTakeFirst()) throw new PublicSafetyAccessError(409, 'Incident source already exists')
     const incident = await advance(tx, access.incident), at = new Date().toISOString()
     await tx.insertInto('public_safety_sources').values({ incident_id: incident.id, digest: hash, byte_length: byteLength, canonical_json: canonical, replay_profile: run.replayProfile, evidence: run.evidence, uploader_id: access.principal.userId, uploaded_at_iso: at, created_sequence: incident.version, created_at: at, updated_at: at }).execute()
     const source = await scopedSource(tx, key, hash)
     await audit(tx, incident, access.principal.userId, 'source-registered', null, { sourceId: source.id, sourceDigest: hash })
-    return { incident: projection(incident, access.member), source: sourceProjection(source) }
+    const result = { incident: projection(incident, access.member), source: sourceProjection(source) }
+    if (deadline !== undefined) {
+      // Only our validated projection tree is traversed, never caller-owned input.
+      const release = (value: unknown) => {
+        if (!value || typeof value !== 'object') return
+        associateIncidentDeadline(value, deadline)
+        for (const nested of Object.values(value)) release(nested)
+      }
+      release(result)
+    }
+    return result
   })
 }
 export async function readPublicSafetySource(key: string, hash: string): Promise<SourceRead> {
