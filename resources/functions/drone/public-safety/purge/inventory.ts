@@ -18,7 +18,7 @@ export const inventoryFields: Record<InventoryGroup, string[]> = {
   observations: ['id', 'source_id', 'capture_id', 'modality', 'pixel_x', 'pixel_y', 'actor_id', 'observed_at_iso', 'created_sequence'],
   reviews: ['id', 'observation_id', 'previous_review_id', 'disposition', 'actor_id', 'reviewed_at_iso', 'created_sequence'],
   audits: ['id', 'incident_id', 'sequence', 'actor_id', 'action', 'target_user_id', 'at_iso'],
-  nonCustodyMemberships: ['id', 'incident_id', 'user_id', 'role', 'active', 'version'],
+  nonCustodyMemberships: ['id', 'incident_id', 'user_id', 'role'],
   managedArtifacts: ['id', 'artifact_key', 'incident_id', 'retention_scope_id', 'source_id', 'source_digest', 'source_byte_length', 'source_created_sequence', 'config_digest', 'version', 'generation', 'state', 'planned_root_json', 'target_path', 'receipt_json', 'plan_digest', 'file_count', 'total_planned_bytes', 'manifest_sha256'],
   managedFiles: ['id', 'artifact_id', 'ordinal', 'relative_path', 'role', 'planned_bytes', 'sha256', 'identity_json'],
   managedEvents: ['id', 'artifact_id', 'sequence', 'incident_version', 'action', 'actor_user_id', 'at_iso', 'request_id', 'request_digest', 'step', 'outcome_code'],

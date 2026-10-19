@@ -1,13 +1,16 @@
 import assert from 'node:assert/strict'
 import { randomUUID } from 'node:crypto'
 import { existsSync, readFileSync, readdirSync, writeFileSync, mkdirSync } from 'node:fs'
-import { join } from 'node:path'
+import { mkdir, symlink } from 'node:fs/promises'
+import { join, resolve } from 'node:path'
 import { actor, as, seed, database, root, retention, records, managed, access, status } from './managed-context'
 import { purgeAbilities, purgeCoverage, purgeExclusions, purgePolicy } from '../../../resources/functions/drone/public-safety/purge/types'
 const { publicSafetyPurgeGate } = await import('../../../resources/functions/drone/public-safety/purge/policy')
 import { inspectTemporaryWorkspace } from '../../../resources/functions/artifacts/native-storage/temporary-workspaces'
 const purge = await import('../../../resources/functions/drone/public-safety/purge/service')
 const job = (await import('../../../app/Jobs/PublicSafetyPurgeSweep')).default
+await mkdir(join(root, 'app/Jobs'), { recursive: true })
+await symlink(resolve(import.meta.dir, '../../../app/Jobs/PublicSafetyPurgeSweep.ts'), join(root, 'app/Jobs/PublicSafetyPurgeSweep.ts'))
 const { Gate } = await import('@stacksjs/auth/gate')
 for (const ability of purgeAbilities) Gate.define(`public-safety:purge-${ability}`, (user, key) => publicSafetyPurgeGate(user, key, ability))
 const positive = process.argv.includes('--require-positive')
@@ -28,9 +31,12 @@ try {
     let preview = await purge.previewPublicSafetyPurge('purge-tracer')
     assert.equal(preview.executorEnabled, false); assert.equal(preview.existingPurgeKey, null)
     await assert.rejects(() => job.dispatchNow(undefined), status(409))
+    await assert.rejects(() => import('@stacksjs/queue').then(queue => queue.runJob('PublicSafetyPurgeSweep', { payload: {} })), status(409))
     assert(existsSync(join(tree, 'manifest.json')))
     const disabledBody = { expectedVersion: preview.incidentVersion, expectedRetentionVersion: preview.retentionVersion, policyVersion: purgePolicy, coverage: purgeCoverage, inventoryDigest: preview.inventoryDigest, exclusions: purgeExclusions, receiptRetentionDays: 1, requestId: randomUUID() }
     await assert.rejects(() => purge.acceptPublicSafetyPurge('purge-tracer', disabledBody), status(409))
+    await assert.rejects(() => purge.acceptPublicSafetyPurge('purge-tracer', { ...disabledBody, requestId: `${disabledBody.requestId}\n` }), status(422))
+    await assert.rejects(() => purge.acceptPublicSafetyPurge('purge-tracer', { ...disabledBody, inventoryDigest: `${disabledBody.inventoryDigest}\n` }), status(422))
     const wait = Date.parse(setup.config.retention.expiresAt) - Date.now() + 20
     if (wait > 0) await new Promise(resolve => setTimeout(resolve, wait))
     process.env.PUBLIC_SAFETY_PURGE_ENABLED = 'true'
@@ -38,6 +44,8 @@ try {
     assert.equal(preview.reason, 'eligible'); assert.equal(preview.inventoryKind, 'current-preview')
     const body = { ...disabledBody, inventoryDigest: preview.inventoryDigest }
     const accepted = await purge.acceptPublicSafetyPurge('purge-tracer', body)
+    await assert.rejects(() => purge.readPublicSafetyPurge('purge-tracer', `${accepted.purge.purgeKey}\n`), status(422))
+    await assert.rejects(() => purge.retryPublicSafetyPurge('purge-tracer', accepted.purge.purgeKey, { expectedPurgeVersion: 1, expectedRetentionVersion: 2, requestId: `${randomUUID()}\n` }), status(422))
     assert.equal(accepted.purge.state, 'building'); assert.equal(accepted.purge.contentDeletionPerformed, false)
     assert.equal((await purge.acceptPublicSafetyPurge('purge-tracer', Object.fromEntries(Object.entries({ ...body, exclusions: Object.fromEntries(Object.entries(body.exclusions).reverse()) }).reverse()))).replayed, true)
     assert.equal((await purge.previewPublicSafetyPurge('purge-tracer')).inventoryKind, 'accepted-frozen')
@@ -69,6 +77,23 @@ try {
       }
       finally { const unmounted = Bun.spawnSync(['umount', target], { stdout: 'pipe', stderr: 'pipe' }); assert.equal(unmounted.exitCode, 0, unmounted.stderr.toString()) }
       await purge.retryPublicSafetyPurge('purge-tracer', state.purgeKey, { expectedPurgeVersion: state.version, expectedRetentionVersion: state.retentionVersion, requestId: randomUUID() })
+      state = await purge.readPublicSafetyPurge('purge-tracer', state.purgeKey)
+      const image = readdirSync(target).find(name => name.endsWith('.png'))!
+      assert(image)
+      const originalImage = readFileSync(join(target, image))
+      const foreignMounted = Bun.spawnSync(['mount', '--bind', foreign, target], { stdout: 'pipe', stderr: 'pipe' })
+      assert.equal(foreignMounted.exitCode, 0, foreignMounted.stderr.toString())
+      try {
+        assert.equal(inspectTemporaryWorkspace(tree).reason, 'mounted')
+        await job.dispatchNow({ purgeKey: state.purgeKey }); state = await purge.readPublicSafetyPurge('purge-tracer', state.purgeKey)
+        assert.equal(state.state, 'blocked'); assert.equal(state.completed.namesUnlinked, 0)
+        assert.equal(readFileSync(join(target, 'sentinel'), 'utf8'), 'foreign-mount-fragment')
+        assert.equal(readFileSync(join(foreign, 'sentinel'), 'utf8'), 'foreign-mount-fragment')
+      }
+      finally { const unmounted = Bun.spawnSync(['umount', target], { stdout: 'pipe', stderr: 'pipe' }); assert.equal(unmounted.exitCode, 0, unmounted.stderr.toString()) }
+      assert.deepEqual(readFileSync(join(target, image)), originalImage)
+      await purge.retryPublicSafetyPurge('purge-tracer', state.purgeKey, { expectedPurgeVersion: state.version, expectedRetentionVersion: state.retentionVersion, requestId: randomUUID() })
+      console.log('PASS actual foreign bind mounted sentinel and registered image bytes preserved across refusal and unmount')
       console.log('PASS actual namespace process reference and bind mount preserve accepted files before positive execution')
     }
     const inspected = inspectTemporaryWorkspace(tree)
