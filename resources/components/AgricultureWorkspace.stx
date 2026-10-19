@@ -1,0 +1,116 @@
+<script client>
+import type { AgricultureCalibratedImage, AgricultureLayer, AgricultureRun, AgricultureScenario, LivestockObservation } from '../functions/drone/agriculture/types'
+import { agricultureScenarios, simulateAgriculture } from '../functions/drone/agriculture/runtime'
+import { processAgriculture } from '../functions/drone/agriculture/layer'
+import { calibrateAgricultureImage } from '../functions/drone/agriculture/radiometry'
+import { createLivestockObservation } from '../functions/drone/agriculture/evidence'
+import { agricultureImagePreview, agricultureLayerPreview } from '../functions/drone/agriculture/presentation'
+const scenario = state<AgricultureScenario>('nominal')
+const run = state<AgricultureRun | null>(null)
+const layer = state<AgricultureLayer | null>(null)
+const captureId = state('')
+const mode = state<'visible' | 'ndvi'>('visible')
+const busy = state(false)
+const binding = state(false)
+const epoch = state(0)
+const error = state('')
+const row = state(0)
+const column = state(0)
+const pixelX = state(48)
+const pixelY = state(36)
+const animalId = state('')
+const observerId = state('')
+const note = state('')
+const observations = state<LivestockObservation[]>([])
+const frame = derived(() => run()?.captures.find(c => c.captureId === captureId()) ?? null)
+const source = derived(() => run()?.survey.captures.find(c => c.id === captureId()) ?? null)
+const calibrated = derived<AgricultureCalibratedImage | null>(() => frame() && run() ? calibrateAgricultureImage(run()!.plan.config.radiometry, frame()!.image, frame()!.capturedAtMs) : null)
+const preview = derived(() => frame() && calibrated() ? agricultureImagePreview(frame()!, calibrated()!, mode()) : '')
+const mapPreview = derived(() => layer() ? agricultureLayerPreview(layer()!) : '')
+const cell = derived(() => {
+  const data = layer(), r = Number(row()), c = Number(column())
+  return data && Number.isInteger(r) && Number.isInteger(c) && r >= 0 && c >= 0 && r < data.grid.rows && c < data.grid.columns ? data.cells[r * data.grid.columns + c] ?? null : null
+})
+const selectedObservations = derived(() => observations().filter(o => o.visitId === run()?.visitId && o.captureId === captureId()))
+const selectedIndex = derived(() => {
+  const f = frame(), x = Number(pixelX()), y = Number(pixelY())
+  return f && Number.isInteger(x) && Number.isInteger(y) && x >= 0 && y >= 0 && x < f.image.width && y < f.image.height ? y * f.image.width + x : null
+})
+function quantity(value: number | null | undefined, digits = 3) { return value === null || value === undefined ? 'unavailable' : value.toFixed(digits) }
+function selectedBand(band: 'red' | 'nir') {
+  const f = frame(), index = selectedIndex(), data = calibrated(), raw = f?.image.bands.find(b => b.band === band)
+  return { dn: index === null || !raw ? 'unavailable' : String(raw.counts[index]), reflectance: index === null || !data?.valid[index] ? 'nodata' : quantity(data[band][index]), irradiance: quantity(raw?.irradiance.valueWm2Nm), atMs: raw?.capturedAtMs ?? null }
+}
+function clear() { pending.stop(); epoch.update(n => n + 1); run.set(null); layer.set(null); captureId.set(''); busy.set(false); binding.set(false); error.set(''); observations.set([]); animalId.set(''); observerId.set(''); note.set(''); row.set(0); column.set(0) }
+const pending = useTimeout(() => {
+  try {
+    const result = simulateAgriculture({ scenario: scenario() })
+    const resultLayer = processAgriculture(result)
+    run.set(result); layer.set(resultLayer); captureId.set(result.captures[0]?.captureId ?? '')
+    const first = resultLayer.cells.findIndex(c => c.ndvi !== null)
+    if (first >= 0) { row.set(Math.floor(first / resultLayer.grid.columns)); column.set(first % resultLayer.grid.columns) }
+  }
+  catch (failure) { error.set(failure instanceof Error ? failure.message : 'Agriculture analysis failed') }
+  finally { busy.set(false) }
+}, 32)
+pending.stop()
+onDestroy(() => { pending.stop(); epoch.update(n => n + 1) })
+effect(() => { scenario(); clear() })
+effect(() => { const f = frame(); if (f) { pixelX.set(Math.floor(f.image.width / 2)); pixelY.set(Math.floor(f.image.height / 2)); animalId.set(''); note.set('') } })
+function execute() { clear(); busy.set(true); pending.start() }
+async function observeAnimal() {
+  const current = run(), selected = frame(), context = epoch()
+  if (!current || !selected || busy() || binding()) return
+  if (observations().length >= 64) { error.set('This session has reached its 64 observation limit'); return }
+  binding.set(true); error.set('')
+  try {
+    const observation = await createLivestockObservation(current, { id: `observation-${observations().length + 1}`, animalId: animalId(), captureId: selected.captureId, pixel: [Number(pixelX()), Number(pixelY())], observerId: observerId(), observedAt: new Date().toISOString(), note: note() })
+    if (epoch() === context) { observations.update(items => [...items, observation]); note.set('') }
+  }
+  catch (failure) { if (epoch() === context) error.set(failure instanceof Error ? failure.message : 'Observation failed') }
+  finally { if (epoch() === context) binding.set(false) }
+}
+</script>
+<template>
+  <section aria-labelledby="agriculture-title" :aria-busy="busy()">
+    <h1 id="agriculture-title" class="font-semibold text-3xl tracking-tight">Field observations</h1>
+    <p class="mt-3 max-w-3xl leading-relaxed text-neutral-400">Fly an owned scouting route, inspect calibrated red/NIR measurements and record an explicitly selected animal observation.</p>
+    <p class="mt-3 text-emerald-200 text-sm">Owned physics and synthetic field imagery. Physical calibration, crop interpretation and animal identity remain unverified.</p>
+    <div class="flex flex-wrap gap-4 items-end mt-8">
+      <div class="min-w-0"><label for="agriculture-scenario" class="block mb-2 text-sm">Scouting scenario</label><select id="agriculture-scenario" x-model="scenario" class="px-3 py-3 max-w-full text-neutral-100 bg-neutral-900 border border-neutral-600 rounded focus-visible:outline-emerald-200"><option :for="name in agricultureScenarios" :value="name">{{ name }}</option></select></div>
+      <button type="button" @click="execute()" :disabled="busy() || binding()" class="px-4 py-3 font-medium text-neutral-950 bg-emerald-200 rounded focus-visible:outline-emerald-200 focus-visible:outline-offset-4 disabled:opacity-50">{{ busy() ? 'Collecting…' : 'Run scouting route' }}</button>
+      <button type="button" @click="clear()" class="px-4 py-3 text-sm border border-neutral-600 rounded focus-visible:outline-emerald-200 focus-visible:outline-offset-4">Clear field observations</button>
+    </div>
+    <p :if="busy()" role="status" class="mt-5 text-emerald-200 text-sm">Running the owned sensor, estimator, mission, authority, raw-band capture and field processing sequence.</p>
+    <p :if="error()" role="alert" class="mt-5 p-4 break-words text-red-200 border border-red-400 rounded">{{ error() }}</p>
+    <p :if="!run() && !busy()" class="mt-7 py-5 text-neutral-400 border-neutral-700 border-t">No field visit yet. Choose a scenario to collect its measurements.</p>
+    <div :if="run() && layer()" class="mt-9">
+      <p class="break-words font-mono text-emerald-200 text-sm" data-agriculture-status>{{ run()?.status }} / {{ run()?.reason }}</p>
+      <dl class="grid gap-5 sm:grid-cols-2 lg:grid-cols-4 mt-6 text-sm">
+        <div><dt class="text-neutral-400">Acknowledged captures</dt><dd class="mt-2 font-mono" data-agriculture-captures>{{ run()?.captures.length }}</dd></div>
+        <div><dt class="text-neutral-400">Observed / field support</dt><dd class="mt-2 font-mono">{{ quantity(layer()?.observedAreaM2) }} / {{ quantity(layer()?.fieldAreaM2) }} m²</dd></div>
+        <div><dt class="text-neutral-400">Area-weighted sample NDVI</dt><dd class="mt-2 font-mono" data-agriculture-mean>{{ quantity(layer()?.meanNdvi) }}</dd></div>
+        <div><dt class="text-neutral-400">Independent modeled board</dt><dd class="mt-2">{{ run()?.survey.boardNeutral ? 'neutral' : 'not neutral' }}</dd></div>
+      </dl>
+      <section aria-labelledby="agriculture-map" class="grid gap-8 lg:grid-cols-2 mt-9 pt-6 border-neutral-700 border-t">
+        <div class="min-w-0"><h2 id="agriculture-map" class="font-semibold text-lg">Field sampling layer</h2><div class="overflow-hidden relative mt-4 bg-neutral-900 border border-neutral-700 rounded"><img :src="mapPreview()" :width="layer()?.grid.columns" :height="layer()?.grid.rows" alt="NDVI calculated from acknowledged calibrated red and near-infrared field samples, with grey nodata" class="block h-auto w-full [image-rendering:pixelated]"><svg :viewBox="'0 0 ' + layer()?.grid.columns + ' ' + layer()?.grid.rows" aria-hidden="true" class="absolute inset-0 h-full w-full pointer-events-none"><rect :x="Number(column())" :y="Number(row())" width="1" height="1" fill="none" stroke="#ffffff" stroke-width="0.08"/></svg></div><p class="mt-3 leading-relaxed text-neutral-400 text-xs">North is up. Colour uses one fixed NDVI scale from -1 to +1; grey is missing support. Each cell samples a qualified source pixel through estimated pose. This is not a reconstructed orthomosaic or a crop diagnosis.</p></div>
+        <div class="min-w-0"><h2 class="font-semibold text-lg">Inspect a grid sample</h2><div class="grid gap-4 grid-cols-2 mt-5"><div><label for="agriculture-row" class="block mb-2 text-sm">Grid row</label><input id="agriculture-row" x-model="row" type="number" min="0" :max="(layer()?.grid.rows ?? 1) - 1" step="1" class="px-3 py-3 w-full bg-neutral-900 border border-neutral-600 rounded focus-visible:outline-emerald-200"></div><div><label for="agriculture-column" class="block mb-2 text-sm">Grid column</label><input id="agriculture-column" x-model="column" type="number" min="0" :max="(layer()?.grid.columns ?? 1) - 1" step="1" class="px-3 py-3 w-full bg-neutral-900 border border-neutral-600 rounded focus-visible:outline-emerald-200"></div></div>
+          <dl class="grid gap-5 grid-cols-2 mt-5 text-sm"><div><dt class="text-neutral-400">Sample status</dt><dd class="mt-1" data-agriculture-cell>{{ cell()?.reason ?? 'outside grid' }}</dd></div><div><dt class="text-neutral-400">NDVI</dt><dd class="mt-1 font-mono">{{ quantity(cell()?.ndvi) }}</dd></div><div><dt class="text-neutral-400">Conditional lower / upper</dt><dd class="mt-1">{{ quantity(cell()?.bounds?.[0]) }} / {{ quantity(cell()?.bounds?.[1]) }}</dd></div><div><dt class="text-neutral-400">Cell support</dt><dd class="mt-1">{{ quantity(cell()?.areaM2) }} m²</dd></div><div><dt class="text-neutral-400">Red / NIR reflectance</dt><dd class="mt-1">{{ quantity(cell()?.redReflectance) }} / {{ quantity(cell()?.nirReflectance) }}</dd></div><div><dt class="text-neutral-400">Estimated position sigma</dt><dd class="mt-1">{{ quantity(cell()?.source?.positionSigmaM) }} m</dd></div></dl>
+          <p class="mt-5 break-words font-mono text-neutral-400 text-xs">Source: {{ cell()?.source?.captureId ?? 'unavailable' }} / pixel {{ cell()?.source?.pixel.join(', ') ?? 'unavailable' }}. Parcel: {{ cell()?.parcelIds.join(', ') ?? 'unavailable' }}.</p>
+          <p class="mt-4 leading-relaxed text-neutral-400 text-xs">Bounds are conditional on declared panel, radiance and irradiance uncertainty. Position error, registration, scene mixing and agronomic inference require separate field validation.</p>
+        </div>
+      </section>
+      <section aria-labelledby="agriculture-parcels" class="mt-9 pt-6 border-neutral-700 border-t"><h2 id="agriculture-parcels" class="font-semibold text-lg">Parcel report</h2><div class="overflow-x-auto mt-5 max-w-full border border-neutral-700 rounded" tabindex="0" role="region" aria-label="Scrollable parcel sample report"><table class="w-full text-left text-xs whitespace-nowrap"><caption class="sr-only">Area-weighted calibrated grid-centre samples by explicit field parcel</caption><thead class="bg-neutral-900"><tr><th scope="col" class="p-3">Parcel</th><th scope="col" class="p-3">Support m²</th><th scope="col" class="p-3">Observed m²</th><th scope="col" class="p-3">Missing m²</th><th scope="col" class="p-3">Mean sample NDVI</th></tr></thead><tbody><tr :for="parcel in layer()?.parcels ?? []" class="border-neutral-800 border-t"><th scope="row" class="p-3 font-normal">{{ parcel.name }}</th><td class="p-3 font-mono">{{ quantity(parcel.areaM2) }}</td><td class="p-3 font-mono">{{ quantity(parcel.observedAreaM2) }}</td><td class="p-3 font-mono">{{ quantity(parcel.missingAreaM2) }}</td><td class="p-3 font-mono">{{ quantity(parcel.meanNdvi) }}</td></tr></tbody></table></div></section>
+      <section :if="frame()" aria-labelledby="agriculture-capture" class="grid gap-8 lg:grid-cols-2 mt-9 pt-6 border-neutral-700 border-t">
+        <div class="min-w-0"><h2 id="agriculture-capture" class="font-semibold text-lg">Source capture</h2><div class="flex flex-wrap gap-4 mt-5"><div class="min-w-0"><label for="agriculture-frame" class="block mb-2 text-sm">Acknowledged capture</label><select id="agriculture-frame" x-model="captureId" class="px-3 py-3 max-w-full text-neutral-100 bg-neutral-900 border border-neutral-600 rounded focus-visible:outline-emerald-200"><option :for="capture in run()?.captures ?? []" :value="capture.captureId">{{ capture.captureId }} / {{ capture.capturedAtMs }} ms</option></select></div><div><label for="agriculture-modality" class="block mb-2 text-sm">Capture view</label><select id="agriculture-modality" x-model="mode" class="px-3 py-3 text-neutral-100 bg-neutral-900 border border-neutral-600 rounded focus-visible:outline-emerald-200"><option value="visible">Visible</option><option value="ndvi">Calibrated NDVI</option></select></div></div><div class="overflow-hidden relative mt-5 bg-neutral-900 border border-neutral-700 rounded"><img :src="preview()" :width="frame()?.image.width" :height="frame()?.image.height" alt="Actual selected visible or calibrated numeric-band capture with the proposed animal observation pixel" class="block h-auto w-full [image-rendering:pixelated]"><svg :viewBox="'0 0 ' + frame()?.image.width + ' ' + frame()?.image.height" aria-hidden="true" class="absolute inset-0 h-full w-full pointer-events-none"><circle :cx="Number(pixelX()) + .5" :cy="Number(pixelY()) + .5" r="1.6" fill="none" stroke="#ffffff" stroke-width=".4"/></svg></div></div>
+        <div class="min-w-0"><h2 class="font-semibold text-lg">Numeric band provenance</h2><p class="mt-4 break-words text-neutral-400 text-sm">{{ run()?.plan.config.radiometry.id }} / {{ frame()?.image.registrationId }}. Registration error: {{ quantity(frame()?.image.registrationErrorPx) }} px.</p><dl class="grid gap-5 grid-cols-2 mt-5 text-sm"><div><dt class="text-neutral-400">Capture / ACK</dt><dd class="mt-1">{{ frame()?.capturedAtMs }} / {{ frame()?.acknowledgedAtMs }} ms</dd></div><div><dt class="text-neutral-400">Valid numeric pixels</dt><dd class="mt-1">{{ quantity((calibrated()?.validFraction ?? 0) * 100, 1) }} %</dd></div><div><dt class="text-neutral-400">Red DN / reflectance</dt><dd class="mt-1">{{ selectedBand('red').dn }} / {{ selectedBand('red').reflectance }}</dd></div><div><dt class="text-neutral-400">NIR DN / reflectance</dt><dd class="mt-1">{{ selectedBand('nir').dn }} / {{ selectedBand('nir').reflectance }}</dd></div><div><dt class="text-neutral-400">Red / NIR irradiance</dt><dd class="mt-1">{{ selectedBand('red').irradiance }} / {{ selectedBand('nir').irradiance }} W/m²/nm</dd></div><div><dt class="text-neutral-400">Red / NIR epoch</dt><dd class="mt-1">{{ selectedBand('red').atMs }} / {{ selectedBand('nir').atMs }} ms</dd></div></dl><p class="mt-5 break-all font-mono text-neutral-400 text-xs">Estimated pose reference: {{ source()?.pose.reference }}. Position / attitude source: {{ source()?.pose.positionCapturedAtMs }} / {{ source()?.pose.attitudeCapturedAtMs }} ms.</p><p class="mt-4 leading-relaxed text-neutral-400 text-xs">Raw 16-bit DN is corrected for black level, exposure, gain, row response and vignette. Per-band panel reflectance and irradiance qualify the derived values. The current field and calibration are synthetic.</p></div>
+      </section>
+      <section :if="frame()" aria-labelledby="agriculture-livestock" class="mt-9 pt-6 border-neutral-700 border-t"><h2 id="agriculture-livestock" class="font-semibold text-lg">Selected animal observation</h2><p class="mt-3 max-w-3xl leading-relaxed text-neutral-400 text-sm">Select a source pixel and explicitly supply an animal label. The record binds image bytes, calibration, estimated position and parcel. It does not recognize or authenticate an animal. Changing capture clears an unsubmitted selection.</p>
+        <form @submit.prevent="observeAnimal()" class="grid gap-5 sm:grid-cols-2 mt-5"><div><label for="agriculture-animal" class="block mb-2 text-sm">Selected animal label</label><input id="agriculture-animal" x-model="animalId" required maxlength="64" class="px-3 py-3 w-full bg-neutral-900 border border-neutral-600 rounded focus-visible:outline-emerald-200"></div><div><label for="agriculture-observer" class="block mb-2 text-sm">Observer identity</label><input id="agriculture-observer" x-model="observerId" required maxlength="64" class="px-3 py-3 w-full bg-neutral-900 border border-neutral-600 rounded focus-visible:outline-emerald-200"></div><div><label for="agriculture-pixel-x" class="block mb-2 text-sm">Output pixel x</label><input id="agriculture-pixel-x" x-model="pixelX" type="number" min="0" :max="(frame()?.image.width ?? 1) - 1" step="1" required class="px-3 py-3 w-full bg-neutral-900 border border-neutral-600 rounded focus-visible:outline-emerald-200"></div><div><label for="agriculture-pixel-y" class="block mb-2 text-sm">Output pixel y</label><input id="agriculture-pixel-y" x-model="pixelY" type="number" min="0" :max="(frame()?.image.height ?? 1) - 1" step="1" required class="px-3 py-3 w-full bg-neutral-900 border border-neutral-600 rounded focus-visible:outline-emerald-200"></div><div class="sm:col-span-2"><label for="agriculture-note" class="block mb-2 text-sm">Observation note</label><textarea id="agriculture-note" x-model="note" required maxlength="1000" rows="3" class="px-3 py-3 w-full bg-neutral-900 border border-neutral-600 rounded focus-visible:outline-emerald-200"></textarea></div><button type="submit" :disabled="busy() || binding()" class="justify-self-start px-4 py-3 font-medium text-neutral-950 bg-emerald-200 rounded focus-visible:outline-emerald-200 focus-visible:outline-offset-4 disabled:opacity-50">{{ binding() ? 'Binding observation…' : 'Record selected animal' }}</button></form>
+        <p :if="!selectedObservations().length" class="mt-5 text-neutral-400 text-sm">No explicit animal observation recorded for this capture.</p><ol class="mt-5 space-y-5"><li :for="observation in selectedObservations()" class="pl-4 border-l border-neutral-600"><p class="break-words text-sm" data-agriculture-observation>{{ observation.animalId }} / {{ observation.observerId }} / {{ observation.parcelIds.join(', ') }}</p><p class="mt-2 break-words text-neutral-300 text-sm">{{ observation.note }}</p><p class="mt-2 text-neutral-400 text-xs">Original capture {{ observation.captureId }}, pixel {{ observation.pixel.join(', ') }}. Identity and physical animal presence unverified.</p><p class="mt-2 break-all font-mono text-neutral-400 text-xs">{{ observation.captureSha256 }}</p></li></ol><p class="mt-4 leading-relaxed text-neutral-400 text-xs">Workspace declarations stay in this analysis session. Use native agriculture:observe to retain them in a new private dataset.</p>
+      </section>
+      <details class="mt-9"><summary class="text-sm focus-visible:outline-emerald-200 cursor-pointer">Planning and interpretation assumptions</summary><ul class="mt-3 space-y-2 text-neutral-400 text-xs"><li :for="assumption in run()?.plan.assumptions ?? []">{{ assumption }}</li><li :for="limitation in layer()?.limitations ?? []">{{ limitation }}</li></ul></details>
+      <a href="https://github.com/stacksjs/drone/issues/21" class="inline-block mt-8 text-emerald-200 text-sm underline underline-offset-4">Agriculture scope and remaining acceptance</a>
+    </div>
+  </section>
+</template>

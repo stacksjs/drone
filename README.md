@@ -49,6 +49,20 @@ These profiles use owned raw sensors, estimation, mission policy, controls and a
 outputs remain inhibited. Read the [shared contract](docs/vehicles.md), [air model](docs/vehicles-air.md),
 [ground model](docs/vehicles-ground.md) and [surface corrections](docs/vehicles-surface.md) and [subsea pressure/DVL inspection](docs/vehicles-subsea.md).
 
+## Agriculture sensing
+
+Open `/agriculture` to run owned crop scouting, inspect raw red/NIR calibration and source pixels,
+view a clipped field/parcel sampling layer and record explicitly selected livestock declarations.
+
+```sh
+./buddy agriculture:plan examples/agriculture.json
+./buddy agriculture:simulate --output /tmp/new-field-visit
+./buddy agriculture:process /tmp/new-field-visit/recording.json
+```
+
+The numeric model is checked against pinned vendor panel-image extracts. Physical calibration,
+crop interpretation and animal identity remain unverified. Read [semantics and evidence](docs/agriculture.md).
+
 ## Camera tracking
 
 Open `/camera` after configuring a unique `DRONE_CAMERA_TOKEN` in your ignored `.env`. Choose

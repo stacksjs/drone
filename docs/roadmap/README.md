@@ -55,6 +55,12 @@ companion application and simulator, not a native board autopilot.
 
 ## Sequence
 
+Crop scouting now collects acknowledged numeric red/NIR and visible frames through the owned
+survey runtime. Panel/irradiance calibration, an independently checked numerical model, field/parcel
+sampling reports and explicit source-bound livestock declarations are implemented. Measured hardware,
+registered real field data and agronomic/animal qualification remain in
+[#21](https://github.com/stacksjs/drone/issues/21).
+
 Asset-relative bridge inspection now uses the owned mission/control loop, measured modeled range
 registration, visible/synthetic thermal pixels, explicit operator reviews and repeat-visit geometry.
 Physical asset/camera/thermal qualification and richer assets remain in

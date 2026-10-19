@@ -12,6 +12,31 @@ Object.assign(globalThis, autoImports)
 declare global {
   const writeCompletedArtifact: typeof autoImports.writeCompletedArtifact
   const completedArtifactLimits: typeof autoImports.completedArtifactLimits
+  const printAsync: typeof autoImports.printAsync
+  const printErrorAsync: typeof autoImports.printErrorAsync
+  const renderAgricultureImage: typeof autoImports.renderAgricultureImage
+  const createAgricultureCamera: typeof autoImports.createAgricultureCamera
+  const createLivestockObservation: typeof autoImports.createLivestockObservation
+  const validateLivestockObservation: typeof autoImports.validateLivestockObservation
+  const validateLivestockObservations: typeof autoImports.validateLivestockObservations
+  const validateAgricultureRun: typeof autoImports.validateAgricultureRun
+  const agricultureRecordingJson: typeof autoImports.agricultureRecordingJson
+  const parseAgricultureRecording: typeof autoImports.parseAgricultureRecording
+  const agricultureEvidenceLimits: typeof autoImports.agricultureEvidenceLimits
+  const writeAgricultureDataset: typeof autoImports.writeAgricultureDataset
+  const readAgricultureConfig: typeof autoImports.readAgricultureConfig
+  const readAgricultureRecording: typeof autoImports.readAgricultureRecording
+  const readAgricultureObservations: typeof autoImports.readAgricultureObservations
+  const exampleAgricultureConfig: typeof autoImports.exampleAgricultureConfig
+  const processAgriculture: typeof autoImports.processAgriculture
+  const createAgriculturePlan: typeof autoImports.createAgriculturePlan
+  const agricultureImagePreview: typeof autoImports.agricultureImagePreview
+  const agricultureLayerPreview: typeof autoImports.agricultureLayerPreview
+  const agricultureRadiance: typeof autoImports.agricultureRadiance
+  const validateAgricultureRadiometry: typeof autoImports.validateAgricultureRadiometry
+  const calibrateAgricultureImage: typeof autoImports.calibrateAgricultureImage
+  const simulateAgriculture: typeof autoImports.simulateAgriculture
+  const agricultureScenarios: typeof autoImports.agricultureScenarios
   const antennaBenchConfig: typeof autoImports.antennaBenchConfig
   const runAntennaBench: typeof autoImports.runAntennaBench
   const antennaBenchScenarios: typeof autoImports.antennaBenchScenarios
@@ -217,6 +242,7 @@ declare global {
   const validatePayloadBus: typeof autoImports.validatePayloadBus
   const payloadInventory: typeof autoImports.payloadInventory
   const createModeledCamera: typeof autoImports.createModeledCamera
+  const createModeledShutter: typeof autoImports.createModeledShutter
   const openPiAiCameraPayload: typeof autoImports.openPiAiCameraPayload
   const createPayloadPoseTimeline: typeof autoImports.createPayloadPoseTimeline
   const openCameraPayloadProcess: typeof autoImports.openCameraPayloadProcess
@@ -224,6 +250,7 @@ declare global {
   const createReplayCameraPayload: typeof autoImports.createReplayCameraPayload
   const payloadLimits: typeof autoImports.payloadLimits
   const PayloadCaptureError: typeof autoImports.PayloadCaptureError
+  const rasterPreviewDataUri: typeof autoImports.rasterPreviewDataUri
   const runRuntimeBench: typeof autoImports.runRuntimeBench
   const runtimeBenchFaults: typeof autoImports.runtimeBenchFaults
   const buildRuntime: typeof autoImports.buildRuntime

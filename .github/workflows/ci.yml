@@ -113,6 +113,28 @@ jobs:
         working-directory: ${{ runner.temp }}
       - run: $GITHUB_WORKSPACE/storage/runtime-build/cli/drone inspection:simulate --scenario structure-motion
         working-directory: ${{ runner.temp }}
+      - run: $GITHUB_WORKSPACE/storage/runtime-build/cli/drone agriculture:plan "$GITHUB_WORKSPACE/examples/agriculture.json"
+        working-directory: ${{ runner.temp }}
+      - run: $GITHUB_WORKSPACE/storage/runtime-build/cli/drone agriculture:simulate --visit ci-field --output "$RUNNER_TEMP/agriculture-collected"
+        working-directory: ${{ runner.temp }}
+      - name: Reprocess the full calibrated field layer through a stdout pipe
+        working-directory: ${{ runner.temp }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          "$GITHUB_WORKSPACE/storage/runtime-build/cli/drone" agriculture:process "$RUNNER_TEMP/agriculture-collected/recording.json" --output "$RUNNER_TEMP/agriculture-processed" | bun -e 'const result = await Bun.stdin.json(); if (result.layer.cells.length !== 256 || result.layer.parcels.length !== 2 || result.layer.physicalAgronomyVerified !== false) throw new Error("Invalid calibrated field layer"); console.log("Verified full field layer through stdout pipe")'
+      - run: $GITHUB_WORKSPACE/storage/runtime-build/cli/drone agriculture:observe "$RUNNER_TEMP/agriculture-collected/recording.json" --id ci-selection --animal selected-light-animal --capture photo-0016 --x 60 --y 33 --observer ci-operator --observed-at 2026-10-18T12:00:00.000Z --note "Explicit synthetic source-pixel declaration, identity unverified" --output "$RUNNER_TEMP/agriculture-observed"
+        working-directory: ${{ runner.temp }}
+      - name: Preserve source-bound declarations through standalone reprocessing
+        working-directory: ${{ runner.temp }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          "$GITHUB_WORKSPACE/storage/runtime-build/cli/drone" agriculture:process "$RUNNER_TEMP/agriculture-observed/recording.json" --observations "$RUNNER_TEMP/agriculture-observed/livestock-observations.json" --output "$RUNNER_TEMP/agriculture-retained" | bun -e 'const result = await Bun.stdin.json(); if (result.observations !== 1) throw new Error("Lost explicit animal declaration"); const records = await Bun.file(`${result.dataset.directory}/livestock-observations.json`).json(); if (records[0].captureId !== "photo-0016" || records[0].identityAuthenticated !== false || records[0].physicalAnimalVerified !== false) throw new Error("Changed source-bound declaration"); console.log("Verified explicit declaration retention")'
+      - run: $GITHUB_WORKSPACE/storage/runtime-build/cli/drone agriculture:simulate --scenario band-skew
+        working-directory: ${{ runner.temp }}
+      - run: $GITHUB_WORKSPACE/storage/runtime-build/cli/drone agriculture:simulate --scenario irradiance-loss
+        working-directory: ${{ runner.temp }}
   firmware:
     runs-on: ubuntu-latest
     steps:

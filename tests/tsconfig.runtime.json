@@ -57,6 +57,11 @@
     "./unit/completed-artifact.test.ts",
     "../resources/functions/drone/inspection/**/*.ts",
     "./unit/inspection-*.test.ts",
-    "./unit/modeled-camera.test.ts"
+    "./unit/modeled-camera.test.ts",
+    "../resources/functions/drone/agriculture/**/*.ts",
+    "../resources/functions/drone/presentation/**/*.ts",
+    "./unit/agriculture-*.test.ts",
+    "./unit/raster-preview.test.ts",
+    "./unit/modeled-shutter.test.ts"
   ]
 }

@@ -43,6 +43,10 @@ import InspectionPlan from '../app/Commands/InspectionPlan'
 import InspectionSimulate from '../app/Commands/InspectionSimulate'
 import InspectionReview from '../app/Commands/InspectionReview'
 import InspectionCompare from '../app/Commands/InspectionCompare'
+import AgriculturePlan from '../app/Commands/AgriculturePlan'
+import AgricultureSimulate from '../app/Commands/AgricultureSimulate'
+import AgricultureProcess from '../app/Commands/AgricultureProcess'
+import AgricultureObserve from '../app/Commands/AgricultureObserve'
 
 const app = cli('drone')
 RuntimeBuild(app)
@@ -82,6 +86,10 @@ InspectionPlan(app)
 InspectionSimulate(app)
 InspectionReview(app)
 InspectionCompare(app)
+AgriculturePlan(app)
+AgricultureSimulate(app)
+AgricultureProcess(app)
+AgricultureObserve(app)
 app.help()
 app.version('0.1.0')
 try { await app.parse(process.argv) }
