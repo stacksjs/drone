@@ -87,6 +87,7 @@ export interface ApplicationRelease {
 export interface ApplicationCell {
   id: string
   boundsM: [number, number, number, number]
+  /** Exact field support, including any excluded subset. */
   areaM2: number
   excludedAreaM2: number
   coveredAreaM2: number
@@ -105,6 +106,7 @@ export interface ApplicationReport {
   missedAreaM2: number
   overlapAreaM2: number
   emittedAmount: number
+  /** Deposited onto treatable field support; excludes excludedAmount. */
   inFieldAmount: number
   excludedAmount: number
   outsideAmount: number
