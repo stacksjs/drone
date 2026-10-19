@@ -144,7 +144,11 @@ test('managed real writer authority fences competing reconciliation in both file
       expect(await output).toContain(stage === 'generation-claim' ? 'PASS paused original live handle refuses committed reconciliation generation' : `PASS ${stage} completes after competing writer refusal`)
     }
     finally {
-      for (const pending of [contender, child]) if (pending && pending.exitCode === null) { process.kill(pending.pid, 'SIGKILL'); await pending.exited }
+      for (const pending of [contender, child]) if (pending && pending.exitCode === null) {
+        try { process.kill(pending.pid, 'SIGKILL') }
+        catch (error) { if (!(error instanceof Error && 'code' in error && error.code === 'ESRCH')) throw error }
+        await pending.exited
+      }
       await rm(root, { recursive: true, force: true })
     }
   }
