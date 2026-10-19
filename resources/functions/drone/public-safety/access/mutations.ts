@@ -7,6 +7,7 @@ import { planPublicSafetyMission } from '../planner'
 import { PublicSafetyAccessError } from './errors'
 import { requireIncidentAccess, assertIncidentPayload } from './policy'
 import { associateIncidentDeadline, assertIncidentDeadline, checkedIncidentResult } from './deadline'
+import { queueIncidentWorkspaceRefresh } from '../workspace/updates'
 
 export const maximumVersion = 2147483647
 
@@ -50,6 +51,7 @@ export async function advance(tx: TransactionHandle, incident: IncidentRow, clos
   const next = { ...incident, version: incident.version + 1, ...(closed ? { status: 'closed' as const } : {}) }
   const result = await tx.updateTable('public_safety_incidents').set({ version: next.version, status: next.status, updated_at: new Date().toISOString() }).where('id', '=', incident.id).where('version', '=', incident.version).executeTakeFirst()
   if (mutationCount(result) !== 1) throw new PublicSafetyAccessError(409, 'Incident version has changed')
+  queueIncidentWorkspaceRefresh(incident.id)
   return next
 }
 

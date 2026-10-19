@@ -11,6 +11,7 @@ import { PublicSafetyAccessError } from './errors'
 import { assertIncidentPayload } from './policy'
 import { maximumVersion, projection, advance, pagination } from './mutations'
 import { associateIncidentDeadline, assertIncidentDeadline, checkedIncidentResult } from './deadline'
+import { queueIncidentWorkspaceRefresh } from '../workspace/updates'
 import { activeMember, authorizePublicSafetyHandover, isCoordinator, requireHandoverAccess, requireHandoverHuman } from './handover-policy'
 import { appendHandoverAudit, commandDigest, decisionInput, eventProjection, findOffer, handoverConflict, handoverPlain, handoverProfile, handoverTable, handoverUnavailable, handoverUuid, hashHandover, offerDigest, offerInput, parseOffer, terminalFor } from './handover-ledger'
 import { handoverBriefing, handoverSourceFields, newerHandoverContext, offeredSource, stageHandoverSource, unchangedHandoverSource, verifiedHandoverSource } from './handover-context'
@@ -97,8 +98,24 @@ export async function readIncidentHandoverDesk(key: string, options: HandoverDes
   const body = handoverPlain(options, names), { after, limit } = pagination(Object.fromEntries(['afterSequence', 'limit'].filter(name => body[name] !== undefined).map(name => [name, body[name]])))
   if (body.offerKey !== undefined) handoverUuid(body.offerKey)
   await authorizePublicSafetyHandover(key, 'read')
-  return checkedIncidentResult(transaction(async tx => {
-    const access = await lockedAccess(tx, key, 'read'), assignment = await currentAssignment(tx, access)
+  return checkedIncidentResult(transaction(async tx => projectIncidentHandoverDesk(tx, await lockedAccess(tx, key, 'read'), { offerKey: body.offerKey as string | undefined, afterSequence: after, limit })))
+}
+
+/** Internal metadata-only source discovery for a workspace's bounded outside-TX staging. */
+export async function pendingWorkspaceHandoverSource(tx: HandoverReader, access: HandoverAccess, offerKey?: string): Promise<string | undefined> {
+  const assignment = await currentAssignment(tx, access)
+  const row = offerKey === undefined ? await latestOffer(tx, access, assignment) : await findOffer(tx, access.incident.id, offerKey)
+  if (!row) return
+  const facts = parseOffer(row)
+  if (!visible(access, facts)) { if (offerKey !== undefined) handoverUnavailable(); return }
+  const offer = await offerProjection(tx, access, facts)
+  if (offer.state === 'expired' && offerKey !== undefined) handoverUnavailable()
+  return offer.state === 'pending' ? facts.sourceDigest : undefined
+}
+
+/** Internal handle-taking desk projector. A provided staging map forbids replay under the final lock. */
+export async function projectIncidentHandoverDesk(tx: HandoverReader, access: HandoverAccess, body: HandoverDeskOptions, staged?: ReadonlyMap<string, Awaited<ReturnType<typeof stageHandoverSource>>>): Promise<HandoverDesk> {
+    const { after, limit } = pagination({ afterSequence: body.afterSequence, limit: body.limit }), assignment = await currentAssignment(tx, access)
     const row = body.offerKey === undefined ? await latestOffer(tx, access, assignment) : await findOffer(tx, access.incident.id, body.offerKey as string)
     const facts = row ? parseOffer(row) : null
     if (facts && !visible(access, facts) && body.offerKey !== undefined) handoverUnavailable()
@@ -108,7 +125,12 @@ export async function readIncidentHandoverDesk(key: string, options: HandoverDes
     const pending = offer?.state === 'pending'
     let briefing = null
     if (facts && pending) {
-      await verifiedHandoverSource(tx, access.incident, facts.sourceDigest)
+      if (staged) {
+        const source = staged.get(facts.sourceDigest)
+        if (!source) handoverConflict()
+        await unchangedHandoverSource(tx, access.incident, source)
+      }
+      else await verifiedHandoverSource(tx, access.incident, facts.sourceDigest)
       briefing = await handoverBriefing(tx, access.incident, facts, after, limit)
     }
     const current = body.offerKey === undefined ? row : await latestOffer(tx, access, assignment)
@@ -116,7 +138,6 @@ export async function readIncidentHandoverDesk(key: string, options: HandoverDes
     const coordinate = access.principal.canCoordinate && access.incident.status === 'active'
     const desk: HandoverDesk = { assignment, incident: projection(access.incident, access.member), offer, briefing, actionability: { canOffer: coordinate && isCoordinator(access) && !currentPending, canAccept: coordinate && !!pending && access.principal.userId === facts?.recipientUserId, canDecline: coordinate && !!pending && access.principal.userId === facts?.recipientUserId, canCancel: coordinate && !!pending && isCoordinator(access) && access.principal.userId === facts?.coordinatorId } }
     return release(desk, offer && !offer.terminalEvent ? Math.min(Date.parse(facts!.expiresAt), Date.parse(access.incident.retain_until)) : Date.parse(access.incident.retain_until))
-  }))
 }
 
 export async function offerIncidentCoordination(key: string, input: unknown): Promise<HandoverReceipt> {
@@ -188,6 +209,7 @@ export async function decideIncidentHandover(key: string, input: unknown): Promi
       const changed = await tx.updateTable('public_safety_incidents').set({ coordinator_id: facts.recipientUserId, version: access.incident.version + 1, updated_at: at }).where('id', '=', access.incident.id).where('version', '=', access.incident.version).where('coordinator_id', '=', facts.coordinatorId).executeTakeFirst()
       if (mutationCount(changed) !== 1) handoverConflict()
       access.incident = { ...access.incident, coordinator_id: facts.recipientUserId, version: access.incident.version + 1 }
+      queueIncidentWorkspaceRefresh(access.incident.id)
       access.member = { ...incoming, role: 'coordinator', version: incoming.version + 1 }
       await currentAssignment(tx, access)
     }

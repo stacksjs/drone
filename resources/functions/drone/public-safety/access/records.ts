@@ -38,7 +38,7 @@ function privateNote(value: unknown, maximum: number): string {
   if (typeof value !== 'string' || !value.trim() || bytes(value) > maximum) throw new PublicSafetyAccessError(422, 'Invalid incident declaration')
   return value
 }
-function sourceProjection(row: SourceRow): SourceProjection {
+export function sourceProjection(row: SourceRow): SourceProjection {
   if (row.replay_profile !== 'owned-public-safety-collection-v1' || row.evidence !== 'owned-public-safety-physics-simulation') inconsistent()
   return { id: row.id, digest: row.digest, byteLength: row.byte_length, replayProfile: row.replay_profile, evidence: row.evidence, uploaderId: row.uploader_id, uploadedAt: row.uploaded_at_iso, createdSequence: row.created_sequence, uploaderAuthenticated: true, ...flags }
 }
@@ -124,11 +124,14 @@ export async function listPublicSafetySources(key: string, options: RecordPageOp
   await authorizePublicSafetyIncident(key, 'view')
   return checkedIncidentResult(transaction(async tx => {
     const { incident } = await recordReadAccess(key, tx)
-    // Metadata only: neither load nor serialize canonical source planes for a catalog.
-    const fields = sourceFields.filter(field => field !== 'canonical_json')
-    const rows = asRows<SourceRow>(await tx.selectFrom('public_safety_sources').select(fields).where('incident_id', '=', incident.id).where('created_sequence', '>', after).orderBy('created_sequence', 'asc').limit(limit + 1).execute())
-    return associateIncidentDeadline(page(rows.map(sourceProjection), after, limit), Date.parse(incident.retain_until))
+    return associateIncidentDeadline(await projectIncidentSourceCatalog(tx, incident, after, limit), Date.parse(incident.retain_until))
   }))
+}
+/** Internal handle-taking read seam. Metadata only; source planes are never catalog fields. */
+export async function projectIncidentSourceCatalog(tx: Reader, incident: IncidentRow, after: number, limit: number): Promise<RecordPage<SourceProjection>> {
+  const fields = sourceFields.filter(field => field !== 'canonical_json')
+  const rows = asRows<SourceRow>(await tx.selectFrom('public_safety_sources').select(fields).where('incident_id', '=', incident.id).where('created_sequence', '>', after).where('created_sequence', '<=', incident.version).orderBy('created_sequence', 'asc').limit(limit + 1).execute())
+  return page(rows.map(sourceProjection), after, limit)
 }
 export async function appendPublicSafetyObservation(key: string, input: unknown): Promise<ObservationAppend> {
   const body = exactRecord(input, ['expectedVersion', 'sourceDigest', 'captureId', 'modality', 'pixel', 'note', 'uncertaintyNote']), expected = expectedVersion(body.expectedVersion)

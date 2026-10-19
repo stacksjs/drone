@@ -6,6 +6,7 @@ import { isUniqueViolation, transaction } from '@stacksjs/orm'
 import { planPublicSafetyMission } from '../planner'
 import { publicSafetyRecordingData } from '../evidence'
 import { PublicSafetyAccessError } from './errors'
+import { queueIncidentWorkspaceRefresh } from '../workspace/updates'
 import { requirePublicSafetyPrincipal } from './principal'
 import { requireIncidentAccess, validateIncidentKey } from './policy'
 import { associateIncidentDeadline, assertIncidentDeadline, checkedIncidentResult } from './deadline'
@@ -44,6 +45,7 @@ export async function createPublicSafetyIncident(input: unknown): Promise<Incide
       const incident = asRow<IncidentRow>(await tx.selectFrom('public_safety_incidents').selectAll().where('incident_key', '=', plan.config.id).executeTakeFirst())!
       await tx.insertInto('public_safety_incident_members').values({ incident_id: incident.id, user_id: principal.userId, role: 'coordinator', active: true, version: 1, granted_by: principal.userId, revoked_by: null, created_at: at, updated_at: at }).execute()
       await audit(tx, incident, principal.userId, 'created', null, { revision: incident.revision, purpose: incident.purpose })
+      queueIncidentWorkspaceRefresh(incident.id)
       const member = asRow<IncidentMemberRow>(await tx.selectFrom('public_safety_incident_members').selectAll().where('incident_id', '=', incident.id).where('user_id', '=', principal.userId).executeTakeFirst())!
       const result = projection(incident, member)
       assertIncidentDeadline(result)
