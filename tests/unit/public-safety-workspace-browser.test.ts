@@ -66,13 +66,13 @@ test('fixture timeout cleanup terminates an owned descendant and resistant paren
   let owned: ReturnType<typeof spawnWorkspaceFixture> | undefined
   try {
     const config = join(directory, 'bunfig.toml'); await writeFile(config, 'preload=[]\n')
-    await writeFile(join(directory, 'descendant.ts'), `import { writeFileSync } from 'node:fs'; process.on('SIGTERM', () => { writeFileSync('descendant-stopped', 'stopped'); process.exit(0) }); setInterval(() => {}, 1000)`)
+    await writeFile(join(directory, 'descendant.ts'), `import { writeFileSync } from 'node:fs'; process.on('SIGTERM', () => { writeFileSync('descendant-stopped', 'stopped'); process.exit(0) }); writeFileSync('descendant-ready', 'ready'); setInterval(() => {}, 1000)`)
     await writeFile(join(directory, 'parent.ts'), `import { writeFileSync } from 'node:fs'; const child = Bun.spawn([process.execPath, '--config=${config}', '--no-env-file', 'descendant.ts'], { stdout: 'ignore', stderr: 'ignore' }); process.on('SIGTERM', () => {}); writeFileSync('descendant.pid', String(child.pid)); setInterval(() => {}, 1000)`)
     owned = spawnWorkspaceFixture([process.execPath, `--config=${config}`, '--no-env-file', 'parent.ts'], directory, process.env)
     for (let attempt = 0; attempt < 100 && !await Bun.file(join(directory, 'descendant.pid')).exists(); attempt++) await Bun.sleep(25)
     const descendant = Number(await Bun.file(join(directory, 'descendant.pid')).text())
-    // Let the actual descendant install its graceful termination handler.
-    await Bun.sleep(100)
+    for (let attempt = 0; attempt < 100 && !await Bun.file(join(directory, 'descendant-ready')).exists(); attempt++) await Bun.sleep(25)
+    expect(await Bun.file(join(directory, 'descendant-ready')).exists()).toBe(true)
     await owned.stop()
     expect(await Bun.file(join(directory, 'descendant-stopped')).exists()).toBe(true)
     expect(() => process.kill(descendant, 0)).toThrow()
