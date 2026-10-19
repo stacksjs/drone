@@ -4,7 +4,8 @@ import type { HandoverAssignment, HandoverDesk, HandoverDeskOptions, HandoverOff
 import type { HandoverAccess, HandoverReader } from './handover-policy'
 import type { HandoverAuditRow, OfferFacts, TerminalFacts } from './handover-ledger'
 import { randomUUID } from 'node:crypto'
-import { asRow, asRows, lockRow, mutationCount } from '@stacksjs/database/runtime'
+import { types } from 'node:util'
+import { asRow, asRows, db, lockRow, mutationCount } from '@stacksjs/database/runtime'
 import { transaction } from '@stacksjs/orm'
 import { PublicSafetyAccessError } from './errors'
 import { assertIncidentPayload } from './policy'
@@ -12,7 +13,7 @@ import { maximumVersion, projection, advance, pagination } from './mutations'
 import { associateIncidentDeadline, assertIncidentDeadline, checkedIncidentResult } from './deadline'
 import { activeMember, authorizePublicSafetyHandover, isCoordinator, requireHandoverAccess, requireHandoverHuman } from './handover-policy'
 import { appendHandoverAudit, commandDigest, decisionInput, eventProjection, findOffer, handoverConflict, handoverPlain, handoverProfile, handoverTable, handoverUnavailable, handoverUuid, hashHandover, offerDigest, offerInput, parseOffer, terminalFor } from './handover-ledger'
-import { handoverBriefing, handoverSourceFields, newerHandoverContext, offeredSource, verifiedHandoverSource } from './handover-context'
+import { handoverBriefing, handoverSourceFields, newerHandoverContext, offeredSource, stageHandoverSource, unchangedHandoverSource, verifiedHandoverSource } from './handover-context'
 
 /** Also tag independently returnable nested projections, using the existing shared deadline. */
 function release<T extends object>(value: T, deadline: number): T {
@@ -56,7 +57,8 @@ async function latestOffer(tx: HandoverReader, access: HandoverAccess, assignmen
 }
 async function receipt(tx: HandoverReader, access: HandoverAccess, facts: OfferFacts, row: HandoverAuditRow, replayed: boolean): Promise<HandoverReceipt> {
   const offer = await offerProjection(tx, access, facts)
-  const deadline = !replayed || offer.state === 'pending' ? Math.min(Date.parse(facts.expiresAt), Date.parse(access.incident.retain_until)) : Date.parse(access.incident.retain_until)
+  if (offer.state === 'expired') handoverUnavailable()
+  const deadline = !replayed || !offer.terminalEvent ? Math.min(Date.parse(facts.expiresAt), Date.parse(access.incident.retain_until)) : Date.parse(access.incident.retain_until)
   return release({ incident: projection(access.incident, access.member), offer, event: eventProjection(row, facts), replayed }, deadline)
 }
 async function replay(tx: HandoverReader, access: HandoverAccess, requestId: string, fingerprint: string): Promise<HandoverReceipt | undefined> {
@@ -68,9 +70,28 @@ async function replay(tx: HandoverReader, access: HandoverAccess, requestId: str
   return receipt(tx, access, facts, row, true)
 }
 
+/** Stage expensive bounded canonical verification outside the final authority transaction.
+ * A prior request never stages content: replay remains behind fresh tx authorization.
+ */
+async function stageCommand(key: string, requestId: string, sourceDigest?: string, offerKey?: string) {
+  const access = await requireHandoverAccess(key, 'write')
+  const prior = await db.primary.selectFrom(handoverTable).select('id').where('incident_id', '=', access.incident.id).where('request_id', '=', requestId).executeTakeFirst()
+  if (prior) return
+  if (!offerKey && !isCoordinator(access)) throw new PublicSafetyAccessError(403, 'Only the current coordinator may offer handover')
+  let digest = sourceDigest
+  if (offerKey) {
+    const facts = parseOffer(await findOffer(db.primary, access.incident.id, offerKey))
+    requireVisible(access, facts)
+    if (access.principal.userId !== facts.recipientUserId) throw new PublicSafetyAccessError(403, 'This handover decision is not permitted')
+    digest = facts.sourceDigest
+  }
+  if (!digest) handoverConflict()
+  return stageHandoverSource(db.primary, access.incident, digest)
+}
+
 export async function readIncidentHandoverDesk(key: string, options: HandoverDeskOptions = {}): Promise<HandoverDesk> {
   // Descriptor-safe optional keys; pagination() rejects all other shapes and accessors.
-  if (!options || typeof options !== 'object') throw new PublicSafetyAccessError(422, 'Invalid handover options')
+  if (!options || typeof options !== 'object' || types.isProxy(options)) throw new PublicSafetyAccessError(422, 'Invalid handover options')
   const names = Object.keys(Object.getOwnPropertyDescriptors(options))
   if (names.some(name => !['offerKey', 'afterSequence', 'limit'].includes(name))) throw new PublicSafetyAccessError(422, 'Invalid handover options')
   const body = handoverPlain(options, names), { after, limit } = pagination(Object.fromEntries(['afterSequence', 'limit'].filter(name => body[name] !== undefined).map(name => [name, body[name]])))
@@ -81,22 +102,27 @@ export async function readIncidentHandoverDesk(key: string, options: HandoverDes
     const row = body.offerKey === undefined ? await latestOffer(tx, access, assignment) : await findOffer(tx, access.incident.id, body.offerKey as string)
     const facts = row ? parseOffer(row) : null
     if (facts && !visible(access, facts) && body.offerKey !== undefined) handoverUnavailable()
-    const offer = facts && visible(access, facts) ? await offerProjection(tx, access, facts) : null
+    const selected = facts && visible(access, facts) ? await offerProjection(tx, access, facts) : null
+    if (selected?.state === 'expired' && body.offerKey !== undefined) handoverUnavailable()
+    const offer = selected?.state === 'expired' ? null : selected
     const pending = offer?.state === 'pending'
     let briefing = null
     if (facts && pending) {
       await verifiedHandoverSource(tx, access.incident, facts.sourceDigest)
       briefing = await handoverBriefing(tx, access.incident, facts, after, limit)
     }
+    const current = body.offerKey === undefined ? row : await latestOffer(tx, access, assignment)
+    const currentPending = current ? (await offerProjection(tx, access, parseOffer(current))).state === 'pending' : false
     const coordinate = access.principal.canCoordinate && access.incident.status === 'active'
-    const desk: HandoverDesk = { assignment, incident: projection(access.incident, access.member), offer, briefing, actionability: { canOffer: coordinate && isCoordinator(access) && !pending, canAccept: coordinate && !!pending && access.principal.userId === facts?.recipientUserId, canDecline: coordinate && !!pending && access.principal.userId === facts?.recipientUserId, canCancel: coordinate && !!pending && isCoordinator(access) && access.principal.userId === facts?.coordinatorId } }
-    return release(desk, pending ? Math.min(Date.parse(facts!.expiresAt), Date.parse(access.incident.retain_until)) : Date.parse(access.incident.retain_until))
+    const desk: HandoverDesk = { assignment, incident: projection(access.incident, access.member), offer, briefing, actionability: { canOffer: coordinate && isCoordinator(access) && !currentPending, canAccept: coordinate && !!pending && access.principal.userId === facts?.recipientUserId, canDecline: coordinate && !!pending && access.principal.userId === facts?.recipientUserId, canCancel: coordinate && !!pending && isCoordinator(access) && access.principal.userId === facts?.coordinatorId } }
+    return release(desk, offer && !offer.terminalEvent ? Math.min(Date.parse(facts!.expiresAt), Date.parse(access.incident.retain_until)) : Date.parse(access.incident.retain_until))
   }))
 }
 
 export async function offerIncidentCoordination(key: string, input: unknown): Promise<HandoverReceipt> {
   const body = offerInput(input)
   await authorizePublicSafetyHandover(key, 'write')
+  const staged = await stageCommand(key, body.requestId, body.sourceDigest)
   return checkedIncidentResult(transaction(async tx => {
     const access = await lockedAccess(tx, key, 'write'), fingerprint = commandDigest(key, access.principal.userId, body)
     const previous = await replay(tx, access, body.requestId, fingerprint)
@@ -110,7 +136,8 @@ export async function offerIncidentCoordination(key: string, input: unknown): Pr
     await requireHandoverHuman(tx, incoming.user_id)
     const latest = await latestOffer(tx, access, assignment)
     if (latest && (await offerProjection(tx, access, parseOffer(latest))).state === 'pending') handoverConflict()
-    const source = await verifiedHandoverSource(tx, access.incident, body.sourceDigest)
+    if (!staged) handoverConflict()
+    const source = await unchangedHandoverSource(tx, access.incident, staged)
     // Recheck request identity after source verification and any awaited native queries.
     await requireHandoverAccess(key, 'write', tx, access.incident)
     const offeredAt = new Date().toISOString(), expiry = Math.min(Date.now() + body.expiresInSeconds * 1000, Date.parse(access.incident.retain_until))
@@ -126,6 +153,7 @@ export async function offerIncidentCoordination(key: string, input: unknown): Pr
 export async function decideIncidentHandover(key: string, input: unknown): Promise<HandoverReceipt> {
   const body = decisionInput(input)
   await authorizePublicSafetyHandover(key, 'write')
+  const staged = body.decision === 'accept' ? await stageCommand(key, body.requestId, undefined, body.offerKey) : undefined
   return checkedIncidentResult(transaction(async tx => {
     const access = await lockedAccess(tx, key, 'write'), fingerprint = commandDigest(key, access.principal.userId, body)
     const previous = await replay(tx, access, body.requestId, fingerprint)
@@ -142,7 +170,8 @@ export async function decideIncidentHandover(key: string, input: unknown): Promi
     if (body.decision === 'accept') {
       const ack = body.acknowledgement
       if (ack.offerDigest !== offer.digest || ack.sourceDigest !== facts.sourceDigest || ack.contextThroughSequence !== facts.contextThroughSequence) handoverConflict()
-      await verifiedHandoverSource(tx, access.incident, facts.sourceDigest)
+      if (!staged) handoverConflict()
+      await unchangedHandoverSource(tx, access.incident, staged)
       await requireHandoverHuman(tx, facts.coordinatorId)
       await requireHandoverHuman(tx, facts.recipientUserId)
       newer = await newerHandoverContext(tx, access.incident, facts)

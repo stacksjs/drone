@@ -10,14 +10,20 @@ import { handoverConflict, handoverInteger, handoverUnavailable, offerDigest } f
 
 const flags = { sourceIdentityAuthenticated: false, physicalFlightEnabled: false, physicalThermalVerified: false } as const
 export const handoverSourceFields = ['id', 'incident_id', 'digest', 'byte_length', 'canonical_json', 'replay_profile', 'evidence', 'uploader_id', 'uploaded_at_iso', 'created_sequence']
-export async function verifiedHandoverSource(tx: HandoverReader, incident: IncidentRow, digest: string): Promise<SourceRow> {
-  const staged = asRow<SourceRow>(await tx.selectFrom('public_safety_sources').select(handoverSourceFields).where('incident_id', '=', incident.id).where('digest', '=', digest).executeTakeFirst()) ?? handoverUnavailable()
-  const run = verifyStoredSource(staged)
+export async function stageHandoverSource(tx: HandoverReader, incident: IncidentRow, digest: string) {
+  const row = asRow<SourceRow>(await tx.selectFrom('public_safety_sources').select(handoverSourceFields).where('incident_id', '=', incident.id).where('digest', '=', digest).executeTakeFirst()) ?? handoverUnavailable()
+  const run = verifyStoredSource(row)
   matchConfig(run, incident)
-  // An awaited native reread preserves the verified canonical binding before authority changes.
-  const current = asRow<SourceRow>(await tx.selectFrom('public_safety_sources').select(handoverSourceFields).where('incident_id', '=', incident.id).where('id', '=', staged.id).executeTakeFirst())
-  if (!current || JSON.stringify(current) !== JSON.stringify(staged)) handoverConflict()
+  return { row, run }
+}
+export async function unchangedHandoverSource(tx: HandoverReader, incident: IncidentRow, staged: Awaited<ReturnType<typeof stageHandoverSource>>): Promise<SourceRow> {
+  const current = asRow<SourceRow>(await tx.selectFrom('public_safety_sources').select(handoverSourceFields).where('incident_id', '=', incident.id).where('id', '=', staged.row.id).executeTakeFirst())
+  if (!current || JSON.stringify(current) !== JSON.stringify(staged.row)) handoverConflict()
+  matchConfig(staged.run, incident)
   return current
+}
+export async function verifiedHandoverSource(tx: HandoverReader, incident: IncidentRow, digest: string): Promise<SourceRow> {
+  return unchangedHandoverSource(tx, incident, await stageHandoverSource(tx, incident, digest))
 }
 export function offeredSource(facts: OfferFacts): SourceProjection {
   return { id: facts.sourceId, digest: facts.sourceDigest, byteLength: facts.sourceByteLength, replayProfile: 'owned-public-safety-collection-v1', evidence: 'owned-public-safety-physics-simulation', uploaderId: facts.sourceUploaderId, uploadedAt: facts.sourceUploadedAt, createdSequence: facts.sourceCreatedSequence, uploaderAuthenticated: true, ...flags }
