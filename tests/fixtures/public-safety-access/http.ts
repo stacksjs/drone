@@ -16,7 +16,7 @@ payload:{required:true,validation:{rule:schema.string()}},lastActivity:{required
 const { root, database, User } = await setupIncidentDatabase()
 const { generateMigrations } = await import('@stacksjs/database/migrations')
 const generated = await generateMigrations()
-assert(generated.isOk, String(generated.error))
+assert(generated.isOk)
 assert((await database.runDatabaseMigration()).isOk)
 const source = resolve(import.meta.dir, '../../..')
 await writeFile(join(root, 'app/Gates.ts'), `export { default } from ${JSON.stringify(join(source, 'app/Gates.ts'))}`)
@@ -28,6 +28,11 @@ const { authCookieName } = await import('@stacksjs/auth/cookie')
 const { sessionLogin, sessionCheck } = await import('@stacksjs/auth/session-auth')
 const { route } = await import('@stacksjs/router')
 await route.register(join(source, 'routes/api.ts'), { prefix: '/api' })
+const observedBodies = new Map<string, boolean>()
+route.use(async (request: Request, next: () => Response | null | Promise<Response | null>) => {
+  try { return await next() }
+  finally { const marker = request.headers.get('x-fixture-unread'); if (marker) observedBodies.set(marker, request.bodyUsed) }
+})
 const nativeRoutes = process.env.INCIDENT_NATIVE_ROUTES === 'true'
 const server = await route.serve({ hostname: '127.0.0.1', port: 0, nativeRoutes })
 try {
@@ -53,9 +58,11 @@ try {
   const config = examplePublicSafetyConfig()
   config.retention.expiresAt = new Date(Date.now() + 86400000).toISOString()
   const key = `/${config.id}`
-  assert.equal((await request('POST', '', null, '{')).status, 403) // Native cookie CSRF runs before the Action.
+  assert.equal((await request('POST', '', null, '{', { 'x-fixture-unread': 'unauthenticated' })).status, 401)
+  assert.equal(observedBodies.get('unauthenticated'), false)
   assert.equal((await request('GET', key, null)).status, 401)
-  assert.equal((await request('POST', '', tokens.get(observer.id)!, '{')).status, 403)
+  assert.equal((await request('POST', '', tokens.get(observer.id)!, '{', { 'x-fixture-unread': 'forbidden' })).status, 403)
+  assert.equal(observedBodies.get('forbidden'), false)
   assert.equal((await request('POST', '', token, '{')).status, 400)
   assert.equal((await request('POST', '', token, 'x'.repeat(256 * 1024 + 1))).status, 413)
   assert.equal((await request('POST', '', token, { config, actorId: outsider.id })).status, 422)
@@ -66,7 +73,8 @@ try {
   assert.equal(created.data.physicalFlightEnabled, false)
   assert.equal((await request('GET', key, tokens.get(outsider.id)!)).status, 403)
   assert.equal((await request('GET', key, null, undefined, { cookie: `${authCookieName()}=${token}` })).status, 200)
-  assert.equal((await request('POST', `${key}/close`, null, { expectedVersion: 1 }, { cookie: `${authCookieName()}=${token}` })).status, 403)
+  assert.equal((await request('POST', `${key}/close`, null, { expectedVersion: 1 }, { cookie: `${authCookieName()}=${token}`, 'x-fixture-unread': 'csrf' })).status, 403)
+  assert.equal(observedBodies.get('csrf'), false)
   const session = await sessionLogin(coordinator.email, password)
   assert.equal(await sessionCheck(session.sessionId), true)
   assert.equal((await request('GET', key, null, undefined, { cookie: `session_id=${session.sessionId}` })).status, 401)
