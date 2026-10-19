@@ -66,8 +66,8 @@ try {
       const { Auth } = await import('@stacksjs/auth/authentication'); assert(await Auth.user())
       writeFileSync(join(root, 'contender-ready'), 'ready')
       const deadline = Date.now() + 60000
-      while (!existsSync(pause) && Date.now() < deadline) await new Promise(resolve => setTimeout(resolve, 10))
-      assert(existsSync(pause))
+      while ((!existsSync(pause) || !existsSync(join(root, 'writer-stopped-confirmed'))) && Date.now() < deadline) await new Promise(resolve => setTimeout(resolve, 10))
+      assert(existsSync(pause) && existsSync(join(root, 'writer-stopped-confirmed')), 'Independent parent must observe actual OS stopped state')
       const current = (await managed.listPublicSafetyManagedArtifacts(saved.key, { requestId: saved.body.requestId })).entries[0]!
       const command = { expectedVersion: current.incidentVersion, expectedArtifactVersion: current.version, requestId: randomUUID() }
       if (stage === 'generation-claim') {

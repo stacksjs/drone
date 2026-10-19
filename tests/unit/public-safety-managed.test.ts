@@ -113,7 +113,7 @@ test('managed recovery classifies registered partial and manifest alias states w
 test('managed real writer authority fences competing reconciliation in both filesystem phases', async () => {
   for (const stage of ['held-prepare', 'held-publish', 'generation-claim']) {
     const root = await mkdtemp(join(tmpdir(), 'drone-incident-access-managed-writer-'))
-    let child: ReturnType<typeof Bun.spawn> | undefined
+    let child: ReturnType<typeof Bun.spawn> | undefined, contender: ReturnType<typeof Bun.spawn> | undefined
     try {
       const config = join(root, 'bunfig.toml'); await writeFile(config, 'preload=[]\n')
       const args = [process.execPath, `--config=${config}`, '--no-env-file', `${import.meta.dir}/../fixtures/public-safety-access/managed-process.ts`]
@@ -124,15 +124,29 @@ test('managed real writer authority fences competing reconciliation in both file
       const deadline = Date.now() + 60000
       while (!await Bun.file(join(root, 'managed-process.json')).exists() && child.exitCode === null && Date.now() < deadline) await new Promise(resolve => setTimeout(resolve, 10))
       if (!await Bun.file(join(root, 'managed-process.json')).exists()) { child.kill('SIGKILL'); await child.exited; throw new Error(`${stage}\n${await output}\n${await errors}`) }
-      const contender = Bun.spawn([...args, 'contend', stage], { ...options, env: { ...options.env, MANAGED_REUSE_DATABASE: '1' } })
-      const [contenderCode, contenderOut, contenderError] = await Promise.all([contender.exited, new Response(contender.stdout).text(), new Response(contender.stderr).text()])
+      const competing = Bun.spawn([...args, 'contend', stage], { ...options, env: { ...options.env, MANAGED_REUSE_DATABASE: '1' } })
+      contender = competing
+      let stopped = false
+      while (child.exitCode === null && Date.now() < deadline) {
+        const state = Bun.spawnSync(['ps', '-o', 'state=', '-p', String(child.pid)], { stdout: 'pipe', stderr: 'pipe' })
+        if (state.exitCode === 0 && state.stdout.toString().trim().startsWith('T')) { stopped = true; break }
+        await new Promise(resolve => setTimeout(resolve, 10))
+      }
+      expect(stopped, `${stage} must hold actual OS stopped state before the competing command`).toBe(true)
+      // The child's marker precedes self-SIGSTOP. This acknowledgment prevents a lost early SIGCONT.
+      await writeFile(join(root, 'writer-stopped-confirmed'), 'stopped')
+      const [contenderCode, contenderOut, contenderError] = await Promise.all([competing.exited, new Response(competing.stdout).text(), new Response(competing.stderr).text()])
       expect(contenderCode, `${stage}\n${contenderOut}\n${contenderError}`).toBe(0)
       expect(contenderOut).toContain(stage === 'generation-claim' ? 'PASS real public reconciliation commits new generation' : `PASS real public reconciler cannot write during ${stage}`)
-      child.kill('SIGCONT')
+      // Bun1.4.2's Subprocess.kill does not deliver SIGCONT on this platform. Use the actual OS API.
+      process.kill(child.pid, 'SIGCONT')
       expect(await child.exited, `${stage}\n${await output}\n${await errors}`).toBe(0)
       expect(await output).toContain(stage === 'generation-claim' ? 'PASS paused original live handle refuses committed reconciliation generation' : `PASS ${stage} completes after competing writer refusal`)
     }
-    finally { if (child && child.exitCode === null) { child.kill('SIGKILL'); await child.exited }; await rm(root, { recursive: true, force: true }) }
+    finally {
+      for (const pending of [contender, child]) if (pending && pending.exitCode === null) { process.kill(pending.pid, 'SIGKILL'); await pending.exited }
+      await rm(root, { recursive: true, force: true })
+    }
   }
 }, 180000)
 
