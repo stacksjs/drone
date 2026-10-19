@@ -10,7 +10,8 @@ const { initializeAuthorization } = await import('@stacksjs/auth/policy')
 await initializeAuthorization()
 const { Gate } = await import('@stacksjs/auth/gate')
 const { getCurrentRequest, route } = await import('@stacksjs/router')
-const { emit, replaySince, setReplayBuffer, stopServer } = await import('@stacksjs/realtime')
+const { createBroadcastHub, emit, replaySince, setReplayBuffer, stopServer } = await import('@stacksjs/realtime')
+const { transaction } = await import('@stacksjs/orm')
 const { workspaceRefreshChannel } = await import('../../../resources/functions/drone/public-safety/workspace/updates')
 await route.register(join(source, 'routes/api.ts'), { prefix: '/api' })
 const nativeRoutes = process.env.INCIDENT_NATIVE_ROUTES === 'true'
@@ -50,6 +51,16 @@ try {
   assert.equal((await slowReader.read()).done, true)
   await slowReader.cancel()
   const recovered = await connected(await send()); await recovered.cancel()
+  const oversized = await connected(await send())
+  emit(channel, 'refresh', { refresh: true, unexpected: 'x'.repeat(2048) })
+  assert.equal((await oversized.read()).done, true, 'Oversized native frames cannot cross final release')
+  await oversized.cancel()
+
+  const heartbeatToken = await f.credential(f.recipient.id, ['public-safety:read'])
+  const heartbeat = await connected(await send(heartbeatToken))
+  await f.tokens.revokeToken(heartbeatToken)
+  assert.equal((await heartbeat.read()).done, true, 'Native heartbeat must reread current authority even without a publication')
+  await heartbeat.cancel()
 
   let stalled = false
   Gate.after(async (user, ability) => {
@@ -72,6 +83,27 @@ try {
   assert.equal((await recipient.read()).done, true)
   assert(new TextDecoder().decode((await sender.read()).value).includes('"refresh":true'))
   await Promise.all([sender.cancel(), recipient.cancel()])
+
+  const before = await f.as(f.senderToken, () => f.access.readPublicSafetyIncident(seeded.key))
+  let hints = 0
+  const remove = createBroadcastHub().addBroadcastHook(message => {
+    if (message.channel !== channel) return
+    assert.equal(message.event, 'refresh')
+    assert.deepEqual(message.data, { refresh: true })
+    hints++
+  })
+  try {
+    const rollback = new Error('Intentional fixture outer rollback')
+    await assert.rejects(f.as(f.senderToken, () => transaction(async () => {
+      await f.access.changePublicSafetyMembership(seeded.key, { expectedVersion: before.version, userId: f.unrelated.id, role: 'reviewer' })
+      throw rollback
+    })), error => error === rollback)
+    assert.equal(hints, 0, 'A native outer rollback must publish no workspace hint')
+    assert.equal((await f.as(f.senderToken, () => f.access.readPublicSafetyIncident(seeded.key))).version, before.version)
+    await f.as(f.senderToken, () => f.access.changePublicSafetyMembership(seeded.key, { expectedVersion: before.version, userId: f.unrelated.id, role: 'reviewer' }))
+    assert.equal(hints, 1, 'Exactly the actual native COMMIT publishes the content-free hint')
+  }
+  finally { remove() }
 
   setReplayBuffer({ channels: ['*'] })
   try {

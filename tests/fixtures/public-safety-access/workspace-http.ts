@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict'
 import { AsyncLocalStorage } from 'node:async_hooks'
 import { writeFile } from 'node:fs/promises'
+import { createConnection } from 'node:net'
 import { join, resolve } from 'node:path'
 import { setupIncidentDatabase } from './setup'
 import { examplePublicSafetyConfig } from '../../../resources/functions/drone/public-safety/fixtures'
@@ -16,6 +17,7 @@ await initializeAuthorization()
 const { Rbac } = await import('@stacksjs/auth/rbac')
 const { Gate } = await import('@stacksjs/auth/gate')
 const { createToken, revokeToken } = await import('@stacksjs/auth/tokens')
+const { authCookieName } = await import('@stacksjs/auth/cookie')
 const { route, getCurrentRequest } = await import('@stacksjs/router')
 const { emit } = await import('@stacksjs/realtime/emit')
 const { workspaceRefreshChannel } = await import('../../../resources/functions/drone/public-safety/workspace/updates')
@@ -77,10 +79,30 @@ try {
   const readCredential = await token(reader.id, ['public-safety:read'])
   const outsiderCredential = await token(outsider.id, ['public-safety:read'])
   const coordinateOnly = await token(coordinator.id, ['public-safety:coordinate'])
+  // fetch refuses GET bodies before sending; a real loopback HTTP socket reaches the server seam.
+  const bodyRequest = (path: string, token: string | null, marker: string, chunked = false) => new Promise<number>((resolve, reject) => {
+    const socket = createConnection({ host: '127.0.0.1', port: server.port! })
+    let response = ''
+    socket.setTimeout(5000, () => socket.destroy(new Error('Fixture GET body response timed out')))
+    socket.on('error', reject)
+    socket.on('data', bytes => { response += bytes.toString() })
+    socket.on('end', () => { const status = /^HTTP\/1\.1 (\d+)/.exec(response); assert(status); resolve(Number(status[1])) })
+    const body = ' '.repeat(8193)
+    socket.on('connect', () => socket.write(`GET /api/public-safety/incidents${path} HTTP/1.1\r\nHost: 127.0.0.1:${server.port}\r\nConnection: close\r\n${token ? `Authorization: Bearer ${token}\r\n` : ''}Content-Type: application/json\r\n${chunked ? 'Transfer-Encoding: chunked' : 'Content-Length: 8193'}\r\nX-Fixture-Unread: ${marker}\r\n\r\n${chunked ? `${body.length.toString(16)}\r\n${body}\r\n0\r\n\r\n` : body}`))
+  })
   for (const suffix of ['/workspace', '/workspace/events']) {
     assert.equal((await send('GET', `/workspace-wire${suffix}`, undefined, outsiderCredential)).status, 403)
     assert.equal((await send('GET', `/workspace-wire${suffix}`, undefined, coordinateOnly)).status, 403)
+    for (const [current, status, name] of [[null, 401, 'anonymous'], [outsiderCredential, 403, 'outsider'], [coordinateOnly, 403, 'scope'], [credential, 422, 'authorized']] as const) {
+      const marker = `workspace-${name}-${suffix}`
+      assert.equal(await bodyRequest(`/workspace-wire${suffix}`, current, marker), status)
+      assert.equal(observedBodies.get(marker), false, 'GET bodies must stay unread, including after successful authority checks')
+    }
+    const marker = `workspace-chunked-${suffix}`
+    assert.equal(await bodyRequest(`/workspace-wire${suffix}`, credential, marker, true), 422)
+    assert.equal(observedBodies.get(marker), false)
   }
+  assert.equal((await send('GET', '/workspace-wire/workspace', undefined, null, { cookie: `${authCookieName()}=${credential}` })).status, 200, 'Native safe GET cookie authentication needs no mutation CSRF exchange')
   assert.equal((await send('PUT', '/workspace-wire/members', { expectedVersion: 1, userId: reader.id, role: 'observer' })).status, 200)
   const recording = simulatePublicSafety({ config, seconds: 10 })
   const admitted = await send('POST', '/workspace-wire/sources', { expectedVersion: 2, recording: JSON.parse(publicSafetyRecordingData(recording)) })
@@ -114,7 +136,11 @@ try {
       if (committed || !getCurrentRequest()?.headers.has('x-fixture-commit-scope')) return
       committed++
       // The native writer committed; publication deliberately has no SQL.
-      emit(workspaceRefreshChannel(Number(incident.id)), 'refresh', { refresh: true })
+      await Promise.all(['emitter-one', 'emitter-two'].map(label => subscriberContext.run(label, async () => {
+        await Promise.resolve()
+        emit(workspaceRefreshChannel(Number(incident.id)), 'refresh', { refresh: true })
+        assert.equal(subscriberContext.getStore(), label, 'Concurrent emitter context is restored')
+      })))
       await Bun.sleep(20)
       assert(getCurrentRequest()?.headers.has('x-fixture-commit-scope'), 'Publisher context is restored')
     } })

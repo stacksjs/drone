@@ -14,7 +14,9 @@ async function authorize(key: string): Promise<void> {
 }
 function options(request: IncidentRequest, events: boolean): WorkspaceOptions {
   const url = new URL(request.url)
-  if (url.search.length > 4096 || request.body) throw new PublicSafetyAccessError(422, 'Invalid workspace request')
+  const length = request.headers.get('content-length')
+  // Bun may expose a GET body as null; reject its wire framing without reading it.
+  if (url.search.length > 4096 || request.body || request.headers.has('transfer-encoding') || length !== null && length !== '0') throw new PublicSafetyAccessError(422, 'Invalid workspace request')
   const values = url.searchParams
   if ([...values.keys()].some(name => events || !keys.includes(name as typeof keys[number]) || values.getAll(name).length !== 1)) throw new PublicSafetyAccessError(422, 'Invalid workspace options')
   const result: Record<string, string | number> = {}
