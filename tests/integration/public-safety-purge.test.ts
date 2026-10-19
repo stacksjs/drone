@@ -57,6 +57,12 @@ test.skipIf(process.env.PUBLIC_SAFETY_PURGE_NAMESPACE_TEST !== '1')('accepted pu
   for (const kind of ['root-replacement', 'parent-replacement', 'root-uid', 'parent-uid']) expect(stdout).toContain(`PASS actual ${kind} preserves`)
 }, 180000)
 
+test.skipIf(process.env.PUBLIC_SAFETY_PURGE_NAMESPACE_TEST !== '1')('accepted purge serializes six real public writers against held freeze authority', async () => {
+  requireQualifiedNamespace()
+  const { qualifyPurgeMixedFreezeRace } = await import('../helpers/public-safety-purge-mixed-race')
+  await qualifyPurgeMixedFreezeRace()
+}, 180000)
+
 test.skipIf(process.env.PUBLIC_SAFETY_PURGE_NAMESPACE_TEST !== '1')('accepted purge recovers genuine SIGKILL after namespace unlink', async () => {
   requireQualifiedNamespace()
   await qualifyPurgeProcessRecovery()
