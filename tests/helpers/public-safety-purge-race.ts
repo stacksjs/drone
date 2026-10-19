@@ -1,5 +1,4 @@
 import { expect } from 'bun:test'
-import { execFileSync } from 'node:child_process'
 import { existsSync } from 'node:fs'
 import { mkdtemp, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
@@ -21,11 +20,17 @@ export async function qualifyPurgeExecutorRace(stage: 'held-claim' | 'stale-read
     const first = await run('first', true), deadline = Date.now() + 45000
     while (!existsSync(join(root, 'purge-race-paused.json')) && first.child.exitCode === null && Date.now() < deadline) await new Promise(resolve => setTimeout(resolve, 10))
     if (!existsSync(join(root, 'purge-race-paused.json'))) { if (first.child.exitCode === null) first.child.kill('SIGKILL'); const [code, stdout, stderr] = await first.result; throw new Error(`Actual ${stage} barrier not observed (${code})\n${stdout}\n${stderr}`) }
-    expect(execFileSync('ps', ['-o', 'stat=', '-p', String(first.child.pid)], { encoding: 'utf8' }).trim()).toContain('T')
+    let stopped = false
+    while (first.child.exitCode === null && Date.now() < deadline) {
+      const state = Bun.spawnSync(['ps', '-o', 'state=', '-p', String(first.child.pid)], { stdout: 'pipe', stderr: 'pipe' })
+      if (state.exitCode === 0 && state.stdout.toString().trim().startsWith('T')) { stopped = true; break }
+      await new Promise(resolve => setTimeout(resolve, 10))
+    }
+    expect(stopped, 'Marker must be followed by actual OS stopped state before the competing operation').toBe(true)
     const second = await run('second', true)
     const [secondCode, secondOutput, secondErrors] = await second.result
     expect(secondCode, `${secondOutput}\n${secondErrors}`).toBe(0)
-    first.child.kill('SIGCONT')
+    process.kill(first.child.pid, 'SIGCONT')
     const [firstCode, firstOutput, firstErrors] = await first.result
     expect(firstCode, `${firstOutput}\n${firstErrors}`).toBe(0)
     const finish = await run('finish', true)

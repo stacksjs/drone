@@ -1,5 +1,4 @@
 import { expect } from 'bun:test'
-import { execFileSync } from 'node:child_process'
 import { existsSync } from 'node:fs'
 import { mkdtemp, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
@@ -24,11 +23,18 @@ export async function qualifyPurgeStoppedWriter(stage: 'between-stages' | 'held-
     }
     while (!existsSync(join(root, 'purge-writer-paused.json')) && writer.child.exitCode === null && Date.now() < deadline) await new Promise(resolve => setTimeout(resolve, 10))
     if (!existsSync(join(root, 'purge-writer-paused.json'))) { if (writer.child.exitCode === null) writer.child.kill('SIGKILL'); const [code, stdout, stderr] = await writer.result; throw new Error(`Actual B writer barrier missing (${code})\n${stdout}\n${stderr}`) }
-    expect(execFileSync('ps', ['-o', 'stat=', '-p', String(writer.child.pid)], { encoding: 'utf8' }).trim()).toContain('T')
+    let stopped = false
+    while (writer.child.exitCode === null && Date.now() < deadline) {
+      const state = Bun.spawnSync(['ps', '-o', 'state=', '-p', String(writer.child.pid)], { stdout: 'pipe', stderr: 'pipe' })
+      if (state.exitCode === 0 && state.stdout.toString().trim().startsWith('T')) { stopped = true; break }
+      await new Promise(resolve => setTimeout(resolve, 10))
+    }
+    expect(stopped, 'Marker must be followed by actual OS stopped state before the competing operation').toBe(true)
+    await writeFile(join(root, 'writer-stopped-confirmed'), 'stopped')
     accepter ??= run('accept', true)
     const [acceptCode, acceptOut, acceptErrors] = await accepter.result
     expect(acceptCode, `${acceptOut}\n${acceptErrors}`).toBe(0)
-    writer.child.kill('SIGCONT')
+    process.kill(writer.child.pid, 'SIGCONT')
     const [writerCode, writerOut, writerErrors] = await writer.result
     expect(writerCode, `${writerOut}\n${writerErrors}`).toBe(0)
     expect(writerOut).toContain(stage === 'between-stages' ? 'PASS actual stopped B live writer refuses payload' : `PASS actual stopped B ${stage} write authority finishes`)

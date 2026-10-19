@@ -46,8 +46,8 @@ try {
         const { Auth } = await import('@stacksjs/auth/authentication'); assert(await Auth.user())
         writeFileSync(join(root, 'purge-writer-contender-ready'), 'ready')
         const deadline = Date.now() + 45000
-        while (!existsSync(pausedPath) && Date.now() < deadline) await new Promise(resolve => setTimeout(resolve, 10))
-        assert(existsSync(pausedPath))
+        while ((!existsSync(pausedPath) || !existsSync(join(root, 'writer-stopped-confirmed'))) && Date.now() < deadline) await new Promise(resolve => setTimeout(resolve, 10))
+        assert(existsSync(pausedPath) && existsSync(join(root, 'writer-stopped-confirmed')))
       }
       if (mode === 'accept') {
         const wait = Date.parse(saved.expiresAt) - Date.now() + 20
