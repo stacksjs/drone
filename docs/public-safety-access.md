@@ -56,8 +56,9 @@ a body-only CSRF token is unavailable because these routes defer body parsing un
 | Evidence custodian | Yes | Yes | No |
 
 Creation installs exactly one coordinator. Membership changes cannot mint another coordinator,
-remove or demote the current one, or perform handover. That requires the separate two-phase
-handover workflow. An account needs both platform eligibility and active incident membership.
+remove or demote the current one, or perform handover. Use the separate two-phase
+[incident coordination handover](public-safety-handover.md), currently under qualification.
+An account needs both platform eligibility and active incident membership.
 Client-supplied actor, grantor or principal fields grant nothing and are rejected by mutation schemas.
 
 The service resolves the current native request and account, then checks the current token and
@@ -135,6 +136,7 @@ with immutable verified collection sources, explicit pixel declarations and appe
 The [retention custody functions](public-safety-retention.md) add minimal status and explicit hold
 review after expiry, without reopening content access or deleting data.
 The [separate purge module](public-safety-purge.md) records explicit accepted removal and minimal
-receipts, with declared exclusions. Issue #23 remains open for atomic recipient-bound team
-handover, an authorized operator workspace and live observations, plus jurisdiction, hardware,
+receipts, with declared exclusions. The [handover module](public-safety-handover.md) transfers
+incident coordination after explicit recipient acknowledgement. Issue #23 remains open for
+sector/team assignments, an authorized operator workspace and live observations, plus jurisdiction, hardware,
 firmware interoperability and operational qualification.

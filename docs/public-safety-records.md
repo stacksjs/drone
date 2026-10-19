@@ -118,6 +118,8 @@ uncacheable. These models have no generated REST, search or generic dashboard ex
 The access deadline controls current reads and writes. It does not erase database pages, exported
 files, backups or uncontrolled copies. [Retention custody](public-safety-retention.md) provides explicit enrollment and hold review,
 without granting deletion authority. [Accepted local purge](public-safety-purge.md) separately
-controls active DB payload and registered files; uncontrolled copies remain excluded. Recipient-bound
-atomic handover, an authorized operator workspace and live observations remain in issue #23,
+controls active DB payload and registered files; uncontrolled copies remain excluded. The
+[incident handover module](public-safety-handover.md) binds recipient acknowledgement to a
+selected-source briefing and its original uncertainty. Sector/team assignments, an authorized
+operator workspace and live observations remain in issue #23,
 alongside hardware, jurisdiction/operator, interoperability and field qualification.
