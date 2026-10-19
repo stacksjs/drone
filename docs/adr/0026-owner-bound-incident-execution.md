@@ -92,6 +92,22 @@ qualified by an actual HTTP and rendered STX observer receiving a real producer
 event while a later private credit is held and the simulator has not returned.
 There is no public per-event acknowledgement or finished-array progress replay.
 
+Producer credit must follow successful native enqueue of that exact progress
+view. Calling `emit` alone cannot establish enqueue: native authorization runs
+later and may close a full stream. Connected and heartbeat frames cannot grant
+an application credit. Native closure releases the execution subscriber and
+rejects any pending publication. The outer reader still checks current authority
+before releasing unchanged native bytes.
+
+The installed realtime package, 0.75.221, lacks enqueue and close observers.
+Contribute those optional observers to Stacks, then pin the reviewed stream
+implementation in a narrow application compatibility module using the installed
+native hub. This bridge requires its own source and copied-artifact tests and
+does not upgrade the installed package. Remove it when an adopted native release
+passes the same enqueue, closure and subscriber-context tests. No alternate event
+bus, frame parser, wire reconstruction or package publication is part of this
+decision.
+
 Completion writes no durable source. Explicit admission single-flights against
 close and uses one private checked-registration seam in the existing sole
 writer. After canonical replay, that seam checks original owner, membership
