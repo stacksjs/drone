@@ -2,7 +2,7 @@ import type { MissionPlan, MissionTask } from '../missions/plan'
 import type { SensorVector } from '../sensors/types'
 import type { SurveyCapture, SurveyPlan, SurveyPose, SurveyRun } from './types'
 import type { SurveyCamera } from './camera'
-import type { MissionSimulationInstrument } from '../missions/simulation'
+import type { MissionSimulationInstrument, MissionSimulationContext, MissionSimulationObservation } from '../missions/simulation'
 import { simulateMission } from '../missions/simulation'
 import { validateMission } from '../missions/plan'
 import { rotateBodyToNed } from '../controls/physics'
@@ -16,6 +16,28 @@ import { surveyDatasetLimits } from './quality'
 
 export const surveyScenarios = ['nominal', 'crosshatch', 'terrain', 'camera-loss', 'wrong-ack', 'imu-loss', 'position-loss', 'rc-override', 'abort'] as const
 export type SurveyScenario = typeof surveyScenarios[number]
+
+export interface SurveySimulationOptions {
+  config?: unknown
+  scenario?: SurveyScenario
+  seconds?: number
+  /** Bound to the actual shutter request and every correlated ACK. */
+  sessionId?: string
+  cameraFactory?: (plan: SurveyPlan, fault: 'none' | 'loss' | 'wrong-ack') => SurveyCamera
+  observation?(nowMs: number): MissionSimulationObservation
+  /** Synchronous policy before collection admission with isolated current-epoch snapshots. */
+  observe?(context: MissionSimulationContext): 'abort' | undefined
+  /** Synchronous confirmed-capture notification during the loop, never from a finished trace. */
+  onCapture?(capture: SurveyCapture, context: MissionSimulationContext): void
+}
+
+function synchronousHook<T>(value: T): T {
+  if (value instanceof Promise) {
+    Promise.prototype.then.call(value, () => {}, () => {})
+    throw new TypeError('Survey simulation hooks must be synchronous')
+  }
+  return value
+}
 
 /** Compile only what the existing owned quad mission can execute within its retained bounds. */
 export function compileSurveyMission(input: SurveyPlan): MissionPlan {
@@ -36,8 +58,10 @@ export function compileSurveyMission(input: SurveyPlan): MissionPlan {
 }
 
 /** Owned raw sensor, estimator, mission and quad physics collection. Camera truth never supplies a geotag. */
-export function simulateSurvey(options: { config?: unknown, scenario?: SurveyScenario, seconds?: number, cameraFactory?: (plan: SurveyPlan, fault: 'none' | 'loss' | 'wrong-ack') => SurveyCamera } = {}): SurveyRun {
+export function simulateSurvey(options: SurveySimulationOptions = {}): SurveyRun {
   const scenario = options.scenario ?? 'nominal', seconds = options.seconds ?? 100
+  const sessionId = options.sessionId === undefined ? 'mapping-session-1' : options.sessionId
+  if (typeof sessionId !== 'string' || !/^[a-z][a-z0-9-]{0,63}$/.test(sessionId)) throw new TypeError('Invalid survey session identity')
   if (!surveyScenarios.includes(scenario) || !Number.isInteger(seconds) || seconds < 8 || seconds > 120) throw new RangeError('Invalid survey scenario or duration (8..120 seconds)')
   const config = options.config === undefined ? exampleSurveyConfig() : structuredClone(options.config)
   if (options.config === undefined && scenario === 'crosshatch') (config as ReturnType<typeof exampleSurveyConfig>).crosshatch = true
@@ -52,10 +76,17 @@ export function simulateSurvey(options: { config?: unknown, scenario?: SurveySce
   let lastLane = '', lastPosition: SensorVector | null = null, lastReference: string | null = null
   const fail = (message: string): 'abort' => { reason ??= message; pending = null; camera.close(); return 'abort' }
   const instrument: MissionSimulationInstrument = {
+    observation: options.observation,
     dropSensors(nowMs) { return { imu: scenario === 'imu-loss' && nowMs >= 7000 && nowMs < 9000, position: scenario === 'position-loss' && nowMs >= 7000 && nowMs < 9000 } },
     render: camera.render,
-    observe({ nowMs, estimate, sensors, mission: state, authority }) {
+    observe(context) {
+      const { nowMs, estimate, sensors, mission: state, authority } = context
       if (reason) return 'abort'
+      try {
+        const action = synchronousHook(options.observe?.(structuredClone(context)))
+        if (action !== undefined) return fail(action === 'abort' ? 'collection-policy-abort' : 'collection-policy-invalid')
+      }
+      catch { return fail('collection-policy-failed') }
       if (state.state !== 'running') return undefined
       if (authority !== 'autonomous') { reason = 'collection-authority-lost'; camera.close(); return undefined }
       try {
@@ -63,7 +94,12 @@ export function simulateSurvey(options: { config?: unknown, scenario?: SurveySce
           const ack = camera.poll(nowMs)
           if (ack) {
             if (ack.sessionId !== pending.sessionId || ack.sequence !== pending.sequence || ack.reference !== pending.pose.reference || ack.issuedAtMs !== pending.issuedAtMs || ack.capturedAtMs !== pending.capturedAtMs || ack.acknowledgedAtMs > pending.issuedAtMs + 80 || ack.rgba.length !== pending.width * pending.height * 4) return fail('camera-ack-scope-or-timing')
-            captures.push({ ...pending, rgba: ack.rgba, acknowledgedAtMs: ack.acknowledgedAtMs }); pending = null
+            const confirmed = { ...pending, rgba: new Uint8Array(ack.rgba), acknowledgedAtMs: ack.acknowledgedAtMs }
+            captures.push(confirmed); pending = null
+            try {
+              if (synchronousHook(options.onCapture?.(structuredClone(confirmed), structuredClone(context))) !== undefined) return fail('capture-observer-invalid')
+            }
+            catch { return fail('capture-observer-failed') }
           }
           else if (nowMs >= pending.issuedAtMs + 80) return fail('camera-ack-deadline')
         }
@@ -87,7 +123,7 @@ export function simulateSurvey(options: { config?: unknown, scenario?: SurveySce
         const positionSigmaM = Math.sqrt(Math.max(...p.covarianceBlocks.map(block => block.positionM2))) + plan.config.calibration.uncertainty.translationSigmaM + Math.hypot(...p.velocityMps) * clockSeconds + Math.hypot(...plan.config.calibration.extrinsics.translationM) * attitudeSigmaRad
         const surveyPose: SurveyPose = { capturedAtMs: nowMs, reference: pose.reference, positionM: pose.positionM, quaternionWxyz: pose.quaternionWxyz, cameraPositionM, geodetic: nedToGeodetic(cameraPositionM, plan.config.origin), positionSigmaM, attitudeSigmaRad, headingAlignment: 'initial-simulation-north', positionCapturedAtMs: pose.positionCapturedAtMs, attitudeCapturedAtMs: pose.attitudeCapturedAtMs, attitudePrediction: 'qualified-gyro-hold' }
         const id = `photo-${String(++sequence).padStart(4, '0')}`
-        pending = { id, filename: `${id}.png`, laneId: lane.id, sessionId: 'mapping-session-1', sequence, issuedAtMs: nowMs, capturedAtMs: nowMs, exposureTimeUs: plan.config.exposureTimeUs, timestampReference: 'synthetic-exposure-midpoint', clockDomain: 'fixture-monotonic-ms', clockUncertaintyMs: plan.config.calibration.timing.clockUncertaintyMs, calibrationId: plan.config.calibration.id, pose: surveyPose, width, height, footprintM: projectSurveyFootprint(plan, pose.positionM, pose.quaternionWxyz), rtk: { status: 'unavailable', reason: 'Synthetic GNSS has no RTK correction solution' }, ppk: { status: 'unavailable', reason: 'No raw carrier-phase observations or base station' }, gcps: { status: 'unavailable', reason: 'No independently surveyed ground control observations' } }
+        pending = { id, filename: `${id}.png`, laneId: lane.id, sessionId, sequence, issuedAtMs: nowMs, capturedAtMs: nowMs, exposureTimeUs: plan.config.exposureTimeUs, timestampReference: 'synthetic-exposure-midpoint', clockDomain: 'fixture-monotonic-ms', clockUncertaintyMs: plan.config.calibration.timing.clockUncertaintyMs, calibrationId: plan.config.calibration.id, pose: surveyPose, width, height, footprintM: projectSurveyFootprint(plan, pose.positionM, pose.quaternionWxyz), rtk: { status: 'unavailable', reason: 'Synthetic GNSS has no RTK correction solution' }, ppk: { status: 'unavailable', reason: 'No raw carrier-phase observations or base station' }, gcps: { status: 'unavailable', reason: 'No independently surveyed ground control observations' } }
         camera.request({ sessionId: pending.sessionId, sequence, issuedAtMs: nowMs, reference: pose.reference })
         lastAt = nowMs; lastLane = lane.id; lastPosition = [...pose.positionM]
       }

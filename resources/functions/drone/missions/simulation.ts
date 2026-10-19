@@ -4,7 +4,8 @@ import type { MissionAction, MissionSnapshot } from './engine'
 import type { EstimatorSnapshot } from '../estimation/estimator'
 import type { SensorSnapshot } from '../sensors/pipeline'
 import type { RigidBodyState } from '../controls/physics'
-import type { AuthorityState } from '../authority/supervisor'
+import type { AuthorityState, AuthorityObservation } from '../authority/supervisor'
+import { authorityPolicy } from '../authority/supervisor'
 import { createAuthoritySupervisor } from '../authority/supervisor'
 import { createSimulatedOutputWatchdog } from '../authority/watchdog'
 import { createRigidBody } from '../controls/physics'
@@ -15,12 +16,59 @@ import { createMissionEngine, observeMission, recoverMission } from './engine'
 import { exampleMission, validateMission } from './plan'
 export const missionScenarios = ['nominal', 'pause-resume', 'recovery', 'abort', 'rc-override', 'reserve', 'branch-return'] as const
 export type MissionScenario = typeof missionScenarios[number]
+/** Qualified external fixture observations. Neither field can increase modeled authority. */
+export interface MissionSimulationObservation {
+  link?: AuthorityObservation['link']
+  battery?: AuthorityObservation['battery']
+}
+/** Isolated same-epoch inputs after actual supervisor qualification, before the next mission step. */
+export interface MissionSimulationContext {
+  nowMs: number
+  estimate: EstimatorSnapshot
+  sensors: SensorSnapshot
+  mission: MissionSnapshot
+  authority: AuthorityState
+  battery: AuthorityObservation['battery']
+  link: AuthorityObservation['link']
+}
 /** Simulation instrumentation keeps model rendering separate from estimated collection decisions. */
 export interface MissionSimulationInstrument {
+  observation?(nowMs: number): MissionSimulationObservation
   disturbance?(nowMs: number): { windMps?: SensorVector, forceN?: SensorVector, torqueNm?: SensorVector }
   dropSensors?(nowMs: number): { imu?: boolean, position?: boolean }
   render(state: RigidBodyState, nowMs: number): void
-  observe(context: { nowMs: number, estimate: EstimatorSnapshot, sensors: SensorSnapshot, mission: MissionSnapshot, authority: AuthorityState }): 'abort' | undefined
+  observe(context: MissionSimulationContext): 'abort' | undefined
+}
+
+function plainData(value: unknown, keys: string[]): value is Record<string, unknown> {
+  if (!value || typeof value !== 'object' || Object.getPrototypeOf(value) !== Object.prototype) return false
+  const descriptors = Object.getOwnPropertyDescriptors(value)
+  return Reflect.ownKeys(descriptors).every(key => typeof key === 'string' && keys.includes(key) && 'value' in descriptors[key]! && descriptors[key]!.enumerable)
+}
+
+function synchronousResult<T>(value: T): T {
+  if (value instanceof Promise) {
+    // Consume a genuine rejected promise without allowing a late callback to continue the owned loop.
+    Promise.prototype.then.call(value, () => {}, () => {})
+    throw new TypeError('Mission simulation callbacks must be synchronous')
+  }
+  return value
+}
+
+function qualifiedObservation(value: unknown, nowMs: number, nominalBattery: number, previous: MissionSimulationObservation): MissionSimulationObservation {
+  if (!plainData(value, ['link', 'battery'])) throw new TypeError('Invalid mission instrument observation')
+  const result: MissionSimulationObservation = {}
+  for (const kind of ['link', 'battery'] as const) {
+    if (!Object.hasOwn(value, kind)) continue
+    const sample = value[kind], field = kind === 'link' ? 'connected' : 'remainingPercent'
+    if (!plainData(sample, ['capturedAtMs', field]) || Object.keys(sample).length !== 2 || !Number.isSafeInteger(sample.capturedAtMs) || (sample.capturedAtMs as number) < 0 || (sample.capturedAtMs as number) > nowMs || nowMs - (sample.capturedAtMs as number) > (kind === 'link' ? authorityPolicy.linkAgeMs : authorityPolicy.batteryAgeMs)) throw new TypeError('Invalid mission instrument clock')
+    if (kind === 'link' ? typeof sample.connected !== 'boolean' : !Number.isFinite(sample.remainingPercent) || (sample.remainingPercent as number) < 0 || (sample.remainingPercent as number) > nominalBattery) throw new TypeError('Invalid mission instrument resource')
+    const prior = previous[kind]
+    if (prior && ((sample.capturedAtMs as number) < prior.capturedAtMs || (sample.capturedAtMs === prior.capturedAtMs && sample[field] !== (prior as unknown as Record<string, unknown>)[field]))) throw new TypeError('Replayed mission instrument observation')
+    if (kind === 'link') result.link = { capturedAtMs: sample.capturedAtMs as number, connected: sample.connected as boolean }
+    else result.battery = { capturedAtMs: sample.capturedAtMs as number, remainingPercent: sample.remainingPercent as number }
+  }
+  return result
 }
 /** Actual owned raw-sensor/estimator/control pipeline, with a separately ticking modeled board. */
 export function simulateMission(options: { plan?: unknown, scenario?: MissionScenario, seconds?: number, instrument?: MissionSimulationInstrument } = {}) {
@@ -45,6 +93,7 @@ export function simulateMission(options: { plan?: unknown, scenario?: MissionSce
   let lastTask = ''
   let lastState = ''
   let recovered = false
+  let previousObservation: MissionSimulationObservation = {}
   const transitions: { atMs: number, taskId: string, state: string, reason: string }[] = []
   const path: { atMs: number, estimatedPositionM: number[] | null, truthPositionM: number[], targetM: number[] | null, state: string, taskId: string }[] = []
   const triggers: { atMs: number, taskId: string, channel: string, evidence: 'simulated-event' }[] = []
@@ -56,14 +105,26 @@ export function simulateMission(options: { plan?: unknown, scenario?: MissionSce
     sensors = feed.advanceTo(nowMs)
     estimate = estimator.update(sensors)
     if (nowMs < 600 || nowMs % 20 !== 0) continue
-    const batteryPercent = scenario === 'reserve' && nowMs >= 5000 ? 29 : (scenario === 'branch-return' ? 75 : 100) - plan.power.hoverW * Math.max(0, nowMs - 600) / 3600000 / plan.power.availableWh * 100
+    const nominalBattery = scenario === 'reserve' && nowMs >= 5000 ? 29 : (scenario === 'branch-return' ? 75 : 100) - plan.power.hoverW * Math.max(0, nowMs - 600) / 3600000 / plan.power.availableWh * 100
+    let supplied: MissionSimulationObservation = {}, instrumentInvalid = false
+    try {
+      const provider = options.instrument?.observation
+      if (provider !== undefined) {
+        const update = qualifiedObservation(synchronousResult(provider(nowMs)), nowMs, nominalBattery, previousObservation)
+        // Omission is not a new measurement and cannot restore a depleted resource or refresh its age.
+        supplied = qualifiedObservation({ ...previousObservation, ...update }, nowMs, 100, previousObservation)
+        previousObservation = supplied
+      }
+    }
+    catch { instrumentInvalid = true }
+    const batteryPercent = instrumentInvalid ? 0 : Math.min(supplied.battery?.remainingPercent ?? nominalBattery, nominalBattery)
     const runtime = board.snapshot()
     const observation = {
       kind: 'simulation' as const, nowMs, estimate,
       runtime: { bootId: runtime.bootId, capturedAtMs: nowMs, watchdogHealthy: runtime.fault === null },
       rc: { capturedAtMs: nowMs, connected: true, armSwitch: true, override: scenario === 'rc-override' && nowMs >= 5000 },
       interlocks: { capturedAtMs: nowMs, killActive: false, onGround: nowMs === 600 || truth.groundContact, motorsStopped: truth.motorsN.every(n => n < 0.01) },
-      battery: { capturedAtMs: nowMs, remainingPercent: batteryPercent }, link: { capturedAtMs: nowMs, connected: true },
+      battery: { capturedAtMs: supplied.battery?.capturedAtMs ?? nowMs, remainingPercent: batteryPercent }, link: instrumentInvalid ? { capturedAtMs: nowMs, connected: false } : supplied.link ?? { capturedAtMs: nowMs, connected: true },
     }
     const send = (action: 'arm' | 'engage' | 'renew' | 'disarm', targetM = mission.targetM) => {
       const s = supervisor.snapshot()
@@ -74,17 +135,20 @@ export function simulateMission(options: { plan?: unknown, scenario?: MissionSce
     if (nowMs === 600) { send('arm'); send('engage', [0, 0, 0]) }
     const missionInput = observeMission({ estimate, authority: supervisor.snapshot().state, batteryPercent, onGround: observation.interlocks.onGround })
     let action: MissionAction | undefined = nowMs === 600 ? 'start' : undefined
+    let instrumentAbort = instrumentInvalid
     if (options.instrument) {
       try {
-        options.instrument.render(structuredClone(truth), nowMs)
-        if (options.instrument.observe({ nowMs, estimate: structuredClone(estimate), sensors: structuredClone(sensors), mission: structuredClone(mission), authority: supervisor.snapshot().state }) === 'abort') action = 'abort'
+        if (synchronousResult(options.instrument.render(structuredClone(truth), nowMs)) !== undefined) throw new TypeError('Invalid mission render callback result')
+        const result = synchronousResult(options.instrument.observe(structuredClone({ nowMs, estimate, sensors, mission, authority: supervisor.snapshot().state, battery: observation.battery, link: observation.link })))
+        if (result !== undefined) instrumentAbort = true
       }
-      catch { action = 'abort' }
+      catch { instrumentAbort = true }
     }
     if (scenario === 'pause-resume' && nowMs === 5000) action = 'pause'
     if ((scenario === 'pause-resume' || scenario === 'recovery') && nowMs === 7000) action = 'resume'
     if (scenario === 'abort' && nowMs === 5000) action = 'abort'
-    if (scenario === 'recovery' && nowMs === 5000) {
+    if (instrumentAbort) action = 'abort'
+    if (scenario === 'recovery' && nowMs === 5000 && !instrumentAbort) {
       engine = recoverMission(JSON.parse(JSON.stringify(engine.trace())), missionInput)
       mission = engine.snapshot(); recovered = true
     }
