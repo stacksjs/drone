@@ -7,6 +7,6 @@ export async function incidentDataExposureBoundary(request: Request, next: () =>
   try { path = decodeURIComponent(path).toLowerCase() }
   catch { /* Malformed escapes cannot match a supported native literal route. */ }
   const reserved = ['/api/dashboard', '/models', '/dashboard']
-  if (reserved.some(prefix => path === prefix || path.startsWith(`${prefix}/`))) return Response.json({ error: 'Not Found' }, { status: 404, headers: { 'Cache-Control': 'private, no-store', 'Vary': 'Authorization, Cookie' } })
+  if (reserved.some(prefix => path === prefix || path.startsWith(`${prefix}/`))) return Response.json({ error: 'Not Found' }, { status: 404, headers: { 'Cache-Control': 'private, no-store', 'Vary': 'Authorization, Cookie', 'X-Content-Type-Options': 'nosniff' } })
   return next()
 }
