@@ -102,6 +102,8 @@ export interface VehicleSession {
   createPayload?(): VehiclePayloadPort
   /** Quantize model truth into declared measurements. Called every 20 ms with capture-time reference. */
   renderMeasurement(state: VehiclePlantState, atMs: number, reference: string): VehicleMeasurement
+  /** Independent simulator probes only. Never a controller measurement or host estimate. */
+  observeIndependent?(state: VehiclePlantState, atMs: number, actuators: number[], hostAvailable: boolean): void
 }
 export interface VehicleProfile {
   scenario: string
