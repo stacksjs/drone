@@ -1,3 +1,4 @@
+import { retainedPreview } from '../../helpers/public-safety-retained'
 import assert from 'node:assert/strict'
 import { mkdir, readFile } from 'node:fs/promises'
 import { openSync, closeSync } from 'node:fs'
@@ -40,7 +41,7 @@ try {
     const run = simulatePublicSafety({ config, seconds: 10 })
     await access.createPublicSafetyIncident({ config })
     const source = await records.registerPublicSafetySource(config.id, { expectedVersion: 1, recording: run })
-    const preview = await retention.previewPublicSafetyRetention(config.id)
+    const preview = retainedPreview(await retention.previewPublicSafetyRetention(config.id))
     await retention.enrollPublicSafetyRetention(config.id, { expectedVersion: 2, policyVersion: 'local-managed-v1', inventoryDigest: preview.inventoryDigest, requestId: randomUUID() })
     const body = { expectedVersion: 3, expectedRetentionVersion: 1, sourceDigest: source.source.digest, datasetProfile: 'owned-public-safety-dataset-v1', requestId: randomUUID() }
     const created = await managed.createPublicSafetyManagedDataset(config.id, body)
@@ -92,7 +93,7 @@ try {
       assert.deepEqual((await managed.readPublicSafetyManagedArtifactFile(config.id, created.artifact.key, recording.id)).bytes, data.bytes, 'a legitimate concurrent file reader is compatible with scoped mount inspection')
     }
     finally { closeSync(heldReader) }
-    assert.equal((await retention.previewPublicSafetyRetention(config.id)).managedArtifactCount, 1)
+    assert.equal((retainedPreview(await retention.previewPublicSafetyRetention(config.id))).managedArtifactCount, 1)
   })
   console.log('PASS actual native managed source-derived dataset publication, replay, bytes and read-only reconciliation')
 }

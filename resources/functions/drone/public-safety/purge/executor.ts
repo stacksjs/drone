@@ -109,7 +109,7 @@ async function noPreparation(tx: TransactionHandle, context: Context, item: Purg
   await updateItem(tx, item, { state: 'verified-absent', result_code: 'no-preparation-observed', verified_at_iso: new Date().toISOString() })
   await recordStep(tx, context, 'result', delta)
 }
-async function fileUnit(id: number): Promise<boolean> {
+async function fileUnit(id: number, remainingBytes: number): Promise<{ progressed: boolean, chargedBytes: number, budgetBlocked: boolean }> {
   const staged = await transaction(async tx => {
     const context = await current(tx, id)
     let item: PurgeItemRow | undefined
@@ -118,6 +118,9 @@ async function fileUnit(id: number): Promise<boolean> {
       if (item) break
     }
     if (!item) return undefined
+    const chargedBytes = item.kind === 'file' ? item.planned_bytes : 0
+    if (chargedBytes === null || !Number.isSafeInteger(chargedBytes) || chargedBytes < 0 || chargedBytes > 33554432) throw new PurgeFileBlocked('capacity-exceeded')
+    if (chargedBytes > remainingBytes) return { budgetBlocked: true as const }
     if (item.kind === 'artifact') {
       const artifact = JSON.parse(item.planned_json) as { receipt_json: string | null }
       if (artifact.receipt_json === null) await noPreparation(tx, context, item)
@@ -127,10 +130,11 @@ async function fileUnit(id: number): Promise<boolean> {
       }
       return { done: true as const }
     }
-    return { item }
+    return { item, chargedBytes }
   }, { retries: 0 })
-  if (!staged) return false
-  if ('done' in staged) return true
+  if (!staged) return { progressed: false, chargedBytes: 0, budgetBlocked: false }
+  if ('budgetBlocked' in staged) return { progressed: false, chargedBytes: 0, budgetBlocked: true }
+  if ('done' in staged) return { progressed: true, chargedBytes: 0, budgetBlocked: false }
   let item = staged.item!
   if (item.state === 'planned') {
     const arm = observePurgeFile(item)
@@ -152,7 +156,7 @@ async function fileUnit(id: number): Promise<boolean> {
     await updateItem(tx, lockedItem, { state: 'verified-absent', result_code: delta.namesUnlinked > 0 ? 'observed-unlinked' : 'absence-reconciled', verified_at_iso: new Date().toISOString() })
     await recordStep(tx, context, 'result', delta, { state: context.row.db_state === 'complete' ? 'running' : context.row.state, fs_state: 'running', outcome_code: null })
   }, { retries: 0 })
-  return true
+  return { progressed: true, chargedBytes: staged.chargedBytes!, budgetBlocked: false }
 }
 async function minimize(tx: TransactionHandle, context: Context, maxRows: number): Promise<void> {
   requirePurgeEnabled()
@@ -212,7 +216,7 @@ export async function runPublicSafetyPurgeBatch(options: BatchOptions = {}): Pro
   const selected = asRow<PurgeRow>(await query.executeTakeFirst())
   if (!selected) return { unitsCommitted: 0, enabled: true, selected: false }
   const deadline = performance.now() + budgetMs
-  let units = 0
+  let units = 0, reservedBytes = 0
   while (units < maxItems && performance.now() < deadline && purgeEnabled()) {
     let phase: 'build' | 'db' | 'fs' | 'minimize' | 'retire' = 'build'
     try {
@@ -225,7 +229,10 @@ export async function runPublicSafetyPurgeBatch(options: BatchOptions = {}): Pro
         const removed = context.row.db_state !== 'blocked' && await transaction(async tx => dbUnit(tx, await current(tx, selected.id), maxRows), { retries: 0 })
         if (!removed) {
           phase = 'fs'
-          if (!await fileUnit(selected.id)) {
+          const file = await fileUnit(selected.id, maxBytes - reservedBytes)
+          if (file.budgetBlocked) break
+          reservedBytes += file.chargedBytes
+          if (!file.progressed) {
             if (context.row.db_state !== 'complete') break
             phase = 'minimize'; await transaction(async tx => minimize(tx, await current(tx, selected.id), maxRows), { retries: 0 })
           }

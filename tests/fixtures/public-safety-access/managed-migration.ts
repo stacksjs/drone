@@ -1,3 +1,4 @@
+import { retainedPreview } from '../../helpers/public-safety-retained'
 import assert from 'node:assert/strict'
 import { rename, readdir } from 'node:fs/promises'
 import { join } from 'node:path'
@@ -19,7 +20,7 @@ try {
     assert.deepEqual(await Promise.all(tables.map(table => database.db.primary.selectFrom(table).selectAll().orderBy('id', 'asc').execute())), oldRows)
     assert.deepEqual(await database.db.unsafe('PRAGMA foreign_key_check'), [])
     assert.deepEqual(await database.db.unsafe('PRAGMA integrity_check'), [{ integrity_check: 'ok' }])
-    const preview = await retention.previewPublicSafetyRetention(config.id)
+    const preview = retainedPreview(await retention.previewPublicSafetyRetention(config.id))
     await retention.enrollPublicSafetyRetention(config.id, { expectedVersion: 2, policyVersion: 'local-managed-v1', inventoryDigest: preview.inventoryDigest, requestId: randomUUID() })
     const created = await managed.createPublicSafetyManagedDataset(config.id, { expectedVersion: 3, expectedRetentionVersion: 1, sourceDigest: source.source.digest, datasetProfile: 'owned-public-safety-dataset-v1', requestId: randomUUID() })
     assert.equal(created.artifact.state, 'complete')

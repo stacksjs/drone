@@ -1,3 +1,4 @@
+import { retainedPreview } from '../../helpers/public-safety-retained'
 import assert from 'node:assert/strict'
 import { randomUUID } from 'node:crypto'
 import { readFile, writeFile } from 'node:fs/promises'
@@ -43,7 +44,7 @@ try {
       config.id = 'custody-matrix'
       config.retention.expiresAt = new Date(Date.now() + 86400000).toISOString()
       await access.createPublicSafetyIncident({ config })
-      const currentVersion = async () => (await retention.previewPublicSafetyRetention(config.id)).incidentVersion
+      const currentVersion = async () => (retainedPreview(await retention.previewPublicSafetyRetention(config.id))).incidentVersion
       const actors = new Map<string, { id: number, token: string }>()
       for (const role of ['pilot', 'observer', 'reviewer', 'evidence-custodian', 'outsider'] as const) {
         const actor = await User.create({ name: `Custody ${role}`, email: `custody-${role}@example.invalid`, password: 'temporary-fixture-password' })
@@ -59,7 +60,7 @@ try {
       const point = await records.appendPublicSafetyObservation(config.id, { expectedVersion: await currentVersion(), sourceDigest: source.source.digest, captureId: capture.id, modality: 'visible', pixel: { x: index % capture.width, y: Math.floor(index / capture.width) }, note: 'PRIVATE-CUSTODY-ANNOTATION', uncertaintyNote: 'PRIVATE-CUSTODY-UNCERTAINTY' })
       let lastReview = (await records.appendPublicSafetyReview(config.id, point.observation.id, { expectedVersion: await currentVersion(), sourceDigest: source.source.digest, previousReviewId: null, disposition: 'unresolved', note: 'PRIVATE-CUSTODY-REVIEW' })).review.id
       const initialConfig = (await database.db.primary.selectFrom('public_safety_incidents').select(['config_json', 'id']).where('incident_key', '=', config.id).executeTakeFirst())!
-      const preview = await retention.previewPublicSafetyRetention(config.id)
+      const preview = retainedPreview(await retention.previewPublicSafetyRetention(config.id))
       assert.deepEqual(preview.counts, { sources: 1, observations: 1, reviews: 1 })
       assert.equal(preview.originalHold, 'none')
       assert.equal(preview.inventoryDigest.length, 64)
@@ -77,11 +78,11 @@ try {
       }
       const otherConfig = { ...config, id: 'custody-other' }
       await access.createPublicSafetyIncident({ config: otherConfig })
-      const otherPreview = await retention.previewPublicSafetyRetention(otherConfig.id)
+      const otherPreview = retainedPreview(await retention.previewPublicSafetyRetention(otherConfig.id))
       await assert.rejects(() => retention.enrollPublicSafetyRetention(otherConfig.id, { ...enrollmentBody, expectedVersion: otherPreview.incidentVersion }), status(409))
       await access.changePublicSafetyMembership(config.id, { expectedVersion: preview.incidentVersion, userId: pilot.id, role: 'pilot' })
       await assert.rejects(() => retention.enrollPublicSafetyRetention(config.id, enrollmentBody), status(409))
-      const fresh = await retention.previewPublicSafetyRetention(config.id)
+      const fresh = retainedPreview(await retention.previewPublicSafetyRetention(config.id))
       assert.notEqual(fresh.inventoryDigest, preview.inventoryDigest)
       const enrollment = await retention.enrollPublicSafetyRetention(config.id, { ...enrollmentBody, expectedVersion: fresh.incidentVersion, inventoryDigest: fresh.inventoryDigest })
       assert.equal(enrollment.scope.holdState, 'none')
@@ -145,7 +146,7 @@ try {
       for (const result of distinct) if (result.status === 'rejected') assert(status(409)(result.reason))
       assert.equal((await current()).version, distinctVersion + 1)
       for (const action of ['enrolled', 'hold-reviewed', 'member-revoked'] as const) {
-        const before = await snapshot(), otherBefore = await retention.previewPublicSafetyRetention(otherConfig.id)
+        const before = await snapshot(), otherBefore = retainedPreview(await retention.previewPublicSafetyRetention(otherConfig.id))
         await database.db.unsafe(`CREATE TRIGGER reject_custody_event BEFORE INSERT ON public_safety_retention_events WHEN NEW.action = '${action}' BEGIN SELECT RAISE(ABORT, 'custody event persistence fault'); END`)
         try {
           if (action === 'enrolled') await assert.rejects(() => retention.enrollPublicSafetyRetention(otherConfig.id, { expectedVersion: otherBefore.incidentVersion, policyVersion: 'local-managed-v1', inventoryDigest: otherBefore.inventoryDigest, requestId: randomUUID() }), /custody event persistence fault/)
@@ -154,12 +155,12 @@ try {
         }
         finally { await database.db.unsafe('DROP TRIGGER reject_custody_event') }
         assert.deepEqual(await snapshot(), before)
-        assert.deepEqual(await retention.previewPublicSafetyRetention(otherConfig.id), otherBefore)
+        assert.deepEqual(retainedPreview(await retention.previewPublicSafetyRetention(otherConfig.id)), otherBefore)
         await assert.rejects(() => retention.readPublicSafetyRetention(otherConfig.id), status(404))
       }
       for (const command of ['enroll', 'hold', 'revoke'] as const) {
         for (const change of ['token', 'permission', 'membership'] as const) {
-          const before = await snapshot(), otherBefore = await retention.previewPublicSafetyRetention(otherConfig.id)
+          const before = await snapshot(), otherBefore = retainedPreview(await retention.previewPublicSafetyRetention(otherConfig.id))
           const lateToken = (await createToken(coordinator.id, 'late custody revocation', ['public-safety:read', 'public-safety:coordinate'], { withRefreshToken: false })).plainTextToken
           const key = command === 'enroll' ? otherConfig.id : config.id
           const ability = command === 'revoke' ? 'revoke' : 'manage'
@@ -188,10 +189,10 @@ try {
             if (change === 'membership') await database.db.primary.updateTable('public_safety_incident_members').set({ active: true }).where('user_id', '=', coordinator.id).execute()
           }
           assert.deepEqual(await snapshot(), before)
-          assert.deepEqual(await retention.previewPublicSafetyRetention(otherConfig.id), otherBefore)
+          assert.deepEqual(retainedPreview(await retention.previewPublicSafetyRetention(otherConfig.id)), otherBefore)
         }
       }
-      const twoPreview = await retention.previewPublicSafetyRetention(otherConfig.id)
+      const twoPreview = retainedPreview(await retention.previewPublicSafetyRetention(otherConfig.id))
       const enrollRace = await Promise.allSettled([0, 1].map(() => as(credential.plainTextToken, () => retention.enrollPublicSafetyRetention(otherConfig.id, { expectedVersion: twoPreview.incidentVersion, policyVersion: 'local-managed-v1', inventoryDigest: twoPreview.inventoryDigest, requestId: randomUUID() }))))
       assert.equal(enrollRace.filter(result => result.status === 'fulfilled').length, 1)
       for (const result of enrollRace) if (result.status === 'rejected') assert(status(409)(result.reason))
@@ -200,7 +201,7 @@ try {
         lastReview = (await records.appendPublicSafetyReview(config.id, point.observation.id, { expectedVersion: await currentVersion(), sourceDigest: source.source.digest, previousReviewId: lastReview, disposition: 'unresolved', note: `Private retained review ${i}` })).review.id
         await retention.reviewPublicSafetyRetentionHold(config.id, await holdBody({ decision: 'release', caseReference: `case:history-${i}`, reviewDueAt: null }))
       }
-      const afterHistory = await retention.previewPublicSafetyRetention(config.id)
+      const afterHistory = retainedPreview(await retention.previewPublicSafetyRetention(config.id))
       assert.deepEqual(afterHistory.counts, { sources: 1, observations: 1, reviews: 102 })
       assert.notEqual(afterHistory.inventoryDigest, fresh.inventoryDigest)
       let cursor = 0, more = true
@@ -266,7 +267,7 @@ try {
       await access.changePublicSafetyMembership(pastConfig.id, { expectedVersion: 1, userId: custodian.id, role: 'evidence-custodian' })
       const pastExpired = { ...pastConfig, retention: { ...pastConfig.retention, expiresAt: new Date(Date.now() - 1).toISOString() } }
       await database.db.primary.updateTable('public_safety_incidents').set({ retain_until: pastExpired.retention.expiresAt, config_json: publicSafetyRecordingData(pastExpired) }).where('incident_key', '=', pastConfig.id).execute()
-      const pastPreview = await as(custodian.token, () => retention.previewPublicSafetyRetention(pastConfig.id))
+      const pastPreview = retainedPreview(await as(custodian.token, () => retention.previewPublicSafetyRetention(pastConfig.id)))
       assert.equal(pastPreview.expired, true)
       const pastEnrollment = await as(custodian.token, () => retention.enrollPublicSafetyRetention(pastConfig.id, { expectedVersion: pastPreview.incidentVersion, policyVersion: 'local-managed-v1', inventoryDigest: pastPreview.inventoryDigest, requestId: randomUUID() }))
       assert.equal(pastEnrollment.scope.enrolledByUserId, custodian.id)

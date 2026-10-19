@@ -1,3 +1,4 @@
+import { retainedPreview } from '../../helpers/public-safety-retained'
 import assert from 'node:assert/strict'
 import { randomUUID } from 'node:crypto'
 import { Database } from 'bun:sqlite'
@@ -100,7 +101,7 @@ try {
     writeFileSync(extra, 'unknown data', { mode: 0o600 })
     const blocked = await managed.reconcilePublicSafetyManagedArtifact(key, created.artifact.key, { expectedVersion: await version(), expectedArtifactVersion: 3, requestId: randomUUID() })
     assert.equal(blocked.artifact.state, 'blocked'); assert.equal((await Bun.file(extra).text()), 'unknown data')
-    assert.equal((await retention.previewPublicSafetyRetention(key)).managedArtifactCount, 2)
+    assert.equal((retainedPreview(await retention.previewPublicSafetyRetention(key))).managedArtifactCount, 2)
     await access.closePublicSafetyIncident(key, { expectedVersion: await version() })
     assert.equal((await managed.listPublicSafetyManagedArtifacts(key)).entries.length, 2)
     assert.equal((await managed.readPublicSafetyManagedArtifact(key, second.artifact.key)).artifact.state, 'complete')

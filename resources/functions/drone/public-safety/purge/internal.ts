@@ -1,9 +1,10 @@
-import type { PurgeState, PurgeArmState, PurgeOutcome, PurgeCounts, PurgeProgress, PurgeActor, PurgeAction, PurgeEvent, PurgeStatus } from './types'
+import type { PurgeState, PurgeArmState, PurgeOutcome, PurgeCounts, PurgeProgress, PurgeActor, PurgeAction, PurgeEvent, PurgeStatus, PurgeReceipt } from './types'
 import type { TransactionHandle } from '@stacksjs/orm'
 import type { IncidentRow } from '../access/policy'
 import { randomUUID } from 'node:crypto'
 import { types } from 'node:util'
 import { asRow, mutationCount } from '@stacksjs/database/runtime'
+import { associateIncidentDeadline, incidentDeadline } from '../access/deadline'
 import { PublicSafetyAccessError } from '../access/errors'
 import { advance, maximumVersion } from '../access/mutations'
 import { purgeCoverage, purgePolicy, zeroPurgeProgress } from './types'
@@ -47,11 +48,13 @@ export function purgeEventProjection(row: PurgeEventRow): PurgeEvent {
   if (row.actor_kind === 'human' ? row.actor_user_id === null || row.system_actor !== null : row.actor_user_id !== null || row.system_actor !== systemPurgeActor.name) purgeConflict()
   return { sequence: row.sequence, incidentVersion: row.incident_version, retentionVersion: row.retention_version, actor: row.actor_kind === 'human' ? { kind: 'human', userId: row.actor_user_id! } : systemPurgeActor, action: row.step, at: row.at_iso, outcome: row.outcome_code, delta: JSON.parse(row.counts_json) }
 }
+export function purgeDeadline(row: PurgeRow): number | undefined { return row.state === 'complete' || row.completed_at_iso !== null ? Date.parse(row.receipt_retain_until_iso ?? '') : undefined }
+export function tagPurgeReceipt(receipt: PurgeReceipt): PurgeReceipt { const deadline = incidentDeadline(receipt.purge); associateIncidentDeadline(receipt.event, deadline); return associateIncidentDeadline(receipt, deadline) }
 export function purgeReceiptDeadline(row: PurgeRow): void { if ((row.state === 'complete' || row.completed_at_iso !== null) && (!row.receipt_retain_until_iso || Date.parse(row.receipt_retain_until_iso) <= Date.now())) purgeUnavailable() }
 export function purgeStatus(row: PurgeRow, incident: IncidentRow, scope: PurgeScopeRow): PurgeStatus {
   purgeReceiptDeadline(row)
   const completed = JSON.parse(row.progress_counts_json) as PurgeProgress
-  return { key: incident.incident_key, purgeKey: row.purge_key, policyVersion: purgePolicy, coverage: purgeCoverage, version: row.version, incidentVersion: incident.version, retentionVersion: scope.version, state: row.state, fsState: row.fs_state, dbState: row.db_state, acceptedAt: row.accepted_at_iso, acceptedByUserId: row.accepted_by_user_id, completedAt: row.completed_at_iso, receiptRetentionDays: row.receipt_retention_days, receiptRetainUntil: row.receipt_retain_until_iso, blockedReviewDueAt: row.review_due_at_iso, reviewOverdue: row.state === 'blocked' && row.review_due_at_iso !== null && Date.parse(row.review_due_at_iso) <= Date.now(), inventoryDigest: row.frozen_inventory_digest, planned: JSON.parse(row.frozen_counts_json) as PurgeCounts, completed, outcomeCode: row.outcome_code, contentDeletionPerformed: completed.namesUnlinked > 0 || completed.sourceRowsRemoved + completed.observationRowsRemoved + completed.reviewRowsRemoved + completed.auditRowsRemoved + completed.nonCustodyMembershipRowsRemoved + completed.incidentPayloadRowsCleared > 0, diagnosticsErased: false, allCopiesErased: false, mediaErasure: false }
+  return associateIncidentDeadline({ key: incident.incident_key, purgeKey: row.purge_key, policyVersion: purgePolicy, coverage: purgeCoverage, version: row.version, incidentVersion: incident.version, retentionVersion: scope.version, state: row.state, fsState: row.fs_state, dbState: row.db_state, acceptedAt: row.accepted_at_iso, acceptedByUserId: row.accepted_by_user_id, completedAt: row.completed_at_iso, receiptRetentionDays: row.receipt_retention_days, receiptRetainUntil: row.receipt_retain_until_iso, blockedReviewDueAt: row.review_due_at_iso, reviewOverdue: row.state === 'blocked' && row.review_due_at_iso !== null && Date.parse(row.review_due_at_iso) <= Date.now(), inventoryDigest: row.frozen_inventory_digest, planned: JSON.parse(row.frozen_counts_json) as PurgeCounts, completed, outcomeCode: row.outcome_code, contentDeletionPerformed: completed.namesUnlinked > 0 || completed.sourceRowsRemoved + completed.observationRowsRemoved + completed.reviewRowsRemoved + completed.auditRowsRemoved + completed.nonCustodyMembershipRowsRemoved + completed.incidentPayloadRowsCleared > 0, diagnosticsErased: false, allCopiesErased: false, mediaErasure: false }, purgeDeadline(row))
 }
 export async function appendPurgeEvent(tx: TransactionHandle, row: PurgeRow, incident: IncidentRow, scope: PurgeScopeRow, actor: PurgeActor, step: PurgeAction, delta = zeroPurgeProgress(), operationId: string = randomUUID(), requestDigest: string | null = null): Promise<PurgeEvent> {
   const at = new Date().toISOString()

@@ -1,3 +1,4 @@
+import { retainedPreview } from '../../helpers/public-safety-retained'
 import assert from 'node:assert/strict'
 import { randomUUID } from 'node:crypto'
 import { database, actor, as, seed, managed, retention, status } from './managed-context'
@@ -19,7 +20,7 @@ try {
       () => managed.createPublicSafetyManagedDataset(key, fixture.body),
       () => managed.reconcilePublicSafetyManagedArtifact(key, created.artifact.key, { expectedVersion: created.artifact.incidentVersion + 1, expectedArtifactVersion: 3, requestId: randomUUID() }),
     ]) await assert.rejects(action, status(404))
-    const preview = await retention.previewPublicSafetyRetention(key), scope = await retention.readPublicSafetyRetention(key)
+    const preview = retainedPreview(await retention.previewPublicSafetyRetention(key)), scope = await retention.readPublicSafetyRetention(key)
     assert.equal(preview.expired, true); assert.equal(preview.managedArtifactCount, 1); assert.equal(preview.counts.sources, 1)
     assert(!('purged' in scope))
     assert.equal(scope.holdState, 'held'); assert.equal(scope.expired, true)

@@ -1,3 +1,4 @@
+import { retainedPreview } from '../../helpers/public-safety-retained'
 import assert from 'node:assert/strict'
 import { randomUUID } from 'node:crypto'
 import { registerPersistentQueryHooks } from '@stacksjs/query-builder'
@@ -34,7 +35,7 @@ try {
     finally { unhook() }
     assert.equal(sourceReads, 0, 'metadata discovery does not reload or replay canonical recording')
     assert.deepEqual(await database.db.primary.selectFrom('public_safety_retention_scopes').selectAll().executeTakeFirst(), originalScope, 'artifact events never rewrite original custody acceptance or hold sequence')
-    assert.equal((await retention.previewPublicSafetyRetention(key)).managedArtifactCount, 101)
+    assert.equal((retainedPreview(await retention.previewPublicSafetyRetention(key))).managedArtifactCount, 101)
     assert.equal((await access.readPublicSafetyIncident(key)).version, 408)
     console.log(`PASS actual101managed artifacts and105events paginate without source replay; publication+read-only history took ${(performance.now() - start).toFixed(1)}ms`)
   })

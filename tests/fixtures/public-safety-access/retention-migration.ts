@@ -1,3 +1,4 @@
+import { retainedPreview } from '../../helpers/public-safety-retained'
 import assert from 'node:assert/strict'
 import { mkdir, readdir, rename } from 'node:fs/promises'
 import { join } from 'node:path'
@@ -43,7 +44,7 @@ try {
     assert.deepEqual(await database.db.primary.selectFrom('public_safety_audits').selectAll().orderBy('id', 'asc').execute(), oldRows)
     assert.deepEqual(await database.db.primary.selectFrom('public_safety_retention_scopes').selectAll().execute(), [])
     assert.deepEqual(await database.db.primary.selectFrom('public_safety_retention_events').selectAll().execute(), [])
-    const preview = await retention.previewPublicSafetyRetention(config.id)
+    const preview = retainedPreview(await retention.previewPublicSafetyRetention(config.id))
     assert.deepEqual(preview.counts, { sources: 1, observations: 1, reviews: 1 })
     const enrollment = await retention.enrollPublicSafetyRetention(config.id, { expectedVersion: 4, policyVersion: 'local-managed-v1', inventoryDigest: preview.inventoryDigest, requestId: crypto.randomUUID() })
     assert.equal(enrollment.scope.contentDeletionPerformed, false)

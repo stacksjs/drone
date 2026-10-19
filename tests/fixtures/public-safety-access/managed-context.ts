@@ -1,3 +1,4 @@
+import { retainedPreview } from '../../helpers/public-safety-retained'
 import { mkdir, rename } from 'node:fs/promises'
 import { join } from 'node:path'
 import { randomUUID } from 'node:crypto'
@@ -47,7 +48,7 @@ export async function seed(key: string, lifetime = 86400000, raster?: number) {
   const run = simulatePublicSafety({ config, seconds: 10 })
   await access.createPublicSafetyIncident({ config })
   const source = await records.registerPublicSafetySource(key, { expectedVersion: 1, recording: run })
-  const preview = await retention.previewPublicSafetyRetention(key)
+  const preview = retainedPreview(await retention.previewPublicSafetyRetention(key))
   await retention.enrollPublicSafetyRetention(key, { expectedVersion: 2, policyVersion: 'local-managed-v1', inventoryDigest: preview.inventoryDigest, requestId: randomUUID() })
   return { config, run, source: source.source, body: { expectedVersion: 3, expectedRetentionVersion: 1, sourceDigest: source.source.digest, datasetProfile: 'owned-public-safety-dataset-v1', requestId: randomUUID() } }
 }

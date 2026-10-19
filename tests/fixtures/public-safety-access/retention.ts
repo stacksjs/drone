@@ -1,3 +1,4 @@
+import { retainedPreview } from '../../helpers/public-safety-retained'
 import assert from 'node:assert/strict'
 import { randomUUID } from 'node:crypto'
 import { setupIncidentDatabase } from './setup'
@@ -26,7 +27,7 @@ try {
     config.retention.expiresAt = new Date(Date.now() + 86400000).toISOString()
     config.retention.hold = 'declared-review-required'
     await access.createPublicSafetyIncident({ config })
-    const preview = await retention.previewPublicSafetyRetention(config.id)
+    const preview = retainedPreview(await retention.previewPublicSafetyRetention(config.id))
     assert.deepEqual(preview.counts, { sources: 0, observations: 0, reviews: 0 })
     assert.equal(preview.originalHold, 'declared-review-required')
     assert.equal(preview.purgeImplemented, false)
