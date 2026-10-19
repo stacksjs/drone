@@ -61,14 +61,16 @@ export async function executionAccess(tx: TransactionHandle, key: string, scope:
   if (original) matchExecutionBinding(original, binding)
   return associateIncidentDeadline({ binding, deadline }, deadline)
 }
-/** A timed-out native decision retains its pending budget until the real promise settles. */
-export async function checkExecutionAuthority(captured: ExecutionContext, scope: string, original?: ExecutionBinding): Promise<ExecutionAuthority> {
+/** Trusted application work shares the finite check budget and original native ALS.
+ * A timed-out decision retains its pending budget until the real promise settles.
+ * Call once around coarse HTTP preflight or a full core check, never nested.
+ */
+export async function runExecutionCheck<T>(captured: ExecutionContext, work: () => Promise<T>): Promise<T> {
   context(captured)
-  requireExecutionScope(scope)
   const owner = executionOwner()
   if (owner.pendingChecks >= limits.pendingChecks) throw new PublicSafetyAccessError(409, 'Execution checks are busy')
   owner.pendingChecks++
-  const pending = captured.run(() => checkedIncidentResult(transaction(tx => executionAccess(tx, captured.key, scope, original)))).finally(() => { owner.pendingChecks-- })
+  const pending = Promise.resolve().then(() => captured.run(work)).finally(() => { owner.pendingChecks-- })
   let timer: ReturnType<typeof setTimeout> | undefined
   try {
     return await Promise.race([pending, new Promise<never>((resolve, reject) => {
@@ -77,4 +79,8 @@ export async function checkExecutionAuthority(captured: ExecutionContext, scope:
     })])
   }
   finally { clearTimeout(timer) }
+}
+export async function checkExecutionAuthority(captured: ExecutionContext, scope: string, original?: ExecutionBinding): Promise<ExecutionAuthority> {
+  requireExecutionScope(scope)
+  return runExecutionCheck(captured, () => checkedIncidentResult(transaction(tx => executionAccess(tx, captured.key, scope, original))))
 }
