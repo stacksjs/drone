@@ -184,6 +184,45 @@ try {
     }
   })
 
+  // Gate's real after-hook commits revocation after successful preflight and before the mutation transaction.
+  // These cases fail if mutation() trusts the preflight result instead of checking native state again.
+  for (const state of ['token', 'permission', 'membership'] as const) {
+    const interleaveKey = `after-preflight-${state}`
+    await make(interleaveKey)
+    await change(interleaveKey, 1, 'evidence-custodian')
+    const credential = await createToken(coordinator.id, `after preflight ${state}`, ['public-safety:read', 'public-safety:coordinate'], { withRefreshToken: false })
+    const before = await as(other.plainTextToken, () => readPublicSafetyIncident(interleaveKey))
+    const beforeAudit = await as(other.plainTextToken, () => readPublicSafetyAudit(interleaveKey))
+    let armed = true, successfulPreflights = 0
+    Gate.after(async (user, ability, allowed, args) => {
+      if (!armed || ability !== 'public-safety:close' || args[0] !== interleaveKey) return
+      assert.equal(allowed, true, 'revocation must occur after an allowed native Gate preflight')
+      assert.equal(user?.id, coordinator.id)
+      armed = false
+      successfulPreflights++
+      if (state === 'token') await revokeToken(credential.plainTextToken)
+      if (state === 'permission') await Rbac.revokePermission(coordinator.id, 'public-safety:access', 'web')
+      if (state === 'membership') {
+        const incident = await database.db.primary.selectFrom('public_safety_incidents').select('id').where('incident_key', '=', interleaveKey).executeTakeFirst()
+        assert(incident)
+        // External account administration can invalidate even the sole coordinator's current membership.
+        await database.db.primary.updateTable('public_safety_incident_members').set({ active: false }).where('incident_id', '=', incident.id).where('user_id', '=', coordinator.id).execute()
+      }
+    })
+    try {
+      await assert.rejects(() => as(credential.plainTextToken, () => closePublicSafetyIncident(interleaveKey, { expectedVersion: before.version })), status(state === 'token' ? 401 : 403))
+      assert.equal(successfulPreflights, 1)
+      assert.equal(armed, false)
+      assert.deepEqual(await as(other.plainTextToken, () => readPublicSafetyIncident(interleaveKey)), before)
+      assert.deepEqual(await as(other.plainTextToken, () => readPublicSafetyAudit(interleaveKey)), beforeAudit)
+    }
+    finally {
+      armed = false
+      if (state === 'permission') await Rbac.givePermission(coordinator.id, 'public-safety:access', 'web')
+    }
+  }
+  console.log('PASS native revocation after successful Gate preflight refuses mutation without version or audit changes')
+
   const retention = 'native-retention-boundary'
   const retained = configFor(retention)
   retained.retention = { ...config.retention, expiresAt: new Date(Date.now() + 1500).toISOString() }
