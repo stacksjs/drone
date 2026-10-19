@@ -64,6 +64,20 @@ offline exports, downloads, backups and replicas, process memory and media
 residuals are outside the accepted scope. The receipt always reports
 `diagnosticsErased: false`, `allCopiesErased: false` and `mediaErasure: false`.
 
+Acceptance stores a durable plan. A trusted server process advances it through the native
+`PublicSafetyPurgeSweep.dispatchNow({ purgeKey })` Job and awaits each complete batch.
+The handler checks the operator flag even on direct dispatch. Each batch permits at most one
+purge, 16 units, 100 DB rows per deletion unit and 32 MiB of conservative file-byte reservations.
+Its five-second cooperative budget is checked between fully awaited units, rather than abandoning
+an active effect. No Scheduler registration or automatic worker-drain guarantee is provided.
+
+The local executor requires the authoritative SQLite database and exact registered private
+filesystem identities. Unknown process visibility, active readers, mounts or changed ownership
+preserve files and block the filesystem arm. Accepted DB removal may proceed independently.
+Forced native connection retirement can require process exit before SQLite writes recover;
+see [Stacks #2922](https://github.com/stacksjs/stacks/issues/2922). The executor uses no GC or
+replacement-connection workaround. Receipt cleanup can be overdue while execution is disabled.
+
 The loopback HTTP qualification uses disposable SQLite and private registered
 artifacts in both native route modes, with actual native authentication,
 permissions and custody. It verifies wire behavior without substituting a mock

@@ -45,8 +45,10 @@ the actual supervisor; incident revisions stop the accepted plan and require a n
 ./buddy public-safety:replay /tmp/incident-collected/recording.json --at-ms 600
 ```
 
-The full coordinated workflow remains in progress under #23: authenticated incident roles,
-source-bound annotations/review, retention enforcement and two-phase team handover are still required.
+Native incident roles, source-bound annotations/review, hold decisions and managed datasets now
+connect to [separately accepted local purge](docs/public-safety-purge.md), disabled by default.
+The full coordinated workflow remains in progress under #23: recipient-bound team handover,
+the authorized live workspace and operational/hardware qualification are still required.
 See [public-safety collection and remaining scope](docs/public-safety.md). Physical outputs are inhibited.
 
 ## Owned vehicle missions

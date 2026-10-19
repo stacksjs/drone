@@ -1,6 +1,6 @@
 # Owned public-safety collection
 
-Issue [#23](https://github.com/stacksjs/drone/issues/23) requires coordinated search, fire and disaster observation, incident annotations, operator review, team handover, enforced access/privacy/retention and runtime handling of communications, incident boundaries and resources. The collection and runtime foundation is connected to persisted authenticated source, observation and review APIs. Managed deletion, live coordination and handover remain required work.
+Issue [#23](https://github.com/stacksjs/drone/issues/23) requires coordinated search, fire and disaster observation, incident annotations, operator review, team handover, enforced access/privacy/retention and runtime handling of communications, incident boundaries and resources. The collection and runtime foundation connects to authenticated source, observation, review and managed retention APIs. Separately accepted local purge is disabled by default. Live coordination, handover and operational qualification remain required work.
 
 The four explicit observation purposes are search and rescue, fire observation, disaster assessment and lawful police observation. There is no identity recognition, automatic person pursuit, detention or enforcement action. Purpose authority and retention are explicit declarations, not established legal authority. All fixtures are synthetic and physical outputs remain inhibited.
 
@@ -59,4 +59,7 @@ sources, explicit supported-pixel observations and append-only reviewer declarat
 native access rules. [Retention custody](public-safety-retention.md) adds explicit inventory-bound
 enrollment, minimal expired custody status and append-only hold decisions. Collection artifacts keep
 their separate unsigned simulator evidence boundary.
-Managed erasure, atomic handover, the authorized workspace and live coordination remain in issue #23.
+[Accepted local purge](public-safety-purge.md) removes only explicitly accepted active DB payload
+and registered private namespace entries, with a minimized custody receipt. It excludes offline
+copies, historical diagnostics, backups and media residuals. Atomic handover, the authorized
+workspace, live coordination and full operational qualification remain in issue #23.

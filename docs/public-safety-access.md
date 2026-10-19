@@ -102,7 +102,8 @@ reads as well as writes, using server UTC. Closure rejects later mutations but p
 reads until expiry. Neither operation automatically erases source files, derivatives, backups
 or uncontrolled copies. A declared hold does not bypass expiry or prove a reviewed legal hold.
 The [retention custody API](public-safety-retention.md) adds explicit enrollment and hold review.
-Managed binary purge receipts remain separate work.
+[Accepted local purge](public-safety-purge.md) is a separate, default-disabled policy for active
+incident DB payload and registered files. Enrollment alone never authorizes that removal.
 
 ## Generic data boundaries
 
@@ -130,6 +131,7 @@ The [source, observation and review functions](public-safety-records.md) extend 
 with immutable verified collection sources, explicit pixel declarations and append-only review.
 The [retention custody functions](public-safety-retention.md) add minimal status and explicit hold
 review after expiry, without reopening content access or deleting data.
-Issue #23 remains open for managed evidence erasure, atomic recipient-bound team
+The [separate purge module](public-safety-purge.md) records explicit accepted removal and minimal
+receipts, with declared exclusions. Issue #23 remains open for atomic recipient-bound team
 handover, an authorized operator workspace and live observations, plus jurisdiction, hardware,
 firmware interoperability and operational qualification.

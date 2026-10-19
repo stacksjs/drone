@@ -96,23 +96,26 @@ returned `cursor` as the next `after` while `hasMore` is true. Every page checks
 access. Retention sequences are separate from incident versions; ordinary record appends can
 advance the incident version without creating a retention event.
 
-## Remaining deletion workflow
+## Separate purge acceptance
 
 [Managed source datasets](public-safety-managed.md) add explicitly requested private copies and
 read-only reconciliation. They do not reinterpret enrollment or a hold as purge acceptance.
 
-Custody projections explicitly report `purgeImplemented: false` and
-`contentDeletionPerformed: false`. Retention declarations and hold decisions remain alongside the
-current stored source, annotation and review data. This history has no automatic deletion job yet.
+Retained custody projections keep their original `purgeImplemented: false` and
+`contentDeletionPerformed: false` flags. They describe the existing enrollment contract.
+Use the separate [accepted local purge API](public-safety-purge.md) for deletion progress and receipts.
+Its `local-managed-purge-v1` policy requires a fresh explicit inventory-bound acceptance and
+operator opt-in. No automatic sweep is registered.
 
-The managed registry now records explicitly requested binary and derivative files. The next tracer
-needs separate inventory-bound purge acceptance, resumable deletion progress, a system actor ledger
-and exact receipts for controlled files and database rows. There is no atomic transaction between
-SQLite and the filesystem. Failures must remain visible, and interrupted work must resume against
-the same owned inventory. Existing enrollment never grants destructive acceptance.
+Accepted purge freezes content mutation. During progress, legacy custody reads return 409;
+after completion they return a fixed minimal tombstone and retired-history event page.
+Current-authorized member revocation remains available. Durable arms and a typed system actor
+ledger track separate SQLite and filesystem effects; there is no cross-resource atomic transaction.
+Interrupted work resumes against the accepted owned inventory. Existing enrollment never grants
+destructive acceptance.
 
 Existing offline `--output` directories, downloads, external logs, backups and uncontrolled copies
-are not enrolled by these APIs. Future receipts must distinguish application row removal and
-verified pathname absence from forensic media erasure. Managed deletion, recipient-bound atomic
+are not enrolled by these APIs. Purge receipts distinguish application row removal and verified
+pathname absence from forensic media erasure. Recipient-bound atomic
 handover, the authorized workspace and live coordination remain open in issue #23, together with
 operational and hardware qualification.

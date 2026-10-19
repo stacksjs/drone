@@ -29,8 +29,6 @@ jobs:
       - run: python3 -m py_compile resources/functions/drone/camera/imx500_worker.py
       - run: python3 -m unittest discover -s tests/hardware
       - run: ./buddy test
-      - name: Qualify accepted purge with real process and mount isolation
-        run: sudo --non-interactive env PUBLIC_SAFETY_PURGE_NAMESPACE_TEST=1 unshare --fork --pid --mount-proc "$(command -v bun)" test ./tests/integration/public-safety-purge.test.ts
       - run: bun run runtime:cli
       - run: $GITHUB_WORKSPACE/storage/runtime-build/cli/drone runtime:bench --project "$GITHUB_WORKSPACE" --ticks 100 --fault deadline
         working-directory: ${{ runner.temp }}
@@ -183,6 +181,21 @@ jobs:
         working-directory: ${{ runner.temp }}
       - run: $GITHUB_WORKSPACE/storage/runtime-build/cli/drone public-safety:simulate --scenario wrong-ack
         working-directory: ${{ runner.temp }}
+  purge-namespace:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.4.3
+      - run: bun install --frozen-lockfile
+      - run: cp .env.example .env
+      - run: ./buddy key:generate
+      - name: Qualify accepted purge with real process and mount isolation
+        run: sudo --non-interactive env PUBLIC_SAFETY_PURGE_NAMESPACE_TEST=1 unshare --fork --pid --mount-proc "$(command -v bun)" test ./tests/integration/public-safety-purge.test.ts
   firmware:
     runs-on: ubuntu-latest
     steps:

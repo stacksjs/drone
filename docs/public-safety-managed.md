@@ -12,6 +12,11 @@ creation are separate explicit actions. Neither authorizes deletion. Managed art
 `purgeImplemented: false` and `contentDeletionPerformed: false`; legacy offline exports and
 downloaded copies remain outside the managed registry.
 
+[Accepted local purge](public-safety-purge.md) is a separate policy with explicit inventory
+acceptance, durable progress and a minimized receipt. It freezes these content operations before
+removing registered namespace entries and accepted DB payload. Existing enrollment and dataset
+requests never grant that destructive authority.
+
 ## Native API
 
 Paths below are relative to `/api/public-safety/incidents/{incident}/managed-artifacts`.
