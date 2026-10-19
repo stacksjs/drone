@@ -1,5 +1,6 @@
 import type { UserModel } from '@stacksjs/orm'
 import { defineGates } from '@stacksjs/auth'
+import { publicSafetyCreateGate, publicSafetyIncidentGate } from '../resources/functions/drone/public-safety/access/policy'
 
 /**
  * Authorization Gates Configuration
@@ -28,6 +29,11 @@ export default defineGates({
    * }
    */
   gates: {
+    'public-safety:create': publicSafetyCreateGate,
+    'public-safety:view': (user, key: string) => publicSafetyIncidentGate(user, key, 'view'),
+    'public-safety:audit': (user, key: string) => publicSafetyIncidentGate(user, key, 'audit'),
+    'public-safety:manage-members': (user, key: string) => publicSafetyIncidentGate(user, key, 'manage-members'),
+    'public-safety:close': (user, key: string) => publicSafetyIncidentGate(user, key, 'close'),
     /** Check if user can access admin area */
     'access-admin': (user: UserModel | null) => {
       return user?.email?.endsWith('@stacksjs.com') ?? false
