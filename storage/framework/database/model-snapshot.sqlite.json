@@ -157,7 +157,11 @@
               "closed",
               "source-registered",
               "observation-created",
-              "review-appended"
+              "review-appended",
+              "handover-offered",
+              "handover-accepted",
+              "handover-declined",
+              "handover-canceled"
             ]
           },
           {
@@ -206,6 +210,53 @@
             "isUnique": false,
             "isNullable": true,
             "hasDefault": false
+          },
+          {
+            "name": "handover_key",
+            "type": "string",
+            "isPrimaryKey": false,
+            "isUnique": false,
+            "isNullable": true,
+            "hasDefault": false,
+            "maxLength": 36
+          },
+          {
+            "name": "handover_step",
+            "type": "enum",
+            "isPrimaryKey": false,
+            "isUnique": false,
+            "isNullable": true,
+            "hasDefault": false,
+            "enumValues": [
+              "offer",
+              "terminal"
+            ]
+          },
+          {
+            "name": "handover_assignment_version",
+            "type": "integer",
+            "isPrimaryKey": false,
+            "isUnique": false,
+            "isNullable": true,
+            "hasDefault": false
+          },
+          {
+            "name": "request_id",
+            "type": "string",
+            "isPrimaryKey": false,
+            "isUnique": false,
+            "isNullable": true,
+            "hasDefault": false,
+            "maxLength": 36
+          },
+          {
+            "name": "request_digest",
+            "type": "string",
+            "isPrimaryKey": false,
+            "isUnique": false,
+            "isNullable": true,
+            "hasDefault": false,
+            "maxLength": 64
           }
         ],
         "indexes": [
@@ -216,6 +267,34 @@
               "sequence"
             ],
             "type": "unique"
+          },
+          {
+            "name": "public_safety_handover_step_unique",
+            "columns": [
+              "incident_id",
+              "handover_key",
+              "handover_step"
+            ],
+            "type": "unique"
+          },
+          {
+            "name": "public_safety_handover_request_unique",
+            "columns": [
+              "incident_id",
+              "request_id"
+            ],
+            "type": "unique"
+          },
+          {
+            "name": "public_safety_handover_assignment",
+            "columns": [
+              "incident_id",
+              "actor_id",
+              "handover_assignment_version",
+              "action",
+              "sequence"
+            ],
+            "type": "index"
           }
         ]
       },
@@ -2778,7 +2857,7 @@
       }
     ]
   },
-  "hash": "6240e01155fa40107f6983bc0b35a34f275d132940155678fb84b1e65c56250f",
+  "hash": "4b51d3875cdf7ab223936f7cb6e4a6c474ccc8c9bdc4a44c1eb44a20a95ebcab",
   "dialect": "sqlite",
-  "updatedAt": "2026-10-19T15:39:46.097Z"
+  "updatedAt": "2026-10-19T17:36:40.463Z"
 }

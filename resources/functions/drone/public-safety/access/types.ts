@@ -5,7 +5,7 @@ export type IncidentRole = typeof incidentRoles[number]
 export type AssignableIncidentRole = Exclude<IncidentRole, 'coordinator'>
 export const incidentAbilities = ['view', 'audit', 'manage-members', 'close', 'source-register', 'observation-create', 'review-append'] as const
 export type IncidentAbility = typeof incidentAbilities[number]
-export type IncidentAuditAction = 'created' | 'member-granted' | 'member-revoked' | 'closed' | 'source-registered' | 'observation-created' | 'review-appended'
+export type IncidentAuditAction = 'created' | 'member-granted' | 'member-revoked' | 'closed' | 'source-registered' | 'observation-created' | 'review-appended' | 'handover-offered' | 'handover-accepted' | 'handover-declined' | 'handover-canceled'
 export interface IncidentProjection {
   key: string
   version: number
