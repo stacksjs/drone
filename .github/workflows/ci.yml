@@ -12,6 +12,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
       - uses: oven-sh/setup-bun@v2
         with:
           bun-version: 1.4.3
@@ -27,6 +29,8 @@ jobs:
       - run: python3 -m py_compile resources/functions/drone/camera/imx500_worker.py
       - run: python3 -m unittest discover -s tests/hardware
       - run: ./buddy test
+      - name: Qualify accepted purge with real process and mount isolation
+        run: sudo --non-interactive env PUBLIC_SAFETY_PURGE_NAMESPACE_TEST=1 unshare --fork --pid --mount-proc "$(command -v bun)" test ./tests/integration/public-safety-purge.test.ts
       - run: bun run runtime:cli
       - run: $GITHUB_WORKSPACE/storage/runtime-build/cli/drone runtime:bench --project "$GITHUB_WORKSPACE" --ticks 100 --fault deadline
         working-directory: ${{ runner.temp }}
