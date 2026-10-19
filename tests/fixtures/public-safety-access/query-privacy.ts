@@ -76,7 +76,7 @@ try {
   for (const canary of canaries) assert(!diagnostics.includes(canary), 'private material copied into query diagnostics')
   await log.flush()
   async function localLogs(directory: string): Promise<string[]> {
-    const entries = await readdir(directory, { withFileTypes: true }).catch(() => [])
+    const entries = await readdir(directory, { withFileTypes: true })
     const texts: string[] = []
     for (const entry of entries) {
       const file = join(directory, entry.name)
@@ -86,6 +86,7 @@ try {
     return texts
   }
   const files = (await localLogs(join(root, 'storage/logs'))).join('\n')
+  assert(files.includes('diagnostic_public_probe'), 'public failed-query diagnostics must reach the local file transport')
   for (const canary of canaries) assert(!files.includes(canary), 'private failed-query material copied into local logs')
   console.log('PASS native private query diagnostics excluded while public bound diagnostics persist')
 }
