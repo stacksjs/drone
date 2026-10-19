@@ -1,8 +1,8 @@
 # Synthetic incident execution
 
-Implementation is being qualified on the execution integration branch. The
-routes and panel must pass the native authority, lifecycle and rendered-browser
-checks before publication. See [ADR26](adr/0026-owner-bound-incident-execution.md).
+The source Stacks application supports owned synthetic execution and deliberate
+source admission. See [ADR26](adr/0026-owner-bound-incident-execution.md) for its
+authority and deployment contract.
 
 The `/incidents` workspace runs the existing owned public-safety simulator with
 an explicit scenario and requested virtual duration of 8 to 120 seconds. Connect
