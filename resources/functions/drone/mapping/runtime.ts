@@ -1,6 +1,7 @@
 import type { MissionPlan, MissionTask } from '../missions/plan'
 import type { SensorVector } from '../sensors/types'
 import type { SurveyCapture, SurveyPlan, SurveyPose, SurveyRun } from './types'
+import type { SurveyCamera } from './camera'
 import type { MissionSimulationInstrument } from '../missions/simulation'
 import { simulateMission } from '../missions/simulation'
 import { validateMission } from '../missions/plan'
@@ -35,7 +36,7 @@ export function compileSurveyMission(input: SurveyPlan): MissionPlan {
 }
 
 /** Owned raw sensor, estimator, mission and quad physics collection. Camera truth never supplies a geotag. */
-export function simulateSurvey(options: { config?: unknown, scenario?: SurveyScenario, seconds?: number } = {}): SurveyRun {
+export function simulateSurvey(options: { config?: unknown, scenario?: SurveyScenario, seconds?: number, cameraFactory?: (plan: SurveyPlan, fault: 'none' | 'loss' | 'wrong-ack') => SurveyCamera } = {}): SurveyRun {
   const scenario = options.scenario ?? 'nominal', seconds = options.seconds ?? 100
   if (!surveyScenarios.includes(scenario) || !Number.isInteger(seconds) || seconds < 8 || seconds > 120) throw new RangeError('Invalid survey scenario or duration (8..120 seconds)')
   const config = options.config === undefined ? exampleSurveyConfig() : structuredClone(options.config)
@@ -44,7 +45,7 @@ export function simulateSurvey(options: { config?: unknown, scenario?: SurveySce
   const plan = createSurveyPlan(config), mission = compileSurveyMission(plan)
   if (plan.config.calibration.evidence !== 'synthetic' || plan.config.calibration.output.width * plan.config.calibration.output.height > 65536) throw new RangeError('Owned mapping fixture requires synthetic calibration and at most 65536 pixels')
   if (plan.config.calibration.timing.clockUncertaintyMs > surveyDatasetLimits.clockUncertaintyMs) throw new RangeError('Owned mapping fixture clock uncertainty exceeds 5 ms')
-  const camera = createSurveyCamera(plan, scenario === 'camera-loss' ? 'loss' : scenario === 'wrong-ack' ? 'wrong-ack' : 'none')
+  const camera = (options.cameraFactory ?? createSurveyCamera)(plan, scenario === 'camera-loss' ? 'loss' : scenario === 'wrong-ack' ? 'wrong-ack' : 'none')
   const captures: SurveyCapture[] = []
   let pending: Omit<SurveyCapture, 'rgba' | 'acknowledgedAtMs'> | null = null
   let reason: string | null = null, sequence = 0, lastAt = -Infinity

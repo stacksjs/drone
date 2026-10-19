@@ -34,8 +34,14 @@ export function renderSurveyImage(plan: SurveyPlan, body: RigidBodyState): Uint8
 
 export interface SurveyShutterCommand { sessionId: string, sequence: number, issuedAtMs: number, reference: string }
 export interface SurveyShutterAck extends SurveyShutterCommand { capturedAtMs: number, acknowledgedAtMs: number, rgba: Uint8Array }
+export interface SurveyCamera {
+  render: (state: RigidBodyState, nowMs: number) => void
+  request: (command: SurveyShutterCommand) => void
+  poll: (nowMs: number) => SurveyShutterAck | null
+  close: () => void
+}
 /** Mapping adapter preserves the visible-only shutter interface. */
-export function createSurveyCamera(plan: SurveyPlan, fault: 'none' | 'loss' | 'wrong-ack' = 'none') {
+export function createSurveyCamera(plan: SurveyPlan, fault: 'none' | 'loss' | 'wrong-ack' = 'none'): SurveyCamera {
   const camera = createModeledCamera(body => ({ rgba: renderSurveyImage(plan, body), thermalCentiKelvin: null }), { fault })
   return {
     render: camera.render,
