@@ -20,6 +20,7 @@ if (process.env.WORKSPACE_BROWSER_EVIDENCE) { await mkdir(process.env.WORKSPACE_
 assert(!html.includes('<IncidentWorkspace'), 'Native component must compile')
 assert(!html.includes(fixture.senderToken), 'HTML must not hydrate a credential')
 let recipientStreams = 0
+const recipientStreamStarts: number[] = []
 let delayObservation = true, releaseObservation: (() => void) | undefined
 const secret = randomUUID()
 let readOnlyToken: string | undefined
@@ -27,12 +28,13 @@ const controlRequest = async (request: Request) => {
   if (new URL(request.url).pathname.startsWith('/__fixture/')) {
     if (request.headers.get('x-fixture-control') !== secret) return new Response(null, { status: 404 })
     const action = new URL(request.url).pathname.slice('/__fixture/'.length)
-    if (action === 'status') return Response.json({ releaseReady: !!releaseObservation, recipientStreams })
+    if (action === 'status') return Response.json({ releaseReady: !!releaseObservation, recipientStreams, recipientStreamStarts })
     if (action === 'release') { releaseObservation?.(); return Response.json({ ok: true }) }
     if (action === 'verify') {
       const committed = await fixture.snapshot(seeded.key)
       assert.equal(committed.incident!.coordinator_id, fixture.recipient.id)
       for (const [kind, count] of [['observation-created', 2], ['review-appended', 1], ['handover-accepted', 1]] as const) assert.equal(committed.audits.filter(audit => audit.action === kind).length, count)
+      return Response.json({ ok: true })
     }
     else if (action === 'read-only') { readOnlyToken = await fixture.credential(fixture.recipient.id, ['public-safety:read']); return Response.json({ token: readOnlyToken }) }
     else if (action === 'revoke') { if (readOnlyToken) await fixture.tokens.revokeToken(readOnlyToken); await fixture.tokens.revokeToken(fixture.recipientToken) }
@@ -43,7 +45,7 @@ const controlRequest = async (request: Request) => {
 }
 route.use(async (request: Request, next: () => Promise<Response | null> | Response | null) => {
   if (new URL(request.url).pathname.startsWith('/api/')) {
-    if (new URL(request.url).pathname.endsWith('/workspace/events') && request.headers.get('authorization') === `Bearer ${fixture.recipientToken}`) recipientStreams++
+    if (new URL(request.url).pathname.endsWith('/workspace/events') && request.headers.get('authorization') === `Bearer ${fixture.recipientToken}`) { recipientStreams++; recipientStreamStarts.push(Date.now()) }
     const response = await next()
     if (delayObservation && request.method === 'POST' && new URL(request.url).pathname.endsWith('/observations') && response?.ok) {
       delayObservation = false
@@ -66,7 +68,23 @@ await writeFile(join(root, 'credentials.json'), JSON.stringify({ url: `http://12
 let drift = 0, previous = Date.now()
 const monitor = setInterval(() => { const now = Date.now(); drift = Math.max(drift, now - previous - 100); previous = now }, 100)
 try {
+  if (process.env.WORKSPACE_BROWSER_CONTROL_ONLY === 'true') {
+    const observation = { sourceDigest: seeded.source.digest, captureId: capture.id, modality: 'visible', pixel: { x: pixel % capture.width, y: Math.floor(pixel / capture.width) }, note: 'Native fixture original', uncertaintyNote: 'Native fixture uncertainty' }
+    await fixture.as(fixture.senderToken, () => fixture.records.appendPublicSafetyObservation(seeded.key, { ...observation, expectedVersion: 4 }))
+    const second = await fixture.as(fixture.senderToken, () => fixture.records.appendPublicSafetyObservation(seeded.key, { ...observation, expectedVersion: 5 }))
+    await fixture.as(fixture.recipientToken, () => fixture.records.appendPublicSafetyReview(seeded.key, second.observation.id, { expectedVersion: 6, sourceDigest: seeded.source.digest, previousReviewId: null, disposition: 'unresolved', note: 'Native fixture review' }))
+    const offer = await fixture.offer(seeded)
+    await fixture.as(fixture.recipientToken, () => fixture.handover.decideIncidentHandover(seeded.key, fixture.decision(offer)))
+    const url = `http://127.0.0.1:${server.port}/__fixture/verify`
+    assert.equal((await fetch(url)).status, 404)
+    const verified = await fetch(url, { headers: { 'x-fixture-control': secret } })
+    assert.equal(verified.status, 200)
+    assert.deepEqual(await verified.json(), { ok: true })
+    console.log('PASS native workspace browser verify control')
+  }
+  else {
   const child = Bun.spawn([process.execPath, `--config=${join(root, 'bunfig.toml')}`, '--no-env-file', join(source, 'tests/helpers/workspace-browser-driver.ts')], { cwd: root, env: process.env, stdout: 'inherit', stderr: 'inherit' })
   assert.equal(await child.exited, 0, 'Isolated native browser driver must pass')
+  }
 }
 finally { clearInterval(monitor); console.log(`QA native server maximum100ms timer drift ms: ${drift}`); releaseObservation?.(); await server.stop(true); await fixture.database.closeDatabaseConnection() }
