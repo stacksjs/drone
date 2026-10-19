@@ -70,13 +70,18 @@ export async function runExecutionCheck<T>(captured: ExecutionContext, work: () 
   const owner = executionOwner()
   if (owner.pendingChecks >= limits.pendingChecks) throw new PublicSafetyAccessError(409, 'Execution checks are busy')
   owner.pendingChecks++
+  const began = performance.now()
   const pending = Promise.resolve().then(() => captured.run(work)).finally(() => { owner.pendingChecks-- })
   let timer: ReturnType<typeof setTimeout> | undefined
   try {
-    return await Promise.race([pending, new Promise<never>((resolve, reject) => {
+    const result = await Promise.race([pending, new Promise<never>((resolve, reject) => {
       void resolve
       timer = setTimeout(() => reject(new PublicSafetyAccessError(404, 'Incident is unavailable')), limits.checkTimeoutMs)
     })])
+    // Synchronous domain replay can delay the timeout task while promise microtasks
+    // still settle. Release requires elapsed time, even if that task has not run.
+    if (performance.now() - began >= limits.checkTimeoutMs) throw new PublicSafetyAccessError(404, 'Incident is unavailable')
+    return result
   }
   finally { clearTimeout(timer) }
 }
