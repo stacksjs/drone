@@ -1,9 +1,8 @@
-/** Finite logical admission and transport budgets, not OS CPU/RSS or thread-exit guarantees. */
+/** Finite logical budgets, not OS CPU/RSS or thread-exit guarantees.
+ * One global/account/incident reservation, one subscriber, and the canonical 16 MiB
+ * recording ceiling are fixed protocol invariants rather than editable limits.
+ */
 export default {
-  globalReservations: 1,
-  accountReservations: 1,
-  incidentReservations: 1,
-  subscribers: 1,
   pendingChecks: 8,
   nativePending: 2,
   frameBytes: 4096,
@@ -15,5 +14,4 @@ export default {
   runWallMs: 60000,
   stopGraceMs: 2000,
   retainedMs: 60000,
-  recordingBytes: 16 * 1024 * 1024,
 } as const

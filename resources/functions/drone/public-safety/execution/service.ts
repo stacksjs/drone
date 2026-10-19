@@ -155,9 +155,10 @@ async function deliver(slot: ExecutionSlot, subscriber: Subscriber): Promise<boo
 function notifyTerminal(slot: ExecutionSlot): void {
   const subscriber = slot.subscriber
   if (!subscriber?.active) return
-  void deliver(slot, subscriber).catch(() => {
+  const release = () => {
     if (slot.subscriber === subscriber) slot.subscriber = null
-  })
+  }
+  void deliver(slot, subscriber).then(delivered => { if (!delivered) release() }).catch(release)
 }
 function pump(slot: ExecutionSlot): void {
   const subscriber = slot.subscriber, event = slot.pendingEvent
@@ -282,7 +283,11 @@ export async function startIncidentExecution(context: ExecutionContext, input: E
   uuid(body.intent); requireExecutionScope(body.scope)
   if (!publicSafetyScenarios.includes(body.scenario as PublicSafetyScenario) || !Number.isSafeInteger(body.seconds) || (body.seconds as number) < 8 || (body.seconds as number) > 120) throw new PublicSafetyAccessError(422, 'Invalid execution scenario or duration')
   const current = await checkExecutionAuthority(context, body.scope)
-  if (currentSlot()) throw new PublicSafetyAccessError(409, 'An execution reservation is already retained')
+  const retained = currentSlot()
+  if (retained) {
+    const sameOwner = retained.binding.accountId === current.binding.accountId && retained.binding.tokenId === current.binding.tokenId
+    throw new PublicSafetyAccessError(sameOwner ? 409 : 429, 'An execution reservation is already retained')
+  }
   if (!(workerUrl instanceof URL) || workerUrl.protocol !== 'file:' || workerUrl.host || workerUrl.search || workerUrl.hash || !/\/app\/Workers\/PublicSafetySimulation\.(?:ts|js)$/.test(workerUrl.pathname)) throw new PublicSafetyAccessError(422, 'Invalid owned Worker entrypoint')
   const config = JSON.parse(current.binding.configJson)
   if (config.survey.calibration.evidence !== 'synthetic') throw new PublicSafetyAccessError(422, 'Execution requires synthetic calibration')
