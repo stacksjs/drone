@@ -1,10 +1,18 @@
 import type { IncidentRequest } from './http'
+import { readTextBody, RequestBodyError } from '@stacksjs/router'
+import { parseJsonText } from '../../http/native-router/json'
 import { PublicSafetyAccessError } from './errors'
 import { assertIncidentDeadline, associateIncidentDeadline, incidentDeadline } from './deadline'
-import { execute, failure, privateHeaders, readBody } from './http'
+import { execute, failure, privateHeaders } from './http'
 import { authorizePublicSafetyHandover } from './handover-policy'
 import { decideIncidentHandover, offerIncidentCoordination, readIncidentHandoverDesk } from './handover'
 
+async function readHandoverBody(request: IncidentRequest): Promise<unknown> {
+  if (request.headers.get('content-type')?.split(';')[0]?.trim().toLowerCase() !== 'application/json') throw new RequestBodyError('Content-Type must be application/json', 415)
+  const text = await readTextBody(new Request(request.url, { method: request.method, headers: request.headers, body: request.body ?? null }), 8192)
+  try { return parseJsonText(text, { rejectDuplicateKeys: true }) }
+  catch { throw new RequestBodyError('Send valid UTF-8 JSON', 400) }
+}
 function incident(request: IncidentRequest) { return request.getParam('incident') ?? '' }
 function query(request: IncidentRequest, reading = false) {
   const values = new URL(request.url).searchParams
@@ -30,7 +38,7 @@ export async function offerHandoverHttp(request: IncidentRequest): Promise<Respo
     const key = incident(request)
     await authorizePublicSafetyHandover(key, 'write')
     query(request)
-    const receipt = await offerIncidentCoordination(key, await readBody(request, 8192))
+    const receipt = await offerIncidentCoordination(key, await readHandoverBody(request))
     assertIncidentDeadline(receipt)
     const response = associateIncidentDeadline(Response.json(receipt, { status: receipt.replayed ? 200 : 201, headers: privateHeaders }), incidentDeadline(receipt))
     assertIncidentDeadline(response)
@@ -43,6 +51,6 @@ export function decideHandoverHttp(request: IncidentRequest): Promise<Response> 
     const key = incident(request)
     await authorizePublicSafetyHandover(key, 'write')
     query(request)
-    return decideIncidentHandover(key, await readBody(request, 8192))
+    return decideIncidentHandover(key, await readHandoverBody(request))
   })
 }
