@@ -35,3 +35,19 @@ test.skipIf(process.env.PUBLIC_SAFETY_PURGE_NAMESPACE_TEST !== '1')('accepted pu
   requireQualifiedNamespace()
   await qualifyPurgeProcessRecovery()
 }, 180000)
+
+test.skipIf(process.env.PUBLIC_SAFETY_PURGE_NAMESPACE_TEST !== '1')('accepted purge qualifies actual registered inode faults and manifest transitions', async () => {
+  requireQualifiedNamespace()
+  const { runPurgeQualificationFixture } = await import('../helpers/public-safety-purge-fixture')
+  const { code, stdout, stderr } = await runPurgeQualificationFixture('purge-faults', 225000)
+  expect(code, `${stdout}\n${stderr}`).toBe(0)
+  for (const kind of ['missing', 'replacement', 'extra', 'symlink', 'hardlink', 'permission', 'partial', 'pending-only', 'two-aliases']) expect(stdout).toContain(`PASS actual controlled registered namespace ${kind}`)
+}, 240000)
+
+test.skipIf(process.env.PUBLIC_SAFETY_PURGE_NAMESPACE_TEST !== '1')('accepted purge qualifies captured nonce authority against real SQLite triggers', async () => {
+  requireQualifiedNamespace()
+  const { runPurgeQualificationFixture } = await import('../helpers/public-safety-purge-fixture')
+  const { code, stdout, stderr } = await runPurgeQualificationFixture('purge-critical', 165000)
+  expect(code, `${stdout}\n${stderr}`).toBe(0)
+  for (const fault of ['nonce', 'generation', 'phase', 'id']) expect(stdout).toContain(`PASS actual SQLite AFTER UPDATE ${fault} drift`)
+}, 180000)

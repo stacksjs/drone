@@ -110,7 +110,11 @@ function continuity(tx: TransactionHandle, access: Access, row: ArtifactRow): vo
   const statement = tx.unsafe('UPDATE public_safety_managed_artifacts SET operation_nonce = operation_nonce WHERE id = ? AND version = ? AND generation = ? AND state = ? AND operation_nonce = ? RETURNING id', [row.id, row.version, row.generation, row.state, row.operation_nonce]) as unknown as { executeSync?: () => unknown }
   if (typeof statement.executeSync !== 'function') managedUnavailable()
   const rows = statement.executeSync()
-  if (!Array.isArray(rows) || rows.length !== 1) conflict()
+  if (!Array.isArray(rows) || rows.length !== 1 || !rows[0] || typeof rows[0] !== 'object' || (rows[0] as { id?: unknown }).id !== row.id) conflict()
+  const observed = tx.unsafe('SELECT id FROM public_safety_managed_artifacts WHERE id = ? AND version = ? AND generation = ? AND state = ? AND operation_nonce = ?', [row.id, row.version, row.generation, row.state, row.operation_nonce]) as unknown as { executeSync?: () => unknown }
+  if (typeof observed.executeSync !== 'function') managedUnavailable()
+  const verified = observed.executeSync()
+  if (!Array.isArray(verified) || verified.length !== 1 || !verified[0] || typeof verified[0] !== 'object' || (verified[0] as { id?: unknown }).id !== row.id) conflict()
   managedDeadline(access.incident)
 }
 function planFile(path: string, contents: string | Uint8Array, ordinal: number) {

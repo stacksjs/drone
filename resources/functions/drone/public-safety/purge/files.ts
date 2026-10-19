@@ -14,8 +14,8 @@ export class PurgeFileBlocked extends Error { constructor(readonly outcome: Purg
 function blocked(outcome: PurgeOutcome): never { throw new PurgeFileBlocked(outcome) }
 function absent(path: string): boolean { try { lstatSync(path); return false } catch (error) { if (error instanceof Error && 'code' in error && error.code === 'ENOENT') return true; throw error } }
 function match(expected: CompletedArtifactIdentity, links?: string): BigIntStats {
-  try { const stat = lstatSync(expected.path, { bigint: true }); identityMatches(expected, stat, links); return stat }
-  catch { return blocked('identity-changed') }
+  try { const stat = lstatSync(expected.path, { bigint: true }); if (links !== undefined && String(stat.nlink) !== links) blocked('unexpected-link'); identityMatches(expected, stat, links); return stat }
+  catch (error) { if (error instanceof PurgeFileBlocked) throw error; return blocked('identity-changed') }
 }
 interface AliasArm { path: string, present: boolean }
 export interface PurgeFileArm { profile: 'local-purge-arm-v1', plan: PurgeFilePlan, aliases: AliasArm[], observedBytes: number, observedSha256: string | null, fingerprint: string }
@@ -56,11 +56,10 @@ function readHash(expected: CompletedArtifactIdentity, maximum: number, links: s
 }
 function armFingerprint(arm: Omit<PurgeFileArm, 'fingerprint'>): string { return sha256(JSON.stringify(arm)) }
 /** Observe one exact registered unit outside the write transaction. Never unlink here. */
-export function observePurgeFile(item: PurgeItemRow): PurgeFileArm {
+function observe(item: PurgeItemRow, inspect: boolean): PurgeFileArm {
   const plan = JSON.parse(item.planned_json) as PurgeFilePlan
   checkAncestors(plan)
   namespace(plan)
-  supportingInspection(plan)
   const aliases = plan.names.map(path => ({ path, present: !absent(path) })), present = aliases.filter(alias => alias.present)
   if (!present.length) blocked('missing-unarmed')
   let observedBytes = 0, observedSha256: string | null = null
@@ -70,8 +69,14 @@ export function observePurgeFile(item: PurgeItemRow): PurgeFileArm {
     const observed = readHash({ ...plan.expected, path: present[0]!.path }, item.planned_bytes!, String(present.length))
     observedBytes = observed.bytes; observedSha256 = observed.hash
   }
+  if (inspect) supportingInspection(plan)
   const arm = { profile: 'local-purge-arm-v1' as const, plan, aliases, observedBytes, observedSha256 }
   return { ...arm, fingerprint: armFingerprint(arm) }
+}
+export function observePurgeFile(item: PurgeItemRow): PurgeFileArm { return observe(item, true) }
+/** Recheck the exact bounded observation under the arm CAS; effect execution independently repeats actual native inspection. */
+export function revalidatePurgeArmObservation(item: PurgeItemRow, expected: PurgeFileArm): void {
+  if (JSON.stringify(observe(item, false)) !== JSON.stringify(expected)) blocked('identity-changed')
 }
 function syncParent(path: string, identity: CompletedArtifactIdentity): void {
   const parent = dirname(path)

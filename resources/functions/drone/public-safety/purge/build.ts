@@ -51,7 +51,8 @@ export async function buildPurgePage(tx: TransactionHandle, row: PurgeRow, incid
   const cursor = JSON.parse(row.build_cursor_json) as BuildCursor, counts = JSON.parse(row.materialized_counts_json) as PurgeCounts
   const group = inventoryGroups[cursor.group]
   if (group) {
-    const rows = await inventoryPage(tx, incident.id, group, cursor.after)
+    const limit = group === 'managedArtifacts' ? 1 : 100
+    const rows = await inventoryPage(tx, incident.id, group, cursor.after, limit)
     for (const entry of rows) {
       cursor.digest = sha256(`${cursor.digest}\n${inventoryLine(group, entry)}`)
       if (group === 'managedArtifacts') await artifactItems(tx, row, cursor, entry)
@@ -61,7 +62,7 @@ export async function buildPurgePage(tx: TransactionHandle, row: PurgeRow, incid
       }
     }
     inventoryAdd(counts, group, rows)
-    if (rows.length < 100) { cursor.group++; cursor.after = 0 }
+    if (rows.length < limit) { cursor.group++; cursor.after = 0 }
     else cursor.after = rows.at(-1)!.id as number
   }
   else {

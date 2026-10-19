@@ -24,7 +24,7 @@ export const inventoryFields: Record<InventoryGroup, string[]> = {
   managedEvents: ['id', 'artifact_id', 'sequence', 'incident_version', 'action', 'actor_user_id', 'at_iso', 'request_id', 'request_digest', 'step', 'outcome_code'],
 }
 export const inventoryTables: Record<InventoryGroup, string> = { sources: 'public_safety_sources', observations: 'public_safety_observations', reviews: 'public_safety_reviews', audits: 'public_safety_audits', nonCustodyMemberships: 'public_safety_incident_members', managedArtifacts: 'public_safety_managed_artifacts', managedFiles: 'public_safety_managed_artifact_files', managedEvents: 'public_safety_managed_artifact_events' }
-export async function inventoryPage(tx: Pick<TransactionHandle, 'selectFrom'>, incidentId: number, group: InventoryGroup, after: number): Promise<Record<string, unknown>[]> {
+export async function inventoryPage(tx: Pick<TransactionHandle, 'selectFrom'>, incidentId: number, group: InventoryGroup, after: number, limit = 100): Promise<Record<string, unknown>[]> {
   const table = inventoryTables[group]
   let query = tx.selectFrom(table)
   if (group === 'observations' || group === 'reviews') {
@@ -34,7 +34,7 @@ export async function inventoryPage(tx: Pick<TransactionHandle, 'selectFrom'>, i
   else if (group === 'managedFiles' || group === 'managedEvents') query = query.innerJoin('public_safety_managed_artifacts', 'public_safety_managed_artifacts.id', '=', `${table}.artifact_id`).where('public_safety_managed_artifacts.incident_id', '=', incidentId)
   else query = query.where(`${table}.incident_id`, '=', incidentId)
   if (group === 'nonCustodyMemberships') query = query.where('role', 'not in', ['coordinator', 'evidence-custodian'])
-  return asRows<Record<string, unknown>>(await query.select(inventoryFields[group].map(field => `${table}.${field}`)).where(`${table}.id`, '>', after).orderBy(`${table}.id`, 'asc').limit(100).execute())
+  return asRows<Record<string, unknown>>(await query.select(inventoryFields[group].map(field => `${table}.${field}`)).where(`${table}.id`, '>', after).orderBy(`${table}.id`, 'asc').limit(limit).execute())
 }
 export function inventoryLine(group: InventoryGroup, row: Record<string, unknown>): string { return `${JSON.stringify([group, ...inventoryFields[group].map(field => row[field])])}\n` }
 export function inventoryAdd(counts: PurgeCounts, group: InventoryGroup, rows: Record<string, unknown>[]): void {

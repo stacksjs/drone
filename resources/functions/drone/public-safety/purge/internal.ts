@@ -30,7 +30,7 @@ export const systemPurgeActor = { kind: 'system', name: 'public-safety-local-pur
 export const purgeTables = { purge: 'public_safety_purges', item: 'public_safety_purge_items', event: 'public_safety_purge_events' } as const
 export function purgeConflict(): never { throw new PublicSafetyAccessError(409, 'Accepted purge state has changed') }
 export function purgeUnavailable(): never { throw new PublicSafetyAccessError(404, 'Incident purge is unavailable') }
-export function purgeUuid(value: unknown): asserts value is string { if (typeof value !== 'string' || !/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/.test(value)) throw new PublicSafetyAccessError(422, 'Invalid purge identifier') }
+export function purgeUuid(value: unknown): asserts value is string { if (typeof value !== 'string' || value.length !== 36 || !/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/.test(value)) throw new PublicSafetyAccessError(422, 'Invalid purge identifier') }
 export function purgePlain(value: unknown, keys: string[], optional = false): Record<string, unknown> {
   if (!value || typeof value !== 'object' || types.isProxy(value) || Object.getPrototypeOf(value) !== Object.prototype || Object.getOwnPropertySymbols(value).length) throw new PublicSafetyAccessError(422, 'Invalid purge fields')
   const descriptors = Object.getOwnPropertyDescriptors(value)
@@ -47,7 +47,7 @@ export function purgeEventProjection(row: PurgeEventRow): PurgeEvent {
   if (row.actor_kind === 'human' ? row.actor_user_id === null || row.system_actor !== null : row.actor_user_id !== null || row.system_actor !== systemPurgeActor.name) purgeConflict()
   return { sequence: row.sequence, incidentVersion: row.incident_version, retentionVersion: row.retention_version, actor: row.actor_kind === 'human' ? { kind: 'human', userId: row.actor_user_id! } : systemPurgeActor, action: row.step, at: row.at_iso, outcome: row.outcome_code, delta: JSON.parse(row.counts_json) }
 }
-export function purgeReceiptDeadline(row: PurgeRow): void { if (row.state === 'complete' && (!row.receipt_retain_until_iso || Date.parse(row.receipt_retain_until_iso) <= Date.now())) purgeUnavailable() }
+export function purgeReceiptDeadline(row: PurgeRow): void { if ((row.state === 'complete' || row.completed_at_iso !== null) && (!row.receipt_retain_until_iso || Date.parse(row.receipt_retain_until_iso) <= Date.now())) purgeUnavailable() }
 export function purgeStatus(row: PurgeRow, incident: IncidentRow, scope: PurgeScopeRow): PurgeStatus {
   purgeReceiptDeadline(row)
   const completed = JSON.parse(row.progress_counts_json) as PurgeProgress

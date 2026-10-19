@@ -23,8 +23,8 @@ export async function requirePublicSafetyRetentionAccess(key: string, ability: R
   if (!member || member.active !== true && member.active !== 1 || !coordinator && (ability === 'revoke' || member.role !== 'evidence-custodian')) throw new PublicSafetyAccessError(403, 'This custody action is not permitted')
   const scope = asRow<{ freeze_state: 'retained' | 'frozen' | 'purged', original_hold: 'none' | 'declared-review-required' }>(await handle.selectFrom('public_safety_retention_scopes').select(['freeze_state', 'original_hold']).where('incident_id', '=', incident.id).executeTakeFirst())
   if (scope && scope.freeze_state !== 'retained') {
-    const purge = asRow<{ state: string, receipt_retain_until_iso: string | null }>(await handle.selectFrom('public_safety_purges').select(['state', 'receipt_retain_until_iso']).where('incident_id', '=', incident.id).executeTakeFirst())
-    if (!purge || purge.state === 'complete' && (!purge.receipt_retain_until_iso || Date.parse(purge.receipt_retain_until_iso) <= Date.now())) throw new PublicSafetyAccessError(404, 'Incident custody is unavailable')
+    const purge = asRow<{ state: string, completed_at_iso: string | null, receipt_retain_until_iso: string | null }>(await handle.selectFrom('public_safety_purges').select(['state', 'completed_at_iso', 'receipt_retain_until_iso']).where('incident_id', '=', incident.id).executeTakeFirst())
+    if (!purge || (purge.state === 'complete' || purge.completed_at_iso !== null) && (!purge.receipt_retain_until_iso || Date.parse(purge.receipt_retain_until_iso) <= Date.now())) throw new PublicSafetyAccessError(404, 'Incident custody is unavailable')
     return { principal, incident, member, originalHold: scope.original_hold, lifecycle: 'frozen' as const }
   }
   const stored = projection(incident, member)

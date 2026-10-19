@@ -13,7 +13,7 @@ import { purgeTables, purgeConflict, appendPurgeEvent, transitionPurge, systemPu
 import { zeroPurgeProgress } from './types'
 import { purgeEnabled, requirePurgeEnabled } from './policy'
 import { buildPurgePage } from './build'
-import { executePurgeFile, observePurgeFile, PurgeFileBlocked } from './files'
+import { executePurgeFile, observePurgeFile, revalidatePurgeArmObservation, PurgeFileBlocked } from './files'
 import { verifyPurgeConvergence } from './convergence'
 import { inventoryFields, inventoryTables } from './inventory'
 interface Context { row: PurgeRow, incident: IncidentRow, scope: PurgeScopeRow }
@@ -36,6 +36,10 @@ function continuity(tx: TransactionHandle, row: PurgeRow, item: PurgeItemRow): v
   if (typeof statement.executeSync !== 'function') throw new PurgeFileBlocked('inspection-unavailable')
   const result = statement.executeSync()
   if (!Array.isArray(result) || result.length !== 1 || !result[0] || typeof result[0] !== 'object' || (result[0] as { id?: unknown }).id !== item.id) purgeConflict()
+  const fresh = tx.unsafe('SELECT id FROM public_safety_purge_items WHERE id = ? AND purge_id = ? AND version = ? AND generation = ? AND state = ? AND operation_nonce = ? AND EXISTS (SELECT 1 FROM public_safety_purges WHERE id = ? AND version = ? AND generation = ? AND operation_nonce = ?)', [item.id, row.id, item.version, item.generation, 'armed', nonce, row.id, row.version, row.generation, row.operation_nonce]) as unknown as { executeSync?: () => unknown }
+  if (typeof fresh.executeSync !== 'function') throw new PurgeFileBlocked('inspection-unavailable')
+  const verified = fresh.executeSync()
+  if (!Array.isArray(verified) || verified.length !== 1 || !verified[0] || typeof verified[0] !== 'object' || (verified[0] as { id?: unknown }).id !== item.id) purgeConflict()
 }
 async function updateItem(tx: TransactionHandle, item: PurgeItemRow, changes: Partial<PurgeItemRow>): Promise<PurgeItemRow> {
   if (item.version >= maximumVersion || item.generation >= maximumVersion) purgeConflict()
@@ -51,6 +55,7 @@ async function recordStep(tx: TransactionHandle, context: Context, step: 'arm' |
 async function blockUnit(id: number, outcome: PurgeOutcome, phase: 'build' | 'db' | 'fs' | 'minimize' | 'retire'): Promise<void> {
   await transaction(async tx => {
     const context = await current(tx, id)
+    if (context.row.state === 'complete' || context.row.completed_at_iso !== null) return
     requirePurgeEnabled()
     const at = new Date().toISOString()
     await recordStep(tx, context, 'blocked', zeroPurgeProgress(), { state: 'blocked', ...(phase === 'fs' ? { fs_state: 'blocked' as const } : phase === 'db' || phase === 'build' ? { db_state: 'blocked' as const } : {}), outcome_code: outcome, blocked_at_iso: context.row.blocked_at_iso ?? at, review_due_at_iso: context.row.review_due_at_iso ?? new Date(Date.now() + 30 * 86400000).toISOString(), next_eligible_at_iso: new Date(Date.now() + 60000).toISOString() })
@@ -132,7 +137,8 @@ async function fileUnit(id: number): Promise<boolean> {
     await transaction(async tx => {
       const context = await current(tx, id), lockedItem = asRow<PurgeItemRow>(await lockRow(tx, purgeTables.item, { id: item.id })) ?? purgeConflict()
       requirePurgeEnabled()
-      if (lockedItem.version !== item.version || lockedItem.generation !== item.generation || lockedItem.state !== 'planned' || JSON.stringify(observePurgeFile(lockedItem)) !== JSON.stringify(arm)) purgeConflict()
+      if (lockedItem.version !== item.version || lockedItem.generation !== item.generation || lockedItem.state !== 'planned') purgeConflict()
+      revalidatePurgeArmObservation(lockedItem, arm)
       item = await updateItem(tx, lockedItem, { state: 'armed', arm_json: JSON.stringify(arm), alias_json: JSON.stringify(arm.aliases), observed_bytes: arm.observedBytes, observed_sha256: arm.observedSha256, armed_at_iso: new Date().toISOString() })
       await recordStep(tx, context, 'arm')
     }, { retries: 0 })
@@ -212,7 +218,7 @@ export async function runPublicSafetyPurgeBatch(options: BatchOptions = {}): Pro
     try {
       const context = await transaction(tx => current(tx, selected.id), { retries: 0 })
       if (context.row.build_digest === null && context.row.sealed_totals_json === '{}') await transaction(async tx => { const value = await current(tx, selected.id); await buildPurgePage(tx, value.row, value.incident, value.scope) }, { retries: 0 })
-      else if (context.row.state === 'complete') { phase = 'retire'; if (!context.row.receipt_retain_until_iso || Date.parse(context.row.receipt_retain_until_iso) > Date.now()) break; await transaction(async tx => retireMetadata(tx, await current(tx, selected.id), maxRows), { retries: 0 }); break }
+      else if (context.row.state === 'complete') { phase = 'retire'; if (!context.row.receipt_retain_until_iso || Date.parse(context.row.receipt_retain_until_iso) > Date.now()) break; await transaction(async tx => retireMetadata(tx, await current(tx, selected.id), maxRows), { retries: 0 }); units++; break }
       else if (context.row.sealed_totals_json !== '{}') { phase = 'minimize'; await transaction(async tx => minimize(tx, await current(tx, selected.id), maxRows), { retries: 0 }) }
       else {
         phase = 'db'

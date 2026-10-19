@@ -37,7 +37,7 @@ export async function acceptPublicSafetyPurge(key: string, input: unknown): Prom
   const expected = expectedVersion(body.expectedVersion), expectedRetention = expectedVersion(body.expectedRetentionVersion)
   purgeUuid(body.requestId)
   const exclusions = purgePlain(body.exclusions, Object.keys(purgeExclusions))
-  if (body.policyVersion !== purgePolicy || body.coverage !== purgeCoverage || Object.values(exclusions).some(value => value !== true) || typeof body.inventoryDigest !== 'string' || !/^[a-f0-9]{64}$/.test(body.inventoryDigest) || !Number.isSafeInteger(body.receiptRetentionDays) || (body.receiptRetentionDays as number) < 1 || (body.receiptRetentionDays as number) > 365) throw new PublicSafetyAccessError(422, 'Invalid purge acceptance')
+  if (body.policyVersion !== purgePolicy || body.coverage !== purgeCoverage || Object.values(exclusions).some(value => value !== true) || typeof body.inventoryDigest !== 'string' || body.inventoryDigest.length !== 64 || !/^[a-f0-9]{64}$/.test(body.inventoryDigest) || !Number.isSafeInteger(body.receiptRetentionDays) || (body.receiptRetentionDays as number) < 1 || (body.receiptRetentionDays as number) > 365) throw new PublicSafetyAccessError(422, 'Invalid purge acceptance')
   await authorizePublicSafetyPurge(key, 'accept')
   return transaction(async tx => {
     const access = await locked(tx, key, 'accept'), fingerprint = sha256(JSON.stringify(['accept', key, access.principal.userId, expected, expectedRetention, purgePolicy, purgeCoverage, body.inventoryDigest, Object.keys(purgeExclusions).map(name => exclusions[name]), body.receiptRetentionDays, body.requestId]))
@@ -53,6 +53,7 @@ export async function acceptPublicSafetyPurge(key: string, input: unknown): Prom
     if (inventory.digest !== body.inventoryDigest) purgeConflict()
     requirePurgeEnabled()
     access.incident = await advance(tx, access.incident)
+    requirePurgeEnabled()
     const changed = await tx.updateTable('public_safety_retention_scopes').set({ freeze_state: 'frozen', version: access.scope.version + 1, updated_at: new Date().toISOString() }).where('id', '=', access.scope.id).where('version', '=', access.scope.version).where('freeze_state', '=', 'retained').executeTakeFirst()
     if (mutationCount(changed) !== 1) purgeConflict()
     access.scope = { ...access.scope, version: access.scope.version + 1, freeze_state: 'frozen' }
@@ -78,6 +79,7 @@ export async function listPublicSafetyPurgeEvents(key: string, purgeKey: string,
     const access = await requirePublicSafetyPurgeAccess(key, 'events', tx), row = await findPurge(tx, access.incident.id, purgeKey)
     purgeReceiptDeadline(row)
     const rows = asRows<PurgeEventRow>(await tx.selectFrom(purgeTables.event).selectAll().where('purge_id', '=', row.id).where('sequence', '>', after).orderBy('sequence', 'asc').limit((limit as number) + 1).execute()), entries = rows.slice(0, limit as number).map(purgeEventProjection)
+    purgeReceiptDeadline(row)
     return { entries, cursor: entries.at(-1)?.sequence ?? after as number, hasMore: rows.length > (limit as number) }
   }, { retries: 0 })
 }
