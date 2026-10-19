@@ -219,7 +219,7 @@ export function openIncidentWorkspace(settings: WorkspaceClientOptions = {}) {
       if (generation !== identity || version !== activity) return false
       const ambiguous = !(failure instanceof WireFailure) || failure.status >= 500
       if (!ambiguous) retry = null
-      publish({ busy: false, confirmationRequired: failure instanceof WireFailure ? failure.status === 409 : true, canRetryHandover: ambiguous && handover, error: failure instanceof WireFailure && failure.status === 422 ? 'The fields were refused. Check your declaration.' : failure instanceof WireFailure && failure.status === 409 ? 'The context changed. Review fresh records before explicitly submitting again.' : 'Outcome unknown. Inspect current records before making another declaration.', notice: '' })
+      publish({ busy: false, confirmationRequired: ambiguous || failure instanceof WireFailure && failure.status === 409, canRetryHandover: ambiguous && handover, error: failure instanceof WireFailure && failure.status === 422 ? 'The fields were refused. Check your declaration.' : failure instanceof WireFailure && failure.status === 409 ? 'The context changed. Review fresh records before explicitly submitting again.' : 'Outcome unknown. Inspect current records before making another declaration.', notice: '' })
       await refresh()
       return false
     }

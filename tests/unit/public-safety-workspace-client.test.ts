@@ -259,3 +259,33 @@ test('an expired scope-bound context cursor fails closed without repeated stale 
   }
   finally { model.close() }
 })
+
+test('HTTP 5xx outcomes preserve warning and explicit confirmation for every declaration kind', async () => {
+  for (const kind of ['observation', 'review', 'handover'] as const) {
+    let events!: BroadcastStreamClientOptions, writes = 0
+    const data = snapshot(), digest = 'a'.repeat(64)
+    data.selected = { source: { digest } } as unknown as WorkspaceSnapshot['selected']
+    data.actions.canObserve = true; data.actions.canReview = true
+    data.handover = { offer: { key: '80000000-0000-4000-8000-000000000001' }, actionability: { canCancel: true } } as unknown as WorkspaceSnapshot['handover']
+    const model = openIncidentWorkspace({ request: async (path, init) => {
+      if (init?.method === 'POST') { writes++; return Response.json({ error: 'Unavailable' }, { status: kind === 'review' ? 503 : 500 }) }
+      if (path.endsWith(`/sources/${digest}`)) return Response.json({ source: { digest }, recording: null })
+      if (path.includes('/observations/1/reviews')) return Response.json({ entries: [], cursor: 0, hasMore: false })
+      if (path.endsWith('/observations/1')) return Response.json({ id: 1, sourceDigest: digest })
+      return Response.json(data)
+    }, stream: options => { events = options; return { close() {} } }, refreshMs: 60000 })
+    try {
+      model.connect('incident-a', 'private'); events.onConnected?.(); await settle(); await model.loadSource(); await model.loadReviews(1)
+      const submit = () => kind === 'handover' ? model.decide('cancel') : kind === 'review' ? model.review({ disposition: 'unresolved', note: 'Bound review' }, model.reviewBinding()) : model.observe({ captureId: 'photo-0001', modality: 'visible', x: 0, y: 0, note: 'Explicit observation', uncertaintyNote: 'Unresolved' })
+      expect(await submit()).toBe(false)
+      expect(model.get().confirmationRequired).toBe(true)
+      expect(model.get().canRetryHandover).toBe(kind === 'handover')
+      expect(model.get().error).toContain('Outcome unknown')
+      await model.refresh()
+      expect(model.get().error).toContain('Outcome unknown')
+      expect(await submit()).toBe(false)
+      expect(writes).toBe(1)
+    }
+    finally { model.close() }
+  }
+})

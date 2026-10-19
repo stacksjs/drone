@@ -62,9 +62,14 @@ function openSource() { model.selectSource(sourceChoice()) }
 function openOffer() { model.selectOffer(offerChoice()) }
 async function recordObservation() {
   if (!supportedPixel()) return
-  if (await model.observe({ captureId: captureId(), modality: modality(), x: Number(pixelX()), y: Number(pixelY()), note: observationNote(), uncertaintyNote: uncertaintyNote() })) { observationNote.set(''); uncertaintyNote.set('') }
+  const submitted = { captureId: captureId(), modality: modality(), x: Number(pixelX()), y: Number(pixelY()), note: observationNote(), uncertaintyNote: uncertaintyNote() }
+  const digest = current()?.selected?.source.digest
+  if (await model.observe(submitted) && digest === current()?.selected?.source.digest && submitted.captureId === captureId() && submitted.modality === modality() && submitted.x === Number(pixelX()) && submitted.y === Number(pixelY()) && submitted.note === observationNote() && submitted.uncertaintyNote === uncertaintyNote()) { observationNote.set(''); uncertaintyNote.set('') }
 }
-async function recordReview() { if (await model.review({ disposition: disposition(), note: reviewNote() }, reviewDraftBinding)) reviewNote.set('') }
+async function recordReview() {
+  const submitted = { disposition: disposition(), note: reviewNote() }, binding = reviewDraftBinding
+  if (await model.review(submitted, binding) && submitted.note === reviewNote() && submitted.disposition === disposition() && JSON.stringify(binding) === JSON.stringify(reviewDraftBinding)) reviewNote.set('')
+}
 async function offer() {
   const recipient = current()?.recipients?.entries.find(member => `${member.userId}:${member.role}:${member.membershipVersion}` === recipientId())
   if (recipient && await model.offer(recipient, outgoingRole(), Number(ttl()))) recipientId.set('')
