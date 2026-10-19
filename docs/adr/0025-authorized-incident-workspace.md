@@ -54,9 +54,13 @@ them requires a direct runtime dependency, not a framework upgrade or source
 bridge. The stream carries fixed content-free refresh hints. Current records
 come from fresh authorized reads, rather than broadcast payload copies.
 
-Every delayed authorization explicitly re-enters the captured subscriber's
-native request context and rechecks current token, SQL grant, membership and
-scope. A broadcaster's request cannot authorize another subscriber. A thin
+Every delayed authorization captures the complete subscriber async context at
+Action entry, before opening a transaction, then explicitly re-enters its native
+request context and rechecks current token, SQL grant, membership and scope.
+This also prevents a publisher's completed transaction context from leaking
+into the delayed SQL read. Installed .221 needs this explicit binding; the
+reusable native stream correction is published separately. A broadcaster's
+request cannot authorize another subscriber. A thin
 release adapter reads native chunks without parsing/rebuilding SSE, rechecks
 current authority and synchronously checks expiry before release. Connection,
 frame, queue and pending-authorization limits are finite; cancellation releases
