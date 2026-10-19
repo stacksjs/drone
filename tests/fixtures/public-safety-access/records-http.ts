@@ -170,9 +170,11 @@ try {
   assert.equal((await send('POST', `${key}/observations`, observer.token, boundaryBody + ' ')).status, 413)
   assert.equal((await send('POST', `${key}/observations`, observer.token, 'é'.repeat(4097))).status, 413)
   const csrf = 'a'.repeat(64), cookie = `${authCookieName()}=${reviewer.token}; X-CSRF-Token=${csrf}`
-  const thermalObservation = await send('POST', `${key}/observations`, null, { ...input, expectedVersion: version++, modality: 'thermal', note: 'é'.repeat(1024) }, { cookie, 'x-csrf-token': csrf })
+  const thermalObservation = await send('POST', `${key}/observations`, null, { ...input, expectedVersion: version++, modality: 'thermal', note: 'é'.repeat(1024), uncertaintyNote: 'é'.repeat(512) }, { cookie, 'x-csrf-token': csrf })
   assert.equal(thermalObservation.status, 201)
   assert.equal(thermalObservation.data.observation.note, 'é'.repeat(1024))
+  assert.equal(thermalObservation.data.observation.uncertaintyNote, 'é'.repeat(512))
+  assert.equal(Buffer.byteLength(thermalObservation.data.observation.uncertaintyNote), 1024)
   const observation = visible.data.observation
   assert.deepEqual((await send('GET', `${key}/observations/${observation.id}`, pilot.token)).data, observation)
   assert.equal((await send('GET', `${otherKey}/observations/${observation.id}`, token)).status, 404)
@@ -184,15 +186,24 @@ try {
   assert.equal(observationNext.data.entries.length, 1)
   assert.equal(observationNext.data.entries[0].id, thermalObservation.data.observation.id)
   const reviewInput = { expectedVersion: version, sourceDigest: source.digest, previousReviewId: null, disposition: 'unresolved', note: ' Initial reviewer declaration é ' }
-  const first = await send('POST', `${key}/observations/${observation.id}/reviews`, reviewer.token, reviewInput)
+  const reviewPath = `${key}/observations/${observation.id}/reviews`
+  for (const note of ['', ' \n\t ', 'é'.repeat(1025)]) assert.equal((await send('POST', reviewPath, reviewer.token, { ...reviewInput, note })).status, 422)
+  const reviewJson = JSON.stringify(reviewInput)
+  const reviewEnvelope = reviewJson + ' '.repeat(8192 - Buffer.byteLength(reviewJson))
+  assert.equal(Buffer.byteLength(reviewEnvelope), 8192)
+  // Both boundary requests have a current version and valid first-review pointer.
+  assert.equal((await send('POST', reviewPath, reviewer.token, reviewEnvelope + ' ')).status, 413)
+  const first = await send('POST', reviewPath, reviewer.token, reviewEnvelope)
   assert.equal(first.status, 201); version++
   assert.equal(first.data.review.selfReview, false)
   assert.equal(first.data.review.uncertaintyNote, input.uncertaintyNote)
   assert.equal((await send('POST', `${key}/observations/${observation.id}/reviews`, reviewer.token, { ...reviewInput, expectedVersion: version })).status, 409)
   assert.equal((await send('POST', `${key}/observations/${observation.id}/reviews`, reviewer.token, { ...reviewInput, expectedVersion: version, previousReviewId: first.data.review.id, sourceDigest: 'a'.repeat(64) })).status, 404)
   assert.equal((await send('POST', `${otherKey}/observations/${observation.id}/reviews`, token, { ...reviewInput, expectedVersion: 1 })).status, 404)
-  const second = await send('POST', `${key}/observations/${observation.id}/reviews`, reviewer.token, { ...reviewInput, expectedVersion: version++, previousReviewId: first.data.review.id, disposition: 'supported-by-source', note: 'Source supports this explicit point, not physical truth' })
+  const second = await send('POST', `${key}/observations/${observation.id}/reviews`, reviewer.token, { ...reviewInput, expectedVersion: version++, previousReviewId: first.data.review.id, disposition: 'supported-by-source', note: 'é'.repeat(1024) })
   assert.equal(second.status, 201)
+  assert.equal(second.data.review.note, 'é'.repeat(1024))
+  assert.equal(Buffer.byteLength(second.data.review.note), 2048)
   const self = await send('POST', `${key}/observations/${thermalObservation.data.observation.id}/reviews`, reviewer.token, { ...reviewInput, expectedVersion: version++ })
   assert.equal(self.status, 201); assert.equal(self.data.review.selfReview, true)
   const history = await send('GET', `${key}/observations/${observation.id}/reviews?limit=1`, observer.token)
@@ -201,6 +212,7 @@ try {
   const nextReview = await send('GET', `${key}/observations/${observation.id}/reviews?after=${history.data.cursor}`, observer.token)
   assert.deepEqual(nextReview.data.entries.map((entry: any) => entry.disposition), ['supported-by-source'])
   assert.equal(nextReview.data.hasMore, false)
+  assert.equal(nextReview.data.entries[0].note, 'é'.repeat(1024))
   assert.deepEqual((await send('GET', `${key}/observations/${observation.id}`, token)).data, observation)
   for (const path of ['/sources', '/observations', `/observations/${observation.id}/reviews`]) {
     for (const query of ['limit=101', 'after=-1', 'after=01', 'after=1%0A', 'limit=1&limit=2', 'afterSequence=1', 'actorId=1']) assert.equal((await send('GET', key + path + '?' + query, token)).status, 422)
@@ -209,7 +221,6 @@ try {
   assert.equal((await send('GET', `${key}/sources/${source.digest}%0A`, token)).status, 422)
   assert.equal((await send('GET', `${key}/sources/${source.digest}?id=1`, token)).status, 422)
   assert.equal((await send('GET', `${key}/observations/${observation.id}?id=1`, token)).status, 422)
-  assert.equal((await send('POST', `${key}/observations/${observation.id}/reviews`, token, '{}'.padEnd(8193, ' '))).status, 413)
   await Rbac.revokePermission(coordinator.id, 'public-safety:access', 'web')
   assert.equal((await send('POST', `${key}/sources`, token, '{', { 'x-fixture-unread': 'platform-revoked' })).status, 403)
   assert.equal(observedBodies.get('platform-revoked'), false)
