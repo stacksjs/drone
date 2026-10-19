@@ -43,7 +43,13 @@ export function openIncidentWorkspace(settings: WorkspaceClientOptions = {}) {
   let retry: { scope: string, path: string, body: HandoverOfferInput | HandoverDecisionInput } | null = null
   const pending = new Set<AbortController>()
   let reviewSelection = 0, authority = '', fieldRefusal = false
-  const executionClient = openIncidentExecution({ endpoint: () => `${base()}/workspace/execution`, request, stream: settings.stream, refreshWorkspace: refresh })
+  const executionClient = openIncidentExecution({ endpoint: () => `${base()}/workspace/execution`, request, stream: settings.stream, refreshWorkspace: refresh,
+    async sourceExists(digest) {
+      const generation = identity, binding = scope
+      const checked = await json<WorkspaceSnapshot>(`${base()}/workspace?sourceDigest=${digest}&limit=1`)
+      return generation === identity && binding === scope && checked.scope === binding && checked.viewer.accountId === accountId && checked.profile === 'incident-workspace-v1' && checked.selected?.source.digest === digest
+    },
+  })
   const publish = (patch: Partial<WorkspaceClientView>) => {
     view = { ...view, ...patch }
     executionClient.sync({ available: view.status === 'current' && !!view.snapshot && !!view.snapshot.actions.canRegisterSource, scope, canMutate: !!view.snapshot?.actions.canRegisterSource, version: view.snapshot?.incident.version ?? 0, catalogDigests: view.snapshot?.sources.entries.map(source => source.digest) ?? [] })

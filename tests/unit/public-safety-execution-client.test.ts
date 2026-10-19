@@ -89,6 +89,7 @@ test('stream renewal only observes the same run and read-only contexts cannot mu
     expect(writes).toBe(1)
     model.sync({ ...context, available: false })
     expect(model.get().execution).toBeNull()
+    expect(model.get().hasReservation).toBe(true)
     callbacks[0]!.onMessage({ channel: 'server', event: 'execution', data: completed(intent) })
     expect(model.get().execution).toBeNull()
     model.sync(context); await model.refresh()
@@ -173,6 +174,24 @@ test('execution binding uses the parent volatile credential and preserves explic
     await Bun.sleep(10)
     expect(model.execution.get().execution).toBeNull()
     expect(model.get().status).toBe('refused')
+  }
+  finally { model.close() }
+})
+
+test('uncertain admission checks its digest beyond the currently paged catalog without moving selection', async () => {
+  let intent = '', checked = '', checks = 0
+  const model = openIncidentExecution({ endpoint: () => '/execution', request: async (path, init) => {
+    if (init?.method !== 'POST') return Response.json(null)
+    if (path.endsWith('/admission')) return Response.json({ error: 'Withheld' }, { status: 503 })
+    intent = JSON.parse(String(init.body)).intent; return Response.json(completed(intent))
+  }, stream: () => ({ close() {} }), refreshWorkspace: async () => {}, sourceExists: async hash => { checks++; checked = hash; return true } })
+  try {
+    model.sync(context); await model.start('nominal', 100)
+    expect(await model.admit()).toBe(false)
+    expect(model.get().sourceExists).toBe(true)
+    expect(checked).toBe('b'.repeat(64))
+    expect(checks).toBe(1)
+    expect(model.get().unknownAdmission).toBe(true)
   }
   finally { model.close() }
 })

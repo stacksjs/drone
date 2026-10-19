@@ -6,6 +6,7 @@ import { useBroadcastStream } from '@stacksjs/stx/composables/use-broadcast-stre
 export interface ExecutionClientContext { available: boolean, scope: string | null, canMutate: boolean, version: number, catalogDigests: string[] }
 export interface ExecutionClientView {
   execution: ExecutionView | null
+  hasReservation: boolean
   busy: boolean
   connected: boolean
   unknownStart: boolean
@@ -19,6 +20,7 @@ interface ExecutionClientOptions {
   request: (path: string, init?: RequestInit) => Promise<Response>
   stream?: (options: BroadcastStreamClientOptions) => { close: () => void }
   refreshWorkspace: () => Promise<void>
+  sourceExists?: (digest: string) => Promise<boolean>
 }
 class RequestFailure extends Error { constructor(readonly status: number) { super('Execution request refused') } }
 const uuid = /^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/
@@ -29,7 +31,7 @@ const live = (value: ExecutionView) => ['waiting-for-consumer', 'running', 'stop
 export function openIncidentExecution(settings: ExecutionClientOptions) {
   const createStream = settings.stream ?? useBroadcastStream
   const listeners = new Set<(value: ExecutionClientView) => void>()
-  let view: ExecutionClientView = { execution: null, busy: false, connected: false, unknownStart: false, unknownAdmission: false, sourceExists: false, error: '', notice: '' }
+  let view: ExecutionClientView = { execution: null, hasReservation: false, busy: false, connected: false, unknownStart: false, unknownAdmission: false, sourceExists: false, error: '', notice: '' }
   let context: ExecutionClientContext = { available: false, scope: null, canMutate: false, version: 0, catalogDigests: [] }
   let generation = 0, streamGeneration = 0, intent: string | null = null, execution: string | null = null
   let stream: { close: () => void } | null = null, streamFor: string | null = null, reading: Promise<void> | null = null
@@ -52,7 +54,7 @@ export function openIncidentExecution(settings: ExecutionClientOptions) {
   function clear() {
     intent = null; execution = null
     conceal()
-    publish({ unknownStart: false, unknownAdmission: false, error: '', notice: '' })
+    publish({ hasReservation: false, unknownStart: false, unknownAdmission: false, error: '', notice: '' })
   }
   function valid(value: ExecutionView): boolean {
     return !!value && uuid.test(value.execution) && uuid.test(value.intent) && value.scope === context.scope && value.profile === 'owned-public-safety-collection-v1'
@@ -73,7 +75,7 @@ export function openIncidentExecution(settings: ExecutionClientOptions) {
       conceal()
       publish({ notice: 'Execution availability changed. Read current status; missing metadata is unknown history.' })
     }, Math.min(delay, 2147483647))
-    publish({ execution: value, unknownStart: false, sourceExists: !!value.completion && context.catalogDigests.includes(value.completion.digest) })
+    publish({ execution: value, hasReservation: true, unknownStart: false, sourceExists: !!value.completion && context.catalogDigests.includes(value.completion.digest) })
     if (live(value)) attach(value)
     else closeStream()
   }
@@ -154,7 +156,7 @@ export function openIncidentExecution(settings: ExecutionClientOptions) {
     beginMutation()
     const version = generation, scope = context.scope
     intent = crypto.randomUUID()
-    publish({ busy: true, error: '', notice: '' })
+    publish({ hasReservation: true, busy: true, error: '', notice: '' })
     try {
       const value = await json<ExecutionView>(settings.endpoint(), { intent, scope, scenario, seconds })
       if (!current(version, scope)) return false
@@ -165,7 +167,7 @@ export function openIncidentExecution(settings: ExecutionClientOptions) {
       if (!current(version, scope)) return false
       const unknown = !(failure instanceof RequestFailure) || failure.status >= 500
       if (!unknown) intent = null
-      publish({ busy: false, unknownStart: unknown, error: unknown ? 'Outcome unknown. Read current execution status to reconcile the original intent. The start request will not be retried.' : 'Execution start was refused. Review current access, availability and fields.' })
+      publish({ hasReservation: !!intent, busy: false, unknownStart: unknown, error: unknown ? 'Outcome unknown. Read current execution status to reconcile the original intent. The start request will not be retried.' : 'Execution start was refused. Review current access, availability and fields.' })
       return false
     }
   }
@@ -191,6 +193,12 @@ export function openIncidentExecution(settings: ExecutionClientOptions) {
       return false
     }
   }
+  async function reconcileSource(value: ExecutionView, version: number, scope: string) {
+    const hash = value.completion?.digest
+    if (!hash || !settings.sourceExists) return
+    const exists = await settings.sourceExists(hash)
+    if (current(version, scope) && view.execution?.execution === value.execution) publish({ sourceExists: exists })
+  }
   async function admit(): Promise<boolean> {
     const value = view.execution, completion = value?.completion, scope = context.scope
     if (!context.available || !context.canMutate || !scope || view.busy || value?.phase !== 'completed' || !completion || value.admission !== 'unsubmitted' || view.unknownAdmission || view.sourceExists) return false
@@ -205,6 +213,7 @@ export function openIncidentExecution(settings: ExecutionClientOptions) {
       if (!current(version, scope)) return false
       publish({ busy: false, notice: 'Admission response received. Read the current source catalog; source selection remains explicit.' })
       await settings.refreshWorkspace(); await refresh()
+      await reconcileSource(value, version, scope)
       return current(version, scope)
     }
     catch (failure) {
@@ -212,6 +221,7 @@ export function openIncidentExecution(settings: ExecutionClientOptions) {
       const unknown = !(failure instanceof RequestFailure) || failure.status >= 500
       publish({ busy: false, unknownAdmission: unknown, error: unknown ? 'Admission outcome unknown. Read the source catalog to check this digest. Existence does not establish which request inserted it. No automatic retry is made.' : 'Admission was refused. Review the fresh incident version and source catalog before explicitly deciding again.' })
       await settings.refreshWorkspace()
+      if (unknown) { try { await reconcileSource(value, version, scope) } catch {} }
       return false
     }
     finally { if (current(version, scope) && view.busy) publish({ busy: false }) }
