@@ -115,7 +115,7 @@ try {
       if (stage === 'partial-payload') {
         const partial = observations.find(file => file.role === 'recording')!
         assert.equal(partial.observed_bytes, 26)
-        assert(partial.planned_bytes > 26 && partial.observed_sha256 !== partial.sha256)
+        assert(typeof partial.planned_bytes === 'number' && partial.planned_bytes > 26 && partial.observed_sha256 !== partial.sha256)
       }
 
       assert.equal((await access.readPublicSafetyIncident(saved.key)).version, before.incidentVersion + 2)

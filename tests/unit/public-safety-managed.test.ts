@@ -52,8 +52,9 @@ test('managed attempts survive process death without recreating a lost writer', 
       const config = join(root, 'bunfig.toml'); await writeFile(config, 'preload=[]\n')
       const args = [process.execPath, `--config=${config}`, '--no-env-file', `${import.meta.dir}/../fixtures/public-safety-access/managed-process.ts`]
       const options = { cwd: root, env: { ...process.env, APP_ENV: 'test', NODE_ENV: 'test', DB_CONNECTION: 'sqlite', DB_DATABASE_PATH: join(root, 'access.sqlite') }, stdout: 'pipe' as const, stderr: 'pipe' as const }
-      child = Bun.spawn([...args, 'create', stage], options)
-      const output = new Response(child.stdout).text(), errors = new Response(child.stderr).text()
+      const running = Bun.spawn([...args, 'create', stage], options)
+      child = running
+      const output = new Response(running.stdout).text(), errors = new Response(running.stderr).text()
       const deadline = Date.now() + 60000
       while (!await Bun.file(join(root, 'managed-pause.json')).exists() && child.exitCode === null && Date.now() < deadline) await new Promise(resolve => setTimeout(resolve, 10))
       if (!await Bun.file(join(root, 'managed-pause.json')).exists()) {
@@ -92,8 +93,9 @@ test('managed recovery classifies registered partial and manifest alias states w
       const config = join(root, 'bunfig.toml'); await writeFile(config, 'preload=[]\n')
       const args = [process.execPath, `--config=${config}`, '--no-env-file', `${import.meta.dir}/../fixtures/public-safety-access/managed-process.ts`]
       const options = { cwd: root, env: { ...process.env, APP_ENV: 'test', NODE_ENV: 'test', DB_CONNECTION: 'sqlite', DB_DATABASE_PATH: join(root, 'access.sqlite') }, stdout: 'pipe' as const, stderr: 'pipe' as const }
-      child = Bun.spawn([...args, 'create', stage], options)
-      const output = new Response(child.stdout).text(), errors = new Response(child.stderr).text()
+      const running = Bun.spawn([...args, 'create', stage], options)
+      child = running
+      const output = new Response(running.stdout).text(), errors = new Response(running.stderr).text()
       const deadline = Date.now() + 60000
       while (!await Bun.file(join(root, 'managed-pause.json')).exists() && child.exitCode === null && Date.now() < deadline) await new Promise(resolve => setTimeout(resolve, 10))
       if (!await Bun.file(join(root, 'managed-pause.json')).exists()) { child.kill('SIGKILL'); await child.exited; throw new Error(`${stage}\n${await output}\n${await errors}`) }
@@ -116,8 +118,9 @@ test('managed real writer authority fences competing reconciliation in both file
       const config = join(root, 'bunfig.toml'); await writeFile(config, 'preload=[]\n')
       const args = [process.execPath, `--config=${config}`, '--no-env-file', `${import.meta.dir}/../fixtures/public-safety-access/managed-process.ts`]
       const options = { cwd: root, env: { ...process.env, APP_ENV: 'test', NODE_ENV: 'test', DB_CONNECTION: 'sqlite', DB_DATABASE_PATH: join(root, 'access.sqlite') }, stdout: 'pipe' as const, stderr: 'pipe' as const }
-      child = Bun.spawn([...args, 'create', stage], options)
-      const output = new Response(child.stdout).text(), errors = new Response(child.stderr).text()
+      const running = Bun.spawn([...args, 'create', stage], options)
+      child = running
+      const output = new Response(running.stdout).text(), errors = new Response(running.stderr).text()
       const deadline = Date.now() + 60000
       while (!await Bun.file(join(root, 'managed-process.json')).exists() && child.exitCode === null && Date.now() < deadline) await new Promise(resolve => setTimeout(resolve, 10))
       if (!await Bun.file(join(root, 'managed-process.json')).exists()) { child.kill('SIGKILL'); await child.exited; throw new Error(`${stage}\n${await output}\n${await errors}`) }
