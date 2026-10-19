@@ -120,6 +120,13 @@ function stop(slot: ExecutionSlot, reason: Exclude<ExecutionReason, null>, targe
   clearTimeout(slot.wallTimer); clearTimeout(slot.consumerTimer); clearInterval(slot.heartbeatTimer)
   retain(slot)
   Atomics.store(slot.control, words.cancel, 1); Atomics.notify(slot.control, words.credit)
+  // Final authority can still be pending after the genuine ordered finished ACK.
+  // Eligibility is cleared above; known finished work needs no unconfirmed grace.
+  if (slot.finishedAck) {
+    finishStopped(slot)
+    notifyTerminal(slot)
+    return
+  }
   slot.stopTimer = setTimeout(() => {
     if (!owned(slot) || slot.producer !== 'pending') return
     slot.producer = 'unconfirmed'; slot.phase = 'failed'; slot.reason = 'stop-unconfirmed'
