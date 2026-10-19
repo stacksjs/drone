@@ -11,6 +11,7 @@ import { authorizePublicSafetyIncident } from './service'
 import { requireIncidentAccess } from './policy'
 import { exactRecord, expectedVersion, projection, mutation, advance, audit, pagination } from './mutations'
 import { reviewDispositions } from './record-types'
+import { associateIncidentDeadline, assertIncidentDeadline, checkedIncidentResult } from './deadline'
 
 export interface SourceRow {
   id: number, incident_id: number, digest: string, byte_length: number, canonical_json: string,
@@ -108,24 +109,26 @@ export async function registerPublicSafetySource(key: string, input: unknown): P
 export async function readPublicSafetySource(key: string, hash: string): Promise<SourceRead> {
   digest(hash)
   await authorizePublicSafetyIncident(key, 'view')
-  const { row, incident } = await transaction(async tx => {
+  const { row, incident } = await checkedIncidentResult(transaction(async tx => {
     const { incident } = await recordReadAccess(key, tx)
-    return { row: await scopedSource(tx, key, hash), incident }
-  })
+    return associateIncidentDeadline({ row: await scopedSource(tx, key, hash), incident }, Date.parse(incident.retain_until))
+  }))
   const run = verifyStoredSource(row)
   matchConfig(run, incident)
-  return { source: sourceProjection(row), recording: JSON.parse(row.canonical_json) as RecordingData }
+  const result = associateIncidentDeadline({ source: sourceProjection(row), recording: JSON.parse(row.canonical_json) as RecordingData }, Date.parse(incident.retain_until))
+  assertIncidentDeadline(result)
+  return result
 }
 export async function listPublicSafetySources(key: string, options: RecordPageOptions = {}): Promise<RecordPage<SourceProjection>> {
   const { after, limit } = pagination(options)
   await authorizePublicSafetyIncident(key, 'view')
-  return transaction(async tx => {
+  return checkedIncidentResult(transaction(async tx => {
     const { incident } = await recordReadAccess(key, tx)
     // Metadata only: neither load nor serialize canonical source planes for a catalog.
     const fields = sourceFields.filter(field => field !== 'canonical_json')
     const rows = asRows<SourceRow>(await tx.selectFrom('public_safety_sources').select(fields).where('incident_id', '=', incident.id).where('created_sequence', '>', after).orderBy('created_sequence', 'asc').limit(limit + 1).execute())
-    return page(rows.map(sourceProjection), after, limit)
-  })
+    return associateIncidentDeadline(page(rows.map(sourceProjection), after, limit), Date.parse(incident.retain_until))
+  }))
 }
 export async function appendPublicSafetyObservation(key: string, input: unknown): Promise<ObservationAppend> {
   const body = exactRecord(input, ['expectedVersion', 'sourceDigest', 'captureId', 'modality', 'pixel', 'note', 'uncertaintyNote']), expected = expectedVersion(body.expectedVersion)
@@ -154,19 +157,19 @@ export async function appendPublicSafetyObservation(key: string, input: unknown)
 export async function readPublicSafetyObservation(key: string, id: number): Promise<ObservationProjection> {
   rowId(id)
   await authorizePublicSafetyIncident(key, 'view')
-  return transaction(async tx => {
-    await recordReadAccess(key, tx)
-    return observationProjection(await scopedObservation(tx, key, id))
-  })
+  return checkedIncidentResult(transaction(async tx => {
+    const { incident } = await recordReadAccess(key, tx)
+    return associateIncidentDeadline(observationProjection(await scopedObservation(tx, key, id)), Date.parse(incident.retain_until))
+  }))
 }
 export async function listPublicSafetyObservations(key: string, options: RecordPageOptions = {}): Promise<RecordPage<ObservationProjection>> {
   const { after, limit } = pagination(options)
   await authorizePublicSafetyIncident(key, 'view')
-  return transaction(async tx => {
+  return checkedIncidentResult(transaction(async tx => {
     const { incident } = await recordReadAccess(key, tx)
     const rows = asRows<ObservationRow>(await tx.selectFrom('public_safety_observations').innerJoin('public_safety_sources', 'public_safety_sources.id', '=', 'public_safety_observations.source_id').select([...observationFields.map(field => `public_safety_observations.${field}`), 'public_safety_sources.digest as source_digest']).where('public_safety_sources.incident_id', '=', incident.id).where('public_safety_observations.created_sequence', '>', after).orderBy('public_safety_observations.created_sequence', 'asc').limit(limit + 1).execute())
-    return page(rows.map(observationProjection), after, limit)
-  })
+    return associateIncidentDeadline(page(rows.map(observationProjection), after, limit), Date.parse(incident.retain_until))
+  }))
 }
 export async function appendPublicSafetyReview(key: string, observationId: number, input: unknown): Promise<ReviewAppend> {
   rowId(observationId)
@@ -197,10 +200,10 @@ export async function listPublicSafetyReviews(key: string, observationId: number
   rowId(observationId)
   const { after, limit } = pagination(options)
   await authorizePublicSafetyIncident(key, 'view')
-  return transaction(async tx => {
-    await recordReadAccess(key, tx)
+  return checkedIncidentResult(transaction(async tx => {
+    const { incident } = await recordReadAccess(key, tx)
     const observation = await scopedObservation(tx, key, observationId)
     const rows = asRows<ReviewRow>(await tx.selectFrom('public_safety_reviews').selectAll().where('observation_id', '=', observation.id).where('created_sequence', '>', after).orderBy('created_sequence', 'asc').limit(limit + 1).execute())
-    return page(rows.map(row => reviewProjection(row, observation)), after, limit)
-  })
+    return associateIncidentDeadline(page(rows.map(row => reviewProjection(row, observation)), after, limit), Date.parse(incident.retain_until))
+  }))
 }

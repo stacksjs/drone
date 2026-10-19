@@ -101,6 +101,9 @@ Creation requires a future retention deadline within 366 days. Expiry denies inc
 reads as well as writes, using server UTC. Closure rejects later mutations but permits scoped
 reads until expiry. Neither operation automatically erases source files, derivatives, backups
 or uncontrolled copies. A declared hold does not bypass expiry or prove a reviewed legal hold.
+Content results are checked after actual transaction completion and again after awaited HTTP
+middleware. If expiry withholds a mutation response after COMMIT, its committed change remains;
+the response gate does not roll back that change or recall bytes already released to clients.
 The [retention custody API](public-safety-retention.md) adds explicit enrollment and hold review.
 [Accepted local purge](public-safety-purge.md) is a separate, default-disabled policy for active
 incident DB payload and registered files. Enrollment alone never authorizes that removal.

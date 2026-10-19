@@ -8,6 +8,7 @@ import { publicSafetyRecordingData } from '../evidence'
 import { PublicSafetyAccessError } from './errors'
 import { requirePublicSafetyPrincipal } from './principal'
 import { requireIncidentAccess, validateIncidentKey } from './policy'
+import { associateIncidentDeadline, assertIncidentDeadline, checkedIncidentResult } from './deadline'
 
 import { maximumVersion, exactRecord, expectedVersion, projection, audit, mutation, advance, pagination } from './mutations'
 
@@ -32,7 +33,7 @@ export async function createPublicSafetyIncident(input: unknown): Promise<Incide
   const configJson = publicSafetyRecordingData(plan.config)
   await authorizePublicSafetyCreate()
   try {
-    return await transaction(async tx => {
+    return await checkedIncidentResult(transaction(async tx => {
       const principal = await requirePublicSafetyPrincipal('coordinate', true)
       // The native user row serializes simultaneous creates from this coordinating account.
       if (!await lockRow(tx, 'users', { id: principal.userId })) throw new PublicSafetyAccessError(401, 'The incident account is unavailable')
@@ -44,8 +45,10 @@ export async function createPublicSafetyIncident(input: unknown): Promise<Incide
       await tx.insertInto('public_safety_incident_members').values({ incident_id: incident.id, user_id: principal.userId, role: 'coordinator', active: true, version: 1, granted_by: principal.userId, revoked_by: null, created_at: at, updated_at: at }).execute()
       await audit(tx, incident, principal.userId, 'created', null, { revision: incident.revision, purpose: incident.purpose })
       const member = asRow<IncidentMemberRow>(await tx.selectFrom('public_safety_incident_members').selectAll().where('incident_id', '=', incident.id).where('user_id', '=', principal.userId).executeTakeFirst())!
-      return projection(incident, member)
-    })
+      const result = projection(incident, member)
+      assertIncidentDeadline(result)
+      return result
+    }))
   }
   catch (error) {
     if (isUniqueViolation(error)) throw new PublicSafetyAccessError(409, 'Incident key already exists')
@@ -55,10 +58,10 @@ export async function createPublicSafetyIncident(input: unknown): Promise<Incide
 
 export async function readPublicSafetyIncident(key: string): Promise<IncidentProjection> {
   await authorizePublicSafetyIncident(key, 'view')
-  return transaction(async tx => {
+  return checkedIncidentResult(transaction(async tx => {
     const { incident, member } = await requireIncidentAccess(key, 'view', tx)
     return projection(incident, member)
-  })
+  }))
 }
 
 export async function changePublicSafetyMembership(key: string, input: unknown): Promise<MembershipChangeProjection> {
@@ -98,10 +101,10 @@ export async function closePublicSafetyIncident(key: string, input: unknown): Pr
 export async function readPublicSafetyAudit(key: string, options: IncidentAuditOptions = {}): Promise<IncidentAuditPage> {
   const { after, limit } = pagination(options)
   await authorizePublicSafetyIncident(key, 'audit')
-  return transaction(async tx => {
+  return checkedIncidentResult(transaction(async tx => {
     const { incident } = await requireIncidentAccess(key, 'audit', tx)
     const rows = asRows<{ sequence: number, actor_id: number, action: IncidentAuditAction, target_user_id: number | null, at_iso: string, details_json: string }>(await tx.selectFrom('public_safety_audits').select(['sequence', 'actor_id', 'action', 'target_user_id', 'at_iso', 'details_json']).where('incident_id', '=', incident.id).where('sequence', '>', after).orderBy('sequence', 'asc').limit(limit + 1).execute())
     const entries = rows.slice(0, limit).map(row => ({ sequence: row.sequence, actorId: row.actor_id, action: row.action, targetUserId: row.target_user_id, at: row.at_iso, details: JSON.parse(row.details_json) }))
-    return { entries, cursor: entries.at(-1)?.sequence ?? after, hasMore: rows.length > limit }
-  })
+    return associateIncidentDeadline({ entries, cursor: entries.at(-1)?.sequence ?? after, hasMore: rows.length > limit }, Date.parse(incident.retain_until))
+  }))
 }

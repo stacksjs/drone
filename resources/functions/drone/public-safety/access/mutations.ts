@@ -6,6 +6,7 @@ import { transaction } from '@stacksjs/orm'
 import { planPublicSafetyMission } from '../planner'
 import { PublicSafetyAccessError } from './errors'
 import { requireIncidentAccess, assertIncidentPayload } from './policy'
+import { associateIncidentDeadline, assertIncidentDeadline, checkedIncidentResult } from './deadline'
 
 export const maximumVersion = 2147483647
 
@@ -25,7 +26,7 @@ export function projection(incident: IncidentRow, member: IncidentMemberRow): In
   try { plan = planPublicSafetyMission(JSON.parse(incident.config_json)) }
   catch { throw new PublicSafetyAccessError(409, 'Stored incident scope is unavailable') }
   if (plan.config.id !== incident.incident_key || plan.config.revision !== incident.revision || plan.config.purpose !== incident.purpose || plan.config.retention.expiresAt !== incident.retain_until) throw new PublicSafetyAccessError(409, 'Stored incident scope is inconsistent')
-  return { key: incident.incident_key, version: incident.version, status: incident.status, purpose: incident.purpose, revision: incident.revision, config: plan.config, retainUntil: incident.retain_until, coordinatorId: incident.coordinator_id, membership: { role: member.role, version: member.version }, identityAuthenticated: true, physicalFlightEnabled: false }
+  return associateIncidentDeadline({ key: incident.incident_key, version: incident.version, status: incident.status, purpose: incident.purpose, revision: incident.revision, config: plan.config, retainUntil: incident.retain_until, coordinatorId: incident.coordinator_id, membership: { role: member.role, version: member.version }, identityAuthenticated: true, physicalFlightEnabled: false } satisfies IncidentProjection, Date.parse(incident.retain_until))
 }
 
 export async function audit(tx: TransactionHandle, incident: IncidentRow, actorId: number, action: IncidentAuditAction, targetUserId: number | null, details: IncidentAuditProjection['details']) {
@@ -33,14 +34,16 @@ export async function audit(tx: TransactionHandle, incident: IncidentRow, actorI
   await tx.insertInto('public_safety_audits').values({ incident_id: incident.id, sequence: incident.version, actor_id: actorId, action, target_user_id: targetUserId, at_iso: at, details_json: JSON.stringify(details), created_at: at, updated_at: at }).execute()
 }
 
-export async function mutation<T>(key: string, ability: Exclude<IncidentAbility, 'view' | 'audit'>, expected: number, work: (tx: TransactionHandle, access: Awaited<ReturnType<typeof requireIncidentAccess>>) => Promise<T>): Promise<T> {
-  return transaction(async tx => {
+export async function mutation<T extends object>(key: string, ability: Exclude<IncidentAbility, 'view' | 'audit'>, expected: number, work: (tx: TransactionHandle, access: Awaited<ReturnType<typeof requireIncidentAccess>>) => Promise<T>): Promise<T> {
+  return checkedIncidentResult(transaction(async tx => {
     const row = asRow<IncidentRow>(await lockRow(tx, 'public_safety_incidents', { incident_key: key }))
     if (!row) throw new PublicSafetyAccessError(404, 'Incident is unavailable')
     const access = await requireIncidentAccess(key, ability, tx, row)
     if (access.incident.version !== expected) throw new PublicSafetyAccessError(409, 'Incident version has changed')
-    return work(tx, access)
-  })
+    const result = associateIncidentDeadline(await work(tx, access), Date.parse(access.incident.retain_until))
+    assertIncidentDeadline(result)
+    return result
+  }))
 }
 export async function advance(tx: TransactionHandle, incident: IncidentRow, closed = false): Promise<IncidentRow> {
   if (incident.version >= maximumVersion) throw new PublicSafetyAccessError(409, 'Incident version capacity reached')
