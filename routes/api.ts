@@ -16,6 +16,12 @@ import PublicSafetyObservationRead from '../app/Actions/PublicSafetyObservationR
 import PublicSafetyObservationList from '../app/Actions/PublicSafetyObservationList'
 import PublicSafetyReviewAppend from '../app/Actions/PublicSafetyReviewAppend'
 import PublicSafetyReviewList from '../app/Actions/PublicSafetyReviewList'
+import PublicSafetyRetentionPreview from '../app/Actions/PublicSafetyRetentionPreview'
+import PublicSafetyRetentionEnroll from '../app/Actions/PublicSafetyRetentionEnroll'
+import PublicSafetyRetentionRead from '../app/Actions/PublicSafetyRetentionRead'
+import PublicSafetyRetentionHoldReview from '../app/Actions/PublicSafetyRetentionHoldReview'
+import PublicSafetyRetentionEvents from '../app/Actions/PublicSafetyRetentionEvents'
+import PublicSafetyCustodyMemberRevoke from '../app/Actions/PublicSafetyCustodyMemberRevoke'
 import { incidentHttpBoundary } from '../resources/functions/drone/public-safety/access/http'
 import { incidentDataExposureBoundary } from '../resources/functions/drone/public-safety/access/exposure'
 
@@ -41,3 +47,9 @@ route.get('/public-safety/incidents/{incident}/observations/{observation}', Publ
 route.get('/public-safety/incidents/{incident}/observations', PublicSafetyObservationList).middleware('auth')
 route.post('/public-safety/incidents/{incident}/observations/{observation}/reviews', PublicSafetyReviewAppend).middleware('auth').parseBody(false)
 route.get('/public-safety/incidents/{incident}/observations/{observation}/reviews', PublicSafetyReviewList).middleware('auth')
+route.get('/public-safety/incidents/{incident}/retention/preview', PublicSafetyRetentionPreview).middleware('auth')
+route.post('/public-safety/incidents/{incident}/retention/enrollment', PublicSafetyRetentionEnroll).middleware('auth').parseBody(false)
+route.get('/public-safety/incidents/{incident}/retention', PublicSafetyRetentionRead).middleware('auth')
+route.post('/public-safety/incidents/{incident}/retention/hold', PublicSafetyRetentionHoldReview).middleware('auth').parseBody(false)
+route.get('/public-safety/incidents/{incident}/retention/events', PublicSafetyRetentionEvents).middleware('auth')
+route.post('/public-safety/incidents/{incident}/retention/revoke-member', PublicSafetyCustodyMemberRevoke).middleware('auth').parseBody(false)

@@ -1,6 +1,6 @@
 # Owned public-safety collection
 
-Issue [#23](https://github.com/stacksjs/drone/issues/23) requires coordinated search, fire and disaster observation, incident annotations, operator review, team handover, enforced access/privacy/retention and runtime handling of communications, incident boundaries and resources. This is the collection and runtime foundation. Annotations, authenticated coordination, retention deletion and handover remain required work.
+Issue [#23](https://github.com/stacksjs/drone/issues/23) requires coordinated search, fire and disaster observation, incident annotations, operator review, team handover, enforced access/privacy/retention and runtime handling of communications, incident boundaries and resources. The collection and runtime foundation is connected to persisted authenticated source, observation and review APIs. Managed deletion, live coordination and handover remain required work.
 
 The four explicit observation purposes are search and rescue, fire observation, disaster assessment and lawful police observation. There is no identity recognition, automatic person pursuit, detention or enforcement action. Purpose authority and retention are explicit declarations, not established legal authority. All fixtures are synthetic and physical outputs remain inhibited.
 
@@ -43,7 +43,7 @@ Replay re-executes the pinned `owned-public-safety-collection-v1` deterministic 
 
 - Connect persisted source-bound annotations and append-only review to the authorized workspace and live observations, retaining uncertain and missing support.
 - Extend native authenticated incident membership/roles to managed exports and live event paths. Declared offline actor strings are insufficient.
-- Managed retention/hold review, redacted views and removal of controlled evidence copies. Current API access denies expiry and revocation; offline files do not enforce deletion.
+- Extend explicit enrollment and hold review to managed files, redacted views and removal of controlled evidence copies. Current API access denies expiry and revocation; offline files do not enforce deletion.
 - Recipient-, assignment-, source- and expiry-bound two-phase handover with atomic acceptance and audit. Incident responsibility and vehicle control remain separate.
 - A shared operator workspace with actual authorized live event delivery, partial searched/unsearched support and reviewed observation/handover actions.
 - Measured visible/thermal calibration, timing/heading/georeferencing, communications, legal/jurisdiction/operator qualification, real team operations, external firmware integration and bench/HIL/vehicle campaigns.
@@ -56,5 +56,7 @@ The persisted [incident access API](public-safety-access.md) uses native Stacks 
 permissions, Gates and generated models for scoped incident membership, closure and paginated
 audit. The [source and review module](public-safety-records.md) retains complete verified collection
 sources, explicit supported-pixel observations and append-only reviewer declarations under the same
-native access rules. Collection artifacts keep their separate unsigned simulator evidence boundary.
+native access rules. [Retention custody](public-safety-retention.md) adds explicit inventory-bound
+enrollment, minimal expired custody status and append-only hold decisions. Collection artifacts keep
+their separate unsigned simulator evidence boundary.
 Managed erasure, atomic handover, the authorized workspace and live coordination remain in issue #23.

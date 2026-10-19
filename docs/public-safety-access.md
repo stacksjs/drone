@@ -101,7 +101,8 @@ Creation requires a future retention deadline within 366 days. Expiry denies inc
 reads as well as writes, using server UTC. Closure rejects later mutations but permits scoped
 reads until expiry. Neither operation automatically erases source files, derivatives, backups
 or uncontrolled copies. A declared hold does not bypass expiry or prove a reviewed legal hold.
-Durable hold review and managed binary purge receipts remain separate work.
+The [retention custody API](public-safety-retention.md) adds explicit enrollment and hold review.
+Managed binary purge receipts remain separate work.
 
 ## Generic data boundaries
 
@@ -127,6 +128,8 @@ distributed revocation or vehicle evidence.
 
 The [source, observation and review functions](public-safety-records.md) extend this access module
 with immutable verified collection sources, explicit pixel declarations and append-only review.
-Issue #23 remains open for managed hold review and evidence erasure, atomic recipient-bound team
+The [retention custody functions](public-safety-retention.md) add minimal status and explicit hold
+review after expiry, without reopening content access or deleting data.
+Issue #23 remains open for managed evidence erasure, atomic recipient-bound team
 handover, an authorized operator workspace and live observations, plus jurisdiction, hardware,
 firmware interoperability and operational qualification.
