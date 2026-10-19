@@ -49,6 +49,13 @@ a fixed minimal tombstone and retired-history event page. Receipt expiry
 returns 404 even if disabled or stopped execution makes metadata cleanup
 overdue. Custody revocation remains current-authorized throughout these states.
 
+Completed receipts carry their release deadline in private object metadata.
+Services check it after the actual transaction commits. HTTP adapters check it
+after awaiting the service and creating the JSON response. The final incident
+boundary checks again after awaited middleware and response cloning. Public
+DTOs and headers gain no deadline capability. These checks gate application
+release and cannot recall bytes already handed to the network or client memory.
+
 Status and events contain aggregate counters and safe outcome codes. They do
 not expose source IDs, notes, file paths, inodes, file hashes or private ownership
 plans. `contentDeletionPerformed` records acknowledged committed payload removal
@@ -65,7 +72,10 @@ visibility permits the completed tombstone and current revocation checks;
 inspection refusal preserves the tree and reports completion qualification as
 unavailable. A labeled persisted overdue-receipt reconstruction verifies that
 reads return 404 while disabled cleanup leaves metadata in storage. It does
-not demonstrate a day of elapsed time. Controlled Linux process and mount
+not demonstrate a day of elapsed time. Separate short future receipt dates
+are crossed through real awaited event SELECTs, native post-COMMIT release
+callbacks and late HTTP middleware in both route modes; each expired response
+returns private 404. The fixture keeps the normal wall clock running. Controlled Linux process and mount
 namespace behavior and genuine crash recovery require separate core
 qualifications. HTTP tests do not establish physical, media, power-loss or
 all-copy erasure.

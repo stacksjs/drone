@@ -1,6 +1,7 @@
 import type { IncidentRequest } from '../access/http'
 import { PublicSafetyAccessError } from '../access/errors'
 import { execute, failure, privateHeaders, readBody } from '../access/http'
+import { assertIncidentDeadline, associateIncidentDeadline, incidentDeadline } from '../access/deadline'
 import { authorizePublicSafetyPurge } from './policy'
 import { acceptPublicSafetyPurge, listPublicSafetyPurgeEvents, previewPublicSafetyPurge, readPublicSafetyPurge, retryPublicSafetyPurge } from './service'
 
@@ -32,7 +33,10 @@ export async function acceptPurgeHttp(request: IncidentRequest): Promise<Respons
     await authorizePublicSafetyPurge(key, 'accept')
     query(request)
     const receipt = await acceptPublicSafetyPurge(key, await readBody(request, 8192))
-    return Response.json(receipt, { status: receipt.replayed ? 200 : 202, headers: privateHeaders })
+    assertIncidentDeadline(receipt)
+    const result = associateIncidentDeadline(Response.json(receipt, { status: receipt.replayed ? 200 : 202, headers: privateHeaders }), incidentDeadline(receipt))
+    assertIncidentDeadline(result)
+    return result
   }
   catch (error) { return failure(error) }
 }
@@ -57,7 +61,10 @@ export async function retryPurgeHttp(request: IncidentRequest): Promise<Response
     await authorizePublicSafetyPurge(key, 'retry')
     query(request)
     const receipt = await retryPublicSafetyPurge(key, purge(request), await readBody(request, 8192))
-    return Response.json(receipt, { status: receipt.replayed ? 200 : 202, headers: privateHeaders })
+    assertIncidentDeadline(receipt)
+    const result = associateIncidentDeadline(Response.json(receipt, { status: receipt.replayed ? 200 : 202, headers: privateHeaders }), incidentDeadline(receipt))
+    assertIncidentDeadline(result)
+    return result
   }
   catch (error) { return failure(error) }
 }

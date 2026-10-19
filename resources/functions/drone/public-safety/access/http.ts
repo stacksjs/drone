@@ -1,6 +1,7 @@
 import { createMiddlewareErrorResponse, readJsonBody, RequestBodyError } from '@stacksjs/router'
 import { PublicSafetyAccessError } from './errors'
 import { associateManagedDownload, managedDownloadDeadline } from '../managed/download-deadline'
+import { assertIncidentDeadline, associateIncidentDeadline, incidentDeadline } from './deadline'
 import { authorizePublicSafetyCreate, authorizePublicSafetyIncident, changePublicSafetyMembership, closePublicSafetyIncident, createPublicSafetyIncident, readPublicSafetyAudit, readPublicSafetyIncident } from './service'
 
 export const privateHeaders = { 'Cache-Control': 'private, no-store', 'Vary': 'Authorization, Cookie', 'X-Content-Type-Options': 'nosniff' }
@@ -14,9 +15,10 @@ function privateResponse(response: Response): Response {
   const headers = new Headers(response.headers)
   for (const [key, value] of Object.entries(privateHeaders)) headers.set(key, value)
   const deadline = managedDownloadDeadline(response)
-  // The final application clone can follow awaited middleware after the binary Action.
+  // The final application clone follows awaited middleware for binary and JSON Actions.
   if (deadline !== undefined && (!Number.isFinite(deadline) || Date.now() >= deadline)) return failure(new PublicSafetyAccessError(404, 'Incident is unavailable'))
   const result = new Response(response.body, { status: response.status, statusText: response.statusText, headers })
+  if (deadline !== undefined && (!Number.isFinite(deadline) || Date.now() >= deadline)) return failure(new PublicSafetyAccessError(404, 'Incident is unavailable'))
   return deadline === undefined ? result : associateManagedDownload(result, deadline)
 }
 export function failure(error: unknown): Response {
@@ -35,7 +37,13 @@ export async function incidentHttpBoundary(request: Request, next: () => Promise
   return privateResponse(result)
 }
 export async function execute(work: () => Promise<unknown>, status = 200): Promise<Response> {
-  try { return Response.json(await work(), { status, headers: privateHeaders }) }
+  try {
+    const value = await work()
+    assertIncidentDeadline(value)
+    const result = associateIncidentDeadline(Response.json(value, { status, headers: privateHeaders }), incidentDeadline(value))
+    assertIncidentDeadline(result)
+    return result
+  }
   catch (error) { return failure(error) }
 }
 export function createIncidentHttp(request: WireRequest) {

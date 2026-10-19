@@ -38,8 +38,18 @@ const { sessionLogin, sessionCheck } = await import('@stacksjs/auth/session-auth
 const { route } = await import('@stacksjs/router')
 await route.register(join(source, 'routes/api.ts'), { prefix: '/api' })
 const observedBodies = new Map<string, boolean>()
+let lateReceipt: { deadline: number, responseStatus: number | null } | undefined
 route.use(async (request: Request, next: () => Response | null | Promise<Response | null>) => {
-  try { return await next() }
+  try {
+    const result = await next()
+    if (lateReceipt && request.headers.has('x-fixture-receipt-delay')) {
+      lateReceipt.responseStatus = result?.status ?? null
+      assert(Date.now() < lateReceipt.deadline, 'Late middleware must observe the response before its real deadline')
+      await Bun.sleep(Math.max(1, lateReceipt.deadline - Date.now() + 10))
+      assert(Date.now() >= lateReceipt.deadline)
+    }
+    return result
+  }
   finally { const marker = request.headers.get('x-fixture-unread'); if (marker) observedBodies.set(marker, request.bodyUsed) }
 })
 const { Gate } = await import('@stacksjs/auth/gate')
@@ -195,7 +205,7 @@ try {
   assert.equal((await send('POST', heldCollection, token, command(heldDue))).status, 409)
   assert.equal((await send('GET', heldCustody, token)).data.holdState, 'pending-review')
   const accept = command(due)
-  for (const changed of [{ actorUserId: coordinator.id }, { root }, { expectedVersion: String(accept.expectedVersion) }, { expectedRetentionVersion: '1' }, { policyVersion: 'local-managed-v1' }, { coverage: 'everything' }, { inventoryDigest: 'A'.repeat(64) }, { receiptRetentionDays: 0 }, { receiptRetentionDays: 366 }, { receiptRetentionDays: '1' }, { exclusions: { ...exclusions, mediaResiduals: false } }, { exclusions: { ...exclusions, extra: true } }, { exclusions: {} }, { requestId: 'AAAAAAAA-AAAA-4AAA-8AAA-AAAAAAAAAAAA' }]) assert.equal((await send('POST', collection, token, { ...accept, ...changed })).status, 422)
+  for (const changed of [{ actorUserId: coordinator.id }, { root }, { expectedVersion: String(accept.expectedVersion) }, { expectedRetentionVersion: '1' }, { policyVersion: 'local-managed-v1' }, { coverage: 'everything' }, { inventoryDigest: 'A'.repeat(64) }, { inventoryDigest: `${accept.inventoryDigest}\n` }, { receiptRetentionDays: 0 }, { receiptRetentionDays: 366 }, { receiptRetentionDays: '1' }, { exclusions: { ...exclusions, mediaResiduals: false } }, { exclusions: { ...exclusions, extra: true } }, { exclusions: {} }, { requestId: 'AAAAAAAA-AAAA-4AAA-8AAA-AAAAAAAAAAAA' }, { requestId: `${accept.requestId}\n` }]) assert.equal((await send('POST', collection, token, { ...accept, ...changed })).status, 422)
   assert.equal((await send('POST', collection, token, { ...accept, expectedVersion: accept.expectedVersion + 1 })).status, 409)
   assert.equal((await send('POST', collection, token, { ...accept, expectedRetentionVersion: accept.expectedRetentionVersion + 1 })).status, 409)
   assert.equal((await send('POST', collection, token, { ...accept, inventoryDigest: 'a'.repeat(64) })).status, 409)
@@ -225,7 +235,7 @@ try {
   safe(accepted.data)
   for (const suffix of ['', '/events']) assert.equal((await send('GET', `${heldCollection}/${accepted.data.purge.purgeKey}${suffix}`, token)).status, 404)
   assert.equal((await send('POST', `${heldCollection}/${accepted.data.purge.purgeKey}/retry`, token, { expectedPurgeVersion: 1, expectedRetentionVersion: 1, requestId: randomUUID() })).status, 404)
-  for (const malformed of ['not-a-uuid', 'AAAAAAAA-AAAA-4AAA-8AAA-AAAAAAAAAAAA']) for (const suffix of ['', '/events']) assert.equal((await send('GET', `${collection}/${malformed}${suffix}`, token)).status, 422)
+  for (const malformed of ['not-a-uuid', 'AAAAAAAA-AAAA-4AAA-8AAA-AAAAAAAAAAAA', `${accepted.data.purge.purgeKey}%0A`]) for (const suffix of ['', '/events']) assert.equal((await send('GET', `${collection}/${malformed}${suffix}`, token)).status, 422)
   for (const flag of ['diagnosticsErased', 'allCopiesErased', 'mediaErasure']) assert.equal(accepted.data.purge[flag], false)
   const reordered = Object.fromEntries(Object.entries({ ...accept, exclusions: Object.fromEntries(Object.entries(exclusions).reverse()) }).reverse())
   const replay = await send('POST', collection, token, reordered)
@@ -242,7 +252,7 @@ try {
   assert.deepEqual(firstPage.entries.map((entry: any) => entry.sequence), [1]); assert.equal(firstPage.cursor, 1); safe(firstPage)
   const current = (await send('GET', path, token)).data
   const retry = { expectedPurgeVersion: current.version, expectedRetentionVersion: current.retentionVersion, requestId: randomUUID() }
-  for (const changed of [{ expectedPurgeVersion: '1' }, { expectedRetentionVersion: '2' }, { batchSize: 1 }, { actorUserId: coordinator.id }, { requestId: 'bad' }]) assert.equal((await send('POST', `${path}/retry`, token, { ...retry, ...changed })).status, 422)
+  for (const changed of [{ expectedPurgeVersion: '1' }, { expectedRetentionVersion: '2' }, { batchSize: 1 }, { actorUserId: coordinator.id }, { requestId: 'bad' }, { requestId: `${retry.requestId}\n` }]) assert.equal((await send('POST', `${path}/retry`, token, { ...retry, ...changed })).status, 422)
   assert.equal((await send('POST', `${path}/retry`, token, { ...retry, expectedPurgeVersion: current.version + 1 })).status, 409)
   const retried = await send('POST', `${path}/retry`, token, JSON.stringify(retry).padEnd(8192, ' '))
   assert.equal(retried.status, 202); assert.equal(retried.data.replayed, false); assert.equal(retried.data.event.action, 'retry'); safe(retried.data)
@@ -299,7 +309,8 @@ try {
     const retiredEvents = (await send('GET', `${custody}/events`, token)).data
     assert.deepEqual(retiredEvents.entries, []); assert.equal(retiredEvents.historyRetired, true)
     safe(tombstone.data); safe(retiredEvents)
-    const currentRevoke = await send('POST', `${custody}/revoke-member`, token, { expectedRetentionVersion: finished.retentionVersion, userId: receiptCustodian.id, requestId: randomUUID() })
+    const completedRevoke = { expectedRetentionVersion: finished.retentionVersion, userId: receiptCustodian.id, requestId: randomUUID() }
+    const currentRevoke = await send('POST', `${custody}/revoke-member`, token, completedRevoke)
     assert.equal(currentRevoke.status, 200); assert.equal(currentRevoke.data.event.action, 'member-revoked'); safe(currentRevoke.data)
     for (const suffix of ['', '/events']) assert.equal((await send('GET', path + suffix, receiptCustodian.token)).status, 403)
     assert.equal((await send('GET', `${collection}/preview`, receiptCustodian.token)).status, 403)
@@ -307,6 +318,76 @@ try {
     // Controlled persisted receipt-deadline reconstruction tests stale storage denial, not elapsed one-day qualification.
     const Purge = (await import(join(root, 'app/Models/PublicSafetyPurge.ts'))).default
     const stored = await Purge.where('purge_key', finished.purgeKey).first()
+    // Reconstruct only short FUTURE completed-receipt dates, then cross them through actual awaited work.
+    // This is deadline-boundary evidence, not a simulated clock or an elapsed day of receipt retention.
+    const crossings = [
+      { name: 'purge-preview', method: 'GET', endpoint: `${collection}/preview`, body: undefined },
+      { name: 'purge-read', method: 'GET', endpoint: path, body: undefined },
+      { name: 'purge-events', method: 'GET', endpoint: `${path}/events`, body: undefined },
+      { name: 'custody-preview', method: 'GET', endpoint: `${custody}/preview`, body: undefined },
+      { name: 'custody-read', method: 'GET', endpoint: custody, body: undefined },
+      { name: 'custody-events', method: 'GET', endpoint: `${custody}/events`, body: undefined },
+      { name: 'accept-replay', method: 'POST', endpoint: collection, body: accept },
+      { name: 'retry-replay', method: 'POST', endpoint: `${path}/retry`, body: retry },
+      { name: 'frozen-revoke-replay', method: 'POST', endpoint: `${custody}/revoke-member`, body: completedRevoke },
+    ]
+    const failures: string[] = []
+    const futureDeadline = async () => {
+      const deadline = Date.now() + 600
+      await stored.update({ completed_at_iso: new Date(deadline - 86400000).toISOString(), receipt_retain_until_iso: new Date(deadline).toISOString(), next_eligible_at_iso: new Date(deadline).toISOString() })
+      return deadline
+    }
+    const observe = (name: string, status: number) => {
+      console.log(`Receipt deadline crossing ${name} nativeRoutes=${nativeRoutes} status=${status}`)
+      if (status !== 404) failures.push(`${name}:${status}`)
+    }
+    for (const crossing of crossings) {
+      const deadline = await futureDeadline()
+      lateReceipt = { deadline, responseStatus: null }
+      try {
+        const response = await send(crossing.method, crossing.endpoint, token, crossing.body, { 'x-fixture-receipt-delay': '1' })
+        console.log(`Receipt before middleware ${crossing.name} nativeRoutes=${nativeRoutes} status=${lateReceipt.responseStatus}`)
+        if (lateReceipt.responseStatus !== 200) failures.push(`not-current:${crossing.name}:${lateReceipt.responseStatus}`)
+        observe(`middleware:${crossing.name}`, response.status)
+      }
+      finally { lateReceipt = undefined }
+    }
+    for (const crossing of crossings) {
+      const deadline = await futureDeadline()
+      let commits = 0
+      database.db.primary.setTransactionDefaults({ afterCommit: async () => {
+        commits++
+        assert(Date.now() < deadline, 'Actual COMMIT must complete while the receipt is current')
+        await Bun.sleep(Math.max(1, deadline - Date.now() + 10))
+      } })
+      try {
+        const response = await send(crossing.method, crossing.endpoint, token, crossing.body)
+        assert.equal(commits, 1, `Expected actual native post-COMMIT release for ${crossing.name}`)
+        observe(`commit-release:${crossing.name}`, response.status)
+      }
+      finally { database.db.primary.setTransactionDefaults({ afterCommit: undefined }) }
+    }
+    const { registerPersistentQueryHooks } = await import('@stacksjs/query-builder')
+    for (const name of ['purge-events', 'accept-replay', 'frozen-revoke-replay']) {
+      const crossing = crossings.find(value => value.name === name)!, deadline = await futureDeadline()
+      let delayed = 0
+      const unhook = registerPersistentQueryHooks({ onQueryEnd(event) {
+        const sql = event.sql.replace(/["`]/g, '').toLowerCase()
+        if (delayed || !sql.startsWith('select') || !sql.includes('from public_safety_purge_events')) return
+        delayed++
+        assert(Date.now() < deadline, 'Actual event SELECT must observe a current receipt')
+        // Native query hooks are synchronous. Blocking here delays the real awaited SELECT result.
+        Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, Math.max(1, deadline - Date.now() + 10))
+      } })
+      try {
+        const response = await send(crossing.method, crossing.endpoint, token, crossing.body)
+        assert.equal(delayed, 1, `Expected actual event SELECT for ${name}`)
+        observe(`awaited-select:${name}`, response.status)
+      }
+      finally { unhook() }
+    }
+    assert.deepEqual(failures, [], 'Completed receipts must remain private after every awaited release boundary')
+    console.log(`PASS actual future receipt SQL COMMIT and middleware deadline crossings nativeRoutes=${nativeRoutes}`)
     const elapsedAt = new Date(Date.now() - 2 * 86400000).toISOString(), expiredAt = new Date(Date.parse(elapsedAt) + 86400000).toISOString()
     await stored.update({ completed_at_iso: elapsedAt, receipt_retain_until_iso: expiredAt, next_eligible_at_iso: expiredAt })
     process.env.PUBLIC_SAFETY_PURGE_ENABLED = 'false'
