@@ -31,6 +31,15 @@ function requireQualifiedNamespace(): void {
   expect(/^NSpid:\s+1\s*$/m.test(readFileSync('/proc/self/status', 'utf8'))).toBe(true)
 }
 
+test.skipIf(process.env.PUBLIC_SAFETY_PURGE_NAMESPACE_TEST !== '1')('accepted purge retires expired metadata before permitting incident key reuse', async () => {
+  requireQualifiedNamespace()
+  const { qualifyPurgeMetadata } = await import('../helpers/public-safety-purge-metadata')
+  const result = await qualifyPurgeMetadata({ requirePositive: true })
+  expect(result.code, `${result.stdout}\n${result.stderr}`).toBe(0)
+  expect(result.positiveQualified).toBe(true)
+  expect(result.stdout).toContain('FK-safe units before public key reuse')
+}, 180000)
+
 test.skipIf(process.env.PUBLIC_SAFETY_PURGE_NAMESPACE_TEST !== '1')('accepted purge recovers genuine SIGKILL after namespace unlink', async () => {
   requireQualifiedNamespace()
   await qualifyPurgeProcessRecovery()
