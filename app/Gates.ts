@@ -33,6 +33,7 @@ export default defineGates({
    * }
    */
   gates: {
+    'public-safety:workspace-read': (user, key: string) => publicSafetyIncidentGate(user, key, 'view'),
     'public-safety:handover-read': (user, key: string) => publicSafetyHandoverGate(user, key, 'read'),
     'public-safety:handover-write': (user, key: string) => publicSafetyHandoverGate(user, key, 'write'),
     'public-safety:purge-preview': (user, key: string) => publicSafetyPurgeGate(user, key, 'preview'),
