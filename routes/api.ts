@@ -22,6 +22,12 @@ import PublicSafetyRetentionRead from '../app/Actions/PublicSafetyRetentionRead'
 import PublicSafetyRetentionHoldReview from '../app/Actions/PublicSafetyRetentionHoldReview'
 import PublicSafetyRetentionEvents from '../app/Actions/PublicSafetyRetentionEvents'
 import PublicSafetyCustodyMemberRevoke from '../app/Actions/PublicSafetyCustodyMemberRevoke'
+import PublicSafetyManagedCreate from '../app/Actions/PublicSafetyManagedCreate'
+import PublicSafetyManagedList from '../app/Actions/PublicSafetyManagedList'
+import PublicSafetyManagedRead from '../app/Actions/PublicSafetyManagedRead'
+import PublicSafetyManagedFile from '../app/Actions/PublicSafetyManagedFile'
+import PublicSafetyManagedEvents from '../app/Actions/PublicSafetyManagedEvents'
+import PublicSafetyManagedReconcile from '../app/Actions/PublicSafetyManagedReconcile'
 import { incidentHttpBoundary } from '../resources/functions/drone/public-safety/access/http'
 import { incidentDataExposureBoundary } from '../resources/functions/drone/public-safety/access/exposure'
 
@@ -53,3 +59,10 @@ route.get('/public-safety/incidents/{incident}/retention', PublicSafetyRetention
 route.post('/public-safety/incidents/{incident}/retention/hold', PublicSafetyRetentionHoldReview).middleware('auth').parseBody(false)
 route.get('/public-safety/incidents/{incident}/retention/events', PublicSafetyRetentionEvents).middleware('auth')
 route.post('/public-safety/incidents/{incident}/retention/revoke-member', PublicSafetyCustodyMemberRevoke).middleware('auth').parseBody(false)
+
+route.post('/public-safety/incidents/{incident}/managed-artifacts', PublicSafetyManagedCreate).middleware('auth').parseBody(false)
+route.get('/public-safety/incidents/{incident}/managed-artifacts', PublicSafetyManagedList).middleware('auth')
+route.get('/public-safety/incidents/{incident}/managed-artifacts/{artifact}', PublicSafetyManagedRead).middleware('auth')
+route.match(['GET', 'HEAD'], '/public-safety/incidents/{incident}/managed-artifacts/{artifact}/files/{file}', PublicSafetyManagedFile).middleware('auth')
+route.get('/public-safety/incidents/{incident}/managed-artifacts/{artifact}/events', PublicSafetyManagedEvents).middleware('auth')
+route.post('/public-safety/incidents/{incident}/managed-artifacts/{artifact}/reconcile', PublicSafetyManagedReconcile).middleware('auth').parseBody(false)

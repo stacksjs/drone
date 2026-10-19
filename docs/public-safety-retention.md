@@ -18,7 +18,9 @@ incident available through the content API.
 First read the retention preview. It returns the incident key and version, deadline, expiry status,
 original hold declaration, aggregate source/observation/review counts and an inventory digest.
 It excludes geometry, purpose authority, configuration, individual source digests and private notes.
-`managedArtifactCount: 0` and `legacyOfflineExportsManaged: false` describe this tracer's boundaries.
+`managedArtifactCount` counts registered managed attempts. The current inventory digest includes
+deterministic managed artifact/file metadata; an earlier enrollment digest remains historical
+acceptance. `legacyOfflineExportsManaged: false` continues to exclude old offline copies.
 
 Submit that inventory digest and incident version with `policyVersion: 'local-managed-v1'` and a
 new canonical lowercase UUIDv4 `requestId`. The final transaction recomputes the inventory under
@@ -95,6 +97,9 @@ access. Retention sequences are separate from incident versions; ordinary record
 advance the incident version without creating a retention event.
 
 ## Remaining deletion workflow
+
+[Managed source datasets](public-safety-managed.md) add explicitly requested private copies and
+read-only reconciliation. They do not reinterpret enrollment or a hold as purge acceptance.
 
 Custody projections explicitly report `purgeImplemented: false` and
 `contentDeletionPerformed: false`. Retention declarations and hold decisions remain alongside the

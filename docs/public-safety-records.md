@@ -5,6 +5,9 @@ declarations and append-only review history. Native Stacks accounts, tokens, per
 model-derived migrations and transactions provide the persistence and access checks described in
 [incident access](public-safety-access.md). The collection producer remains unsigned simulation.
 
+[Managed source datasets](public-safety-managed.md) can explicitly publish private derivatives
+from one admitted source after custody enrollment, without copying observation or review notes.
+
 ## Register a collection source
 
 Create an incident through the access API, then collect with that exact configuration through

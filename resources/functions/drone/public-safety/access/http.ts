@@ -1,8 +1,9 @@
 import { createMiddlewareErrorResponse, readJsonBody, RequestBodyError } from '@stacksjs/router'
 import { PublicSafetyAccessError } from './errors'
+import { associateManagedDownload, managedDownloadDeadline } from '../managed/download-deadline'
 import { authorizePublicSafetyCreate, authorizePublicSafetyIncident, changePublicSafetyMembership, closePublicSafetyIncident, createPublicSafetyIncident, readPublicSafetyAudit, readPublicSafetyIncident } from './service'
 
-const privateHeaders = { 'Cache-Control': 'private, no-store', 'Vary': 'Authorization, Cookie', 'X-Content-Type-Options': 'nosniff' }
+export const privateHeaders = { 'Cache-Control': 'private, no-store', 'Vary': 'Authorization, Cookie', 'X-Content-Type-Options': 'nosniff' }
 export interface WireRequest { url: string, method: string, headers: Headers, body?: ReadableStream<Uint8Array> | null }
 export type IncidentRequest = WireRequest & { getParam: (name: string) => string | undefined }
 export function readBody(request: WireRequest, limit: number) {
@@ -12,9 +13,13 @@ export function readBody(request: WireRequest, limit: number) {
 function privateResponse(response: Response): Response {
   const headers = new Headers(response.headers)
   for (const [key, value] of Object.entries(privateHeaders)) headers.set(key, value)
-  return new Response(response.body, { status: response.status, statusText: response.statusText, headers })
+  const deadline = managedDownloadDeadline(response)
+  // The final application clone can follow awaited middleware after the binary Action.
+  if (deadline !== undefined && (!Number.isFinite(deadline) || Date.now() >= deadline)) return failure(new PublicSafetyAccessError(404, 'Incident is unavailable'))
+  const result = new Response(response.body, { status: response.status, statusText: response.statusText, headers })
+  return deadline === undefined ? result : associateManagedDownload(result, deadline)
 }
-function failure(error: unknown): Response {
+export function failure(error: unknown): Response {
   if (error instanceof PublicSafetyAccessError || error instanceof RequestBodyError) return Response.json({ error: error.message }, { status: error.status, headers: privateHeaders })
   return Response.json({ error: 'Incident request failed' }, { status: 500, headers: privateHeaders })
 }

@@ -1,4 +1,5 @@
 import { publicSafetyRetentionGate } from '../resources/functions/drone/public-safety/retention/policy'
+import { publicSafetyManagedGate } from '../resources/functions/drone/public-safety/managed/policy'
 import type { UserModel } from '@stacksjs/orm'
 import { defineGates } from '@stacksjs/auth'
 import { publicSafetyCreateGate, publicSafetyIncidentGate } from '../resources/functions/drone/public-safety/access/policy'
@@ -30,6 +31,10 @@ export default defineGates({
    * }
    */
   gates: {
+    'public-safety:managed-read': (user, key: string) => publicSafetyManagedGate(user, key, 'read'),
+    'public-safety:managed-create': (user, key: string) => publicSafetyManagedGate(user, key, 'create'),
+    'public-safety:managed-events': (user, key: string) => publicSafetyManagedGate(user, key, 'events'),
+    'public-safety:managed-reconcile': (user, key: string) => publicSafetyManagedGate(user, key, 'reconcile'),
     'public-safety:retention-read': (user, key: string) => publicSafetyRetentionGate(user, key, 'read'),
     'public-safety:retention-manage': (user, key: string) => publicSafetyRetentionGate(user, key, 'manage'),
     'public-safety:retention-revoke': (user, key: string) => publicSafetyRetentionGate(user, key, 'revoke'),
