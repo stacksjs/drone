@@ -5,7 +5,7 @@ import { join } from 'node:path'
 
 // Genuine native application core with personal tokens/Gates/disposable SQLite and actual Worker.
 // This does not qualify HTTP/browser receipt, deployment, hard resource limits or OS thread join.
-test('native execution empty status requires current owner eligibility', async () => {
+test('native execution preserves original owner, genuine progress, stop and explicit admission', async () => {
   const root = await mkdtemp(join(tmpdir(), 'drone-incident-access-execution-core-'))
   let child: ReturnType<typeof Bun.spawn> | undefined
   try {
@@ -15,7 +15,7 @@ test('native execution empty status requires current owner eligibility', async (
     try {
       const [code, stdout, stderr] = await Promise.all([running.exited, new Response(running.stdout).text(), new Response(running.stderr).text()])
       expect(code, `${stdout}\n${stderr}`).toBe(0)
-      expect(stdout).toContain('PASS native execution empty status requires current authority')
+      expect(stdout).toContain('PASS native execution owner-bound lifecycle and explicit admission')
     }
     finally { clearTimeout(timeout) }
   }
