@@ -210,6 +210,35 @@ jobs:
           path: |
             ${{ runner.temp }}/workspace-browser-evidence/*.png
             ${{ runner.temp }}/workspace-browser-evidence/compiled.html
+  execution-browser:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.4.3
+      - run: bun install --frozen-lockfile
+      - run: cp .env.example .env
+      - run: ./buddy key:generate
+      - name: Qualify rendered execution with native authority and a genuine Worker
+        shell: bash
+        env:
+          EXECUTION_BROWSER_QA: 'true'
+          EXECUTION_BROWSER_EVIDENCE: ${{ runner.temp }}/execution-browser-evidence
+        run: |
+          set -euo pipefail
+          export BROWSE_BROWSER="$(command -v google-chrome)"
+          test -x "$BROWSE_BROWSER"
+          bun test tests/unit/public-safety-execution-browser.test.ts
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: execution-browser-evidence
+          if-no-files-found: ignore
+          path: |
+            ${{ runner.temp }}/execution-browser-evidence/*.png
+            ${{ runner.temp }}/execution-browser-evidence/compiled.html
   purge-namespace:
     runs-on: ubuntu-latest
     timeout-minutes: 30
