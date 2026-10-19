@@ -1,6 +1,7 @@
 # ADR 24: recipient-confirmed incident coordination
 
-Status: design accepted; implementation and qualification in progress for issue23.
+Status: accepted and implemented for incident-wide coordination in issue23.
+Operational, sector/team and hardware acceptance remain open.
 
 An assignment is responsibility for coordinating the whole incident. Its identity
 includes the incident revision, coordinator account and that coordinator's active

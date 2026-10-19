@@ -1,8 +1,7 @@
 # Incident coordination handover
 
-Implementation qualification is in progress on the handover branch. This is a
-recipient-confirmed transfer of responsibility for coordinating one whole
-incident. Vehicle control, RC authority, runtime leases, pilot qualification,
+Authorized operators can offer and explicitly accept responsibility for
+coordinating one whole incident. Vehicle control, RC authority, runtime leases, pilot qualification,
 sector assignments and physical outputs remain separate.
 
 The outgoing operator must be both the current coordinator pointer and an active
@@ -151,7 +150,9 @@ or retention expiry denies handover content and replay. No expiry scheduler or
 automatic cancellation event is created.
 
 Handover offers and terminal decisions are private append-only PublicSafetyAudit
-rows. Their lookup fields, source references, fingerprints and details are erased
+rows. Malformed protocol rows or broken terminal lineage refuse the operation;
+a resolved offer cannot become pending again because its lookup fields were
+damaged. Their lookup fields, source references, fingerprints and details are erased
 with the existing accepted purge-v1 audit group. The fixed inventory and
 previously accepted plans are unchanged. No per-offer copy survives in custody or
 purge receipt metadata. Native diagnostic exclusions and explicit field redaction
