@@ -77,15 +77,24 @@ behavior and require actual controller/HTTP qualification. They are not hard
 scheduling or resource guarantees.
 
 An isolated Worker probe transferred full recordings for all ten existing
-scenarios at requested durations 100 and 120 seconds. Production controller
-qualification separately completed nominal runs at both durations, with fresh
-native authority on each of 2,716 producer events. Those runs took approximately
-20 and 22 seconds on the development host; the virtual survey finished before
-the requested duration. Parent canonical replay took approximately 3.13 and
-2.45 seconds. Neither run entered replay with a pending heartbeat, so controlled
-pending-check overlap requires separate evidence. Validation remains intact,
-with current authority and deadline checks after it returns. These measurements
-do not qualify Pi hardware or bound worst-case scheduling, CPU or memory use.
+scenarios at requested durations 100 and 120 seconds. The production controller
+subsequently passed all 20 combinations through actual native authority,
+14,384 genuine callback credits and explicit source admission. Each complete
+recording matched the unchanged ordinary runtime's canonical bytes. Completion
+alone changed no source, incident version or audit; deliberate admission added
+one source and one audit and advanced the version once. The nine fault scenarios
+demonstrated blocked or aborted collection with neutral board outputs.
+
+The matrix took 149 seconds on the development host. Its fixtures compute the
+ordinary expectation before starting the controller, warming parent modules and
+retaining an additional canonical string. Nominal controller completion took
+approximately 15.69 and 14.49 seconds; parent canonical replay took 2.27 and
+2.45 seconds. All 33 sampled periodic subscriber checks succeeded. Every result
+entered replay with no pending check or busy owner heartbeat, so controlled
+pending-check overlap still requires separate evidence. Validation remains
+intact, with current authority and deadline checks after it returns. These
+measurements do not qualify Pi hardware or bound worst-case scheduling, CPU
+or memory use.
 
 Native createBroadcastHub/createBroadcastResponse own progress framing and
 bounded pending delivery. The stream rejects replay-buffer matches and uses
