@@ -61,6 +61,7 @@
     "commit-msg": "bun x gitlint --edit \"$1\""
   },
   "devDependencies": {
+    "@stacksjs/query-builder": "0.75.221",
     "better-dx": "^0.2.37"
   },
   "author": "Chris Breuer <chris@stacksjs.com>",

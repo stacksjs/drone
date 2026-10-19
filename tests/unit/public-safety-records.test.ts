@@ -43,3 +43,19 @@ test('canonical source encoding accepts exactly 16 MiB and refuses one additiona
   input[input.length - 1] += 'a'
   expect(() => publicSafetyRecordingData(input)).toThrow('source exceeds 16 MiB')
 })
+
+// Query lifecycle instrumentation coordinates real persisted changes after staging, before TX.
+test('native staged source and observation checks survive interleavings and shared version races', async () => {
+  const directory = await mkdtemp(join(tmpdir(), 'drone-incident-access-'))
+  try {
+    const config = join(directory, 'bunfig.toml')
+    await writeFile(config, 'preload=[]\n')
+    const child = Bun.spawn([process.execPath, `--config=${config}`, '--no-env-file', `${import.meta.dir}/../fixtures/public-safety-access/records-critical.ts`], {
+      cwd: directory, env: { ...process.env, APP_ENV: 'test', NODE_ENV: 'test', DB_CONNECTION: 'sqlite', DB_DATABASE_PATH: join(directory, 'access.sqlite') }, stdout: 'pipe', stderr: 'pipe',
+    })
+    const [code, stdout, stderr] = await Promise.all([child.exited, new Response(child.stdout).text(), new Response(child.stderr).text()])
+    expect(code, `${stdout}\n${stderr}`).toBe(0)
+    expect(stdout).toContain('PASS native staged-record interleavings and homogeneous mixed mutation races')
+  }
+  finally { await rm(directory, { recursive: true, force: true }) }
+}, 180000)
