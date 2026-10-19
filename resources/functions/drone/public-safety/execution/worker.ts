@@ -3,7 +3,6 @@ import { simulatePublicSafety } from '../runtime'
 import { publicSafetyRecordingData } from '../evidence'
 import { executionDigest, executionWords as words } from './protocol'
 
-declare const self: Worker & { close: () => void }
 /** Thin app Worker bootstrap invokes this once. No Auth/ORM, request or private file input. */
 export function runPublicSafetyWorker(): void {
   self.onmessage = ({ data }: MessageEvent<ExecutionWorkerInput>) => {
@@ -11,7 +10,7 @@ export function runPublicSafetyWorker(): void {
     self.onmessage = null
     let outcome: 'completed' | 'canceled' | 'failed' | 'refused' = 'failed', transferred = false
     let control: Int32Array | undefined
-    const send = (message: ExecutionWorkerMessage, transfer?: Transferable[]) => self.postMessage(message, transfer ?? [])
+    const send = (message: ExecutionWorkerMessage, transfer?: ArrayBuffer[]) => self.postMessage(message, transfer ?? [])
     try {
       if (data.version !== 1 || !(data.control instanceof SharedArrayBuffer) || data.control.byteLength !== words.length * 4 || !Number.isSafeInteger(data.creditWaitMs) || data.creditWaitMs < 1 || Object.keys(process.env).length) throw new Error('Invalid owned Worker bootstrap')
       for (const name of ['Auth', 'db', 'getCurrentRequest', 'request']) if ((globalThis as Record<string, unknown>)[name] !== undefined) throw new Error('Application authority entered the Worker')
@@ -50,9 +49,9 @@ export function runPublicSafetyWorker(): void {
     }
     finally {
       // All producer, canonicalization, encoding and transfer work has ended before ACK.
-      // close marks termination; neither this ACK nor close claims an OS thread join.
+      // The cleared message handler lets Bun drain naturally after the genuine ACK.
+      // Neither this ACK nor the native close marker claims an OS thread join.
       send({ version: 1, kind: 'finished', outcome, transferred })
-      self.close()
     }
   }
 }
