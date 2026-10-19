@@ -20,3 +20,27 @@ export function applicationReportPreview(report: ApplicationReport, maximumDoseP
   }
   return rasterPreviewDataUri(east.length, north.length, pixels)
 }
+
+/** Fixed 600x160 data coordinates. Missing measurements break the measured line. No rate is clipped. */
+export function applicationRatePlot(rows: readonly { atMs: number, targetPerSecond: number, measuredPerSecond: number | null }[], maximumRatePerSecond: number): { targetPath: string, measuredPath: string } {
+  if (!Number.isFinite(maximumRatePerSecond) || maximumRatePerSecond <= 0) throw new RangeError('Invalid application rate display scale')
+  if (!Array.isArray(rows) || rows.length > 9001) throw new RangeError('Invalid application rate plot capacity')
+  let previous = -1
+  for (const row of rows) {
+    if (!Number.isSafeInteger(row.atMs) || row.atMs < 0 || row.atMs <= previous) throw new RangeError('Invalid application rate epoch')
+    if (!Number.isFinite(row.targetPerSecond) || row.targetPerSecond < 0 || row.measuredPerSecond !== null && (!Number.isFinite(row.measuredPerSecond) || row.measuredPerSecond < 0)) throw new RangeError('Invalid application rate value')
+    previous = row.atMs
+  }
+  if (!rows.length) return { targetPath: '', measuredPath: '' }
+  const start = rows[0]!.atMs, duration = rows.at(-1)!.atMs - start
+  const number = (value: number) => Math.round(value * 1000) / 1000
+  let targetPath = '', measuredPath = '', measuredPen = false
+  for (const [index, row] of rows.entries()) {
+    const x = number(10 + (duration ? (row.atMs - start) / duration * 580 : 0))
+    const y = (rate: number) => number(150 - rate / maximumRatePerSecond * 140)
+    targetPath += `${index ? 'L' : 'M'}${x} ${y(row.targetPerSecond)}`
+    if (row.measuredPerSecond === null) measuredPen = false
+    else { measuredPath += `${measuredPen ? 'L' : 'M'}${x} ${y(row.measuredPerSecond)}`; measuredPen = true }
+  }
+  return { targetPath, measuredPath }
+}
