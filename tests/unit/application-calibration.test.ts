@@ -40,6 +40,6 @@ test('calibration rejects zero catches, wrong units, impossible weights and unbo
 })
 
 test('calibration accessors are rejected without reading private user data', () => {
-  const value = { get pulses() { throw new Error('PRIVATE_CALIBRATION_ACCESSOR_INVOKED') }, litres: 2, durationMs: 120000 }
+  const value = { get pulses(): number { throw new Error('PRIVATE_CALIBRATION_ACCESSOR_INVOKED') }, litres: 2, durationMs: 120000 }
   expect(() => applicationPulseFactor(value)).toThrow('fields or accessor')
 })

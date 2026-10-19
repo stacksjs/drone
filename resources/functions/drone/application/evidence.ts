@@ -5,7 +5,7 @@ import { replayVehicleMission } from '../missions/vehicle'
 import { createVehicleMeasurementQualifier } from '../vehicles/measurements'
 import { applicationPulseFactor, applicationScaleFactor } from './calibration'
 import { createApplicationController } from './controller'
-import { planApplication, validateApplicationConfig } from './planner'
+import { applicationNeutralTailMs, planApplication, validateApplicationConfig } from './planner'
 
 export const applicationEvidenceLimits = Object.freeze({ recordingBytes: 16 * 1024 * 1024, hostRows: 9001, probes: 10001, releases: 10001, maximumMs: 200000 })
 function fail(reason: string): never { throw new TypeError(`Invalid application recording: ${reason}`) }
@@ -137,7 +137,7 @@ export function validateApplicationRun(input: unknown): ApplicationRun {
     const recorded = run.inputs[i]!, row = vehicle.path[i]!, trace = vehicle.trace.rows[i]!
     controllerInput(recorded)
     fields(row, ['atMs', 'positionM', 'truthPositionM', 'mission', 'measurement', 'measurementPose', 'actuators'])
-    if (recorded.atMs <= previousMs || recorded.atMs !== row.atMs || row.atMs !== trace.observation.nowMs || recorded.reference !== trace.observation.reference || recorded.taskId !== row.mission.taskId || recorded.missionState !== row.mission.state || !equivalent(row.mission, trace.result) || (row.positionM !== null && (!vector(row.positionM, 3) || !equivalent(row.positionM, trace.observation.positionM))) || !vector(row.truthPositionM, 3) || !channels(row.actuators) || (recorded.enabled && trace.observation.authority !== 'autonomous')) fail('host input, mission or pose epoch mismatch')
+    if (recorded.atMs !== 600 + i * 20 || recorded.atMs !== row.atMs || row.atMs !== trace.observation.nowMs || recorded.reference !== trace.observation.reference || recorded.taskId !== row.mission.taskId || recorded.missionState !== row.mission.state || !equivalent(row.mission, trace.result) || (row.positionM !== null && (!vector(row.positionM, 3) || !equivalent(row.positionM, trace.observation.positionM))) || !vector(row.truthPositionM, 3) || !channels(row.actuators) || (recorded.enabled && trace.observation.authority !== 'autonomous')) fail('host input, mission or pose epoch mismatch')
     if (recorded.ground.healthy && (!row.positionM || Math.hypot(...recorded.ground.positionM.map((n, j) => n - row.positionM![j]!)) > recorded.ground.uncertaintyM + config.implement.maxSpeedMps * .14)) fail('qualified ground observation diverges beyond declared uncertainty and latency travel')
     if (row.measurement !== null) {
       fields(row.measurement, ['version', 'evidence', 'vehicle', 'sequence', 'reference', 'capturedAtMs', 'receivedAtMs', 'values'])
@@ -167,10 +167,18 @@ export function validateApplicationRun(input: unknown): ApplicationRun {
   fields(run.shutdown, ['requestedAtMs', 'finalAtMs', 'emittedAfterRequest', 'closureVerified', 'evidence'])
   if (!epoch(run.shutdown.requestedAtMs) || !epoch(run.shutdown.finalAtMs) || run.shutdown.requestedAtMs > run.shutdown.finalAtMs || run.shutdown.finalAtMs < previousMs || !finite(run.shutdown.emittedAfterRequest, 0) || typeof run.shutdown.closureVerified !== 'boolean' || run.shutdown.evidence !== 'independent-modeled-plant-tail') fail('shutdown declaration')
   let previousPlant: ApplicationPlantSnapshot | undefined, emitted = 0, emittedBeforeRequest = 0, releaseIndex = 0
-  for (const probe of run.probes) {
+  const probesByEpoch = new Map<number, ApplicationRun['probes'][number]>()
+  let firstUnavailableAtMs: number | null = null
+  for (let index = 0; index < run.probes.length; index++) {
+    const probe = run.probes[index]!
     fields(probe, ['atMs', 'hostAvailable', 'positionM', 'yawRad', 'state', 'boardChannels'])
     if (!epoch(probe.atMs) || probe.atMs !== probe.state.atMs || !vector(probe.positionM, 3) || !finite(probe.yawRad, -1000, 1000) || typeof probe.hostAvailable !== 'boolean' || !channels(probe.boardChannels) || probe.hostAvailable !== (probe.atMs <= previousMs)) fail('independent probe scope')
+    const regularEpoch = 600 + index * 20
+    const finalPartial = index === run.probes.length - 1 && probe.atMs === run.shutdown.finalAtMs && previousPlant && probe.atMs > previousPlant.atMs && probe.atMs < regularEpoch && probe.atMs % 4 === 0
+    if (probe.atMs !== regularEpoch && !finalPartial) fail('independent probe cadence')
+    if (!probe.hostAvailable) firstUnavailableAtMs ??= probe.atMs
     plant(probe.state, config, previousPlant)
+    probesByEpoch.set(probe.atMs, probe)
     const next = run.releases[releaseIndex], delta = probe.state.emittedAmount - (previousPlant?.emittedAmount ?? 0)
     if (next && next.atMs < probe.atMs) fail('release has no matching plant probe')
     if (next?.atMs === probe.atMs) {
@@ -184,6 +192,20 @@ export function validateApplicationRun(input: unknown): ApplicationRun {
     else if (!equivalent(delta, 0)) fail('emitted material is missing a release record')
     previousPlant = probe.state
   }
+  for (const row of vehicle.path) if (!equivalent(row.truthPositionM, probesByEpoch.get(row.atMs)?.positionM)) fail('host truth position differs from independent same-epoch probe')
+  if (!equivalent(vehicle.finalTruthPositionM, run.probes.at(-1)!.positionM)) fail('vehicle final truth differs from final independent probe')
+  let requestedByDecisions: number | null = null
+  for (let i = 0; i < run.decisions.length; i++) {
+    const decision = run.decisions[i]!
+    if (decision.state === 'applying') requestedByDecisions = null
+    else if (run.decisions[i - 1]?.state === 'applying') requestedByDecisions ??= decision.atMs
+  }
+  const horizonMs = run.options.seconds * 1000
+  const hostLostBeforeHorizon = vehicle.status === 'host-lost' || vehicle.status === 'duration-exhausted' && run.options.scenario === 'host-loss' && previousMs < horizonMs && firstUnavailableAtMs !== null && firstUnavailableAtMs <= horizonMs
+  if (hostLostBeforeHorizon && firstUnavailableAtMs !== previousMs + 20) fail('host-loss boundary differs from retained host cadence')
+  const expectedRequest = hostLostBeforeHorizon ? firstUnavailableAtMs : requestedByDecisions ?? previousMs
+  const endOfVehicleMs = vehicle.status === 'host-lost' ? firstUnavailableAtMs! + 100 : vehicle.status === 'duration-exhausted' ? horizonMs : previousMs
+  if (run.shutdown.requestedAtMs !== expectedRequest || run.shutdown.finalAtMs !== endOfVehicleMs + applicationNeutralTailMs(config)) fail('shutdown request or independent tail differs from retained decisions and host boundary')
   plant(run.final, config)
   if (!previousPlant || !equivalent(previousPlant, run.final) || releaseIndex !== run.releases.length || !equivalent(emitted, run.final.emittedAmount) || !equivalent(run.shutdown.emittedAfterRequest, emitted - emittedBeforeRequest) || run.final.atMs !== run.shutdown.finalAtMs) fail('final inventory, releases or residual shutdown accounting')
   const closed = run.final.masterPosition <= .001 && run.final.energy <= .001 && run.final.flowPerSecond <= 1e-10 && run.shutdown.finalAtMs - run.shutdown.requestedAtMs >= config.calibration.closingAllowanceMs

@@ -11,7 +11,7 @@ import { createVehicleMeasurementQualifier, predictVehicleMeasurementPose, vehic
 export function runVehicleSimulation(profileInput: VehicleProfile, options: { scenario?: string, seconds?: number, neutralTailMs?: number } = {}) {
   const scenario = options.scenario ?? profileInput.scenario, seconds = options.seconds ?? 120
   const neutralTailMs = options.neutralTailMs ?? 0
-  if (!Number.isSafeInteger(neutralTailMs) || neutralTailMs < 0 || neutralTailMs > 5000 || neutralTailMs % 4 !== 0) throw new RangeError('Invalid independent vehicle neutral tail')
+  if (!Number.isSafeInteger(neutralTailMs) || neutralTailMs < 0 || neutralTailMs > 15000 || neutralTailMs % 4 !== 0) throw new RangeError('Invalid independent vehicle neutral tail')
   if (!Number.isInteger(seconds) || seconds < 2 || seconds > 180 || scenario !== profileInput.scenario || !profileInput.scenarios.includes(scenario) || profileInput.evidence !== 'modeled-vehicle-profile' || profileInput.physicalFlightEnabled !== false) throw new RangeError('Invalid vehicle simulation profile, scenario or duration')
   const { plan, worstCaseMs, requiredWh } = validateVehicleMission(profileInput.mission)
   if (profileInput.vehicle !== plan.vehicle || plan.origin.latitudeDeg !== 0 || plan.origin.longitudeDeg !== 0 || plan.origin.ellipsoidHeightM !== 100) throw new TypeError('Vehicle fixture requires its declared 0,0,100 WGS84 origin')
@@ -38,10 +38,10 @@ export function runVehicleSimulation(profileInput: VehicleProfile, options: { sc
   try {
     for (let nowMs = 0; nowMs <= seconds * 1000; nowMs += 4) {
       finalAtMs = nowMs
-      const faults = profileInput.faults(scenario, nowMs), boardState = board.tick(nowMs)
+      const faults = profileInput.faults(scenario, nowMs, 'host'), boardState = board.tick(nowMs)
       if (nowMs > 600) truth = plant.step(boardState.actuators, 0.004, { windMps: faults.windMps ?? [0, 0, 0], currentMps: faults.currentMps ?? [0, 0, 0] })
       if (faults.hostLost) hostLostAt ??= nowMs
-      if (nowMs > 600) session.observeIndependent?.(structuredClone(truth), nowMs, [...boardState.actuators], hostLostAt === null)
+      if (nowMs >= 600) session.observeIndependent?.(structuredClone(truth), nowMs, [...boardState.actuators], hostLostAt === null)
       if (hostLostAt !== null) {
         if (nowMs - hostLostAt >= 100) { status = 'host-lost'; fault = board.snapshot().fault ?? 'host-lost'; break }
         continue
@@ -109,7 +109,7 @@ export function runVehicleSimulation(profileInput: VehicleProfile, options: { sc
   // Opt-in material/actuator settling has no host sensor, estimation, mission or control work.
   const hostEndAtMs = finalAtMs
   for (let elapsed = 4; elapsed <= neutralTailMs; elapsed += 4) {
-    const nowMs = hostEndAtMs + elapsed, faults = profileInput.faults(scenario, nowMs), boardState = board.tick(nowMs)
+    const nowMs = hostEndAtMs + elapsed, faults = profileInput.faults(scenario, nowMs, 'independent-tail'), boardState = board.tick(nowMs)
     truth = plant.step(boardState.actuators, .004, { windMps: faults.windMps ?? [0, 0, 0], currentMps: faults.currentMps ?? [0, 0, 0] })
     session.observeIndependent?.(structuredClone(truth), nowMs, [...boardState.actuators], false)
     finalAtMs = nowMs

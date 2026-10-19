@@ -13,6 +13,10 @@ function fields(value: unknown, keys: string[]): asserts value is Record<string,
   if (!value || typeof value !== 'object' || Object.getPrototypeOf(value) !== Object.prototype || Object.getOwnPropertyNames(value).length !== keys.length || keys.some(key => !Object.hasOwn(value, key))) fail('record fields')
 }
 function id(value: unknown) { if (typeof value !== 'string' || !/^[a-z][a-z0-9-]{0,39}$/.test(value)) fail('identifier') }
+/** Independent settling budget for validated calibration, rounded to the actual 4 ms plant cadence. */
+export function applicationNeutralTailMs(config: ApplicationConfig): number {
+  return Math.ceil(Math.max(2000, config.calibration.closingAllowanceMs, Math.max(config.calibration.primaryCloseMs, config.calibration.masterCloseMs) + 8 * config.calibration.energyTauMs + 200 + config.implement.fallTimeS * 1000) / 4) * 4
+}
 /** Reject accessors/cycles/prototypes and bound configuration work before cloning any input. */
 function bounded(input: unknown) {
   let nodes = 0, bytes = 0
@@ -24,7 +28,7 @@ function bounded(input: unknown) {
     else if (value === null || typeof value === 'boolean') bytes += 5
     else if (value && typeof value === 'object' && (Array.isArray(value) || Object.getPrototypeOf(value) === Object.prototype)) {
       if (ancestors.has(value) || Object.getOwnPropertySymbols(value).length) fail('cyclic or symbolic config')
-      if (Array.isArray(value) && value.length > 64) fail('array resource bound')
+      if (Array.isArray(value) && (Object.getPrototypeOf(value) !== Array.prototype || value.length > 64)) fail('array prototype or resource bound')
       ancestors.add(value)
       const names = Object.getOwnPropertyNames(value)
       if (names.length > 65) fail('record resource bound')

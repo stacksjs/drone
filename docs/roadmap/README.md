@@ -61,6 +61,12 @@ sampling reports and explicit source-bound livestock declarations are implemente
 registered real field data and agronomic/animal qualification remain in
 [#21](https://github.com/stacksjs/drone/issues/21).
 
+Prescribed inert-water and inert-granule application now runs on the owned ground runtime with
+separate implement leases, quantized delivery instruments, exclusions, fault latches and independent
+shutdown probes. Exact finite-kernel dose/coverage/overlap reports and source replay are implemented.
+Physical calibration, distribution, dose/drift, local requirements and HIL remain in
+[#22](https://github.com/stacksjs/drone/issues/22). See [application evidence](../application.md).
+
 Asset-relative bridge inspection now uses the owned mission/control loop, measured modeled range
 registration, visible/synthetic thermal pixels, explicit operator reviews and repeat-visit geometry.
 Physical asset/camera/thermal qualification and richer assets remain in

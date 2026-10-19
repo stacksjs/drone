@@ -1,0 +1,91 @@
+<script client>
+import type { ApplicationImplement, ApplicationReport, ApplicationScenario } from '../functions/drone/application/types'
+import type { ApplicationRun } from '../functions/drone/application/runtime-types'
+import { exampleApplicationConfig } from '../functions/drone/application/fixtures'
+import { applicationScenarios, simulateApplication } from '../functions/drone/application/runtime'
+import { processApplication } from '../functions/drone/application/coverage'
+import { applicationRatePlot, applicationReportPreview } from '../functions/drone/application/presentation'
+const implement = state<ApplicationImplement>('sprayer')
+const scenario = state<ApplicationScenario>('nominal')
+const mode = state('test')
+const authorization = state('none')
+const run = state<ApplicationRun | null>(null)
+const report = state<ApplicationReport | null>(null)
+const busy = state(false)
+const error = state('')
+const epoch = state(600)
+const cellIndex = state(0)
+const config = derived(() => run()?.config ?? exampleApplicationConfig(implement()))
+const unit = derived(() => config().material.unit)
+const maximumEpoch = derived(() => run()?.final.atMs ?? 600)
+const validEpoch = derived(() => !run() || Number.isSafeInteger(Number(epoch())) && (run()!.inputs.some(row => row.atMs === Number(epoch())) || run()!.probes.some(row => row.atMs === Number(epoch()))))
+const input = derived(() => validEpoch() ? run()?.inputs.find(row => row.atMs === Number(epoch())) ?? null : null)
+const decision = derived(() => validEpoch() ? run()?.decisions.find(row => row.atMs === Number(epoch())) ?? null : null)
+const probe = derived(() => validEpoch() ? run()?.probes.find(row => row.atMs === Number(epoch())) ?? null : null)
+const cell = derived(() => Number.isInteger(Number(cellIndex())) && Number(cellIndex()) >= 0 ? report()?.cells[Number(cellIndex())] ?? null : null)
+const doseMaximum = derived(() => Math.max(1, ...config().prescription.map(zone => zone.ratePerHa)))
+const preview = derived(() => report() ? applicationReportPreview(report()!, doseMaximum()) : '')
+const rateMaximum = derived(() => Math.max(config().calibration.maxRatePerSecond, ...(run()?.decisions.map(row => Math.max(row.targetPerSecond, row.measuredPerSecond ?? 0)) ?? [])))
+const ratePlot = derived(() => applicationRatePlot(run()?.decisions ?? [], rateMaximum()))
+function quantity(value: number | null | undefined, digits = 6) { return value === null || value === undefined ? 'unavailable' : value.toFixed(digits).replace(/^-0(\.0+)$/, '0$1') }
+function vector(value: readonly number[] | null | undefined) { return value ? value.map(n => n.toFixed(3)).join(', ') : 'unavailable' }
+const pending = useTimeout(() => {
+  try {
+    const result = simulateApplication({ config: exampleApplicationConfig(implement()), scenario: scenario(), testMode: mode() === 'test', authorizeImplement: authorization() === 'grant' })
+    const audited = processApplication(result)
+    run.set(result); report.set(audited)
+    void nextTick(() => { if (run() === result) epoch.set(result.final.atMs) })
+  }
+  catch (failure) { error.set(failure instanceof Error ? failure.message : 'Application simulation failed') }
+  finally { busy.set(false) }
+}, 32)
+pending.stop()
+function clear() { pending.stop(); run.set(null); report.set(null); error.set(''); busy.set(false); epoch.set(600); cellIndex.set(0) }
+effect(() => { implement(); scenario(); mode(); authorization(); clear() })
+onDestroy(() => pending.stop())
+function execute() { clear(); busy.set(true); pending.start() }
+</script>
+<template>
+  <section aria-labelledby="application-title" :aria-busy="busy()">
+    <h1 id="application-title" class="font-semibold text-3xl tracking-tight">Prescribed application</h1>
+    <p class="mt-3 max-w-3xl leading-relaxed text-neutral-400">Run an owned ground mission with inert water or granules. Inspect separate implement authority, quantized instruments and independent modeled deposition.</p>
+    <p class="mt-3 text-emerald-200 text-sm">Physical outputs remain inhibited. This model does not qualify field dose, drift, local requirements or a physical trial.</p>
+    <div class="flex flex-wrap gap-4 items-end mt-8">
+      <div><label for="application-implement" class="block mb-2 text-sm">Implement</label><select id="application-implement" x-model="implement" class="px-3 py-3 max-w-full bg-neutral-900 border border-neutral-600 rounded"><option value="sprayer">Inert-water sprayer</option><option value="spreader">Inert-granule spreader</option></select></div>
+      <div><label for="application-scenario" class="block mb-2 text-sm">Scenario</label><select id="application-scenario" x-model="scenario" class="px-3 py-3 max-w-full bg-neutral-900 border border-neutral-600 rounded"><option :for="name in applicationScenarios" :value="name">{{ name }}</option></select></div>
+      <div><label for="application-mode" class="block mb-2 text-sm">Run mode</label><select id="application-mode" x-model="mode" class="px-3 py-3 max-w-full bg-neutral-900 border border-neutral-600 rounded"><option value="test">Dry test</option><option value="apply">Metered model</option></select></div>
+      <div class="min-w-0"><label for="application-authority" class="block mb-2 text-sm">Separate implement lease</label><select id="application-authority" x-model="authorization" class="px-3 py-3 max-w-full bg-neutral-900 border border-neutral-600 rounded"><option value="none">No grant</option><option value="grant">Grant for this modeled run</option></select></div>
+      <button type="button" @click="execute()" :disabled="busy()" class="px-4 py-3 font-medium text-neutral-950 bg-emerald-200 rounded focus-visible:outline-emerald-200 disabled:opacity-50">{{ busy() ? 'Running model...' : 'Run modeled route' }}</button>
+      <button type="button" @click="clear()" class="px-4 py-3 text-sm border border-neutral-600 rounded focus-visible:outline-emerald-200">Clear recording</button>
+    </div>
+    <p :if="busy()" role="status" class="mt-5 text-emerald-200 text-sm">Running sensor, estimator, mission, metering and exact coverage processing.</p>
+    <p :if="error()" role="alert" class="mt-5 p-4 break-words text-red-200 border border-red-400 rounded">{{ error() }}</p>
+    <p :if="!run() && !busy()" class="mt-7 py-5 text-neutral-400 border-neutral-700 border-t">No application recording. Dry test and no grant are the defaults. Metered discharge requires both the metered model and a separate grant.</p>
+    <div :if="run() && report()" class="mt-8 space-y-8">
+      <section aria-labelledby="application-result" class="py-5 border-neutral-700 border-t">
+        <h2 id="application-result" class="font-semibold text-lg">{{ run()?.status }} / {{ run()?.reason }}</h2>
+        <dl class="grid gap-5 grid-cols-2 sm:grid-cols-4 mt-5 text-sm"><div><dt class="text-neutral-400">Modeled emitted</dt><dd class="mt-1 font-mono">{{ quantity(report()?.emittedAmount) }} {{ unit() }}</dd></div><div><dt class="text-neutral-400">Treatable field</dt><dd class="mt-1 font-mono">{{ quantity(report()?.treatableAreaM2, 2) }} m2</dd></div><div><dt class="text-neutral-400">Covered / missed</dt><dd class="mt-1 font-mono">{{ quantity(report()?.coveredAreaM2, 2) }} / {{ quantity(report()?.missedAreaM2, 2) }} m2</dd></div><div><dt class="text-neutral-400">Distinct-pass overlap</dt><dd class="mt-1 font-mono">{{ quantity(report()?.overlapAreaM2, 3) }} m2</dd></div></dl>
+        <p class="mt-4 break-words text-neutral-400 text-sm">Material {{ config().material.id }}, batch {{ config().material.batch }}. Calibration {{ config().calibration.id }} is synthetic. Route completion does not establish complete field coverage.</p>
+      </section>
+      <section aria-labelledby="application-rate" class="min-w-0">
+        <h2 id="application-rate" class="font-semibold text-lg">Rate and independent metering</h2>
+        <p class="mt-2 text-neutral-400 text-sm">Full host recording: green is requested rate, white is the measured 400 ms window. Gaps have no measured line. Vertical scale: 0 to {{ quantity(rateMaximum()) }} {{ unit() }}/s.</p>
+        <svg width="600" height="160" viewBox="0 0 600 160" role="img" aria-label="Recorded target and independently measured material rates on a shared time and flow scale" class="block mt-4 h-auto w-full bg-neutral-900 border border-neutral-700 rounded"><path :d="ratePlot().targetPath" fill="none" stroke="#6ee7b7" stroke-width="1.5"/><path :d="ratePlot().measuredPath" fill="none" stroke="#ffffff" stroke-width="1.25"/></svg>
+        <label for="application-time" class="flex flex-wrap gap-3 justify-between mt-5 text-sm">Recorded epoch <span class="font-mono">{{ epoch() }} / {{ maximumEpoch() }} ms</span></label><input id="application-time" type="range" min="600" :max="maximumEpoch()" step="20" x-model.number="epoch" class="mt-3 w-full accent-emerald-200">
+        <div class="flex flex-wrap gap-3 items-end mt-3"><div><label for="application-epoch" class="block mb-2 text-sm">Exact epoch, ms</label><input id="application-epoch" type="number" min="600" :max="maximumEpoch()" step="20" x-model.number="epoch" class="px-3 py-2 w-36 bg-neutral-900 border border-neutral-600 rounded"></div><button type="button" @click="epoch.set(run()?.inputs.at(-1)?.atMs || 600)" class="px-3 py-2 text-sm border border-neutral-600 rounded">Last host input</button><button type="button" @click="epoch.set(maximumEpoch())" class="px-3 py-2 text-sm border border-neutral-600 rounded">Independent tail end</button></div>
+        <p :if="!validEpoch()" role="alert" class="mt-3 text-red-200 text-sm">Choose an exact retained epoch. No observation is inferred between records.</p>
+        <div class="grid gap-5 md:grid-cols-2 mt-5 text-sm"><div class="min-w-0"><h3 class="font-medium">Host policy at this epoch</h3><p :if="!input()" class="mt-2 text-neutral-400">No host observation at this epoch. Independent tail probes do not extend the host estimator or decisions.</p><dl :if="input()" class="mt-3 space-y-2 break-words"><div><dt class="text-neutral-400">Decision / task</dt><dd>{{ decision()?.state }} / {{ decision()?.reason }} / {{ input()?.taskId }}</dd></div><div><dt class="text-neutral-400">Estimated north, east, down</dt><dd class="font-mono">{{ vector(decision()?.estimatedPositionM) }} m</dd></div><div><dt class="text-neutral-400">Speed / lease expiry</dt><dd class="font-mono">{{ quantity(input()?.ground.speedMps) }} m/s / {{ decision()?.grantExpiresAtMs ?? 'no lease' }} ms</dd></div><div><dt class="text-neutral-400">Measured delivered estimate</dt><dd class="font-mono">{{ quantity(decision()?.measuredDeliveredAmount) }} +/- {{ quantity(decision()?.measurementUncertainty) }} {{ unit() }}</dd></div><div><dt class="text-neutral-400">Meter capture / raw pulse / scale</dt><dd class="font-mono">{{ input()?.feedback?.capturedAtMs ?? 'missing' }} ms / {{ input()?.feedback?.pulseCount ?? 'missing' }} / {{ input()?.feedback?.scaleRaw ?? 'missing' }}</dd></div><div><dt class="text-neutral-400">Primary, master, energy command</dt><dd class="font-mono">{{ vector(decision()?.channels) }}</dd></div></dl></div><div class="min-w-0"><h3 class="font-medium">Independent modeled plant probe</h3><p :if="!probe()" class="mt-2 text-neutral-400">No model probe at this exact epoch.</p><dl :if="probe()" class="mt-3 space-y-2"><div><dt class="text-neutral-400">Actual model flow / inventory</dt><dd class="font-mono">{{ quantity(probe()?.state.flowPerSecond) }} {{ unit() }}/s / {{ quantity(probe()?.state.remainingAmount) }} {{ unit() }}</dd></div><div><dt class="text-neutral-400">Primary / master position</dt><dd class="font-mono">{{ quantity(probe()?.state.primaryPosition) }} / {{ quantity(probe()?.state.masterPosition) }}</dd></div><div><dt class="text-neutral-400">Actual model emitted / unmetered loss</dt><dd class="font-mono">{{ quantity(probe()?.state.emittedAmount) }} / {{ quantity(probe()?.state.unmeteredLossAmount) }} {{ unit() }}</dd></div><div><dt class="text-neutral-400">Host available to model</dt><dd>{{ probe()?.hostAvailable ? 'yes' : 'no' }}</dd></div></dl></div></div>
+      </section>
+      <section aria-labelledby="application-dose" class="grid gap-6 md:grid-cols-2 pt-7 border-neutral-700 border-t">
+        <div class="min-w-0"><h2 id="application-dose" class="font-semibold text-lg">Retained dose cells</h2><img :src="preview()" width="320" height="320" alt="North-up exact modeled deposited dose cells; red is zero, green reaches the declared maximum, grey is unavailable treatable support" class="block object-contain mt-4 h-80 w-full bg-neutral-900 border border-neutral-700 rounded [image-rendering:pixelated]"><p class="mt-3 text-neutral-400 text-xs">North is up. Fixed colour scale: 0 to {{ doseMaximum() }} {{ unit() }}/ha and above. Grey is unavailable treatable support. Uniform rectangular deposition is a declared model, not measured field dose.</p></div>
+        <div class="min-w-0"><label for="application-cell" class="block mb-2 text-sm">Cell index, north to south, west to east</label><input id="application-cell" type="number" min="0" :max="(report()?.cells.length || 1) - 1" step="1" x-model.number="cellIndex" class="px-3 py-2 w-32 bg-neutral-900 border border-neutral-600 rounded"><p :if="!cell()" role="alert" class="mt-3 text-red-200 text-sm">Choose a retained cell index.</p><dl :if="cell()" class="mt-5 space-y-3 break-words text-sm"><div><dt class="text-neutral-400">Cell / north-east bounds</dt><dd class="font-mono">{{ cell()?.id }} / {{ vector(cell()?.boundsM) }} m</dd></div><div><dt class="text-neutral-400">Dose / prescribed amount</dt><dd class="font-mono">{{ quantity(cell()?.dosePerHa, 2) }} {{ unit() }}/ha / {{ quantity(cell()?.prescribedAmount) }} {{ unit() }}</dd></div><div><dt class="text-neutral-400">Field support / excluded support</dt><dd class="font-mono">{{ quantity(cell()?.areaM2, 3) }} / {{ quantity(cell()?.excludedAreaM2, 3) }} m2</dd></div><div><dt class="text-neutral-400">Covered / distinct-pass overlap</dt><dd class="font-mono">{{ quantity(cell()?.coveredAreaM2, 3) }} / {{ quantity(cell()?.overlapAreaM2, 3) }} m2</dd></div></dl></div>
+      </section>
+      <section aria-labelledby="application-closure" class="pt-7 border-neutral-700 border-t"><h2 id="application-closure" class="font-semibold text-lg">Shutdown and material balance</h2><p class="mt-3 text-sm">Modeled closure {{ run()?.shutdown.closureVerified ? 'verified in the independent tail' : 'unverified' }}. Request {{ run()?.shutdown.requestedAtMs }} ms, final probe {{ run()?.shutdown.finalAtMs }} ms. Emitted after request: {{ quantity(run()?.shutdown.emittedAfterRequest) }} {{ unit() }}.</p><dl class="grid gap-4 grid-cols-2 sm:grid-cols-4 mt-5 text-sm"><div><dt class="text-neutral-400">Treatable field</dt><dd class="font-mono">{{ quantity(report()?.inFieldAmount) }} {{ unit() }}</dd></div><div><dt class="text-neutral-400">Excluded support</dt><dd class="font-mono">{{ quantity(report()?.excludedAmount) }} {{ unit() }}</dd></div><div><dt class="text-neutral-400">Outside field</dt><dd class="font-mono">{{ quantity(report()?.outsideAmount) }} {{ unit() }}</dd></div><div><dt class="text-neutral-400">Still in flight</dt><dd class="font-mono">{{ quantity(report()?.inFlightAmount) }} {{ unit() }}</dd></div></dl><p class="mt-4 text-neutral-400 text-xs">Conservation residual {{ quantity(report()?.conservationError, 10) }} {{ unit() }}. Host measured totals and independent material truth are separate evidence.</p></section>
+    </div>
+    <section aria-labelledby="application-requirements" class="mt-8 pt-7 border-neutral-700 border-t"><h2 id="application-requirements" class="font-semibold text-lg">Declared constraints</h2><p class="mt-3 break-words text-neutral-400 text-sm">Wind north/east {{ vector(config().weather.windMps) }} m/s, maximum {{ config().weatherLimits.maxWindMps }} m/s. Temperature {{ config().weather.temperatureC }} C within {{ config().weatherLimits.minTemperatureC }}..{{ config().weatherLimits.maxTemperatureC }} C; humidity {{ config().weather.humidityPercent }}%, minimum {{ config().weatherLimits.minHumidityPercent }}%. Inversion must be absent. Weather age limit {{ config().weatherLimits.maxAgeMs }} ms.</p><p class="mt-3 break-words text-neutral-400 text-sm">Operator {{ config().localRequirements.operatorId }}. Jurisdiction {{ config().localRequirements.jurisdiction ?? 'unspecified' }}. Local requirements remain {{ config().localRequirements.status }}; physical trial eligible: false. Material-specific distribution, independent catch/scale calibration, drift/weather and local operating requirements need physical qualification.</p></section>
+  </section>
+</template>
+<style>
+select, input, button { font: inherit; outline-offset: 4px; }
+select, input { color: inherit; }
+</style>

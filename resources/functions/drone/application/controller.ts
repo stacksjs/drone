@@ -91,7 +91,8 @@ export function createApplicationController(configInput: ApplicationConfig, inpu
         else if (!zone) reason = 'application-no-whole-footprint-prescription'
         else {
           target = zone.ratePerHa * o.speedMps * config.implement.swathM / 10000; zoneId = zone.id
-          if (feedback.remaining !== null && feedback.remaining <= quantum * 2) { latch ??= 'application-level-empty'; target = 0 }
+          if (zone.ratePerHa === 0) reason = 'application-zero-prescription'
+          else if (feedback.remaining !== null && feedback.remaining <= quantum * 2) { latch ??= 'application-level-empty'; target = 0 }
           else if (target < config.calibration.minRatePerSecond || target > config.calibration.maxRatePerSecond) { latch ??= 'application-rate-unattainable'; target = 0 }
           else { state = 'applying'; reason = 'application-qualified-rate-control'; wasApplying = true }
         }

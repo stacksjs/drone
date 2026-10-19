@@ -44,6 +44,28 @@ declare global {
   const unwrapPan: typeof autoImports.unwrapPan
   const validateAntennaConfig: typeof autoImports.validateAntennaConfig
   const createAntennaTracker: typeof autoImports.createAntennaTracker
+  const applicationPulseFactor: typeof autoImports.applicationPulseFactor
+  const applicationScaleFactor: typeof autoImports.applicationScaleFactor
+  const applicationScaleMass: typeof autoImports.applicationScaleMass
+  const applicationRatePerSecond: typeof autoImports.applicationRatePerSecond
+  const createApplicationController: typeof autoImports.createApplicationController
+  const processApplicationReleases: typeof autoImports.processApplicationReleases
+  const processApplication: typeof autoImports.processApplication
+  const applicationCoverageLimits: typeof autoImports.applicationCoverageLimits
+  const validateApplicationRun: typeof autoImports.validateApplicationRun
+  const applicationRecordingJson: typeof autoImports.applicationRecordingJson
+  const parseApplicationRecording: typeof autoImports.parseApplicationRecording
+  const applicationEvidenceLimits: typeof autoImports.applicationEvidenceLimits
+  const writeApplicationDataset: typeof autoImports.writeApplicationDataset
+  const exampleApplicationConfig: typeof autoImports.exampleApplicationConfig
+  const applicationNeutralTailMs: typeof autoImports.applicationNeutralTailMs
+  const validateApplicationConfig: typeof autoImports.validateApplicationConfig
+  const planApplication: typeof autoImports.planApplication
+  const createApplicationPlant: typeof autoImports.createApplicationPlant
+  const applicationReportPreview: typeof autoImports.applicationReportPreview
+  const applicationRatePlot: typeof autoImports.applicationRatePlot
+  const simulateApplication: typeof autoImports.simulateApplication
+  const applicationScenarios: typeof autoImports.applicationScenarios
   const createAuthorityKernel: typeof autoImports.createAuthorityKernel
   const createAuthorityHarness: typeof autoImports.createAuthorityHarness
   const authorityScenarios: typeof autoImports.authorityScenarios

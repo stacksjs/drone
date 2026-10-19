@@ -48,6 +48,10 @@ import AgriculturePlan from '../app/Commands/AgriculturePlan'
 import AgricultureSimulate from '../app/Commands/AgricultureSimulate'
 import AgricultureProcess from '../app/Commands/AgricultureProcess'
 import AgricultureObserve from '../app/Commands/AgricultureObserve'
+import ApplicationPlan from '../app/Commands/ApplicationPlan'
+import ApplicationSimulate from '../app/Commands/ApplicationSimulate'
+import ApplicationProcess from '../app/Commands/ApplicationProcess'
+import ApplicationReplay from '../app/Commands/ApplicationReplay'
 
 const app = cli('drone')
 RuntimeBuild(app)
@@ -92,6 +96,10 @@ AgriculturePlan(app)
 AgricultureSimulate(app)
 AgricultureProcess(app)
 AgricultureObserve(app)
+ApplicationPlan(app)
+ApplicationSimulate(app)
+ApplicationProcess(app)
+ApplicationReplay(app)
 app.help()
 app.version('0.1.0')
 try { await app.parse(process.argv) }

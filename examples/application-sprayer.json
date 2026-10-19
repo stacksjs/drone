@@ -1,0 +1,124 @@
+{
+  "version": 1,
+  "id": "inert-sprayer",
+  "frame": "LOCAL_NED",
+  "origin": {
+    "latitudeDeg": 0,
+    "longitudeDeg": 0,
+    "ellipsoidHeightM": 100
+  },
+  "boundary": [
+    [
+      1,
+      -1
+    ],
+    [
+      6,
+      -1
+    ],
+    [
+      6,
+      1
+    ],
+    [
+      1,
+      1
+    ]
+  ],
+  "exclusions": [],
+  "prescription": [
+    {
+      "id": "field-rate",
+      "polygon": [
+        [
+          1,
+          -1
+        ],
+        [
+          6,
+          -1
+        ],
+        [
+          6,
+          1
+        ],
+        [
+          1,
+          1
+        ]
+      ],
+      "ratePerHa": 200
+    }
+  ],
+  "routeM": [
+    [
+      2,
+      0
+    ],
+    [
+      5,
+      0
+    ]
+  ],
+  "gridResolutionM": 0.5,
+  "material": {
+    "id": "inert-water",
+    "batch": "synthetic-batch",
+    "kind": "water",
+    "unit": "L",
+    "densityKgPerL": 1,
+    "initialAmount": 1
+  },
+  "implement": {
+    "type": "sprayer",
+    "swathM": 0.8,
+    "footprintLengthM": 0.4,
+    "fallTimeS": 0.1,
+    "minSpeedMps": 0.15,
+    "maxSpeedMps": 0.8
+  },
+  "calibration": {
+    "id": "synthetic-sprayer-meter",
+    "evidence": "synthetic",
+    "pulse": {
+      "pulses": 4000,
+      "litres": 2,
+      "durationMs": 120000
+    },
+    "scale": {
+      "tareRaw": 1000,
+      "loadedRaw": 11000,
+      "knownMassKg": 1
+    },
+    "minRatePerSecond": 0.001,
+    "maxRatePerSecond": 0.03,
+    "primaryCloseMs": 150,
+    "masterCloseMs": 100,
+    "energyTauMs": 80,
+    "noFlowTimeoutMs": 1000,
+    "closingAllowanceMs": 1000,
+    "encoderCounts": 1000
+  },
+  "weather": {
+    "windMps": [
+      0,
+      0
+    ],
+    "temperatureC": 20,
+    "humidityPercent": 60,
+    "inversion": false
+  },
+  "weatherLimits": {
+    "maxWindMps": 2,
+    "minTemperatureC": 5,
+    "maxTemperatureC": 35,
+    "minHumidityPercent": 30,
+    "maxAgeMs": 500
+  },
+  "localRequirements": {
+    "status": "unqualified",
+    "jurisdiction": null,
+    "operatorId": "declared-operator",
+    "evidenceLinks": []
+  }
+}

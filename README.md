@@ -63,6 +63,24 @@ view a clipped field/parcel sampling layer and record explicitly selected livest
 The numeric model is checked against pinned vendor panel-image extracts. Physical calibration,
 crop interpretation and animal identity remain unverified. Read [semantics and evidence](docs/agriculture.md).
 
+## Prescribed application
+
+Open `/application` to inspect an inert-water sprayer or inert-granule spreader on the owned
+ground runtime. Separate implement leases, quantized instruments, exclusion guards, independent
+shutdown probes and exact modeled dose/overlap accounting are implemented. Dry mode and no grant
+are the defaults; metered simulation requires both explicit selections.
+
+```sh
+./buddy application:plan examples/application-sprayer.json
+./buddy application:simulate --implement sprayer --mode apply --authorize-implement --output /tmp/new-application
+./buddy application:process /tmp/new-application/recording.json
+./buddy application:replay /tmp/new-application/recording.json
+```
+
+Material, calibration, weather and unqualified local requirements travel with private source-bound
+records. Physical calibration, field dose/drift, local authorization and HIL remain open in
+[#22](https://github.com/stacksjs/drone/issues/22). Read [application semantics and limits](docs/application.md).
+
 ## Camera tracking
 
 Open `/camera` after configuring a unique `DRONE_CAMERA_TOKEN` in your ignored `.env`. Choose
@@ -367,7 +385,8 @@ The current development split is the Stacks application on the Pi plus your chos
 autopilot on a dedicated Pixhawk. The accepted direction is to replace those firmware layers with
 our own implementation through the roadmap. You own the follow logic, behavior extensions, simulation, UI and integration code.
 This does not claim that flight-controller firmware, radio firmware, camera firmware, or board designs
-were authored here. The owned flight stack is planned in this repository; custom PCB design is not implemented.
+were authored here. Owned estimation, controls, authority and mission policy run in simulation;
+the native board kernel remains neutral-only. Custom PCB design is not implemented.
 
 ## Current boundaries
 
@@ -379,8 +398,12 @@ were authored here. The owned flight stack is planned in this repository; custom
   security boundary against another local process or a router forwarding to a physical vehicle.
 - Implemented camera path: Picamera2 IMX500 acquisition/inference extraction, bounded JPEG preview,
   TypeScript selected-person association, explicit loss/reselection and an optional visual motion guard.
-  The Pi hardware validation is pending. No metric visual localization, person re-identification,
-  obstacle avoidance, terrain following, automatic phone pairing, or flight-log persistence yet.
+  Calibrated range/pose-backed selected-point localization and fusion run in simulation; Pi camera,
+  depth, heading and physical field qualification remain pending. No automatic person re-identification
+  or phone pairing is claimed.
+- Owned multi-vehicle physics, raw-sensor estimation, supervised controls, missions, navigation,
+  diagnostic journals and domain workflows have explicit simulation evidence. Native board/HIL,
+  physical actuator control and whole-runtime restart acceptance remain separate roadmap gates.
 - Software envelope prediction assumes immediate ideal velocity response and a stationary target over
   its horizon. It does not model braking, wind, sensor error, moving obstacles, or aircraft dynamics.
 - A camera detecting a person does not establish who that person is or their GPS distance.

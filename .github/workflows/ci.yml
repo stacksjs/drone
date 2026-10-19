@@ -138,6 +138,22 @@ jobs:
         working-directory: ${{ runner.temp }}
       - run: $GITHUB_WORKSPACE/storage/runtime-build/cli/drone agriculture:simulate --scenario irradiance-loss
         working-directory: ${{ runner.temp }}
+      - run: $GITHUB_WORKSPACE/storage/runtime-build/cli/drone application:plan "$GITHUB_WORKSPACE/examples/application-sprayer.json"
+        working-directory: ${{ runner.temp }}
+      - run: $GITHUB_WORKSPACE/storage/runtime-build/cli/drone application:simulate
+        working-directory: ${{ runner.temp }}
+      - run: $GITHUB_WORKSPACE/storage/runtime-build/cli/drone application:simulate --mode apply --authorize-implement --output "$RUNNER_TEMP/application-sprayer"
+        working-directory: ${{ runner.temp }}
+      - run: $GITHUB_WORKSPACE/storage/runtime-build/cli/drone application:simulate --implement spreader --mode apply --authorize-implement --output "$RUNNER_TEMP/application-spreader"
+        working-directory: ${{ runner.temp }}
+      - run: $GITHUB_WORKSPACE/storage/runtime-build/cli/drone application:process "$RUNNER_TEMP/application-sprayer/recording.json" --output "$RUNNER_TEMP/application-reprocessed"
+        working-directory: ${{ runner.temp }}
+      - run: $GITHUB_WORKSPACE/storage/runtime-build/cli/drone application:replay "$RUNNER_TEMP/application-spreader/recording.json"
+        working-directory: ${{ runner.temp }}
+      - run: $GITHUB_WORKSPACE/storage/runtime-build/cli/drone application:simulate --mode apply --authorize-implement --scenario host-loss
+        working-directory: ${{ runner.temp }}
+      - run: $GITHUB_WORKSPACE/storage/runtime-build/cli/drone application:simulate --mode apply --authorize-implement --scenario master-stuck
+        working-directory: ${{ runner.temp }}
   firmware:
     runs-on: ubuntu-latest
     steps:

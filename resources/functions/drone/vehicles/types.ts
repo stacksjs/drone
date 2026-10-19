@@ -117,6 +117,6 @@ export interface VehicleProfile {
   scenarios: readonly string[]
   /** Allocate independent mutable state for each execution. Never reuse a session for another run. */
   createSession(): VehicleSession
-  /** Declared fault fixture. Undefined fields retain the nominal environment. */
-  faults(scenario: string, atMs: number): VehicleFaults
+  /** Declared fault fixture. Tail probes may preserve an active fault but must not invent a new host event. */
+  faults(scenario: string, atMs: number, phase?: 'host' | 'independent-tail'): VehicleFaults
 }

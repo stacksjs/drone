@@ -4,7 +4,7 @@ import type { VehicleProfile } from '../vehicles/types'
 import { createGroundSession, createGroundProfile } from '../vehicles/ground/profile'
 import { createGroundOdometry } from '../vehicles/ground/odometry'
 import { runVehicleSimulation } from '../vehicles/runtime'
-import { planApplication } from './planner'
+import { applicationNeutralTailMs, planApplication } from './planner'
 import { exampleApplicationConfig } from './fixtures'
 import { createApplicationController } from './controller'
 import { createApplicationPlant } from './plant'
@@ -16,6 +16,7 @@ export function simulateApplication(options: ApplicationOptions = {}): Applicati
   const authorizeImplement = options.authorizeImplement ?? false, testMode = options.testMode ?? true
   if (!applicationScenarios.includes(scenario) || !/^[a-z][a-z0-9-]{0,63}$/.test(visitId) || typeof authorizeImplement !== 'boolean' || typeof testMode !== 'boolean' || !Number.isSafeInteger(seconds) || seconds < 2 || seconds > 180) throw new RangeError('Invalid application options')
   const plan = planApplication(options.config ?? exampleApplicationConfig()), config = plan.config
+  const neutralTailMs = applicationNeutralTailMs(config)
   const inputs: ApplicationControllerInput[] = [], decisions: ApplicationDecision[] = [], probes: ApplicationProbe[] = [], releases: ApplicationRun['releases'] = []
   let plant: ApplicationPlant | null = null, faultAtMs: number | null = null, hostLossAtMs: number | null = null, faultInjected = false
   let lastTaskId: string | null = null, lastDecision: ApplicationDecision | null = null, shutdownAt: number | null = null
@@ -78,17 +79,18 @@ export function simulateApplication(options: ApplicationOptions = {}): Applicati
         },
       }
     },
-    faults(_name, atMs) {
-      if (scenario !== 'nominal' && faultAtMs === null && plant && plant.meterSnapshot().emittedAmount > .0015) faultAtMs = Math.ceil((atMs + 400) / 20) * 20
-      const active = activeFault(atMs)
-      if (active) faultInjected = true
+    // eslint-disable-next-line
+    faults(scenarioName, atMs, phase = 'host') {
+      if (phase === 'host' && scenario !== 'nominal' && faultAtMs === null && plant && plant.meterSnapshot().emittedAmount > .0015) faultAtMs = Math.ceil((atMs + 400) / 20) * 20
+      if (phase === 'host' && activeFault(atMs)) faultInjected = true
+      const active = faultInjected && activeFault(atMs)
       const plantFault = active && ['empty', 'stuck-valve', 'master-stuck', 'blocked-flow'].includes(scenario) ? scenario : null
       plant?.setFault(plantFault)
       if (scenario === 'host-loss' && active) { hostLossAtMs ??= atMs; shutdownAt ??= atMs }
       return { hostLost: scenario === 'host-loss' && active, rcOverride: scenario === 'manual' && active, dropPosition: scenario === 'localization-loss' && active }
     },
   }
-  const vehicle = runVehicleSimulation(profile, { scenario, seconds, neutralTailMs: 2000 })
+  const vehicle = runVehicleSimulation(profile, { scenario, seconds, neutralTailMs })
   const actualPlant = plant as ApplicationPlant | null
   if (!actualPlant || !lastProbe) throw new Error('Application simulation produced no independent plant state')
   const final = actualPlant.meterSnapshot(), probe = lastProbe as ApplicationProbe

@@ -221,5 +221,5 @@ test('opt-in independent tail preserves existing ground profiles and adds no hos
   expect(settled.path).toEqual(plain.path)
   expect(settled.trace).toEqual(plain.trace)
   expect(settled.board.actuators).toEqual([0, 0, 0, 1])
-  expect(() => runVehicleSimulation(createGroundProfile(), { seconds: 2, neutralTailMs: 6000 })).toThrow()
+  expect(() => runVehicleSimulation(createGroundProfile(), { seconds: 2, neutralTailMs: 15004 })).toThrow()
 })

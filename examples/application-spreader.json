@@ -1,0 +1,120 @@
+{
+  "version": 1,
+  "id": "inert-spreader",
+  "frame": "LOCAL_NED",
+  "origin": {
+    "latitudeDeg": 0,
+    "longitudeDeg": 0,
+    "ellipsoidHeightM": 100
+  },
+  "boundary": [
+    [
+      1,
+      -1
+    ],
+    [
+      6,
+      -1
+    ],
+    [
+      6,
+      1
+    ],
+    [
+      1,
+      1
+    ]
+  ],
+  "exclusions": [],
+  "prescription": [
+    {
+      "id": "field-rate",
+      "polygon": [
+        [
+          1,
+          -1
+        ],
+        [
+          6,
+          -1
+        ],
+        [
+          6,
+          1
+        ],
+        [
+          1,
+          1
+        ]
+      ],
+      "ratePerHa": 100
+    }
+  ],
+  "routeM": [
+    [
+      2,
+      0
+    ],
+    [
+      5,
+      0
+    ]
+  ],
+  "gridResolutionM": 0.5,
+  "material": {
+    "id": "inert-granules",
+    "batch": "synthetic-batch",
+    "kind": "inert-granules",
+    "unit": "kg",
+    "densityKgPerL": null,
+    "initialAmount": 1
+  },
+  "implement": {
+    "type": "spreader",
+    "swathM": 0.8,
+    "footprintLengthM": 0.4,
+    "fallTimeS": 0.1,
+    "minSpeedMps": 0.15,
+    "maxSpeedMps": 0.8
+  },
+  "calibration": {
+    "id": "synthetic-spreader-meter",
+    "evidence": "synthetic",
+    "pulse": null,
+    "scale": {
+      "tareRaw": 1000,
+      "loadedRaw": 11000,
+      "knownMassKg": 1
+    },
+    "minRatePerSecond": 0.0005,
+    "maxRatePerSecond": 0.015,
+    "primaryCloseMs": 150,
+    "masterCloseMs": 100,
+    "energyTauMs": 80,
+    "noFlowTimeoutMs": 1000,
+    "closingAllowanceMs": 1000,
+    "encoderCounts": 1000
+  },
+  "weather": {
+    "windMps": [
+      0,
+      0
+    ],
+    "temperatureC": 20,
+    "humidityPercent": 60,
+    "inversion": false
+  },
+  "weatherLimits": {
+    "maxWindMps": 2,
+    "minTemperatureC": 5,
+    "maxTemperatureC": 35,
+    "minHumidityPercent": 30,
+    "maxAgeMs": 500
+  },
+  "localRequirements": {
+    "status": "unqualified",
+    "jurisdiction": null,
+    "operatorId": "declared-operator",
+    "evidenceLinks": []
+  }
+}
