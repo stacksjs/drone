@@ -109,6 +109,9 @@ function retain(slot: ExecutionSlot): void {
     slot.recording = null; slot.completion = null; slot.latestEvent = null; slot.candidate = null
     dispose(slot)
   }, Math.max(1, slot.metadataDeadline - Date.now()))
+  // Volatile metadata expires while the server is alive; it does not keep an
+  // otherwise finished process alive or promise recovery after process loss.
+  slot.retentionTimer.unref()
 }
 function stop(slot: ExecutionSlot, reason: Exclude<ExecutionReason, null>, target: 'canceled' | 'failed' = 'canceled'): void {
   if (!active(slot)) return
@@ -168,7 +171,14 @@ function pump(slot: ExecutionSlot): void {
     slot.phase = 'running'; slot.latestEvent = event
     const delivered = await deliver(slot, subscriber)
     if (!delivered && active(slot) && slot.generation === generation && sameSubscriber(slot, subscriber)) { stop(slot, 'consumer-failed', 'failed'); return }
-    if (!active(slot) || slot.generation !== generation || !sameSubscriber(slot, subscriber) || Date.now() >= deadline(slot)) return
+    if (!active(slot) || slot.generation !== generation || !sameSubscriber(slot, subscriber)) return
+    // An asynchronous observer can outlive its pre-delivery authority. Re-enter
+    // both captured contexts after it settles, before releasing another credit.
+    const ownerCredit = await checkExecutionAuthority(owner, slot.binding.scope, slot.binding)
+    const subscriberCredit = await checkExecutionAuthority(subscriber.context, slot.binding.scope, slot.binding)
+    if (!active(slot) || slot.generation !== generation || !sameSubscriber(slot, subscriber)) return
+    slot.binding.authorityUntil = Math.min(slot.binding.authorityUntil, ownerCredit.deadline, subscriberCredit.deadline)
+    if (Date.now() >= deadline(slot)) { stop(slot, 'deadline-expired'); return }
     // Clear parent ownership before granting exactly this actual callback's credit.
     slot.lastSequence = event.sequence; slot.pendingEvent = null; slot.processing = false
     Atomics.store(slot.control, words.credit, event.sequence); Atomics.notify(slot.control, words.credit)
