@@ -48,20 +48,25 @@ try {
     ['public_safety_observations', 'uncertainty_note', observation.id],
     ['public_safety_reviews', 'note', review.id],
     ['public_safety_audits', 'details_json', audit.id],
+    ['public_safety_audits', 'handover_key', audit.id],
+    ['public_safety_audits', 'handover_step', audit.id],
+    ['public_safety_audits', 'handover_assignment_version', audit.id],
+    ['public_safety_audits', 'request_id', audit.id],
+    ['public_safety_audits', 'request_digest', audit.id],
   ] as const
   for (const [index, [table, field, id]] of targets.entries()) {
-    const successful = `Private diagnostic success surface ${index} fixture words`
-    const failed = `Private diagnostic failure surface ${index} fixture words`
-    canaries.push(successful, failed)
+    const successful = field === 'handover_step' ? 'offer' : field === 'handover_assignment_version' ? 1837491336 : `Private diagnostic success surface ${index} fixture words`
+    const failed = field === 'handover_step' ? 'terminal' : field === 'handover_assignment_version' ? 1837491337 : `Private diagnostic failure surface ${index} fixture words`
+    canaries.push(String(successful), String(failed))
     // Also exercise the explicit qualified-column fallback against the native SQL/value scanner.
     const fallback = persistQueryLogValues(`UPDATE ${table} SET ${field} = ? WHERE id = ?`, [failed, id], `Driver reflected ${failed}`, { captureValues: true, sensitiveColumns: config.database.queryLogging?.sensitiveColumns })
     assert.deepEqual(JSON.parse(fallback.bindings), ['<redacted>', id])
-    assert(!fallback.error?.includes(failed))
+    assert(!fallback.error?.includes(String(failed)))
     // The real SQLite driver reflects the failed bound value in its error.
     // The trigger is solely a fixture fault and is confined to this generated private schema.
-    await db.unsafe(`CREATE TRIGGER diagnostic_failure_${index} BEFORE UPDATE OF ${field} ON ${table} WHEN NEW.${field} = '${failed}' BEGIN SELECT RAISE(ABORT, '${failed}'); END`).execute()
+    await db.unsafe(`CREATE TRIGGER diagnostic_failure_${index} BEFORE UPDATE OF ${field} ON ${table} WHEN CAST(NEW.${field} AS TEXT) = '${failed}' BEGIN SELECT RAISE(ABORT, '${failed}'); END`).execute()
     await db.updateTable(table).set({ [field]: successful }).where('id', '=', id).execute()
-    await assert.rejects(() => db.updateTable(table.toUpperCase()).set({ [field]: failed }).where('id', '=', id).execute(), error => error instanceof Error && error.message.includes(failed))
+    await assert.rejects(() => db.updateTable(table.toUpperCase()).set({ [field]: failed }).where('id', '=', id).execute(), error => error instanceof Error && error.message.includes(String(failed)), `actual reflected driver failure required for ${field}`)
     const row = await db.primary.selectFrom(table).select(field).where('id', '=', id).executeTakeFirst()
     assert.equal(row?.[field], successful)
   }
