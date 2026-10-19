@@ -62,10 +62,14 @@ async function observeAnimal() {
   const current = run(), selected = frame(), context = epoch()
   if (!current || !selected || busy() || binding()) return
   if (observations().length >= 64) { error.set('This session has reached its 64 observation limit'); return }
+  const submitted = { animalId: animalId(), observerId: observerId(), pixelX: pixelX(), pixelY: pixelY(), note: note() }
   binding.set(true); error.set('')
   try {
-    const observation = await createLivestockObservation(current, { id: `observation-${observations().length + 1}`, animalId: animalId(), captureId: selected.captureId, pixel: [Number(pixelX()), Number(pixelY())], observerId: observerId(), observedAt: new Date().toISOString(), note: note() })
-    if (epoch() === context) { observations.update(items => [...items, observation]); note.set('') }
+    const observation = await createLivestockObservation(current, { id: `observation-${observations().length + 1}`, animalId: submitted.animalId, captureId: selected.captureId, pixel: [Number(submitted.pixelX), Number(submitted.pixelY)], observerId: submitted.observerId, observedAt: new Date().toISOString(), note: submitted.note })
+    if (epoch() === context) {
+      observations.update(items => [...items, observation])
+      if (captureId() === selected.captureId && animalId() === submitted.animalId && observerId() === submitted.observerId && pixelX() === submitted.pixelX && pixelY() === submitted.pixelY && note() === submitted.note) note.set('')
+    }
   }
   catch (failure) { if (epoch() === context) error.set(failure instanceof Error ? failure.message : 'Observation failed') }
   finally { if (epoch() === context) binding.set(false) }
