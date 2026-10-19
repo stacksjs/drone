@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict'
-import { randomUUID } from 'node:crypto'
+import { randomUUID, createHash } from 'node:crypto'
 import { actor, as, seed, database, managed, records, retention, access, status } from './managed-context'
+import { publicSafetyRecordingData } from '../../../resources/functions/drone/public-safety/evidence'
 import { simulatePublicSafety } from '../../../resources/functions/drone/public-safety/runtime'
 const purge = await import('../../../resources/functions/drone/public-safety/purge/service')
 const { purgeAbilities, purgePolicy, purgeCoverage, purgeExclusions } = await import('../../../resources/functions/drone/public-safety/purge/types')
@@ -19,7 +20,7 @@ try {
     const capture = fixture.run.survey.captures[0]!, support = fixture.run.captures[0]!.support.findIndex(value => value === 1)
     const observationBody = { expectedVersion: 4, sourceDigest: fixture.source.digest, captureId: capture.id, modality: 'visible' as const, pixel: { x: support % capture.width, y: Math.floor(support / capture.width) }, note: 'private-mixed-observation', uncertaintyNote: 'private-mixed-uncertainty' }
     const observation = await records.appendPublicSafetyObservation(key, observationBody)
-    await records.appendPublicSafetyReview(key, observation.observation.id, { expectedVersion: 5, sourceDigest: fixture.source.digest, previousReviewId: null, disposition: 'unresolved', note: 'private-mixed-review' })
+    const reviewed = await records.appendPublicSafetyReview(key, observation.observation.id, { expectedVersion: 5, sourceDigest: fixture.source.digest, previousReviewId: null, disposition: 'unresolved', note: 'private-mixed-review' })
     await access.changePublicSafetyMembership(key, { expectedVersion: 6, userId: observer.user.id, role: 'observer' })
     await managed.createPublicSafetyManagedDataset(key, { ...fixture.body, expectedVersion: 7 })
     await retention.reviewPublicSafetyRetentionHold(key, { expectedRetentionVersion: 1, decision: 'retain', caseReference: 'controlled-mixed-hold', reviewDueAt: new Date(Date.now() + 86400000).toISOString(), requestId: randomUUID() })
@@ -31,15 +32,17 @@ try {
     await retention.reviewPublicSafetyRetentionHold(key, { expectedRetentionVersion: 2, decision: 'release', caseReference: 'controlled-mixed-release', reviewDueAt: null, requestId: randomUUID() })
     const fresh = await purge.previewPublicSafetyPurge(key); assert.equal(fresh.eligibility, 'eligible'); assert.notEqual(fresh.inventoryDigest, original.inventoryDigest)
     assert.equal(fresh.counts.sources, 2); assert.equal(fresh.counts.observations, 1); assert.equal(fresh.counts.reviews, 1); assert.equal(fresh.counts.nonCustodyMemberships, 1); assert.equal(fresh.counts.managedArtifacts, 1)
+    const distinctRecording = simulatePublicSafety({ config: fixture.config, seconds: 12 }), distinctDigest = createHash('sha256').update(publicSafetyRecordingData(distinctRecording)).digest('hex')
+    assert(![fixture.source.digest, source.source.digest].includes(distinctDigest))
     const accepted = await purge.acceptPublicSafetyPurge(key, consent(fresh)), tables = ['public_safety_sources', 'public_safety_observations', 'public_safety_reviews', 'public_safety_incident_members', 'public_safety_managed_artifacts', 'public_safety_retention_scopes']
     const before = await Promise.all(tables.map(table => database.db.primary.selectFrom(table).selectAll().execute())), originalNow = Date.now
     try {
       // Isolate accepted freeze from content expiry with an explicitly controlled local wall-clock rollback.
       Date.now = () => admittedAt
       const expectedVersion = accepted.purge.incidentVersion
-      await assert.rejects(() => records.registerPublicSafetySource(key, { expectedVersion, recording: fixture.run }), status(409))
+      await assert.rejects(() => records.registerPublicSafetySource(key, { expectedVersion, recording: distinctRecording }), status(409))
       await assert.rejects(() => records.appendPublicSafetyObservation(key, { ...observationBody, expectedVersion }), status(409))
-      await assert.rejects(() => records.appendPublicSafetyReview(key, observation.observation.id, { expectedVersion, sourceDigest: fixture.source.digest, previousReviewId: 1, disposition: 'unresolved', note: 'blocked-after-freeze' }), status(409))
+      await assert.rejects(() => records.appendPublicSafetyReview(key, observation.observation.id, { expectedVersion, sourceDigest: fixture.source.digest, previousReviewId: reviewed.review.id, disposition: 'unresolved', note: 'blocked-after-freeze' }), status(409))
       await assert.rejects(() => access.changePublicSafetyMembership(key, { expectedVersion, userId: observer.user.id, role: 'pilot' }), status(409))
       await assert.rejects(() => managed.createPublicSafetyManagedDataset(key, { ...fixture.body, expectedVersion, expectedRetentionVersion: accepted.purge.retentionVersion, requestId: randomUUID() }), status(409))
       await assert.rejects(() => retention.reviewPublicSafetyRetentionHold(key, { expectedRetentionVersion: accepted.purge.retentionVersion, decision: 'retain', caseReference: 'blocked-after-freeze', reviewDueAt: new Date(Date.now() + 86400000).toISOString(), requestId: randomUUID() }), status(409))
