@@ -28,12 +28,12 @@ export async function setupHandoverFixture() {
   for (const user of [sender, recipient]) await Rbac.givePermission(user.id, 'public-safety:create', 'web')
   const credential = async (userId: number, scopes = ['public-safety:read', 'public-safety:coordinate']) => (await tokens.createToken(userId, 'handover fixture', scopes, { withRefreshToken: false })).plainTextToken
   const senderToken = await credential(sender.id), recipientToken = await credential(recipient.id), unrelatedToken = await credential(unrelated.id)
-  const seed = async (key: string) => as(senderToken, async () => {
+  const seed = async (key: string, lifetime = 86400000) => as(senderToken, async () => {
     const config = examplePublicSafetyConfig()
     config.id = key
     config.revision = 'r1'
     config.visitId = 'v1'
-    config.retention.expiresAt = new Date(Date.now() + 86400000).toISOString()
+    config.retention.expiresAt = new Date(Date.now() + lifetime).toISOString()
     await access.createPublicSafetyIncident({ config })
     await access.changePublicSafetyMembership(key, { expectedVersion: 1, userId: recipient.id, role: 'reviewer' })
     await access.changePublicSafetyMembership(key, { expectedVersion: 2, userId: unrelated.id, role: 'observer' })

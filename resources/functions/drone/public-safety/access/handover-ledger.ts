@@ -4,7 +4,7 @@ import type { HandoverAcknowledgement, HandoverEvent, HandoverNewerContext, Hand
 import type { HandoverReader } from './handover-policy'
 import { createHash } from 'node:crypto'
 import { types } from 'node:util'
-import { asRow } from '@stacksjs/database/runtime'
+import { asRow, asRows, sql } from '@stacksjs/database/runtime'
 import { exactRecord, maximumVersion } from './mutations'
 import { PublicSafetyAccessError } from './errors'
 
@@ -139,11 +139,45 @@ export function eventProjection(row: HandoverAuditRow, facts: OfferFacts): Hando
   }
   catch { return handoverConflict() }
 }
+async function correlatedRows(tx: HandoverReader, incidentId: number, key: string): Promise<HandoverAuditRow[]> {
+  const rows = asRows<HandoverAuditRow>(await tx.selectFrom(handoverTable).selectAll().where('incident_id', '=', incidentId).where('handover_key', '=', key).orderBy('sequence', 'asc').limit(3).execute())
+  if (rows.length > 2) handoverConflict()
+  try { for (const row of rows) validateRow(row) }
+  catch { handoverConflict() }
+  return rows
+}
 export async function findOffer(tx: HandoverReader, incidentId: number, key: string): Promise<HandoverAuditRow> {
-  return asRow<HandoverAuditRow>(await tx.selectFrom(handoverTable).selectAll().where('incident_id', '=', incidentId).where('handover_key', '=', key).where('handover_step', '=', 'offer').executeTakeFirst()) ?? handoverUnavailable()
+  const rows = await correlatedRows(tx, incidentId, key)
+  if (!rows.length) handoverUnavailable()
+  const offers = rows.filter(row => row.handover_step === 'offer')
+  if (offers.length !== 1) handoverConflict()
+  return offers[0]!
 }
 export async function terminalFor(tx: HandoverReader, incidentId: number, key: string): Promise<HandoverAuditRow | undefined> {
-  return asRow<HandoverAuditRow>(await tx.selectFrom(handoverTable).selectAll().where('incident_id', '=', incidentId).where('handover_key', '=', key).where('handover_step', '=', 'terminal').executeTakeFirst())
+  const rows = await correlatedRows(tx, incidentId, key)
+  const terminal = rows.find(row => row.handover_step === 'terminal')
+  if (terminal) return terminal
+  const offer = rows.find(row => row.handover_step === 'offer') ?? handoverConflict()
+  // A damaged terminal lookup must not turn a resolved offer back into pending.
+  // This native existence check constrains the incident and offered sequence tail,
+  // returns one identifier and never replays audit payloads.
+  // CASE protects JSON extraction from malformed persisted JSON on either side.
+  const orphan = await tx.selectFrom(handoverTable).select('id').where('incident_id', '=', incidentId).where('sequence', '>', offer.sequence).where('action', 'in', ['handover-accepted', 'handover-declined', 'handover-canceled']).whereRaw(sql`
+    (handover_key IS NULL OR handover_step IS NULL OR handover_step <> 'terminal'
+    OR handover_assignment_version IS NULL OR request_id IS NULL OR request_digest IS NULL
+    OR NOT EXISTS (
+      SELECT 1 FROM public_safety_audits AS protocol_offer
+      WHERE protocol_offer.incident_id = public_safety_audits.incident_id
+        AND protocol_offer.handover_key = public_safety_audits.handover_key
+        AND protocol_offer.handover_step = 'offer' AND protocol_offer.action = 'handover-offered'
+        AND protocol_offer.handover_assignment_version = public_safety_audits.handover_assignment_version
+        AND CASE WHEN json_valid(protocol_offer.details_json) AND json_valid(public_safety_audits.details_json)
+          THEN json_extract(protocol_offer.details_json, '$.offerDigest') = json_extract(public_safety_audits.details_json, '$.offerDigest')
+          ELSE 0 END
+    ))
+  `).limit(1).executeTakeFirst()
+  if (orphan) handoverConflict()
+  return undefined
 }
 export async function appendHandoverAudit(tx: TransactionHandle, input: Omit<HandoverAuditRow, 'id' | 'details_json'>, details: OfferFacts & { offerDigest: string } | TerminalFacts) {
   const encoded = JSON.stringify(details)
