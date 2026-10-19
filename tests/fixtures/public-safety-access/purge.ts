@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import { randomUUID } from 'node:crypto'
-import { existsSync, readFileSync, readdirSync, writeFileSync, mkdirSync, rmdirSync } from 'node:fs'
+import { existsSync, readFileSync, readdirSync, writeFileSync, mkdirSync } from 'node:fs'
 import { join } from 'node:path'
 import { actor, as, seed, database, root, retention, records, managed, access, status } from './managed-context'
 import { purgeAbilities, purgeCoverage, purgeExclusions, purgePolicy } from '../../../resources/functions/drone/public-safety/purge/types'
@@ -57,17 +57,17 @@ try {
       finally { reader.kill('SIGTERM'); await reader.exited }
       let state = await purge.readPublicSafetyPurge('purge-tracer', accepted.purge.purgeKey)
       await purge.retryPublicSafetyPurge('purge-tracer', state.purgeKey, { expectedPurgeVersion: state.version, expectedRetentionVersion: state.retentionVersion, requestId: randomUUID() })
-      const foreign = join(root, 'foreign-mount-sentinel'), target = join(tree, 'mounted-fixture')
-      mkdirSync(foreign, { mode: 0o700 }); mkdirSync(target, { mode: 0o700 }); writeFileSync(join(foreign, 'sentinel'), 'foreign-mount-fragment')
-      const mounted = Bun.spawnSync(['mount', '--bind', foreign, target], { stdout: 'pipe', stderr: 'pipe' })
+      const foreign = join(root, 'foreign-mount-sentinel'), target = join(tree, 'images')
+      mkdirSync(foreign, { mode: 0o700 }); writeFileSync(join(foreign, 'sentinel'), 'foreign-mount-fragment')
+      const mounted = Bun.spawnSync(['mount', '--bind', target, target], { stdout: 'pipe', stderr: 'pipe' })
       assert.equal(mounted.exitCode, 0, mounted.stderr.toString())
       try {
         assert.equal(inspectTemporaryWorkspace(tree).reason, 'mounted')
         await job.dispatchNow({ purgeKey: state.purgeKey }); state = await purge.readPublicSafetyPurge('purge-tracer', state.purgeKey)
-        assert.equal(state.state, 'blocked'); assert.equal(state.completed.namesUnlinked, 0)
+        assert.equal(state.state, 'blocked'); assert.equal(state.outcomeCode, 'inspection-unavailable'); assert.equal(state.completed.namesUnlinked, 0)
         assert.equal(readFileSync(join(foreign, 'sentinel'), 'utf8'), 'foreign-mount-fragment')
       }
-      finally { const unmounted = Bun.spawnSync(['umount', target], { stdout: 'pipe', stderr: 'pipe' }); assert.equal(unmounted.exitCode, 0, unmounted.stderr.toString()); rmdirSync(target) }
+      finally { const unmounted = Bun.spawnSync(['umount', target], { stdout: 'pipe', stderr: 'pipe' }); assert.equal(unmounted.exitCode, 0, unmounted.stderr.toString()) }
       await purge.retryPublicSafetyPurge('purge-tracer', state.purgeKey, { expectedPurgeVersion: state.version, expectedRetentionVersion: state.retentionVersion, requestId: randomUUID() })
       console.log('PASS actual namespace process reference and bind mount preserve accepted files before positive execution')
     }

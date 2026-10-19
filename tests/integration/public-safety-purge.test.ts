@@ -1,10 +1,12 @@
 import { expect, test } from 'bun:test'
+import { readFileSync, readlinkSync } from 'node:fs'
 import { mkdtemp, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
+import { qualifyPurgeProcessRecovery } from '../helpers/public-safety-purge-process'
 // Run explicitly in the real privileged PID/proc/mount namespace. An ordinary-suite skip is unqualified, never positive removal evidence.
 test.skipIf(process.env.PUBLIC_SAFETY_PURGE_NAMESPACE_TEST !== '1')('accepted purge qualifies real process references, mounts and positive namespace removal', async () => {
-  expect(process.platform).toBe('linux')
+  requireQualifiedNamespace()
   const root = await mkdtemp(join(tmpdir(), 'drone-incident-access-purge-namespace-'))
   let child: ReturnType<typeof Bun.spawn> | undefined
   try {
@@ -20,4 +22,16 @@ test.skipIf(process.env.PUBLIC_SAFETY_PURGE_NAMESPACE_TEST !== '1')('accepted pu
     expect(stdout).toContain('PASS actual native Job purge removes accepted files')
   }
   finally { if (child && child.exitCode === null) { child.kill('SIGKILL'); await child.exited }; await rm(root, { recursive: true, force: true }) }
+}, 180000)
+
+function requireQualifiedNamespace(): void {
+  expect(process.platform).toBe('linux')
+  expect(process.pid).toBe(1)
+  expect(readlinkSync('/proc/self/ns/pid')).toBe(readlinkSync('/proc/1/ns/pid'))
+  expect(/^NSpid:\s+1\s*$/m.test(readFileSync('/proc/self/status', 'utf8'))).toBe(true)
+}
+
+test.skipIf(process.env.PUBLIC_SAFETY_PURGE_NAMESPACE_TEST !== '1')('accepted purge recovers genuine SIGKILL after namespace unlink', async () => {
+  requireQualifiedNamespace()
+  await qualifyPurgeProcessRecovery()
 }, 180000)
