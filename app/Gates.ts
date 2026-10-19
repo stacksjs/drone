@@ -1,3 +1,4 @@
+import { publicSafetyHandoverGate } from '../resources/functions/drone/public-safety/access/handover-policy'
 import { publicSafetyRetentionGate } from '../resources/functions/drone/public-safety/retention/policy'
 import { publicSafetyManagedGate } from '../resources/functions/drone/public-safety/managed/policy'
 import { publicSafetyPurgeGate } from '../resources/functions/drone/public-safety/purge/policy'
@@ -32,6 +33,8 @@ export default defineGates({
    * }
    */
   gates: {
+    'public-safety:handover-read': (user, key: string) => publicSafetyHandoverGate(user, key, 'read'),
+    'public-safety:handover-write': (user, key: string) => publicSafetyHandoverGate(user, key, 'write'),
     'public-safety:purge-preview': (user, key: string) => publicSafetyPurgeGate(user, key, 'preview'),
     'public-safety:purge-accept': (user, key: string) => publicSafetyPurgeGate(user, key, 'accept'),
     'public-safety:purge-read': (user, key: string) => publicSafetyPurgeGate(user, key, 'read'),

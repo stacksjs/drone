@@ -8,6 +8,9 @@ import PublicSafetyIncidentRead from '../app/Actions/PublicSafetyIncidentRead'
 import PublicSafetyIncidentMembership from '../app/Actions/PublicSafetyIncidentMembership'
 import PublicSafetyIncidentClose from '../app/Actions/PublicSafetyIncidentClose'
 import PublicSafetyIncidentAudit from '../app/Actions/PublicSafetyIncidentAudit'
+import PublicSafetyHandoverDesk from '../app/Actions/PublicSafetyHandoverDesk'
+import PublicSafetyHandoverOffer from '../app/Actions/PublicSafetyHandoverOffer'
+import PublicSafetyHandoverDecision from '../app/Actions/PublicSafetyHandoverDecision'
 import PublicSafetySourceRegister from '../app/Actions/PublicSafetySourceRegister'
 import PublicSafetySourceRead from '../app/Actions/PublicSafetySourceRead'
 import PublicSafetySourceList from '../app/Actions/PublicSafetySourceList'
@@ -50,6 +53,9 @@ route.get('/public-safety/incidents/{incident}', PublicSafetyIncidentRead).middl
 route.put('/public-safety/incidents/{incident}/members', PublicSafetyIncidentMembership).middleware('auth').parseBody(false)
 route.post('/public-safety/incidents/{incident}/close', PublicSafetyIncidentClose).middleware('auth').parseBody(false)
 route.get('/public-safety/incidents/{incident}/audit', PublicSafetyIncidentAudit).middleware('auth')
+route.get('/public-safety/incidents/{incident}/handover', PublicSafetyHandoverDesk).middleware('auth')
+route.post('/public-safety/incidents/{incident}/handover/offer', PublicSafetyHandoverOffer).middleware('auth').parseBody(false)
+route.post('/public-safety/incidents/{incident}/handover/decision', PublicSafetyHandoverDecision).middleware('auth').parseBody(false)
 route.post('/public-safety/incidents/{incident}/sources', PublicSafetySourceRegister).middleware('auth').parseBody(false)
 route.get('/public-safety/incidents/{incident}/sources/{digest}', PublicSafetySourceRead).middleware('auth')
 route.get('/public-safety/incidents/{incident}/sources', PublicSafetySourceList).middleware('auth')
