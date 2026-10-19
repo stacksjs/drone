@@ -97,3 +97,28 @@ test('accepted purge refuses foreign parent, foreign child and self-parent revie
   expect(code, `${stdout}\n${stderr}`).toBe(0)
   for (const kind of ['foreign-parent', 'foreign-child', 'self-parent', 'review-owner', 'observation-owner']) expect(stdout).toContain(`PASS actual controlled ${kind} review relation`)
 }, 180000)
+
+for (const stage of ['aliases-before-result-commit', 'directory-before-result-commit'] as const) {
+  test.skipIf(process.platform !== 'darwin' && process.env.PUBLIC_SAFETY_PURGE_NAMESPACE_TEST !== '1')(`accepted purge resumes genuine process death at ${stage}`, async () => {
+    await qualifyPurgeProcessRecovery(stage)
+  }, 180000)
+}
+
+for (const stage of ['held-claim', 'stale-read'] as const) {
+  test.skipIf(process.platform !== 'darwin' && process.env.PUBLIC_SAFETY_PURGE_NAMESPACE_TEST !== '1')(`accepted purge serializes actual independent executors at ${stage}`, async () => {
+    const { qualifyPurgeExecutorRace } = await import('../helpers/public-safety-purge-race')
+    await qualifyPurgeExecutorRace(stage)
+  }, 180000)
+}
+
+test.skipIf(process.platform !== 'darwin' && process.env.PUBLIC_SAFETY_PURGE_NAMESPACE_TEST !== '1')('accepted purge validates sealed totals before metadata retirement', async () => {
+  const { runPurgeQualificationFixture } = await import('../helpers/public-safety-purge-fixture')
+  const { code, stdout, stderr } = await runPurgeQualificationFixture('purge-seal', 165000)
+  expect(code, `${stdout}\n${stderr}`).toBe(0)
+  expect(stdout).toContain('PASS actual minimized seal mismatch blocks metadata retirement')
+}, 180000)
+
+test.skipIf(process.platform !== 'darwin' && process.env.PUBLIC_SAFETY_PURGE_NAMESPACE_TEST !== '1')('accepted purge freezes an actual stopped live B writer across clock rollback', async () => {
+  const { qualifyPurgeStoppedWriter } = await import('../helpers/public-safety-purge-writer')
+  await qualifyPurgeStoppedWriter()
+}, 180000)

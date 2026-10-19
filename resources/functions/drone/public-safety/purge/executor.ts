@@ -186,6 +186,7 @@ async function minimize(tx: TransactionHandle, context: Context, maxRows: number
     await recordStep(tx, context, 'minimize', zeroPurgeProgress(), { state: 'minimizing', fs_state: 'complete', db_state: 'complete', sealed_totals_json: JSON.stringify({ inventoryDigest: row.frozen_inventory_digest, planned: JSON.parse(row.frozen_counts_json), completed: JSON.parse(row.progress_counts_json) }) })
     return
   }
+  if (row.sealed_totals_json !== JSON.stringify({ inventoryDigest: row.frozen_inventory_digest, planned: JSON.parse(row.frozen_counts_json), completed: JSON.parse(row.progress_counts_json) })) purgeConflict()
   const artifacts = asRows<{ id: number }>(await tx.selectFrom('public_safety_managed_artifacts').select('id').where('incident_id', '=', context.incident.id).orderBy('id', 'asc').limit(1).execute())
   if (artifacts.length) {
     const id = artifacts[0]!.id

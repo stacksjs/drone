@@ -90,3 +90,32 @@ test.skipIf(process.env.PUBLIC_SAFETY_PURGE_NAMESPACE_TEST !== '1')('accepted pu
   expect(code, `${stdout}\n${stderr}`).toBe(0)
   for (const kind of ['foreign-parent', 'foreign-child', 'self-parent', 'review-owner', 'observation-owner']) expect(stdout).toContain(`PASS actual controlled ${kind} review relation`)
 }, 180000)
+
+for (const stage of ['aliases-before-result-commit', 'directory-before-result-commit'] as const) {
+  test.skipIf(process.env.PUBLIC_SAFETY_PURGE_NAMESPACE_TEST !== '1')(`accepted purge qualifies real namespace death at ${stage}`, async () => {
+    requireQualifiedNamespace()
+    await qualifyPurgeProcessRecovery(stage)
+  }, 180000)
+}
+
+for (const stage of ['held-claim', 'stale-read'] as const) {
+  test.skipIf(process.env.PUBLIC_SAFETY_PURGE_NAMESPACE_TEST !== '1')(`accepted purge qualifies independent namespace executors at ${stage}`, async () => {
+    requireQualifiedNamespace()
+    const { qualifyPurgeExecutorRace } = await import('../helpers/public-safety-purge-race')
+    await qualifyPurgeExecutorRace(stage)
+  }, 180000)
+}
+
+test.skipIf(process.env.PUBLIC_SAFETY_PURGE_NAMESPACE_TEST !== '1')('accepted purge qualifies sealed totals before namespace metadata retirement', async () => {
+  requireQualifiedNamespace()
+  const { runPurgeQualificationFixture } = await import('../helpers/public-safety-purge-fixture')
+  const { code, stdout, stderr } = await runPurgeQualificationFixture('purge-seal', 165000)
+  expect(code, `${stdout}\n${stderr}`).toBe(0)
+  expect(stdout).toContain('PASS actual minimized seal mismatch blocks metadata retirement')
+}, 180000)
+
+test.skipIf(process.env.PUBLIC_SAFETY_PURGE_NAMESPACE_TEST !== '1')('accepted purge qualifies frozen stopped B writer in real namespace', async () => {
+  requireQualifiedNamespace()
+  const { qualifyPurgeStoppedWriter } = await import('../helpers/public-safety-purge-writer')
+  await qualifyPurgeStoppedWriter()
+}, 180000)
