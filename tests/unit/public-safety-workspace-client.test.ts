@@ -199,3 +199,63 @@ test('ordinary refresh and stream renewal preserve drafts while changed viewer a
   }
   finally { model.close() }
 })
+
+test('review drafts cannot move to another original or a different review head, including a pending target switch', async () => {
+  let events!: BroadcastStreamClientOptions, writes = 0, head: number | null = null
+  const data = snapshot(), digest = 'a'.repeat(64)
+  data.selected = { source: { digest } } as unknown as WorkspaceSnapshot['selected']
+  data.actions.canReview = true
+  let release: (() => void) | undefined
+  const model = openIncidentWorkspace({ request: async (path, init) => {
+    if (init?.method === 'POST') { writes++; return Response.json({}) }
+    if (path.endsWith('/observations/2')) await new Promise<void>(resolve => { release = resolve })
+    if (/\/observations\/\d+\/reviews\?/.test(path)) return Response.json({ entries: head === null ? [] : [{ id: head }], cursor: head ?? 0, hasMore: false })
+    const match = path.match(/\/observations\/(\d+)$/)
+    if (match) return Response.json({ id: Number(match[1]), sourceDigest: digest, note: `Original ${match[1]}`, uncertaintyNote: 'Original uncertainty' })
+    return Response.json(data)
+  }, stream: options => { events = options; return { close() {} } }, refreshMs: 60000 })
+  try {
+    model.connect('incident-a', 'private'); events.onConnected?.(); await settle()
+    await model.loadReviews(1)
+    const original = model.reviewBinding()!, draft = { disposition: 'unresolved' as const, note: 'Draft for original one' }
+    const pendingSwitch = model.loadReviews(2)
+    expect(model.get().reviewTarget).toBe(2)
+    expect(model.get().reviews).toBeNull()
+    expect(await model.review(draft, original)).toBe(false)
+    release!(); await pendingSwitch
+    expect(await model.review(draft, original)).toBe(false)
+    expect(writes).toBe(0)
+    expect(model.get().confirmationRequired).toBe(true)
+    model.confirmCurrentContext()
+    const second = model.reviewBinding()!
+    head = 9
+    const nextPage = model.loadReviews(2, 5); release!(); await nextPage
+    // Repeat without delayed transport: the same-target page returns the current head.
+    expect(model.get().reviewTarget).toBe(2)
+    expect(await model.review(draft, second)).toBe(false)
+    expect(writes).toBe(0)
+  }
+  finally { release?.(); model.close() }
+})
+
+test('an expired scope-bound context cursor fails closed without repeated stale reads', async () => {
+  let events!: BroadcastStreamClientOptions, reads = 0
+  const data = snapshot()
+  data.selected = { source: { digest: 'a'.repeat(64) }, cursor: 'prior-process-signed-cursor', hasMore: true } as unknown as WorkspaceSnapshot['selected']
+  const model = openIncidentWorkspace({ request: async path => { reads++; return path.includes('contextCursor=') ? Response.json({ error: 'Invalid context cursor' }, { status: 422 }) : Response.json(data) }, stream: options => { events = options; return { close() {} } }, refreshMs: 60000 })
+  try {
+    model.connect('incident-a', 'private'); events.onConnected?.(); await settle()
+    const reset = model.get().reset
+    model.page('context'); await settle()
+    expect(model.get().status).toBe('refused')
+    expect(model.get().snapshot).toBeNull()
+    expect(model.get().reset).toBe(reset + 1)
+    const stopped = reads
+    events.onConnected?.(); events.onMessage({ channel: 'server-selected', event: 'refresh', data: { refresh: true } })
+    await model.refresh()
+    expect(reads).toBe(stopped)
+    model.connect('incident-a', 'explicit-new-credential'); events.onConnected?.(); await settle()
+    expect(model.get().status).toBe('current')
+  }
+  finally { model.close() }
+})

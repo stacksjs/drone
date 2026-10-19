@@ -1,5 +1,6 @@
 <script client>
 import type { AssignableIncidentRole } from '../functions/drone/public-safety/access/types'
+import type { ReviewBinding } from '../functions/drone/public-safety/workspace/client'
 import { openIncidentWorkspace } from '../functions/drone/public-safety/workspace/client'
 import { workspaceCaptures, workspaceCapturePreview, workspacePixel } from '../functions/drone/public-safety/workspace/images'
 const model = openIncidentWorkspace()
@@ -16,6 +17,7 @@ const pixelY = state(0)
 const observationNote = state('')
 const uncertaintyNote = state('')
 const reviewNote = state('')
+let reviewDraftBinding: ReviewBinding | null = null, lastReviewTarget: number | null = null
 const disposition = state<'unresolved' | 'supported-by-source' | 'not-supported-by-source'>('unresolved')
 const recipientId = state('')
 const outgoingRole = state<AssignableIncidentRole>('observer')
@@ -41,6 +43,9 @@ effect(() => {
     lastReset = workspace().reset
     sourceChoice.set(''); offerChoice.set(''); captureId.set(''); observationNote.set(''); uncertaintyNote.set(''); reviewNote.set(''); recipientId.set(''); acknowledged.set(false); pixelX.set(0); pixelY.set(0)
   }
+  const target = workspace().reviewTarget
+  if (target !== lastReviewTarget) { lastReviewTarget = target; reviewNote.set(''); reviewDraftBinding = null }
+  if (!reviewNote()) reviewDraftBinding = model.reviewBinding()
   const offer = current()?.handover.offer
   const binding = offer?.state === 'pending' ? offer.digest : ''
   if (binding !== lastOffer) { lastOffer = binding; acknowledged.set(false) }
@@ -59,12 +64,13 @@ async function recordObservation() {
   if (!supportedPixel()) return
   if (await model.observe({ captureId: captureId(), modality: modality(), x: Number(pixelX()), y: Number(pixelY()), note: observationNote(), uncertaintyNote: uncertaintyNote() })) { observationNote.set(''); uncertaintyNote.set('') }
 }
-async function recordReview() { if (await model.review({ disposition: disposition(), note: reviewNote() })) reviewNote.set('') }
+async function recordReview() { if (await model.review({ disposition: disposition(), note: reviewNote() }, reviewDraftBinding)) reviewNote.set('') }
 async function offer() {
   const recipient = current()?.recipients?.entries.find(member => `${member.userId}:${member.role}:${member.membershipVersion}` === recipientId())
   if (recipient && await model.offer(recipient, outgoingRole(), Number(ttl()))) recipientId.set('')
 }
 async function accept() { if (await model.decide('accept', acknowledged())) acknowledged.set(false) }
+function confirmContext() { reviewDraftBinding = model.reviewBinding(); model.confirmCurrentContext() }
 function nextReviews() { const value = workspace(); if (value.reviewObservation && value.reviews) void model.loadReviews(value.reviewObservation.id, value.reviews.cursor) }
 function short(value: string) { return value.slice(0, 12) }
 </script>
@@ -91,7 +97,7 @@ function short(value: string) { return value.slice(0, 12) }
     <p :if="workspace().error" role="alert" class="mt-5 p-4 leading-relaxed text-red-200 border border-red-400 rounded">{{ workspace().error }}</p>
     <p :if="workspace().notice" role="status" class="mt-4 text-neutral-300 text-sm">{{ workspace().notice }}</p>
     <div :if="workspace().confirmationRequired && available()" class="flex flex-wrap gap-3 items-center mt-4">
-      <button type="button" @click="model.confirmCurrentContext()" class="px-4 py-3 text-sm border border-emerald-200 rounded focus-visible:outline-emerald-200">I reviewed current records</button>
+      <button type="button" @click="confirmContext()" class="px-4 py-3 text-sm border border-emerald-200 rounded focus-visible:outline-emerald-200">I reviewed current records</button>
       <button :if="workspace().canRetryHandover" type="button" @click="model.retryHandover()" :disabled="workspace().busy" class="px-4 py-3 text-sm border border-neutral-600 rounded focus-visible:outline-emerald-200 disabled:opacity-40">Retry exact handover request</button>
       <p class="max-w-2xl text-neutral-400 text-xs">Observation and review writes are never retried automatically. Reconcile an unknown outcome before making another declaration.</p>
     </div>

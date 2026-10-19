@@ -9,6 +9,7 @@ export interface WorkspaceClientView {
   status: 'disconnected' | 'connecting' | 'synchronizing' | 'current' | 'reconnecting' | 'refused'
   snapshot: WorkspaceSnapshot | null
   source: SourceRead | null
+  reviewTarget: number | null
   reviewObservation: ObservationProjection | null
   reviews: RecordPage<ReviewProjection> | null
   busy: boolean
@@ -24,6 +25,7 @@ interface WorkspaceClientOptions {
   refreshMs?: number
 }
 export interface ObservationDraft { captureId: string, modality: 'visible' | 'thermal', x: number, y: number, note: string, uncertaintyNote: string }
+export interface ReviewBinding { observationId: number, sourceDigest: string, previousReviewId: number | null }
 export interface ReviewDraft { disposition: 'unresolved' | 'supported-by-source' | 'not-supported-by-source', note: string }
 class WireFailure extends Error { constructor(readonly status: number) { super('Incident request refused') } }
 
@@ -32,7 +34,7 @@ export function openIncidentWorkspace(settings: WorkspaceClientOptions = {}) {
   const transport = settings.request ?? ((path: string, init?: RequestInit) => fetch(path, init))
   const createStream = settings.stream ?? useBroadcastStream
   const listeners = new Set<(view: WorkspaceClientView) => void>()
-  let view: WorkspaceClientView = { status: 'disconnected', snapshot: null, source: null, reviewObservation: null, reviews: null, busy: false, error: '', notice: '', confirmationRequired: false, canRetryHandover: false, reset: 0 }
+  let view: WorkspaceClientView = { status: 'disconnected', snapshot: null, source: null, reviewTarget: null, reviewObservation: null, reviews: null, busy: false, error: '', notice: '', confirmationRequired: false, canRetryHandover: false, reset: 0 }
   let credential: string | null = null, incident = '', identity = 0, activity = 0, scope: string | null = null, accountId: number | null = null
   let stream: { close: () => void } | null = null, connected = false, dirty = false
   let reading: Promise<void> | null = null, options: WorkspaceOptions = { limit: 30 }
@@ -49,7 +51,7 @@ export function openIncidentWorkspace(settings: WorkspaceClientOptions = {}) {
     pending.clear()
     clearTimeout(expiry)
     retry = null
-    publish({ snapshot: null, source: null, reviewObservation: null, reviews: null, busy: false, confirmationRequired: clearDrafts ? false : view.confirmationRequired, canRetryHandover: false, reset: view.reset + (clearDrafts ? 1 : 0) })
+    publish({ snapshot: null, source: null, reviewTarget: clearDrafts ? null : view.reviewTarget, reviewObservation: null, reviews: null, busy: false, confirmationRequired: clearDrafts ? false : view.confirmationRequired, canRetryHandover: false, reset: view.reset + (clearDrafts ? 1 : 0) })
   }
   function disconnect(message = '', refused = false) {
     identity++; credential = null; connected = false; dirty = false; scope = null; accountId = null; authority = ''
@@ -123,7 +125,7 @@ export function openIncidentWorkspace(settings: WorkspaceClientOptions = {}) {
         catch (failure) {
           if (generation !== identity || version !== activity) continue
           if (failure instanceof WireFailure && [401, 403, 404].includes(failure.status)) return
-          if (failure instanceof WireFailure && failure.status === 409) { refused(409); return }
+          if (failure instanceof WireFailure && [409, 422].includes(failure.status)) { refused(failure.status); return }
           discard()
           publish({ status: 'reconnecting', error: 'The workspace could not be refreshed. Private content has been cleared.' })
           return
@@ -155,7 +157,7 @@ export function openIncidentWorkspace(settings: WorkspaceClientOptions = {}) {
     if (!/^[a-f0-9]{64}$/.test(digest) || !view.snapshot?.sources.entries.some(source => source.digest === digest)) return
     activity++; options = { ...options, sourceDigest: digest, contextCursor: undefined }
     retry = null
-    publish({ snapshot: null, source: null, reviewObservation: null, reviews: null, confirmationRequired: false, canRetryHandover: false, reset: view.reset + 1, status: 'synchronizing' })
+    publish({ snapshot: null, source: null, reviewTarget: null, reviewObservation: null, reviews: null, confirmationRequired: false, canRetryHandover: false, reset: view.reset + 1, status: 'synchronizing' })
     void refresh()
   }
   function page(kind: 'sources' | 'context' | 'members' | 'handover', first = false) {
@@ -186,6 +188,7 @@ export function openIncidentWorkspace(settings: WorkspaceClientOptions = {}) {
   async function loadReviews(observationId: number, after = 0): Promise<void> {
     const generation = identity, version = activity, digest = view.snapshot?.selected?.source.digest, selection = ++reviewSelection
     if (!digest || !Number.isSafeInteger(observationId) || observationId < 1) return
+    publish({ reviewTarget: observationId, reviewObservation: view.reviewTarget === observationId ? view.reviewObservation : null, reviews: null })
     try {
       const [observation, reviews] = await Promise.all([
         json<ObservationProjection>(`${base()}/observations/${observationId}`),
@@ -226,9 +229,19 @@ export function openIncidentWorkspace(settings: WorkspaceClientOptions = {}) {
     if (!snapshot?.actions.canObserve || !snapshot.selected || !view.source) return false
     return command(`${base()}/observations`, { expectedVersion: snapshot.incident.version, sourceDigest: snapshot.selected.source.digest, captureId: draft.captureId, modality: draft.modality, pixel: { x: draft.x, y: draft.y }, note: draft.note, uncertaintyNote: draft.uncertaintyNote })
   }
-  async function review(draft: ReviewDraft) {
+  function reviewBinding(): ReviewBinding | null {
+    const observation = view.reviewObservation, reviews = view.reviews
+    if (!observation || !reviews || reviews.hasMore || observation.sourceDigest !== view.snapshot?.selected?.source.digest) return null
+    return { observationId: observation.id, sourceDigest: observation.sourceDigest, previousReviewId: reviews.entries.at(-1)?.id ?? null }
+  }
+  async function review(draft: ReviewDraft, binding: ReviewBinding | null) {
     const snapshot = view.snapshot, observation = view.reviewObservation, reviews = view.reviews
     if (!snapshot?.actions.canReview || !observation || !reviews || reviews.hasMore) return false
+    const current = reviewBinding()
+    if (!binding || !current || binding.observationId !== current.observationId || binding.sourceDigest !== current.sourceDigest || binding.previousReviewId !== current.previousReviewId) {
+      publish({ confirmationRequired: true, error: 'Review target or head changed. Read the current original and reviews, then explicitly bind your draft again.' })
+      return false
+    }
     return command(`${base()}/observations/${observation.id}/reviews`, { expectedVersion: snapshot.incident.version, sourceDigest: observation.sourceDigest, previousReviewId: reviews.entries.at(-1)?.id ?? null, disposition: draft.disposition, note: draft.note })
   }
   async function offer(selectedRecipient: WorkspaceRecipient, outgoingRole: AssignableIncidentRole, expiresInSeconds: number) {
@@ -254,7 +267,7 @@ export function openIncidentWorkspace(settings: WorkspaceClientOptions = {}) {
   return {
     get: () => view,
     subscribe(listener: (value: WorkspaceClientView) => void) { listeners.add(listener); listener(view); return () => listeners.delete(listener) },
-    connect, disconnect, refresh, selectSource, selectOffer, page, loadSource, loadReviews, observe, review, offer, decide, retryHandover,
+    connect, disconnect, refresh, selectSource, selectOffer, page, loadSource, loadReviews, observe, review, reviewBinding, offer, decide, retryHandover,
     confirmCurrentContext() { if (view.status === 'current') publish({ confirmationRequired: false, error: '', notice: 'Current context reviewed. Submission requires your explicit action.' }) },
     close() { disconnect(); listeners.clear() },
   }
