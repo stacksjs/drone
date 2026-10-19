@@ -57,7 +57,7 @@ a body-only CSRF token is unavailable because these routes defer body parsing un
 
 Creation installs exactly one coordinator. Membership changes cannot mint another coordinator,
 remove or demote the current one, or perform handover. Use the separate two-phase
-[incident coordination handover](public-safety-handover.md), currently under qualification.
+[incident coordination handover](public-safety-handover.md).
 An account needs both platform eligibility and active incident membership.
 Client-supplied actor, grantor or principal fields grant nothing and are rejected by mutation schemas.
 
