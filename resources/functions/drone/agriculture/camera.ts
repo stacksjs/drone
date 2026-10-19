@@ -41,13 +41,13 @@ export function renderAgricultureImage(plan: AgriculturePlan, body: RigidBodySta
     const ray = rotateBodyToNed(body.quaternionWxyz, camera.bodyRay([x + .5, y + .5]))
     const hit = intersectSurveyRay(survey, origin, ray), point: [number, number] = [hit[0], hit[1]]
     const field = volumeInsideRing(point, survey.boundary) && !survey.holes.some(hole => volumeInsideRing(point, hole))
-    const reflectance = !field ? [.15, .18] : hit[0] < 0 ? [.1, .7] : hit[1] < 0 ? [.2, .4] : [.25, .15]
+    const lightAnimal = field && ((hit[0] + .35) / .13) ** 2 + ((hit[1] + .3) / .075) ** 2 < 1
+    const darkAnimal = field && ((hit[0] - .35) / .12) ** 2 + ((hit[1] - .3) / .07) ** 2 < 1
+    const reflectance = lightAnimal ? [.35, .4] : darkAnimal ? [.06, .08] : !field ? [.15, .18] : hit[0] < 0 ? [.1, .7] : hit[1] < 0 ? [.2, .4] : [.25, .15]
     const index = y * width + x
     for (let i = 0; i < 2; i++) bands[i]!.counts[index] = fault && scenario === 'saturation' ? 65535 : sceneDn(config.radiometry.bands[i]!, reflectance[i]! * illumination[i]! / Math.PI, x, y, survey.exposureTimeUs, 1)
     // Independent visible landmarks, not an index palette or automatic animal labels.
-    let colour = !field ? [126, 96, 68] : hit[0] < 0 ? [58, 112, 50] : hit[1] < 0 ? [112, 130, 59] : [149, 118, 65]
-    if (field && ((hit[0] + .35) / .13) ** 2 + ((hit[1] + .3) / .075) ** 2 < 1) colour = [235, 230, 211]
-    if (field && ((hit[0] - .35) / .12) ** 2 + ((hit[1] - .3) / .07) ** 2 < 1) colour = [48, 42, 36]
+    const colour = lightAnimal ? [235, 230, 211] : darkAnimal ? [48, 42, 36] : !field ? [126, 96, 68] : hit[0] < 0 ? [58, 112, 50] : hit[1] < 0 ? [112, 130, 59] : [149, 118, 65]
     rgba.set([...colour, 255], index * 4)
   }
   return { width, height, rgba, registrationId: 'synthetic-common-optical-grid-v1', registrationErrorPx: 0, bands }

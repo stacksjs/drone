@@ -48,6 +48,28 @@ test('independent ground zones yield numeric NDVI while changing band irradiance
   expect(a.bands[0].counts).not.toEqual(a.bands[1].counts)
 })
 
+test('opaque modeled animal materials share the visible and raw-band ray intersection without identifying animals', () => {
+  const plan = createAgriculturePlan(exampleAgricultureConfig())
+  const body = createRigidBody({ positionM: [0, 0, -1.5] }).snapshot()
+  const image = renderAgricultureImage(plan, body, 9000)
+  const calibrated = calibrateAgricultureImage(plan.config.radiometry, image, 9000)
+  // Depth1.46m and focal60px put these pixel-centre rays near N/E[-.353,-.304]
+  // and[+.353,+.304]. Brown5 correction is <.004m, inside both declared ellipses.
+  const samples = [
+    { x: 60, y: 21, rgba: [235, 230, 211, 255], red: .35, nir: .4, ndvi: 1 / 15 },
+    { x: 35, y: 50, rgba: [48, 42, 36, 255], red: .06, nir: .08, ndvi: 1 / 7 },
+  ]
+  for (const sample of samples) {
+    const index = sample.y * image.width + sample.x
+    expect(Array.from(image.rgba.slice(index * 4, index * 4 + 4))).toEqual(sample.rgba)
+    expect(calibrated.valid[index]).toBe(1)
+    expect(calibrated.red[index]).toBeCloseTo(sample.red, 3)
+    expect(calibrated.nir[index]).toBeCloseTo(sample.nir, 3)
+    expect(calibrated.ndvi[index]).toBeCloseTo(sample.ndvi, 3)
+  }
+  expect(Object.keys(image).sort()).toEqual(['bands', 'height', 'registrationErrorPx', 'registrationId', 'rgba', 'width'])
+})
+
 test('transient raw-band and uncertain shutter failures latch abort after one admitted frame', () => {
   const expected = { 'irradiance-loss': 'agriculture-irradiance-unqualified', 'band-skew': 'agriculture-band-synchronization', saturation: 'agriculture-insufficient-valid-pixels', 'camera-loss': 'agriculture-camera-ack-deadline', 'wrong-ack': 'agriculture-camera-ack-scope-or-timing' } as const
   for (const scenario of Object.keys(expected) as (keyof typeof expected)[]) {
