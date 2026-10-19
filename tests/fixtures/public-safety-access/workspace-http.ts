@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict'
+import { AsyncLocalStorage } from 'node:async_hooks'
 import { writeFile } from 'node:fs/promises'
 import { join, resolve } from 'node:path'
 import { setupIncidentDatabase } from './setup'
@@ -13,15 +14,21 @@ await writeFile(join(root, 'app/Gates.ts'), `export { default } from ${JSON.stri
 const { initializeAuthorization } = await import('@stacksjs/auth/policy')
 await initializeAuthorization()
 const { Rbac } = await import('@stacksjs/auth/rbac')
+const { Gate } = await import('@stacksjs/auth/gate')
 const { createToken, revokeToken } = await import('@stacksjs/auth/tokens')
 const { route, getCurrentRequest } = await import('@stacksjs/router')
 const { emit } = await import('@stacksjs/realtime/emit')
 const { workspaceRefreshChannel } = await import('../../../resources/functions/drone/public-safety/workspace/updates')
 await route.register(join(source, 'routes/api.ts'), { prefix: '/api' })
 const observedBodies = new Map<string, boolean>()
+const subscriberContext = new AsyncLocalStorage<string>()
 route.use(async (request: Request, next: () => Promise<Response | null> | Response | null) => {
-  try { return await next() }
+  try { return await subscriberContext.run(request.headers.get('x-fixture-subscriber') ?? 'publisher', next) }
   finally { const marker = request.headers.get('x-fixture-unread'); if (marker) observedBodies.set(marker, request.bodyUsed) }
+})
+Gate.after((user, ability) => {
+  const label = getCurrentRequest()?.headers.get('x-fixture-subscriber')
+  if (label && ability === 'public-safety:view') assert.equal(subscriberContext.getStore(), label, 'Fresh native authority retains every subscriber async store')
 })
 const nativeRoutes = process.env.INCIDENT_NATIVE_ROUTES === 'true'
 const server = await route.serve({ hostname: '127.0.0.1', port: 0, nativeRoutes })
@@ -87,7 +94,7 @@ try {
   for (const field of ['canonical_json', 'canonicalJson', 'rgba', 'thermalCentiKelvin', 'support']) assert(!JSON.stringify(selectedData).includes(`"${field}"`))
   const open = async (currentCredential: string) => {
     const abort = new AbortController()
-    const response = await fetch(`${base}/workspace-wire/workspace/events`, { headers: { authorization: `Bearer ${currentCredential}`, 'accept-encoding': 'gzip' }, signal: abort.signal })
+    const response = await fetch(`${base}/workspace-wire/workspace/events`, { headers: { authorization: `Bearer ${currentCredential}`, 'accept-encoding': 'gzip', 'x-fixture-subscriber': currentCredential === credential ? 'subscriber-b' : 'subscriber-a' }, signal: abort.signal })
     assert.equal(response.status, 200)
     assert.equal(response.headers.get('content-type'), 'text/event-stream')
     assert.equal(response.headers.get('content-encoding'), null, 'Native stream must not be compressed')
