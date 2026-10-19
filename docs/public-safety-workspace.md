@@ -1,8 +1,9 @@
 # Authorized incident workspace
 
-Status: implementation in progress. The first tracer combines existing incident,
-source, observation, review and coordination interfaces in one authorized screen.
-It does not yet start a simulator or display a live vehicle feed. See
+Open `/incidents` to connect an existing native personal credential and incident
+key. This read and command tracer combines existing incident, source, observation,
+review and coordination interfaces in one authorized screen. It does not yet
+start a simulator or display a live vehicle feed. See
 [ADR25](adr/0025-authorized-incident-workspace.md) for the accepted design and
 [incident access](public-safety-access.md) for account provisioning.
 
@@ -106,3 +107,25 @@ browser memory remain outside forensic erasure claims. Real in-progress
 simulation, explicit completed-source admission, sector/team responsibility,
 searched-area qualification and operational/hardware acceptance remain separate
 work. Original issue23 acceptance criteria remain open.
+
+## Verification
+
+The mandatory `workspace-browser` CI job compiles the actual STX component and
+uses disposable native accounts, minted credentials, generated migrations and
+file-backed SQLite. It exercises source imagery, two original observations,
+append-only review, recipient-confirmed handover, ordinary 30-second stream
+renewal, read-only access and revocation. It checks escaped text, draft binding,
+mobile overflow, empty browser storage and credential omission when JavaScript
+is unavailable. It uploads only compiled public HTML and selected screenshots.
+
+On a host with an existing Chrome binary, run the same opt-in fixture:
+
+```sh
+WORKSPACE_BROWSER_QA=true BROWSE_BROWSER=/path/to/google-chrome bun test tests/unit/public-safety-workspace-browser.test.ts
+```
+
+The ordinary suite skips the browser lifecycle test; that skip does not qualify
+rendered behavior. Separate native HTTP tests cover rollback, current authority,
+retention crossings through COMMIT and final response release, stream budgets
+and cleanup. These checks establish the bounded software contract, not live
+vehicle operation or physical sensor performance.

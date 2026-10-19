@@ -137,6 +137,8 @@ The [retention custody functions](public-safety-retention.md) add minimal status
 review after expiry, without reopening content access or deleting data.
 The [separate purge module](public-safety-purge.md) records explicit accepted removal and minimal
 receipts, with declared exclusions. The [handover module](public-safety-handover.md) transfers
-incident coordination after explicit recipient acknowledgement. Issue #23 remains open for
-sector/team assignments, an authorized operator workspace and live observations, plus jurisdiction, hardware,
+incident coordination after explicit recipient acknowledgement. The
+[authorized workspace](public-safety-workspace.md) connects these existing reads and commands
+at `/incidents`. Issue #23 remains open for sector/team assignments and in-progress
+collection, plus jurisdiction, hardware,
 firmware interoperability and operational qualification.

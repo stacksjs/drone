@@ -48,9 +48,10 @@ the actual supervisor; incident revisions stop the accepted plan and require a n
 Native incident roles, source-bound annotations/review, hold decisions and managed datasets now
 connect to [separately accepted local purge](docs/public-safety-purge.md), disabled by default.
 [Recipient-confirmed incident handover](docs/public-safety-handover.md) adds atomic coordination
-transfer. The full workflow remains in progress under #23:
-sector/team assignments, the authorized live workspace and operational/hardware qualification
-are still required.
+transfer. Open `/incidents` for the [authorized read and command workspace](docs/public-safety-workspace.md),
+including current source context, observation/review forms and recipient acknowledgement.
+The full workflow remains in progress under #23: in-progress simulation delivery,
+sector/team assignments and operational/hardware qualification are still required.
 See [public-safety collection and remaining scope](docs/public-safety.md). Physical outputs are inhibited.
 
 ## Owned vehicle missions

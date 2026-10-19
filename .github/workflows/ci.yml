@@ -181,6 +181,35 @@ jobs:
         working-directory: ${{ runner.temp }}
       - run: $GITHUB_WORKSPACE/storage/runtime-build/cli/drone public-safety:simulate --scenario wrong-ack
         working-directory: ${{ runner.temp }}
+  workspace-browser:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.4.3
+      - run: bun install --frozen-lockfile
+      - run: cp .env.example .env
+      - run: ./buddy key:generate
+      - name: Qualify the rendered workspace with real native accounts and routes
+        shell: bash
+        env:
+          WORKSPACE_BROWSER_QA: 'true'
+          WORKSPACE_BROWSER_EVIDENCE: ${{ runner.temp }}/workspace-browser-evidence
+        run: |
+          set -euo pipefail
+          export BROWSE_BROWSER="$(command -v google-chrome)"
+          test -x "$BROWSE_BROWSER"
+          bun test tests/unit/public-safety-workspace-browser.test.ts
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: workspace-browser-evidence
+          if-no-files-found: ignore
+          path: |
+            ${{ runner.temp }}/workspace-browser-evidence/*.png
+            ${{ runner.temp }}/workspace-browser-evidence/compiled.html
   purge-namespace:
     runs-on: ubuntu-latest
     timeout-minutes: 30
