@@ -86,6 +86,10 @@ test('explicit lease scope, instrument freshness, replay and missing feedback ca
     else input.feedback!.capturedAtMs = 400
     expect(createApplicationController(config, options).step(input).reason).toBe('application-meter-unavailable')
   }
+  const empty = qualifiedInput(); empty.feedback!.scaleRaw = config.calibration.scale.tareRaw
+  const emptyDecision = createApplicationController(config, options).step(empty)
+  expect(emptyDecision.reason).toBe('application-level-empty')
+  expect(emptyDecision.channels).toEqual([0, 0, 0])
   const replay = createApplicationController(config, options)
   replay.step(qualifiedInput())
   const changed = qualifiedInput(620); changed.feedback!.sequence = 1
@@ -96,6 +100,45 @@ test('explicit lease scope, instrument freshness, replay and missing feedback ca
   const expired = lease.step(qualifiedInput(800))
   expect(expired.reason).toBe('application-grant-expired')
   expect(expired.channels).toEqual([0, 0, 0])
+  const late = createApplicationController(config, options)
+  late.step(qualifiedInput())
+  for (let atMs = 620; atMs < 800; atMs += 20) late.step(qualifiedInput(atMs))
+  const renewal = qualifiedInput(800)
+  renewal.grant = { ...qualifiedInput().grant!, action: 'renew', sequence: 2, issuedAtMs: 800, expiresAtMs: 1000 }
+  expect(late.step(renewal).reason).toBe('application-grant-expired')
+})
+
+test('public controller rejects nonfinite weather clocks and ground kinematics before issuing any metering output', () => {
+  const config = exampleApplicationConfig(), options = { visitId: 'public-test', authorizeImplement: true, testMode: false }
+  const mutations: ((input: ApplicationControllerInput) => void)[] = [
+    input => { input.weather.capturedAtMs = Number.NaN },
+    input => { input.weather.capturedAtMs = Infinity },
+    input => { input.weather.capturedAtMs = 601 },
+    input => { input.ground.speedMps = Number.NaN },
+    input => { input.ground.yawRad = Infinity },
+    input => { input.ground.yawRateRadS = Number.NaN },
+    input => { input.ground.uncertaintyM = 0 },
+    input => { input.ground.uncertaintyM = -1 },
+    input => { input.ground.uncertaintyM = Number.NaN },
+    input => { input.ground.positionM[0] = Infinity },
+  ]
+  for (const mutate of mutations) {
+    const input = qualifiedInput(); mutate(input)
+    const decision = createApplicationController(config, options).step(input)
+    expect(decision.state).toBe('latched')
+    expect(decision.channels).toEqual([0, 0, 0])
+    expect(decision.targetPerSecond).toBe(0)
+    expect(decision.estimatedPositionM.every(Number.isFinite)).toBe(true)
+  }
+})
+
+test('public controller snapshots calibration and authority options rather than retaining mutable caller aliases', () => {
+  const config = exampleApplicationConfig(), options = { visitId: 'public-test', authorizeImplement: true, testMode: false }
+  const controller = createApplicationController(config, options)
+  config.prescription[0]!.ratePerHa = 10000; config.weatherLimits.maxWindMps = 0; options.authorizeImplement = false
+  expect(controller.step(qualifiedInput()).targetPerSecond).toBeCloseTo(.008, 12)
+  const invalid = exampleApplicationConfig(); invalid.calibration.pulse!.litres = 0
+  expect(() => createApplicationController(invalid, options)).toThrow()
 })
 
 test('implement authority defaults dry and requires both an explicit grant and apply mode independently of vehicle arming', () => {
@@ -106,6 +149,16 @@ test('implement authority defaults dry and requires both an explicit grant and a
     expect(run.decisions.every(decision => decision.channels.every(n => n === 0))).toBe(true)
     expect(run.shutdown.closureVerified).toBe(true)
   }
+})
+
+test('a completed authorized route with no prescription preserves zero application and an explicit missing-material outcome', () => {
+  const config = exampleApplicationConfig(); config.prescription = []
+  const run = simulateApplication({ config, authorizeImplement: true, testMode: false })
+  expect(run.status).toBe('completed')
+  expect(run.reason).toBe('application-no-material-discharged')
+  expect(run.final.emittedAmount).toBe(0)
+  expect(run.releases).toEqual([])
+  expect(run.decisions.every(decision => decision.targetPerSecond === 0)).toBe(true)
 })
 
 test('both inert implements use actual ground movement, measured feedback and replayable separately scoped leases', () => {

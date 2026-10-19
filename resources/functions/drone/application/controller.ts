@@ -1,11 +1,16 @@
 import type { ApplicationConfig } from './types'
 import type { ApplicationControllerInput, ApplicationDecision, ApplicationGrant, ApplicationMeterFeedback } from './runtime-types'
 import { applicationPulseFactor, applicationScaleFactor } from './calibration'
+import { validateApplicationConfig } from './planner'
 import { volumeIntersectConvex, volumeSignedArea, volumeTriangulateRing } from '../volumes/geometry'
 import type { VolumeXY } from '../volumes/types'
 
 /** Deterministic host policy. Inputs are qualified estimated ground navigation and independent quantized instruments, never plant truth. */
-export function createApplicationController(config: ApplicationConfig, options: { visitId: string, authorizeImplement: boolean, testMode: boolean }) {
+export function createApplicationController(configInput: ApplicationConfig, inputOptions: { visitId: string, authorizeImplement: boolean, testMode: boolean }) {
+  const config = validateApplicationConfig(configInput)
+  if (!inputOptions || typeof inputOptions !== 'object' || ['visitId', 'authorizeImplement', 'testMode'].some(key => !Object.hasOwn(inputOptions, key) || !('value' in Object.getOwnPropertyDescriptor(inputOptions, key)!))) throw new TypeError('Invalid application controller options')
+  const options = { visitId: inputOptions.visitId, authorizeImplement: inputOptions.authorizeImplement, testMode: inputOptions.testMode }
+  if (typeof options.visitId !== 'string' || !/^[a-z][a-z0-9-]{0,63}$/.test(options.visitId) || typeof options.authorizeImplement !== 'boolean' || typeof options.testMode !== 'boolean') throw new TypeError('Invalid application controller options')
   const triangles = volumeTriangulateRing(config.boundary), excluded = config.exclusions.flatMap(volumeTriangulateRing)
   const zones = config.prescription.map(zone => ({ ...zone, triangles: volumeTriangulateRing(zone.polygon) }))
   const pulseK = config.calibration.pulse ? applicationPulseFactor(config.calibration.pulse) : null, scaleK = applicationScaleFactor(config.calibration.scale)
@@ -14,6 +19,7 @@ export function createApplicationController(config: ApplicationConfig, options: 
   let latch: string | null = null, wasApplying = false, previousTarget = 0, previousPrimary = 0, previousMaster = 0
   let prior: ApplicationMeterFeedback | null = null, signature = '', delivered = 0, lastDeliveryAt = 0, demandedSince: number | null = null, mismatchSince: number | null = null, closedSince: number | null = null
   const history: { atMs: number, delivered: number }[] = []
+  let lastPosition: [number, number, number] = [0, 0, 0]
   const amount = (raw: number) => (raw - config.calibration.scale.tareRaw) / scaleK / (config.material.unit === 'L' ? config.material.densityKgPerL! : 1)
   const clippedArea = (polygon: VolumeXY[], source: VolumeXY[][]) => source.reduce((sum, triangle) => sum + Math.abs(volumeSignedArea(volumeIntersectConvex(polygon, triangle))), 0)
   function forecast(input: ApplicationControllerInput): VolumeXY[] {
@@ -49,20 +55,25 @@ export function createApplicationController(config: ApplicationConfig, options: 
     if (!Number.isSafeInteger(i.atMs) || i.atMs < 0 || i.atMs <= lastAt || i.atMs > 185000) throw new RangeError('Application controller clock must strictly increase')
     if (lastAt >= 0 && i.atMs - lastAt > 40 && wasApplying) latch ??= 'application-host-gap'
     lastAt = i.atMs
+    const positionValid = Array.isArray(o.positionM) && o.positionM.length === 3 && o.positionM.every(n => Number.isFinite(n) && Math.abs(n) <= 100000)
+    if (positionValid) lastPosition = [...o.positionM]
+    const groundValid = positionValid && [o.speedMps, o.wheelSpeedMps, o.yawRad, o.yawRateRadS, o.uncertaintyM, o.personM, o.obstacleM].every(Number.isFinite) && o.uncertaintyM > 0 && o.uncertaintyM <= 1 && o.personM >= 0 && o.obstacleM >= 0 && Math.abs(o.speedMps) <= 2 && Math.abs(o.wheelSpeedMps) <= 5 && Math.abs(o.yawRateRadS) <= 10 && [o.healthy, o.onSurface, o.stopped, o.guardClosed, o.emergency].every(n => typeof n === 'boolean')
+    if (!groundValid) latch ??= 'application-ground-unqualified'
     if (reference !== null && reference !== i.reference) latch ??= 'application-reference-changed'
     reference = i.reference
     const feedback = readFeedback(i)
+    // Expiry is checked against the previous lease before accepting a renewal.
+    if (wasApplying && lease && i.atMs >= lease.expiresAtMs) latch ??= 'application-grant-expired'
     if (i.grant) {
       const g = i.grant
       if (!Number.isSafeInteger(g.sequence) || g.sequence !== grantSequence + 1 || g.issuedAtMs !== i.atMs || !Number.isSafeInteger(g.expiresAtMs) || g.expiresAtMs < i.atMs || g.expiresAtMs > i.atMs + 500 || g.visitId !== options.visitId || g.configId !== config.id || g.materialId !== config.material.id || g.reference !== i.reference || !['grant', 'renew', 'revoke'].includes(g.action) || g.action === 'renew' && lease === null) latch ??= 'application-grant-invalid'
       else { grantSequence = g.sequence; lease = g.action === 'revoke' ? null : { ...g }; if (g.action === 'revoke' && wasApplying && i.missionState !== 'completed') latch ??= 'application-grant-revoked' }
     }
-    if (wasApplying && lease && i.atMs >= lease.expiresAtMs) latch ??= 'application-grant-expired'
     if (wasApplying && !i.enabled && i.missionState !== 'completed') latch ??= 'application-vehicle-authority-lost'
     if (i.emergency) latch ??= 'application-emergency-stop'
     if (i.enabled && !o.healthy) latch ??= o.reason
     if (i.enabled && (!o.guardClosed || o.emergency || !o.onSurface || o.personM <= 2 || o.obstacleM <= 1)) latch ??= 'application-safety-interlock'
-    if (i.atMs - i.weather.capturedAtMs > config.weatherLimits.maxAgeMs || i.weather.capturedAtMs > i.atMs || ![...i.weather.windMps, i.weather.temperatureC, i.weather.humidityPercent].every(Number.isFinite) || Math.hypot(...i.weather.windMps) > config.weatherLimits.maxWindMps || i.weather.temperatureC < config.weatherLimits.minTemperatureC || i.weather.temperatureC > config.weatherLimits.maxTemperatureC || i.weather.humidityPercent < config.weatherLimits.minHumidityPercent || i.weather.inversion) latch ??= 'application-weather-unqualified'
+    if (!Number.isSafeInteger(i.weather.capturedAtMs) || i.weather.capturedAtMs < 0 || i.atMs - i.weather.capturedAtMs > config.weatherLimits.maxAgeMs || i.weather.capturedAtMs > i.atMs || !Array.isArray(i.weather.windMps) || i.weather.windMps.length !== 2 || ![...i.weather.windMps, i.weather.temperatureC, i.weather.humidityPercent].every(Number.isFinite) || Math.hypot(...i.weather.windMps) > config.weatherLimits.maxWindMps || i.weather.temperatureC < config.weatherLimits.minTemperatureC || i.weather.temperatureC > config.weatherLimits.maxTemperatureC || i.weather.humidityPercent < config.weatherLimits.minHumidityPercent || i.weather.humidityPercent > 100 || typeof i.weather.inversion !== 'boolean' || i.weather.inversion) latch ??= 'application-weather-unqualified'
     if (previousTarget > 0 && feedback.remaining !== null && feedback.remaining <= quantum * 2) latch ??= 'application-level-empty'
     if (previousTarget > 0 && demandedSince !== null && i.atMs - demandedSince > config.calibration.noFlowTimeoutMs && i.atMs - lastDeliveryAt > config.calibration.noFlowTimeoutMs) latch ??= 'application-inadequate-delivery'
     if (prior && (Math.abs(prior.primaryEncoder / countMax - previousPrimary) > .06 || Math.abs(prior.masterEncoder / countMax - previousMaster) > .06)) mismatchSince ??= i.atMs
@@ -80,7 +91,8 @@ export function createApplicationController(config: ApplicationConfig, options: 
         else if (!zone) reason = 'application-no-whole-footprint-prescription'
         else {
           target = zone.ratePerHa * o.speedMps * config.implement.swathM / 10000; zoneId = zone.id
-          if (target < config.calibration.minRatePerSecond || target > config.calibration.maxRatePerSecond) { latch ??= 'application-rate-unattainable'; target = 0 }
+          if (feedback.remaining !== null && feedback.remaining <= quantum * 2) { latch ??= 'application-level-empty'; target = 0 }
+          else if (target < config.calibration.minRatePerSecond || target > config.calibration.maxRatePerSecond) { latch ??= 'application-rate-unattainable'; target = 0 }
           else { state = 'applying'; reason = 'application-qualified-rate-control'; wasApplying = true }
         }
       }
@@ -91,6 +103,6 @@ export function createApplicationController(config: ApplicationConfig, options: 
     if (target > 0 && previousTarget <= 0) { demandedSince = i.atMs; lastDeliveryAt = i.atMs; closedSince = null }
     if (target <= 0 && previousTarget > 0) { closedSince = i.atMs; demandedSince = null }
     previousTarget = target; previousPrimary = channels[0]; previousMaster = channels[1]
-    return { atMs: i.atMs, state, reason, taskId: i.taskId, prescriptionId: zoneId, targetPerSecond: target, measuredPerSecond: feedback.rate, measuredDeliveredAmount: delivered, measurementUncertainty: 2 * quantum, estimatedPositionM: [...o.positionM], grantExpiresAtMs: lease?.expiresAtMs ?? null, channels, stopVehicle: latch !== null }
+    return { atMs: i.atMs, state, reason, taskId: i.taskId, prescriptionId: zoneId, targetPerSecond: target, measuredPerSecond: feedback.rate, measuredDeliveredAmount: delivered, measurementUncertainty: 2 * quantum, estimatedPositionM: [...lastPosition], grantExpiresAtMs: lease?.expiresAtMs ?? null, channels, stopVehicle: latch !== null }
   } }
 }
