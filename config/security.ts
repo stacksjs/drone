@@ -24,7 +24,7 @@ export default {
     // ones in app/Models, 'none' turns generated model APIs off, and a list
     // of model names picks exactly those (['own', 'Product'] adds one framework
     // model to yours). STACKS_MODEL_APIS overrides it. See #2866.
-    models: 'all',
+    models: 'none',
   },
 
   firewall: {

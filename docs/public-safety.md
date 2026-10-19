@@ -49,3 +49,10 @@ Replay re-executes the pinned `owned-public-safety-collection-v1` deterministic 
 - Measured visible/thermal calibration, timing/heading/georeferencing, communications, legal/jurisdiction/operator qualification, real team operations, external firmware integration and bench/HIL/vehicle campaigns.
 
 All three issue acceptance requirements remain open until their complete software workflow is verified. Full operational and physical acceptance remains separate from synthetic evidence.
+
+## Authenticated coordination
+
+The persisted [incident access API](public-safety-access.md) uses native Stacks accounts, tokens,
+permissions, Gates and generated models for scoped incident membership, closure and paginated
+audit. Collection artifacts keep their separate unsigned simulator evidence boundary. Annotations,
+review, managed erasure, atomic handover and the operator workspace remain part of issue #23.
