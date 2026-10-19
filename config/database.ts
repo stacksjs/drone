@@ -249,7 +249,13 @@ export default {
      * `gift_cards`, and matches a `code` written without its table wherever
      * the statement names `gift_cards`.
      */
-    sensitiveColumns: [],
+    sensitiveColumns: [
+      'public_safety_incidents.config_json',
+      'public_safety_sources.canonical_json',
+      'public_safety_observations.note',
+      'public_safety_observations.uncertainty_note',
+      'public_safety_reviews.note',
+    ],
 
     /**
      * The threshold in milliseconds to mark a query as slow
@@ -272,6 +278,9 @@ export default {
     excludedQueries: [
       // Don't log the query_logs table itself to avoid recursion
       'query_logs',
+      // Omit future incident query history and failed-query diagnostics before values are copied.
+      // This does not remove records already retained by earlier configurations.
+      'public_safety_',
     ],
 
     /**
