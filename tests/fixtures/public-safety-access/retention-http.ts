@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict'
-import { mkdir, writeFile } from 'node:fs/promises'
+import { writeFile } from 'node:fs/promises'
 import { join, resolve } from 'node:path'
 import { setupIncidentDatabase } from './setup'
 import { examplePublicSafetyConfig } from '../../../resources/functions/drone/public-safety/fixtures'
@@ -8,15 +8,15 @@ import { publicSafetyRecordingData } from '../../../resources/functions/drone/pu
 import { randomUUID } from 'node:crypto'
 
 // A fixture-only model generates the native session table; no application session API is installed.
-await mkdir(join(process.cwd(), 'app/Models'), { recursive: true })
-await writeFile(join(process.cwd(), 'app/Models/Session.ts'), `import { defineModel } from '@stacksjs/orm'
+const { root, database, User } = await setupIncidentDatabase({
+  prepare: root => writeFile(join(root, 'app/Models/Session.ts'), `import { defineModel } from '@stacksjs/orm'
 import { schema } from '@stacksjs/validation'
 export default defineModel({name:'Session',table:'sessions',primaryKey:'id',autoIncrement:false,traits:{useApi:false,useTimestamps:false},attributes:{
 id:{required:true,validation:{rule:schema.string()}},userId:{required:true,validation:{rule:schema.number().integer()}},
 ipAddress:{validation:{rule:schema.string().optional()}},userAgent:{validation:{rule:schema.string().optional()}},
 payload:{required:true,validation:{rule:schema.string()}},lastActivity:{required:true,validation:{rule:schema.number().integer()}},expiresAt:{required:true,validation:{rule:schema.string()}}
-}})`)
-const { root, database, User } = await setupIncidentDatabase()
+}})`),
+})
 const { generateMigrations } = await import('@stacksjs/database/migrations')
 const generated = await generateMigrations()
 assert(generated.isOk)
