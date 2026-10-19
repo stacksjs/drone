@@ -4,7 +4,7 @@ import { join } from 'node:path'
 
 /** Await one guarded native fixture and own its terminal process boundary. */
 export async function runPurgeQualificationFixture(name: string, timeoutMs: number): Promise<{ code: number, stdout: string, stderr: string }> {
-  if (!['purge-faults', 'purge-critical', 'purge-budget', 'purge-capacity', 'purge-sql', 'purge-relations', 'purge-seal', 'purge-bounds'].includes(name)) throw new Error('Unknown qualification fixture')
+  if (!['purge-faults', 'purge-critical', 'purge-budget', 'purge-capacity', 'purge-sql', 'purge-relations', 'purge-seal', 'purge-bounds', 'purge-mixed'].includes(name)) throw new Error('Unknown qualification fixture')
   const root = await mkdtemp(join(tmpdir(), `drone-incident-access-${name}-`))
   let child: ReturnType<typeof Bun.spawn> | undefined
   try {
