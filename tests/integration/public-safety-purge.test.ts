@@ -119,3 +119,19 @@ test.skipIf(process.env.PUBLIC_SAFETY_PURGE_NAMESPACE_TEST !== '1')('accepted pu
   const { qualifyPurgeStoppedWriter } = await import('../helpers/public-safety-purge-writer')
   await qualifyPurgeStoppedWriter()
 }, 180000)
+
+for (const stage of ['held-prepare', 'held-publish'] as const) {
+  test.skipIf(process.env.PUBLIC_SAFETY_PURGE_NAMESPACE_TEST !== '1')(`accepted purge refuses namespace freeze during actual stopped B ${stage}`, async () => {
+    requireQualifiedNamespace()
+    const { qualifyPurgeStoppedWriter } = await import('../helpers/public-safety-purge-writer')
+    await qualifyPurgeStoppedWriter(stage)
+  }, 180000)
+}
+
+test.skipIf(process.env.PUBLIC_SAFETY_PURGE_NAMESPACE_TEST !== '1')('accepted purge qualifies independent private UTF8 item write bounds', async () => {
+  requireQualifiedNamespace()
+  const { runPurgeQualificationFixture } = await import('../helpers/public-safety-purge-fixture')
+  const { code, stdout, stderr } = await runPurgeQualificationFixture('purge-bounds', 165000)
+  expect(code, `${stdout}\n${stderr}`).toBe(0)
+  for (const kind of ['ordinary', 'artifact', 'arm']) expect(stdout).toContain(`PASS controlled UTF8 oversized ${kind} metadata`)
+}, 180000)

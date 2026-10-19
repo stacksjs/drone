@@ -11,12 +11,15 @@ import { sha256 } from '../managed/files'
 import { requirePurgeEnabled } from './policy'
 import { appendPurgeEvent, purgeConflict, purgeTables, systemPurgeActor, transitionPurge } from './internal'
 import { inventoryGroups, inventoryPage, inventoryLine, inventoryAdd } from './inventory'
+import { assertPurgeItemBounds } from './item-bounds'
 export interface PurgeFilePlan { root: CompletedArtifactIdentity, tree: CompletedArtifactIdentity, ancestors: CompletedArtifactIdentity[], names: string[], expected: CompletedArtifactIdentity, registeredNames: Record<string, string[]>, artifactId: number }
 interface BuildCursor { group: number, after: number, ordinal: number, digest: string }
 async function insertItem(tx: TransactionHandle, row: PurgeRow, cursor: BuildCursor, values: Record<string, unknown>): Promise<number> {
   if (++cursor.ordinal >= 2147483647) purgeConflict()
   const at = new Date().toISOString()
-  await tx.insertInto(purgeTables.item).values({ purge_id: row.id, ordinal: cursor.ordinal, kind: 'db-row', parent_item_id: null, artifact_ordinal: null, source_table: null, source_row_id: null, planned_json: '{}', identity_json: null, alias_json: null, planned_bytes: null, planned_sha256: null, version: 1, generation: 1, operation_nonce: randomUUID(), state: 'planned', arm_json: null, observed_bytes: null, observed_sha256: null, result_code: null, armed_at_iso: null, verified_at_iso: null, ...values, created_at: at, updated_at: at }).execute()
+  const item = { purge_id: row.id, ordinal: cursor.ordinal, kind: 'db-row', parent_item_id: null, artifact_ordinal: null, source_table: null, source_row_id: null, planned_json: '{}', identity_json: null, alias_json: null, planned_bytes: null, planned_sha256: null, version: 1, generation: 1, operation_nonce: randomUUID(), state: 'planned', arm_json: null, observed_bytes: null, observed_sha256: null, result_code: null, armed_at_iso: null, verified_at_iso: null, ...values, created_at: at, updated_at: at }
+  assertPurgeItemBounds(item)
+  await tx.insertInto(purgeTables.item).values(item).execute()
   const result = asRows<{ id: number }>(await tx.selectFrom(purgeTables.item).select('id').where('purge_id', '=', row.id).where('ordinal', '=', cursor.ordinal).execute())
   if (result.length !== 1) purgeConflict()
   return result[0]!.id

@@ -16,6 +16,7 @@ import { buildPurgePage } from './build'
 import { executePurgeFile, observePurgeFile, revalidatePurgeArmObservation, PurgeFileBlocked } from './files'
 import { verifyPurgeConvergence } from './convergence'
 import { inventoryFields, inventoryTables } from './inventory'
+import { assertPurgeItemBounds } from './item-bounds'
 interface Context { row: PurgeRow, incident: IncidentRow, scope: PurgeScopeRow }
 interface BatchOptions { maxPurges?: 1, maxItems?: number, maxRows?: number, maxBytes?: number, budgetMs?: number, purgeKey?: string }
 export interface PurgeBatchResult { unitsCommitted: number, enabled: boolean, selected: boolean }
@@ -44,6 +45,7 @@ function continuity(tx: TransactionHandle, row: PurgeRow, item: PurgeItemRow): v
 async function updateItem(tx: TransactionHandle, item: PurgeItemRow, changes: Partial<PurgeItemRow>): Promise<PurgeItemRow> {
   if (item.version >= maximumVersion || item.generation >= maximumVersion) purgeConflict()
   const next = { ...item, ...changes, version: item.version + 1, generation: item.generation + 1, operation_nonce: randomUUID() }
+  assertPurgeItemBounds(next)
   const changed = await tx.updateTable(purgeTables.item).set({ ...changes, version: next.version, generation: next.generation, operation_nonce: next.operation_nonce, updated_at: new Date().toISOString() }).where('id', '=', item.id).where('version', '=', item.version).where('generation', '=', item.generation).executeTakeFirst()
   if (mutationCount(changed) !== 1) purgeConflict()
   return next
