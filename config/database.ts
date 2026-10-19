@@ -255,6 +255,12 @@ export default {
       'public_safety_observations.note',
       'public_safety_observations.uncertainty_note',
       'public_safety_reviews.note',
+      'public_safety_audits.details_json',
+      'public_safety_audits.handover_key',
+      'public_safety_audits.handover_step',
+      'public_safety_audits.handover_assignment_version',
+      'public_safety_audits.request_id',
+      'public_safety_audits.request_digest',
     ],
 
     /**

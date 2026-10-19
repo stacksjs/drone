@@ -30,13 +30,24 @@ try {
   await db.insertInto('public_safety_reviews').values({ observation_id: observation.id, previous_review_id: null, disposition: 'unresolved', note: 'bootstrap', actor_id: user.id, reviewed_at_iso: now, created_sequence: 4, created_at: now, updated_at: now }).execute()
   const review = await db.primary.selectFrom('public_safety_reviews').select('id').where('observation_id', '=', observation.id).executeTakeFirst()
   assert(review)
+  await db.insertInto('public_safety_audits').values({ incident_id: incident.id, sequence: 1, actor_id: user.id, action: 'created', target_user_id: null, at_iso: now, details_json: '{}', created_at: now, updated_at: now }).execute()
+  const audit = await db.primary.selectFrom('public_safety_audits').select('id').where('incident_id', '=', incident.id).executeTakeFirst()
+  assert(audit)
   const canaries: string[] = []
+  for (const field of ['details_json', 'handover_key', 'handover_step', 'handover_assignment_version', 'request_id', 'request_digest']) {
+    const canary = `Private diagnostic handover ${field} ordinary fixture words`
+    canaries.push(canary)
+    const fallback = persistQueryLogValues(`UPDATE public_safety_audits SET ${field} = ? WHERE id = ?`, [canary, 1], `Driver reflected ${canary}`, { captureValues: true, sensitiveColumns: config.database.queryLogging?.sensitiveColumns })
+    assert.deepEqual(JSON.parse(fallback.bindings), ['<redacted>', 1], `handover fallback must redact ${field} independently of normal private-query exclusion`)
+    assert(!fallback.error?.includes(canary), `handover reflected fallback must redact ${field}`)
+  }
   const targets = [
     ['public_safety_incidents', 'config_json', incident.id],
     ['public_safety_sources', 'canonical_json', sourceRow.id],
     ['public_safety_observations', 'note', observation.id],
     ['public_safety_observations', 'uncertainty_note', observation.id],
     ['public_safety_reviews', 'note', review.id],
+    ['public_safety_audits', 'details_json', audit.id],
   ] as const
   for (const [index, [table, field, id]] of targets.entries()) {
     const successful = `Private diagnostic success surface ${index} fixture words`
