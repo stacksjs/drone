@@ -8,6 +8,7 @@
     "../resources/functions/drone/mavlink.ts",
     "./unit/driver-protocol.test.ts",
     "../scripts/build-runtime-cli.ts",
+    "../scripts/qualify-public-safety-managed-budget.ts",
     "../resources/functions/drone/runtime/**/*.ts",
     "../resources/functions/drone/sensors/**/*.ts",
     "../resources/functions/drone/estimation/**/*.ts",

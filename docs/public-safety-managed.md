@@ -113,3 +113,7 @@ connection closure. The library adds no garbage-collection workaround or replace
 
 Local process-crash and filesystem checks do not establish hardware power-loss durability,
 hostile-host protection, media erasure, uncontrolled-copy removal or purge acceptance.
+
+The [resource qualification](public-safety-managed-budget.md) derives a tighter output
+bound for the pinned replay profile and codec. The manifest-inclusive 32 MiB guard
+remains enforced before publication intent.
