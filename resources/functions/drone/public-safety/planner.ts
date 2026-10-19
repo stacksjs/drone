@@ -74,6 +74,15 @@ export function publicSafetySegmentInside(a: SurveyPoint, b: SurveyPoint, ring: 
 }
 function contained(ring: SurveyPoint[], operating: SurveyPoint[]) { return ring.every((p, i) => publicSafetySegmentInside(p, ring[(i + 1) % ring.length]!, operating)) }
 
+/** Length-prefixed incident scope preserves identity without delimiter aliases or truncation. */
+export function publicSafetySessionId(config: Pick<PublicSafetyConfig, 'id' | 'revision' | 'visitId'>): string {
+  bounded(config)
+  for (const value of [config.id, config.revision, config.visitId]) id(value)
+  const session = `incident-${config.id.length}-${config.id}-${config.revision.length}-${config.revision}-${config.visitId.length}-${config.visitId}`
+  if (session.length > 64) fail('combined incident revision visit session scope exceeds 64 characters')
+  return session
+}
+
 /** One explicitly selected incident sector executes through the owned survey mission engine. */
 export function planPublicSafetyMission(input: unknown): PublicSafetyPlan {
   bounded(input)
@@ -81,6 +90,7 @@ export function planPublicSafetyMission(input: unknown): PublicSafetyPlan {
   const c = input as unknown as PublicSafetyConfig
   if (c.version !== 1 || !['search-and-rescue', 'fire-observation', 'disaster-assessment', 'lawful-police-observation'].includes(c.purpose)) fail('version or purpose')
   for (const value of [c.id, c.revision, c.visitId, c.policyId, c.sectorId]) id(value)
+  publicSafetySessionId(c)
   fields(c.purposeAuthority, ['status', 'reference'])
   if (!['simulation-declared', 'unqualified'].includes(c.purposeAuthority.status) || (c.purposeAuthority.reference !== null && (typeof c.purposeAuthority.reference !== 'string' || !c.purposeAuthority.reference.trim() || c.purposeAuthority.reference.length > 256)) || c.purposeAuthority.status === 'simulation-declared' && c.purposeAuthority.reference === null) fail('declared purpose authority')
   fields(c.retention, ['policyId', 'expiresAt', 'hold']); id(c.retention.policyId)

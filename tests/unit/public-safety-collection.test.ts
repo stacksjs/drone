@@ -3,7 +3,7 @@ import { examplePublicSafetyConfig } from '../../resources/functions/drone/publi
 import { simulateSurvey } from '../../resources/functions/drone/mapping/runtime'
 import { createRigidBody } from '../../resources/functions/drone/controls/physics'
 import { createPublicSafetyCamera, renderPublicSafetyImage } from '../../resources/functions/drone/public-safety/camera'
-import { planPublicSafetyMission } from '../../resources/functions/drone/public-safety/planner'
+import { planPublicSafetyMission, publicSafetySessionId } from '../../resources/functions/drone/public-safety/planner'
 
 describe('public-safety collection planning', () => {
   test('retains purpose, selected search sector, operating boundary and retention without granting physical authority', () => {
@@ -170,4 +170,14 @@ test('collects the paired numeric instrument through the actual owned survey cam
     for (let i = 0; i < ack.support.length; i++) if (ack.support[i] !== 1 && (ack.thermalCentiKelvin[i] !== 0 || capture.rgba[i * 4] !== 0 || capture.rgba[i * 4 + 1] !== 0 || capture.rgba[i * 4 + 2] !== 0 || capture.rgba[i * 4 + 3] !== 255)) leaked++
     expect(leaked).toBe(0)
   }
+})
+
+
+test('binds an unambiguous bounded incident revision and visit session before execution', () => {
+  expect(publicSafetySessionId({ id: 'a-b', revision: 'c', visitId: 'd' })).toBe('incident-3-a-b-1-c-1-d')
+  expect(publicSafetySessionId({ id: 'a', revision: 'b-c', visitId: 'd' })).toBe('incident-1-a-3-b-c-1-d')
+  const long = examplePublicSafetyConfig(); long.revision = 'r'.repeat(50)
+  expect(() => planPublicSafetyMission(long)).toThrow('session scope')
+  expect(() => publicSafetySessionId({ id: 'a', revision: 'b', visitId: 'x'.repeat(64) })).toThrow('session scope')
+  expect(publicSafetySessionId(examplePublicSafetyConfig()).length).toBeLessThanOrEqual(64)
 })
