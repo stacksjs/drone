@@ -6,7 +6,7 @@ export type RetentionAction = 'enrolled' | 'hold-reviewed' | 'member-revoked'
 export interface RetentionLimits { purgeImplemented: false, contentDeletionPerformed: false, legacyOfflineExportsManaged: false }
 export interface RetentionPreview extends RetentionLimits {
   key: string, incidentVersion: number, retainUntil: string, expired: boolean, originalHold: OriginalHold,
-  counts: { sources: number, observations: number, reviews: number }, managedArtifactCount: 0, inventoryDigest: string,
+  counts: { sources: number, observations: number, reviews: number }, managedArtifactCount: number, inventoryDigest: string,
 }
 export interface RetentionScopeProjection extends RetentionLimits {
   key: string, policyVersion: 'local-managed-v1', version: number, incidentVersion: number, retainUntil: string, expired: boolean,

@@ -12,7 +12,7 @@ import { requireIncidentAccess } from './policy'
 import { exactRecord, expectedVersion, projection, mutation, advance, audit, pagination } from './mutations'
 import { reviewDispositions } from './record-types'
 
-interface SourceRow {
+export interface SourceRow {
   id: number, incident_id: number, digest: string, byte_length: number, canonical_json: string,
   replay_profile: SourceProjection['replayProfile'], evidence: SourceProjection['evidence'], uploader_id: number, uploaded_at_iso: string, created_sequence: number,
 }
@@ -59,7 +59,7 @@ async function scopedObservation(handle: Reader, key: string, id: number): Promi
   const row = asRow<ObservationRow>(await handle.selectFrom('public_safety_observations').innerJoin('public_safety_sources', 'public_safety_sources.id', '=', 'public_safety_observations.source_id').innerJoin('public_safety_incidents', 'public_safety_incidents.id', '=', 'public_safety_sources.incident_id').select([...observationFields.map(field => `public_safety_observations.${field}`), 'public_safety_sources.digest as source_digest']).where('public_safety_incidents.incident_key', '=', key).where('public_safety_observations.id', '=', id).executeTakeFirst())
   return row ?? unavailable()
 }
-function verifyStoredSource(row: SourceRow): PublicSafetyRun {
+export function verifyStoredSource(row: SourceRow): PublicSafetyRun {
   sourceProjection(row)
   if (typeof row.canonical_json !== 'string' || row.canonical_json.length > publicSafetyEvidenceLimits.recordingBytes || bytes(row.canonical_json) !== row.byte_length || digestOf(row.canonical_json) !== row.digest) inconsistent()
   try {
@@ -69,7 +69,7 @@ function verifyStoredSource(row: SourceRow): PublicSafetyRun {
   }
   catch { return inconsistent() }
 }
-function matchConfig(run: PublicSafetyRun, incident: IncidentRow, incoming = false): void {
+export function matchConfig(run: PublicSafetyRun, incident: IncidentRow, incoming = false): void {
   const config = run.plan.config
   if (publicSafetyRecordingData(config) !== incident.config_json) {
     if (incoming) throw new PublicSafetyAccessError(422, 'Source does not match this incident scope')

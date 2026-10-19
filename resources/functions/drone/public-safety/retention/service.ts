@@ -76,7 +76,7 @@ async function nextScope(tx: TransactionHandle, scope: ScopeRow, changes: Partia
 }
 
 /** Metadata pages only: never select canonical source planes or private declaration text. */
-async function inventory(tx: Reader, access: Access): Promise<Pick<RetentionPreview, 'inventoryDigest' | 'counts'>> {
+async function inventory(tx: Reader, access: Access): Promise<Pick<RetentionPreview, 'inventoryDigest' | 'counts' | 'managedArtifactCount'>> {
   const digest = createHash('sha256'), counts = { sources: 0, observations: 0, reviews: 0 }
   digest.update(publicSafetyRecordingData({ key: access.incident.incident_key, version: access.incident.version, retainUntil: access.incident.retain_until, originalHold: access.originalHold, config: JSON.parse(access.incident.config_json) }))
   const fields = {
@@ -99,13 +99,31 @@ async function inventory(tx: Reader, access: Access): Promise<Pick<RetentionPrev
       after = rows.at(-1)!.id as number
     }
   }
-  return { inventoryDigest: digest.digest('hex'), counts }
+  let managedArtifactCount = 0
+  for (const kind of ['artifacts', 'files'] as const) {
+    let after = 0
+    const columns = kind === 'artifacts'
+      ? ['id', 'artifact_key', 'source_id', 'source_digest', 'version', 'generation', 'state', 'plan_digest', 'file_count', 'total_planned_bytes', 'manifest_sha256', 'prepared_at_iso', 'completed_at_iso']
+      : ['id', 'artifact_id', 'ordinal', 'relative_path', 'planned_bytes', 'sha256', 'identity_json', 'observed_bytes', 'observed_sha256']
+    const table = kind === 'artifacts' ? 'public_safety_managed_artifacts' : 'public_safety_managed_artifact_files'
+    for (;;) {
+      const owned = kind === 'artifacts'
+        ? tx.selectFrom(table).where('public_safety_managed_artifacts.incident_id', '=', access.incident.id)
+        : tx.selectFrom(table).innerJoin('public_safety_managed_artifacts', 'public_safety_managed_artifacts.id', '=', 'public_safety_managed_artifact_files.artifact_id').where('public_safety_managed_artifacts.incident_id', '=', access.incident.id)
+      const rows = asRows<Record<string, string | number | null>>(await owned.select(columns.map(field => `${table}.${field}`)).where(`${table}.id`, '>', after).orderBy(`${table}.id`, 'asc').limit(100).execute())
+      for (const row of rows) digest.update(`${JSON.stringify([kind, ...columns.map(field => row[field])])}\n`)
+      if (kind === 'artifacts') managedArtifactCount += rows.length
+      if (rows.length < 100) break
+      after = rows.at(-1)!.id as number
+    }
+  }
+  return { inventoryDigest: digest.digest('hex'), counts, managedArtifactCount }
 }
 export async function previewPublicSafetyRetention(key: string): Promise<RetentionPreview> {
   await authorizePublicSafetyRetention(key, 'read')
   return transaction(async tx => {
     const access = await requirePublicSafetyRetentionAccess(key, 'read', tx)
-    return { key, incidentVersion: access.incident.version, retainUntil: access.incident.retain_until, expired: Date.parse(access.incident.retain_until) <= Date.now(), originalHold: access.originalHold, ...await inventory(tx, access), managedArtifactCount: 0, ...flags }
+    return { key, incidentVersion: access.incident.version, retainUntil: access.incident.retain_until, expired: Date.parse(access.incident.retain_until) <= Date.now(), originalHold: access.originalHold, ...await inventory(tx, access), ...flags }
   })
 }
 export async function enrollPublicSafetyRetention(key: string, input: unknown): Promise<RetentionReceipt> {

@@ -1,6 +1,7 @@
 {
   "extends": "../tsconfig.json",
   "include": [
+    "../storage/framework/types/env.d.ts",
     "../bin/drone.ts",
     "../resources/functions/drone/drivers/**/*.ts",
     "../resources/functions/drone/udp.ts",
