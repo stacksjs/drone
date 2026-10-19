@@ -154,6 +154,46 @@ vehicle loop alive, restore a whole runtime, arm hardware or execute a physical 
 payload identities prevent duplicate pure-policy events in the continued trace, without claiming
 exactly-once physical delivery. These unsigned files do not authenticate a supervisor.
 
+## Portable version 2 vehicle missions
+
+The same native commands now accept v2 fixed-wing, ground, surface and subsea traces.
+Generate a private recording with the owned profile runtime:
+
+```sh
+./buddy missions:simulate --profile ground --scenario logistics --seconds 120 --output /tmp/new-ground-mission
+./buddy missions:replay /tmp/new-ground-mission/mission.json
+```
+
+`--profile` defaults to `quadcopter`, retaining the v1 behavior and optional `--plan`.
+Other profiles use their reviewed built-in plans and reject `--plan`. Omitted duration is
+45 seconds for quadcopters and 120 seconds for other profiles. A bounded run that fails to
+reach its scenario's expected outcome exits unsuccessfully, even if it saves a diagnostic trace.
+Profile scenario lists are available through `air:simulate`, `ground:simulate`,
+`surface:simulate` and `subsea:simulate` help.
+
+`missions:checkpoint`, `missions:recover`, `missions:resume` and `missions:replay` dispatch
+by explicit trace version. V1 retains its 8 MiB / 6,001-row budget; v2 retains
+16 MiB / 9,001 rows. Playback verifies the entire source before selecting an earlier epoch.
+V2 checkpoint extraction requires an exact active epoch without a pending payload command.
+A source containing later corrupt decisions is rejected even when extracting an earlier prefix.
+
+Use the same observation-file workflow described above for recovery and resume, with the
+matching v2 observation schema in `vehicles/types.ts`, including explicit `payloadAck: null`
+when there is no acknowledgement. Recovery still enters paused state. Resume requires the
+next fresh compatible supervised observation within 40 ms; a longer outage requires recovery
+first. Reference changes, lost authority, estimator loss, fence breach, insufficient reserve,
+endurance exhaustion and unsolicited or malformed acknowledgements refuse publication.
+An immediate planned abort or completed stop/landing is retained as a valid terminal decision
+with its target released. Terminal, ready and running traces cannot be implicitly resumed.
+
+The public policy APIs are `checkpointVehicleMission`, `recoverVehicleMission` and
+`resumeVehicleMission`. Version-aware recording helpers live in `missions/recording.ts`.
+Private exclusive writes validate either trace version before creating an output directory,
+preserve the source and refuse overwrite. A pending or uncertain payload is never retried
+by portable recovery. Confirmed modeled acknowledgements and event identities remain in the
+verified prefix. These are unsigned mission-process artifacts: they neither authenticate the
+observation provider nor restore a complete vehicle runtime, board or physical payload state.
+
 ## Evidence and next work
 
 The public API tests run actual owned physics for nominal, pause/resume, recovery, abort, RC override,

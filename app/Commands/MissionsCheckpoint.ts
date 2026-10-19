@@ -1,6 +1,6 @@
 import { defineCommand } from '@stacksjs/cli'
 import { print, printError } from '@stacksjs/cli/output'
-import { checkpointMission, parseMissionTrace, replayMission } from '../../resources/functions/drone/missions/engine'
+import { checkpointOwnedMission, parseOwnedMissionTrace, replayOwnedMission } from '../../resources/functions/drone/missions/recording'
 import { readMissionFile, writeMissionTrace } from '../../resources/functions/drone/missions/files'
 
 export default defineCommand({
@@ -13,9 +13,9 @@ export default defineCommand({
   async handle(options, path) {
     try {
       if (!options.output || options.atMs === undefined) throw new TypeError('Checkpoint requires --at-ms and --output')
-      const trace = checkpointMission(parseMissionTrace(await readMissionFile(path)), Number(options.atMs))
+      const trace = checkpointOwnedMission(parseOwnedMissionTrace(await readMissionFile(path, { maxBytes: 16 * 1024 * 1024 })), Number(options.atMs))
       const tracePath = await writeMissionTrace(options.output, trace)
-      print(JSON.stringify({ ...replayMission(trace).snapshot(), rows: trace.rows.length, tracePath }, null, 2))
+      print(JSON.stringify({ ...replayOwnedMission(trace).snapshot(), rows: trace.rows.length, tracePath }, null, 2))
     }
     catch (error) { printError(error instanceof Error ? error.message : String(error)); process.exitCode = 1 }
   },

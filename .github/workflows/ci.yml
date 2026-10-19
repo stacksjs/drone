@@ -68,6 +68,19 @@ jobs:
           bun -e 'const root = process.env.RUNNER_TEMP; const trace = await Bun.file(`${root}/mission-recording/mission.json`).json(); const observation = trace.rows.find(row => row.observation.nowMs === 6020).observation; await Bun.write(`${root}/mission-resume-observation.json`, JSON.stringify(observation))'
           "$GITHUB_WORKSPACE/storage/runtime-build/cli/drone" missions:resume "$RUNNER_TEMP/mission-recovered/mission.json" "$RUNNER_TEMP/mission-resume-observation.json" --output "$RUNNER_TEMP/mission-resumed"
           "$GITHUB_WORKSPACE/storage/runtime-build/cli/drone" missions:replay "$RUNNER_TEMP/mission-resumed/mission.json"
+      - name: Exercise portable v2 missions outside the checkout
+        working-directory: ${{ runner.temp }}
+        run: |
+          for profile in fixed-wing ground surface subsea; do
+            root="$RUNNER_TEMP/mission-$profile"
+            binary="$GITHUB_WORKSPACE/storage/runtime-build/cli/drone"
+            "$binary" missions:simulate --profile "$profile" --seconds 180 --output "$root-source"
+            bun -e 'const root = process.argv[1]; const trace = await Bun.file(`${root}-source/mission.json`).json(); await Bun.write(`${root}-epoch.txt`, String(trace.rows[10].observation.nowMs)); await Bun.write(`${root}-recover.json`, JSON.stringify(trace.rows[20].observation)); await Bun.write(`${root}-resume.json`, JSON.stringify(trace.rows[21].observation))' "$root"
+            "$binary" missions:checkpoint "$root-source/mission.json" --at-ms "$(cat "$root-epoch.txt")" --output "$root-checkpoint"
+            "$binary" missions:recover "$root-checkpoint/mission.json" "$root-recover.json" --output "$root-recovered"
+            "$binary" missions:resume "$root-recovered/mission.json" "$root-resume.json" --output "$root-resumed"
+            "$binary" missions:replay "$root-resumed/mission.json"
+          done
       - run: $GITHUB_WORKSPACE/storage/runtime-build/cli/drone navigation:simulate --scenario avoid-land
         working-directory: ${{ runner.temp }}
       - run: $GITHUB_WORKSPACE/storage/runtime-build/cli/drone navigation:simulate --scenario replan

@@ -169,3 +169,21 @@ export function recoverVehicleMission(trace: VehicleMissionTrace, observation: V
   if (!active(engine.snapshot().state) || engine.step(observation, 'recover').state !== 'paused') throw new TypeError('Vehicle checkpoint cannot recover without supervised compatible authority')
   return engine
 }
+/** Verify the whole recording before selecting an exact active, settled-payload prefix. */
+export function checkpointVehicleMission(trace: VehicleMissionTrace, atMs: number): VehicleMissionTrace {
+  const verified = replayVehicleMission(trace).trace()
+  if (!Number.isSafeInteger(atMs) || atMs < 0 || !verified.rows.some(row => row.observation.nowMs === atMs)) throw new RangeError('Checkpoint epoch must match a recorded observation')
+  verified.rows = verified.rows.filter(row => row.observation.nowMs <= atMs)
+  const snapshot = replayVehicleMission(verified).snapshot()
+  if (!active(snapshot.state) || snapshot.payload !== null) throw new TypeError('Vehicle mission checkpoint is not resumable or has an uncertain payload')
+  return verified
+}
+/** Operator resume never clears authority faults or retries a pending payload. */
+export function resumeVehicleMission(trace: VehicleMissionTrace, observation: VehicleMissionObservation) {
+  const engine = replayVehicleMission(trace)
+  if (engine.snapshot().state !== 'paused') throw new TypeError('Vehicle mission resume requires a paused checkpoint')
+  const result = engine.step(observation, 'resume')
+  const plannedAbort = result.state === 'aborted' && result.taskKind === 'abort'
+  if (result.state !== 'running' && result.state !== 'completed' && !plannedAbort) throw new TypeError(`Vehicle mission resume rejected: ${result.reason}`)
+  return engine
+}

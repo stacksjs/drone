@@ -1,7 +1,6 @@
 import { defineCommand } from '@stacksjs/cli'
 import { print, printError } from '@stacksjs/cli/output'
-import type { MissionObservation } from '../../resources/functions/drone/missions/engine'
-import { parseMissionTrace, resumeMission } from '../../resources/functions/drone/missions/engine'
+import { parseOwnedMissionTrace, resumeOwnedMission } from '../../resources/functions/drone/missions/recording'
 import { readMissionFile, writeMissionTrace } from '../../resources/functions/drone/missions/files'
 
 export default defineCommand({
@@ -11,12 +10,12 @@ export default defineCommand({
   async handle(options, checkpoint, observation) {
     try {
       if (!options.output) throw new TypeError('Resume requires --output')
-      const trace = parseMissionTrace(await readMissionFile(checkpoint))
+      const trace = parseOwnedMissionTrace(await readMissionFile(checkpoint, { maxBytes: 16 * 1024 * 1024 }))
       const text = await readMissionFile(observation)
-      let fresh: MissionObservation
+      let fresh: unknown
       try { fresh = JSON.parse(text) }
       catch { throw new TypeError('Invalid mission observation JSON') }
-      const engine = resumeMission(trace, fresh)
+      const engine = resumeOwnedMission(trace, fresh)
       const resumed = engine.trace()
       const tracePath = await writeMissionTrace(options.output, resumed)
       print(JSON.stringify({ ...engine.snapshot(), rows: resumed.rows.length, tracePath }, null, 2))

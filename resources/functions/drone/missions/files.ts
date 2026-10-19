@@ -1,8 +1,9 @@
 import { constants } from 'node:fs'
 import { mkdir, open } from 'node:fs/promises'
 import { resolve } from 'node:path'
-import type { MissionTrace } from './engine'
-import { missionLimits, parseMissionTrace } from './engine'
+import type { OwnedMissionTrace } from './recording'
+import { missionLimits } from './engine'
+import { parseOwnedMissionTrace } from './recording'
 /** Private local simulation artifacts only. No application storage or hardware transport is opened. */
 export async function readMissionFile(path: string, options: { preserveBom?: boolean, maxBytes?: number } = {}): Promise<string> {
   const maxBytes = options.maxBytes ?? missionLimits.bytes
@@ -23,10 +24,10 @@ export async function readMissionFile(path: string, options: { preserveBom?: boo
   }
   finally { await file.close() }
 }
-export async function writeMissionTrace(directory: string, trace: MissionTrace): Promise<string> {
+export async function writeMissionTrace(directory: string, trace: OwnedMissionTrace): Promise<string> {
   const text = JSON.stringify(trace)
   // Recompute before persistence. A completed write remains an unsigned simulator artifact.
-  parseMissionTrace(`${text}\n`)
+  parseOwnedMissionTrace(`${text}\n`)
   const root = resolve(directory)
   await mkdir(root, { mode: 0o700 })
   const path = resolve(root, 'mission.json')

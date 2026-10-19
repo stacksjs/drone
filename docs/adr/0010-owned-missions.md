@@ -39,3 +39,13 @@ first. The CLI records one policy decision without starting or restoring a vehic
 The first release does not claim physical execution, terrain following, hardware exactly-once
 payload delivery or parity with external autopilot mission systems. The detailed contract,
 evidence and remaining gates are in [the mission guide](../missions.md).
+
+## Version 2 portable decision artifacts
+
+Use the same native checkpoint/recover/resume/replay commands for explicit v2 vehicle traces.
+Dispatch to each version's existing policy validator and preserve its own row and byte limits.
+Verify full recordings before prefix selection. Refuse a pending payload at checkpoint extraction,
+require paused recovery and an explicit fresh resume, and retain valid immediate terminal releases.
+Expose profile simulation recordings through `missions:simulate --profile` so the portable workflow
+works from the compiled CLI outside the checkout. This extends policy portability, not correlated
+whole-runtime recovery or physical payload reconciliation.
