@@ -125,6 +125,8 @@ cookie CSRF, unread unauthorized bodies and alternate generic model routes. They
 Auth or the ORM, reset the application's database, or establish production identity-provider,
 distributed revocation or vehicle evidence.
 
-Issue #23 remains open for source-bound annotations and operator review, managed evidence storage
-and erasure, atomic recipient-bound team handover, an authorized operator workspace and live
-observations, plus jurisdiction, hardware, firmware interoperability and operational qualification.
+The [source, observation and review functions](public-safety-records.md) extend this access module
+with immutable verified collection sources, explicit pixel declarations and append-only review.
+Issue #23 remains open for managed hold review and evidence erasure, atomic recipient-bound team
+handover, an authorized operator workspace and live observations, plus jurisdiction, hardware,
+firmware interoperability and operational qualification.

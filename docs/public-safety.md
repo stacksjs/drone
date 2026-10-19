@@ -41,9 +41,9 @@ Replay re-executes the pinned `owned-public-safety-collection-v1` deterministic 
 
 ## Remaining full issue scope
 
-- Source-bound explicit incident annotations and append-only operator review, retaining uncertain and missing observations.
-- Native authenticated incident membership/roles on every read, write, export and live event path. Declared offline actor strings are insufficient.
-- Enforced purpose, retention/hold policy, expiry, revocation, redacted views and removal of controlled evidence copies. Offline files currently do not enforce deletion.
+- Connect persisted source-bound annotations and append-only review to the authorized workspace and live observations, retaining uncertain and missing support.
+- Extend native authenticated incident membership/roles to managed exports and live event paths. Declared offline actor strings are insufficient.
+- Managed retention/hold review, redacted views and removal of controlled evidence copies. Current API access denies expiry and revocation; offline files do not enforce deletion.
 - Recipient-, assignment-, source- and expiry-bound two-phase handover with atomic acceptance and audit. Incident responsibility and vehicle control remain separate.
 - A shared operator workspace with actual authorized live event delivery, partial searched/unsearched support and reviewed observation/handover actions.
 - Measured visible/thermal calibration, timing/heading/georeferencing, communications, legal/jurisdiction/operator qualification, real team operations, external firmware integration and bench/HIL/vehicle campaigns.
@@ -54,5 +54,7 @@ All three issue acceptance requirements remain open until their complete softwar
 
 The persisted [incident access API](public-safety-access.md) uses native Stacks accounts, tokens,
 permissions, Gates and generated models for scoped incident membership, closure and paginated
-audit. Collection artifacts keep their separate unsigned simulator evidence boundary. Annotations,
-review, managed erasure, atomic handover and the operator workspace remain part of issue #23.
+audit. The [source and review module](public-safety-records.md) retains complete verified collection
+sources, explicit supported-pixel observations and append-only reviewer declarations under the same
+native access rules. Collection artifacts keep their separate unsigned simulator evidence boundary.
+Managed erasure, atomic handover, the authorized workspace and live coordination remain in issue #23.
