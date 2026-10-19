@@ -75,9 +75,10 @@ export function openIncidentExecution(settings: ExecutionClientOptions) {
       conceal()
       publish({ notice: 'Execution availability changed. Read current status; missing metadata is unknown history.' })
     }, Math.min(delay, 2147483647))
-    publish({ execution: value, hasReservation: true, unknownStart: false, sourceExists: !!value.completion && context.catalogDigests.includes(value.completion.digest) })
+    const exists = !!value.completion && (context.catalogDigests.includes(value.completion.digest) || value.admission === 'confirmed' || view.execution?.completion?.digest === value.completion.digest && view.sourceExists)
+    publish({ execution: value, hasReservation: true, unknownStart: false, sourceExists: exists })
     if (live(value)) attach(value)
-    else closeStream()
+    else { closeStream(); publish({ connected: false }) }
   }
   function attach(value: ExecutionView) {
     if (streamFor === value.execution || !context.available) return
@@ -147,7 +148,7 @@ export function openIncidentExecution(settings: ExecutionClientOptions) {
     if (prior.scope !== next.scope) clear()
     if (!next.available) { if (prior.available) conceal(); return }
     const completion = view.execution?.completion
-    if (completion) publish({ sourceExists: next.catalogDigests.includes(completion.digest) })
+    if (completion && next.catalogDigests.includes(completion.digest)) publish({ sourceExists: true })
     if (!prior.available || prior.scope !== next.scope) void refresh()
   }
   async function start(scenario: PublicSafetyScenario, seconds: number): Promise<boolean> {
@@ -195,7 +196,7 @@ export function openIncidentExecution(settings: ExecutionClientOptions) {
   }
   async function reconcileSource(value: ExecutionView, version: number, scope: string) {
     const hash = value.completion?.digest
-    if (!hash || !settings.sourceExists) return
+    if (!hash || !settings.sourceExists || !current(version, scope) || view.execution?.execution !== value.execution) return
     const exists = await settings.sourceExists(hash)
     if (current(version, scope) && view.execution?.execution === value.execution) publish({ sourceExists: exists })
   }

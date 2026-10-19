@@ -192,6 +192,8 @@ test('uncertain admission checks its digest beyond the currently paged catalog w
     expect(checked).toBe('b'.repeat(64))
     expect(checks).toBe(1)
     expect(model.get().unknownAdmission).toBe(true)
+    model.sync(context)
+    expect(model.get().sourceExists).toBe(true)
   }
   finally { model.close() }
 })
