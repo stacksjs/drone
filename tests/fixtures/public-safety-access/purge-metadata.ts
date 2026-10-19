@@ -64,16 +64,20 @@ try {
     assert(original)
     const inspected = inspectTemporaryWorkspace(tree)
     console.log(`Actual metadata process inspection ${JSON.stringify(inspected)}`)
-    let disabled = 0
+    let disabled = 0, resultPending = false
     const stop = registerPersistentQueryHooks({ onQueryEnd(event) {
       const sql = event.sql.replace(/["`]/g, '').toLowerCase()
       if (disabled || !sql.startsWith('insert into public_safety_purge_events') || !event.params?.includes('result')) return
+      resultPending = true
+    } })
+    database.db.primary.setTransactionDefaults({ afterCommit: () => {
+      if (!resultPending || disabled) return
       disabled++
       process.env.PUBLIC_SAFETY_PURGE_ENABLED = 'false'
     } })
     let current: PurgeStatus
     try { current = await progress(key, accepted.receipt.purge.purgeKey) }
-    finally { stop() }
+    finally { stop(); database.db.primary.setTransactionDefaults({ afterCommit: undefined }) }
     if (current.state !== 'blocked') {
       assert.equal(disabled, 1); assert.equal(process.env.PUBLIC_SAFETY_PURGE_ENABLED, 'false')
       assert(current.completed.namesUnlinked > 0); assert.notEqual(current.state, 'complete')
