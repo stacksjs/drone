@@ -14,6 +14,11 @@ try {
   assert.equal(definition.traits.useApi, false)
   assert.equal(definition.dashboard.enabled, false)
   assert.equal((await database.pendingMigrationOperations()).length, 0)
+  for (let pass = 0; pass < 2; pass++) {
+    const generated = await database.generateMigrations()
+    assert(generated.isOk, String(generated.error))
+    assert.equal((await database.pendingMigrationOperations()).length, 0)
+  }
   console.log('PASS native incident schema and account security')
 }
 finally { await database.closeDatabaseConnection() }

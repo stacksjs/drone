@@ -1,9 +1,9 @@
 import assert from 'node:assert/strict'
 import { realpathSync } from 'node:fs'
-import { cp, mkdir, symlink, writeFile } from 'node:fs/promises'
+import { cp, lstat, mkdir, symlink, writeFile } from 'node:fs/promises'
 import { basename, dirname, join, resolve } from 'node:path'
 
-export async function setupIncidentDatabase() {
+export async function setupIncidentDatabase(options: { prepare?: (root: string) => Promise<void> } = {}) {
   const root = process.cwd(), source = resolve(import.meta.dir, '../../..')
   assert(basename(root).startsWith('drone-incident-access-'))
   assert.equal(join(realpathSync(dirname(process.env.DB_DATABASE_PATH!)), basename(process.env.DB_DATABASE_PATH!)), join(root, 'access.sqlite'))
@@ -12,10 +12,11 @@ export async function setupIncidentDatabase() {
   await mkdir(join(root, 'storage/framework/database'), { recursive: true })
   await writeFile(join(root, 'package.json'), '{"type":"module","private":true}')
   await writeFile(join(root, 'config/database.ts'), "export default {default:'sqlite',models:{includeFrameworkDefaults:false},connections:{sqlite:{database:process.env.DB_DATABASE_PATH}},queryLogging:{enabled:false}}")
-  await symlink(join(source, 'node_modules'), join(root, 'node_modules'))
-  await symlink(join(source, 'storage/framework/defaults'), join(root, 'storage/framework/defaults'))
+  if (!await lstat(join(root, 'node_modules')).catch(() => null)) await symlink(join(source, 'node_modules'), join(root, 'node_modules'))
+  if (!await lstat(join(root, 'storage/framework/defaults')).catch(() => null)) await symlink(join(source, 'storage/framework/defaults'), join(root, 'storage/framework/defaults'))
   // Only owned model definitions and immutable migration sources are copied, never application DB files.
   await cp(join(source, 'app/Models'), join(root, 'app/Models'), { recursive: true })
+  await options.prepare?.(root)
   await mkdir(join(root, 'resources/functions/drone/public-safety/access'), { recursive: true })
   await cp(join(source, 'resources/functions/drone/public-safety/access/types.ts'), join(root, 'resources/functions/drone/public-safety/access/types.ts'))
   await cp(join(source, 'database/migrations'), join(root, 'database/migrations'), { recursive: true })

@@ -1,5 +1,5 @@
 import type { TransactionHandle } from '@stacksjs/orm'
-import type { IncidentAbility, IncidentAuditAction, IncidentAuditProjection, IncidentProjection, MembershipChangeProjection, AssignableIncidentRole } from './types'
+import type { IncidentAbility, IncidentAuditOptions, IncidentAuditPage, IncidentAuditAction, IncidentAuditProjection, IncidentProjection, MembershipChangeProjection, AssignableIncidentRole } from './types'
 import type { IncidentRow, IncidentMemberRow } from './policy'
 import { Gate } from '@stacksjs/auth/gate'
 import { asRow, asRows, lockRow, mutationCount } from '@stacksjs/database/runtime'
@@ -135,12 +135,17 @@ export async function closePublicSafetyIncident(key: string, input: unknown): Pr
   })
 }
 
-export async function readPublicSafetyAudit(key: string): Promise<IncidentAuditProjection[]> {
+export async function readPublicSafetyAudit(key: string, options: IncidentAuditOptions = {}): Promise<IncidentAuditPage> {
+  if (!options || typeof options !== 'object' || Object.getPrototypeOf(options) !== Object.prototype || Object.getOwnPropertySymbols(options).length) throw new PublicSafetyAccessError(422, 'Invalid audit pagination')
+  const descriptors = Object.getOwnPropertyDescriptors(options)
+  if (Object.keys(descriptors).some(key => !['afterSequence', 'limit'].includes(key) || !('value' in descriptors[key]!) || !descriptors[key]!.enumerable)) throw new PublicSafetyAccessError(422, 'Invalid audit pagination')
+  const after = descriptors.afterSequence?.value === undefined ? 0 : descriptors.afterSequence.value, limit = descriptors.limit?.value === undefined ? 100 : descriptors.limit.value
+  if (!Number.isSafeInteger(after) || after < 0 || after > maximumVersion || !Number.isSafeInteger(limit) || limit < 1 || limit > 100) throw new PublicSafetyAccessError(422, 'Invalid audit pagination')
   await authorizePublicSafetyIncident(key, 'audit')
   return transaction(async tx => {
     const { incident } = await requireIncidentAccess(key, 'audit', tx)
-    const rows = asRows<{ sequence: number, actor_id: number, action: IncidentAuditAction, target_user_id: number | null, at_iso: string, details_json: string }>(await tx.selectFrom('public_safety_audits').select(['sequence', 'actor_id', 'action', 'target_user_id', 'at_iso', 'details_json']).where('incident_id', '=', incident.id).orderBy('sequence', 'asc').limit(1001).execute())
-    if (rows.length > 1000) throw new PublicSafetyAccessError(409, 'Incident audit requires bounded pagination')
-    return rows.map(row => ({ sequence: row.sequence, actorId: row.actor_id, action: row.action, targetUserId: row.target_user_id, at: row.at_iso, details: JSON.parse(row.details_json) }))
+    const rows = asRows<{ sequence: number, actor_id: number, action: IncidentAuditAction, target_user_id: number | null, at_iso: string, details_json: string }>(await tx.selectFrom('public_safety_audits').select(['sequence', 'actor_id', 'action', 'target_user_id', 'at_iso', 'details_json']).where('incident_id', '=', incident.id).where('sequence', '>', after).orderBy('sequence', 'asc').limit(limit + 1).execute())
+    const entries = rows.slice(0, limit).map(row => ({ sequence: row.sequence, actorId: row.actor_id, action: row.action, targetUserId: row.target_user_id, at: row.at_iso, details: JSON.parse(row.details_json) }))
+    return { entries, cursor: entries.at(-1)?.sequence ?? after, hasMore: rows.length > limit }
   })
 }

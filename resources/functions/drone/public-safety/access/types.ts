@@ -30,3 +30,13 @@ export interface MembershipChangeProjection {
   incident: IncidentProjection
   membership: { userId: number, role: IncidentRole, active: boolean, version: number }
 }
+
+export interface IncidentAuditOptions {
+  afterSequence?: number
+  limit?: number
+}
+export interface IncidentAuditPage {
+  entries: IncidentAuditProjection[]
+  cursor: number
+  hasMore: boolean
+}

@@ -18,7 +18,7 @@ test('native incident accounts preserve password security and generated schema c
     expect(stdout).toContain('PASS native incident schema and account security')
   }
   finally { await rm(directory, { recursive: true, force: true }) }
-}, 60000)
+}, 180000)
 
 test('native token principals create, read and atomically coordinate incident membership', async () => {
   const directory = await mkdtemp(join(tmpdir(), 'drone-incident-access-'))
@@ -31,6 +31,7 @@ test('native token principals create, read and atomically coordinate incident me
     const [code, stdout, stderr] = await Promise.all([child.exited, new Response(child.stdout).text(), new Response(child.stderr).text()])
     expect(code, `${stdout}\n${stderr}`).toBe(0)
     expect(stdout).toContain('PASS native incident creation, membership, audit and policy')
+    expect(stdout).toContain('PASS native revocation, retention, CAS, rollback, pagination and durability')
   }
   finally { await rm(directory, { recursive: true, force: true }) }
-}, 60000)
+}, 180000)
