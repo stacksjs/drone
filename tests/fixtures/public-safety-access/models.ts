@@ -16,7 +16,7 @@ try {
   assert.equal((await database.pendingMigrationOperations()).length, 0)
   for (let pass = 0; pass < 2; pass++) {
     const generated = await database.generateMigrations()
-    assert(generated.isOk, String(generated.error))
+    if (generated.isErr) throw generated.error
     assert.equal((await database.pendingMigrationOperations()).length, 0)
   }
   console.log('PASS native incident schema and account security')

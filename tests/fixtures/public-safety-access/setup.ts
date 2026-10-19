@@ -25,10 +25,10 @@ export async function setupIncidentDatabase(options: { prepare?: (root: string) 
   await overridesReady
   const database = await import('@stacksjs/database')
   await database.ensureDatabaseConfigLoaded()
-  database.initializeDbConfig({ app: { env: 'test' }, database: { default: 'sqlite', connections: { sqlite: { database: process.env.DB_DATABASE_PATH } }, models: { includeFrameworkDefaults: false }, queryLogging: { enabled: false } } })
+  database.initializeDbConfig({ app: { env: 'test' }, database: { default: 'sqlite', connections: { sqlite: { database: process.env.DB_DATABASE_PATH } }, queryLogging: { enabled: false } } })
   assert.equal((await database.migrateAuthTables()).success, true)
   const migrated = await database.runDatabaseMigration()
-  assert(migrated.isOk, String(migrated.error))
+  if (migrated.isErr) throw migrated.error
   assert.equal((await database.migrateAuthTables()).success, true)
   assert.equal((await database.migrateRbacTables()).success, true)
   const { ormReady } = await import('@stacksjs/orm')

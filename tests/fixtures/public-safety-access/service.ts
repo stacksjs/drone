@@ -17,12 +17,14 @@ const { sqlDateTime } = await import('@stacksjs/database/runtime')
 const { enhanceRequest, runWithRequest } = await import('@stacksjs/router')
 const { setAmbientRequestContext } = await import('@stacksjs/router/request-context')
 setAmbientRequestContext(true)
+// The native enhancer mutates a Request; its declaration requires the resulting enriched type.
+const nativeRequest = (init: RequestInit) => enhanceRequest(new Request('https://incident.invalid/api/public-safety/incidents', init) as Parameters<typeof enhanceRequest>[0])
 Gate.define('public-safety:create', publicSafetyCreateGate)
 for (const ability of ['view', 'audit', 'manage-members', 'close'] as const) Gate.define(`public-safety:${ability}`, (user, key) => publicSafetyIncidentGate(user, key, ability))
 try {
   if (process.env.INCIDENT_DURABILITY_READ === '1') {
     const saved = JSON.parse(await readFile(join(process.cwd(), 'durability.json'), 'utf8'))
-    await runWithRequest(enhanceRequest(new Request('https://incident.invalid/api/public-safety/incidents', { headers: { authorization: `Bearer ${saved.token}` } })), async () => {
+    await runWithRequest(nativeRequest({ headers: { authorization: `Bearer ${saved.token}` } }), async () => {
       const incident = await readPublicSafetyIncident(saved.key)
       assert.equal(incident.status, 'closed')
       assert.equal(incident.version, 3)
@@ -39,7 +41,7 @@ try {
   await Rbac.givePermission(observer.id, 'public-safety:access', 'web')
   const token = await createToken(coordinator.id, 'fixture', ['public-safety:read', 'public-safety:coordinate'], { withRefreshToken: false })
   const other = await createToken(observer.id, 'fixture', ['public-safety:read', 'public-safety:coordinate'], { withRefreshToken: false })
-  const as = <T>(credential: string | null, action: () => Promise<T>) => runWithRequest(enhanceRequest(new Request('https://incident.invalid/api/public-safety/incidents', { headers: credential ? { authorization: `Bearer ${credential}` } : {} })), action)
+  const as = <T>(credential: string | null, action: () => Promise<T>) => runWithRequest(nativeRequest({ headers: credential ? { authorization: `Bearer ${credential}` } : {} }), action)
   const status = (code: number) => (error: unknown) => error instanceof PublicSafetyAccessError && error.status === code
   const config = examplePublicSafetyConfig()
   config.retention.expiresAt = new Date(Date.now() + 86400000).toISOString()
@@ -188,7 +190,7 @@ try {
   await as(token.plainTextToken, () => createPublicSafetyIncident({ config: retained }))
   assert.equal((await readMain(retention)).status, 'active')
   await Bun.sleep(Math.max(0, Date.parse(retained.retention.expiresAt) - Date.now()))
-  for (const action of [() => readPublicSafetyIncident(retention), () => readPublicSafetyAudit(retention), () => closePublicSafetyIncident(retention, { expectedVersion: 1 }), () => changePublicSafetyMembership(retention, { expectedVersion: 1, userId: observer.id, role: 'observer' })]) await assert.rejects(() => as(token.plainTextToken, action), status(404))
+  for (const action of [() => readPublicSafetyIncident(retention), () => readPublicSafetyAudit(retention), () => closePublicSafetyIncident(retention, { expectedVersion: 1 }), () => changePublicSafetyMembership(retention, { expectedVersion: 1, userId: observer.id, role: 'observer' })]) await assert.rejects(() => as<unknown>(token.plainTextToken, action), status(404))
   for (const expiresAt of [new Date(Date.now() - 1).toISOString(), new Date(Date.now() + 367 * 86400000).toISOString()]) await assert.rejects(() => as(token.plainTextToken, () => createPublicSafetyIncident({ config: { ...configFor('invalid-retention'), retention: { ...config.retention, expiresAt } } })), status(422))
 
   const longAudit = 'native-unbounded-history'
