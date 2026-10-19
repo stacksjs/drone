@@ -34,6 +34,9 @@ export default defineGates({
     'public-safety:audit': (user, key: string) => publicSafetyIncidentGate(user, key, 'audit'),
     'public-safety:manage-members': (user, key: string) => publicSafetyIncidentGate(user, key, 'manage-members'),
     'public-safety:close': (user, key: string) => publicSafetyIncidentGate(user, key, 'close'),
+    'public-safety:source-register': (user, key: string) => publicSafetyIncidentGate(user, key, 'source-register'),
+    'public-safety:observation-create': (user, key: string) => publicSafetyIncidentGate(user, key, 'observation-create'),
+    'public-safety:review-append': (user, key: string) => publicSafetyIncidentGate(user, key, 'review-append'),
     /** Check if user can access admin area */
     'access-admin': (user: UserModel | null) => {
       return user?.email?.endsWith('@stacksjs.com') ?? false

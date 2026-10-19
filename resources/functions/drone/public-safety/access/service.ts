@@ -1,8 +1,7 @@
-import type { TransactionHandle } from '@stacksjs/orm'
-import type { IncidentAbility, IncidentAuditOptions, IncidentAuditPage, IncidentAuditAction, IncidentAuditProjection, IncidentProjection, MembershipChangeProjection, AssignableIncidentRole } from './types'
+import type { IncidentAbility, IncidentAuditOptions, IncidentAuditPage, IncidentAuditAction, IncidentProjection, MembershipChangeProjection, AssignableIncidentRole } from './types'
 import type { IncidentRow, IncidentMemberRow } from './policy'
 import { Gate } from '@stacksjs/auth/gate'
-import { asRow, asRows, lockRow, mutationCount } from '@stacksjs/database/runtime'
+import { asRow, asRows, lockRow } from '@stacksjs/database/runtime'
 import { isUniqueViolation, transaction } from '@stacksjs/orm'
 import { planPublicSafetyMission } from '../planner'
 import { publicSafetyRecordingData } from '../evidence'
@@ -10,27 +9,9 @@ import { PublicSafetyAccessError } from './errors'
 import { requirePublicSafetyPrincipal } from './principal'
 import { requireIncidentAccess, validateIncidentKey } from './policy'
 
+import { maximumVersion, exactRecord, expectedVersion, projection, audit, mutation, advance, pagination } from './mutations'
+
 export { PublicSafetyAccessError } from './errors'
-const maximumVersion = 2147483647
-
-function exactRecord(input: unknown, keys: string[]): Record<string, unknown> {
-  if (!input || typeof input !== 'object' || Object.getPrototypeOf(input) !== Object.prototype || Object.getOwnPropertySymbols(input).length) throw new PublicSafetyAccessError(422, 'Invalid incident action fields')
-  const descriptors = Object.getOwnPropertyDescriptors(input)
-  if (Object.keys(descriptors).length !== keys.length || keys.some(key => !descriptors[key] || !('value' in descriptors[key]!) || !descriptors[key]!.enumerable)) throw new PublicSafetyAccessError(422, 'Invalid incident action fields')
-  return Object.fromEntries(keys.map(key => [key, descriptors[key]!.value]))
-}
-function expectedVersion(value: unknown): number {
-  if (!Number.isSafeInteger(value) || (value as number) < 1 || (value as number) >= maximumVersion) throw new PublicSafetyAccessError(422, 'Invalid incident version')
-  return value as number
-}
-function projection(incident: IncidentRow, member: IncidentMemberRow): IncidentProjection {
-  let plan: ReturnType<typeof planPublicSafetyMission>
-  try { plan = planPublicSafetyMission(JSON.parse(incident.config_json)) }
-  catch { throw new PublicSafetyAccessError(409, 'Stored incident scope is unavailable') }
-  if (plan.config.id !== incident.incident_key || plan.config.revision !== incident.revision || plan.config.purpose !== incident.purpose || plan.config.retention.expiresAt !== incident.retain_until) throw new PublicSafetyAccessError(409, 'Stored incident scope is inconsistent')
-  return { key: incident.incident_key, version: incident.version, status: incident.status, purpose: incident.purpose, revision: incident.revision, config: plan.config, retainUntil: incident.retain_until, coordinatorId: incident.coordinator_id, membership: { role: member.role, version: member.version }, identityAuthenticated: true, physicalFlightEnabled: false }
-}
-
 export async function authorizePublicSafetyCreate(): Promise<void> {
   const principal = await requirePublicSafetyPrincipal('coordinate', true)
   if (!await Gate.allows('public-safety:create', principal.user)) throw new PublicSafetyAccessError(403, 'Incident creation is not permitted')
@@ -40,16 +21,12 @@ export async function authorizePublicSafetyIncident(key: string, ability: Incide
   const principal = await requirePublicSafetyPrincipal(ability === 'view' || ability === 'audit' ? 'read' : 'coordinate')
   if (!await Gate.allows(`public-safety:${ability}`, principal.user, key)) throw new PublicSafetyAccessError(403, 'This incident action is not permitted')
 }
-async function audit(tx: TransactionHandle, incident: IncidentRow, actorId: number, action: IncidentAuditAction, targetUserId: number | null, details: IncidentAuditProjection['details']) {
-  const at = new Date().toISOString()
-  await tx.insertInto('public_safety_audits').values({ incident_id: incident.id, sequence: incident.version, actor_id: actorId, action, target_user_id: targetUserId, at_iso: at, details_json: JSON.stringify(details), created_at: at, updated_at: at }).execute()
-}
-
 export async function createPublicSafetyIncident(input: unknown): Promise<IncidentProjection> {
   const body = exactRecord(input, ['config'])
   let plan: ReturnType<typeof planPublicSafetyMission>
   try { plan = planPublicSafetyMission(body.config) }
   catch { throw new PublicSafetyAccessError(422, 'Invalid incident configuration') }
+  validateIncidentKey(plan.config.id)
   const expiry = Date.parse(plan.config.retention.expiresAt)
   if (expiry <= Date.now() || expiry - Date.now() > 366 * 86400000) throw new PublicSafetyAccessError(422, 'Incident retention must expire within the next 366 days')
   const configJson = publicSafetyRecordingData(plan.config)
@@ -82,23 +59,6 @@ export async function readPublicSafetyIncident(key: string): Promise<IncidentPro
     const { incident, member } = await requireIncidentAccess(key, 'view', tx)
     return projection(incident, member)
   })
-}
-
-async function mutation<T>(key: string, ability: 'manage-members' | 'close', expected: number, work: (tx: TransactionHandle, access: Awaited<ReturnType<typeof requireIncidentAccess>>) => Promise<T>): Promise<T> {
-  return transaction(async tx => {
-    const row = asRow<IncidentRow>(await lockRow(tx, 'public_safety_incidents', { incident_key: key }))
-    if (!row) throw new PublicSafetyAccessError(404, 'Incident is unavailable')
-    const access = await requireIncidentAccess(key, ability, tx, row)
-    if (access.incident.version !== expected) throw new PublicSafetyAccessError(409, 'Incident version has changed')
-    return work(tx, access)
-  })
-}
-async function advance(tx: TransactionHandle, incident: IncidentRow, closed = false): Promise<IncidentRow> {
-  if (incident.version >= maximumVersion) throw new PublicSafetyAccessError(409, 'Incident version capacity reached')
-  const next = { ...incident, version: incident.version + 1, ...(closed ? { status: 'closed' as const } : {}) }
-  const result = await tx.updateTable('public_safety_incidents').set({ version: next.version, status: next.status, updated_at: new Date().toISOString() }).where('id', '=', incident.id).where('version', '=', incident.version).executeTakeFirst()
-  if (mutationCount(result) !== 1) throw new PublicSafetyAccessError(409, 'Incident version has changed')
-  return next
 }
 
 export async function changePublicSafetyMembership(key: string, input: unknown): Promise<MembershipChangeProjection> {
@@ -136,11 +96,7 @@ export async function closePublicSafetyIncident(key: string, input: unknown): Pr
 }
 
 export async function readPublicSafetyAudit(key: string, options: IncidentAuditOptions = {}): Promise<IncidentAuditPage> {
-  if (!options || typeof options !== 'object' || Object.getPrototypeOf(options) !== Object.prototype || Object.getOwnPropertySymbols(options).length) throw new PublicSafetyAccessError(422, 'Invalid audit pagination')
-  const descriptors = Object.getOwnPropertyDescriptors(options)
-  if (Object.keys(descriptors).some(key => !['afterSequence', 'limit'].includes(key) || !('value' in descriptors[key]!) || !descriptors[key]!.enumerable)) throw new PublicSafetyAccessError(422, 'Invalid audit pagination')
-  const after = descriptors.afterSequence?.value === undefined ? 0 : descriptors.afterSequence.value, limit = descriptors.limit?.value === undefined ? 100 : descriptors.limit.value
-  if (!Number.isSafeInteger(after) || after < 0 || after > maximumVersion || !Number.isSafeInteger(limit) || limit < 1 || limit > 100) throw new PublicSafetyAccessError(422, 'Invalid audit pagination')
+  const { after, limit } = pagination(options)
   await authorizePublicSafetyIncident(key, 'audit')
   return transaction(async tx => {
     const { incident } = await requireIncidentAccess(key, 'audit', tx)

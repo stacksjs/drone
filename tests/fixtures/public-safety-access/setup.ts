@@ -3,7 +3,7 @@ import { realpathSync } from 'node:fs'
 import { cp, lstat, mkdir, symlink, writeFile } from 'node:fs/promises'
 import { basename, dirname, join, resolve } from 'node:path'
 
-export async function setupIncidentDatabase(options: { prepare?: (root: string) => Promise<void> } = {}) {
+export async function setupIncidentDatabase(options: { prepare?: (root: string) => Promise<void>, prepareMigrations?: (root: string) => Promise<void> } = {}) {
   const root = process.cwd(), source = resolve(import.meta.dir, '../../..')
   assert(basename(root).startsWith('drone-incident-access-'))
   assert.equal(join(realpathSync(dirname(process.env.DB_DATABASE_PATH!)), basename(process.env.DB_DATABASE_PATH!)), join(root, 'access.sqlite'))
@@ -19,8 +19,10 @@ export async function setupIncidentDatabase(options: { prepare?: (root: string) 
   await options.prepare?.(root)
   await mkdir(join(root, 'resources/functions/drone/public-safety/access'), { recursive: true })
   await cp(join(source, 'resources/functions/drone/public-safety/access/types.ts'), join(root, 'resources/functions/drone/public-safety/access/types.ts'))
+  await cp(join(source, 'resources/functions/drone/public-safety/access/record-types.ts'), join(root, 'resources/functions/drone/public-safety/access/record-types.ts'))
   await cp(join(source, 'database/migrations'), join(root, 'database/migrations'), { recursive: true })
   await cp(join(source, 'storage/framework/database/model-snapshot.sqlite.json'), join(root, 'storage/framework/database/model-snapshot.sqlite.json'))
+  await options.prepareMigrations?.(root)
   const { overridesReady } = await import('@stacksjs/config')
   await overridesReady
   const database = await import('@stacksjs/database')

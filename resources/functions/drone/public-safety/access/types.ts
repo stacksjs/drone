@@ -3,8 +3,9 @@ import type { PublicSafetyConfig, IncidentPurpose } from '../types'
 export const incidentRoles = ['coordinator', 'pilot', 'observer', 'reviewer', 'evidence-custodian'] as const
 export type IncidentRole = typeof incidentRoles[number]
 export type AssignableIncidentRole = Exclude<IncidentRole, 'coordinator'>
-export type IncidentAbility = 'view' | 'audit' | 'manage-members' | 'close'
-export type IncidentAuditAction = 'created' | 'member-granted' | 'member-revoked' | 'closed'
+export const incidentAbilities = ['view', 'audit', 'manage-members', 'close', 'source-register', 'observation-create', 'review-append'] as const
+export type IncidentAbility = typeof incidentAbilities[number]
+export type IncidentAuditAction = 'created' | 'member-granted' | 'member-revoked' | 'closed' | 'source-registered' | 'observation-created' | 'review-appended'
 export interface IncidentProjection {
   key: string
   version: number
