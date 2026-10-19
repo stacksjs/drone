@@ -5,6 +5,8 @@ import { createApplicationController } from '../../resources/functions/drone/app
 import { simulateApplication, applicationScenarios } from '../../resources/functions/drone/application/runtime'
 import { createGroundProfile } from '../../resources/functions/drone/vehicles/ground/profile'
 import { runVehicleSimulation } from '../../resources/functions/drone/vehicles/runtime'
+import type { ApplicationControllerInput } from '../../resources/functions/drone/application/runtime-types'
+import { planApplication } from '../../resources/functions/drone/application/planner'
 
 // Public plant/runtime seams verify real modeled integration and qualified controller replay.
 // They do not qualify real metering, physical isolation or field deposition.
@@ -33,6 +35,69 @@ test('seven-channel plant meters actual material with finite response, independe
   expect(stopped.remainingAmount + stopped.emittedAmount).toBeCloseTo(config.material.initialAmount, 12)
 })
 
+function qualifiedInput(atMs = 600): ApplicationControllerInput {
+  return { atMs, enabled: true, reference: '55:0,0,0,0,0', missionState: 'running', taskId: 'apply-1', ground: { healthy: true, reason: 'ground-encoder-gnss-fused', positionM: [3, 0, 0], speedMps: .5, wheelSpeedMps: .5, yawRad: 0, yawRateRadS: 0, obstacleM: 20, personM: 20, onSurface: true, stopped: false, guardClosed: true, emergency: false, uncertaintyM: .05 }, feedback: { sequence: (atMs - 600) / 20 + 1, capturedAtMs: atMs - 40, pulseCount: 0, scaleRaw: 11000, primaryEncoder: 0, masterEncoder: 0, energyEncoder: 0 }, weather: { windMps: [0, 0], temperatureC: 20, humidityPercent: 60, inversion: false, capturedAtMs: atMs }, grant: atMs === 600 ? { action: 'grant', sequence: 1, issuedAtMs: atMs, expiresAtMs: atMs + 200, visitId: 'public-test', configId: 'inert-sprayer', materialId: 'inert-water', reference: '55:0,0,0,0,0' } : null, emergency: false }
+}
+
+test('qualified estimated speed and explicit prescription determine rate with no positive floor at zero speed or during turns', () => {
+  const config = exampleApplicationConfig(), options = { visitId: 'public-test', authorizeImplement: true, testMode: false }
+  expect(createApplicationController(config, options).step(qualifiedInput()).targetPerSecond).toBeCloseTo(.008, 12)
+  const faster = qualifiedInput(); faster.ground.speedMps = .75
+  expect(createApplicationController(config, options).step(faster).targetPerSecond).toBeCloseTo(.012, 12)
+  for (const change of ['zero', 'turn', 'outside', 'dry-task', 'no-grant'] as const) {
+    const input = qualifiedInput()
+    if (change === 'zero') input.ground.speedMps = 0
+    if (change === 'turn') input.ground.yawRateRadS = .5
+    if (change === 'outside') input.ground.positionM = [7, 0, 0]
+    if (change === 'dry-task') input.taskId = 'home'
+    if (change === 'no-grant') input.grant = null
+    const decision = createApplicationController(config, options).step(input)
+    expect(decision.targetPerSecond).toBe(0)
+    expect(decision.channels).toEqual([0, 0, 0])
+  }
+})
+
+test('whole forecast footprint guards exclusions and prescription boundaries with uncertainty and transport margin', () => {
+  const config = exampleApplicationConfig(), options = { visitId: 'public-test', authorizeImplement: true, testMode: false }
+  config.prescription = [{ id: 'south-rate', polygon: [[1, -1], [3.5, -1], [3.5, 1], [1, 1]], ratePerHa: 200 }, { id: 'north-rate', polygon: [[3.5, -1], [6, -1], [6, 1], [3.5, 1]], ratePerHa: 300 }]
+  const validated = planApplication(config).config
+  for (const [north, expected, zone] of [[2, .008, 'south-rate'], [5, .012, 'north-rate']] as const) {
+    const input = qualifiedInput(); input.ground.positionM[0] = north
+    const decision = createApplicationController(validated, options).step(input)
+    expect(decision.targetPerSecond).toBeCloseTo(expected, 12)
+    expect(decision.prescriptionId).toBe(zone)
+  }
+  const straddling = qualifiedInput(); straddling.ground.positionM[0] = 3.5
+  expect(createApplicationController(validated, options).step(straddling).targetPerSecond).toBe(0)
+  const guarded = exampleApplicationConfig()
+  guarded.exclusions = [[[3.4, -.2], [3.7, -.2], [3.7, .2], [3.4, .2]]]
+  const decision = createApplicationController(planApplication(guarded).config, options).step(qualifiedInput())
+  expect(decision.reason).toBe('application-footprint-guard')
+  expect(decision.targetPerSecond).toBe(0)
+})
+
+test('explicit lease scope, instrument freshness, replay and missing feedback cannot authorize continuous metering', () => {
+  const config = exampleApplicationConfig(), options = { visitId: 'public-test', authorizeImplement: true, testMode: false }
+  const wrongMaterial = qualifiedInput(); wrongMaterial.grant!.materialId = 'other-material'
+  expect(createApplicationController(config, options).step(wrongMaterial).reason).toBe('application-grant-invalid')
+  for (const change of ['missing', 'stale'] as const) {
+    const input = qualifiedInput()
+    if (change === 'missing') input.feedback = null
+    else input.feedback!.capturedAtMs = 400
+    expect(createApplicationController(config, options).step(input).reason).toBe('application-meter-unavailable')
+  }
+  const replay = createApplicationController(config, options)
+  replay.step(qualifiedInput())
+  const changed = qualifiedInput(620); changed.feedback!.sequence = 1
+  expect(replay.step(changed).reason).toBe('application-meter-replay')
+  const lease = createApplicationController(config, options)
+  lease.step(qualifiedInput())
+  for (let atMs = 620; atMs < 800; atMs += 20) lease.step(qualifiedInput(atMs))
+  const expired = lease.step(qualifiedInput(800))
+  expect(expired.reason).toBe('application-grant-expired')
+  expect(expired.channels).toEqual([0, 0, 0])
+})
+
 test('implement authority defaults dry and requires both an explicit grant and apply mode independently of vehicle arming', () => {
   for (const options of [{}, { authorizeImplement: true }, { testMode: false }]) {
     const run = simulateApplication(options)
@@ -47,6 +112,8 @@ test('both inert implements use actual ground movement, measured feedback and re
   for (const type of ['sprayer', 'spreader'] as const) {
     const run = simulateApplication({ config: exampleApplicationConfig(type), authorizeImplement: true, testMode: false })
     expect(run.status).toBe('completed')
+    expect(run.reason).toBe('stopped')
+    expect(run.decisions.some(decision => decision.state === 'latched')).toBe(false)
     expect(run.final.emittedAmount).toBeGreaterThan(.001)
     expect(run.releases.reduce((sum, release) => sum + release.amount, 0)).toBeCloseTo(run.final.emittedAmount, 12)
     expect(run.final.remainingAmount + run.final.emittedAmount + run.final.unmeteredLossAmount).toBeCloseTo(run.config.material.initialAmount, 12)
@@ -64,8 +131,8 @@ test('both inert implements use actual ground movement, measured feedback and re
 })
 
 test('application faults are exercised after actual discharge and latch despite transient instrument recovery', () => {
-  for (const scenario of applicationScenarios.filter(name => name !== 'nominal')) {
-    const run = simulateApplication({ scenario, authorizeImplement: true, testMode: false })
+  for (const type of ['sprayer', 'spreader'] as const) for (const scenario of applicationScenarios.filter(name => name !== 'nominal')) {
+    const run = simulateApplication({ config: exampleApplicationConfig(type), scenario, authorizeImplement: true, testMode: false })
     expect(run.final.emittedAmount).toBeGreaterThan(0)
     expect(run.faultDemonstrated).toBe(true)
     expect(['blocked', 'host-lost']).toContain(run.status)

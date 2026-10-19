@@ -20,7 +20,7 @@ export function simulateApplication(options: ApplicationOptions = {}): Applicati
   let plant: ApplicationPlant | null = null, faultAtMs: number | null = null, hostLossAtMs: number | null = null, faultInjected = false
   let lastTaskId: string | null = null, lastDecision: ApplicationDecision | null = null, shutdownAt: number | null = null
   let releaseAmount = 0, releaseHostAvailable = true, lastProbe: ApplicationProbe | null = null
-  function activeFault(nowMs: number) { return faultAtMs !== null && nowMs >= faultAtMs && (scenario === 'master-stuck' || nowMs < faultAtMs + 2000) }
+  function activeFault(nowMs: number) { return faultAtMs !== null && nowMs >= faultAtMs && (scenario === 'master-stuck' || scenario === 'stuck-valve' || nowMs < faultAtMs + 2000) }
   function flushRelease(probe: ApplicationProbe) {
     if (releaseAmount > 0) releases.push({ atMs: probe.atMs, amount: releaseAmount, positionM: [...probe.positionM], yawRad: probe.yawRad, windMps: [...config.weather.windMps], taskId: releaseHostAvailable ? lastTaskId : null, hostAvailable: releaseHostAvailable, positionEvidence: 'modeled-plant-truth' })
     releaseAmount = 0; releaseHostAvailable = true

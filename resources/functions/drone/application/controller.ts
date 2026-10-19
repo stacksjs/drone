@@ -55,10 +55,10 @@ export function createApplicationController(config: ApplicationConfig, options: 
     if (i.grant) {
       const g = i.grant
       if (!Number.isSafeInteger(g.sequence) || g.sequence !== grantSequence + 1 || g.issuedAtMs !== i.atMs || !Number.isSafeInteger(g.expiresAtMs) || g.expiresAtMs < i.atMs || g.expiresAtMs > i.atMs + 500 || g.visitId !== options.visitId || g.configId !== config.id || g.materialId !== config.material.id || g.reference !== i.reference || !['grant', 'renew', 'revoke'].includes(g.action) || g.action === 'renew' && lease === null) latch ??= 'application-grant-invalid'
-      else { grantSequence = g.sequence; lease = g.action === 'revoke' ? null : { ...g }; if (g.action === 'revoke' && wasApplying) latch ??= 'application-grant-revoked' }
+      else { grantSequence = g.sequence; lease = g.action === 'revoke' ? null : { ...g }; if (g.action === 'revoke' && wasApplying && i.missionState !== 'completed') latch ??= 'application-grant-revoked' }
     }
     if (wasApplying && lease && i.atMs >= lease.expiresAtMs) latch ??= 'application-grant-expired'
-    if (wasApplying && !i.enabled) latch ??= 'application-vehicle-authority-lost'
+    if (wasApplying && !i.enabled && i.missionState !== 'completed') latch ??= 'application-vehicle-authority-lost'
     if (i.emergency) latch ??= 'application-emergency-stop'
     if (i.enabled && !o.healthy) latch ??= o.reason
     if (i.enabled && (!o.guardClosed || o.emergency || !o.onSurface || o.personM <= 2 || o.obstacleM <= 1)) latch ??= 'application-safety-interlock'
