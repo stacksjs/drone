@@ -1,11 +1,18 @@
 <script client>
 import type { AssignableIncidentRole } from '../functions/drone/public-safety/access/types'
+import type { PublicSafetyScenario } from '../functions/drone/public-safety/runtime-types'
+import { publicSafetyScenarios } from '../functions/drone/public-safety/runtime-types'
 import type { ReviewBinding } from '../functions/drone/public-safety/workspace/client'
 import { openIncidentWorkspace } from '../functions/drone/public-safety/workspace/client'
 import { workspaceCaptures, workspaceCapturePreview, workspacePixel } from '../functions/drone/public-safety/workspace/images'
 const model = openIncidentWorkspace()
 const workspace = state(model.get())
 const unsubscribe = model.subscribe(value => workspace.set(value))
+const execution = state(model.execution.get())
+const unsubscribeExecution = model.execution.subscribe(value => execution.set(value))
+const executionScenario = state<PublicSafetyScenario>('nominal')
+const executionSeconds = state(100)
+const executionLive = derived(() => ['waiting-for-consumer', 'running', 'stopping'].includes(execution().execution?.phase ?? ''))
 const incidentKey = state('')
 const token = state('')
 const sourceChoice = state('')
@@ -26,6 +33,7 @@ const acknowledged = state(false)
 const current = derived(() => workspace().snapshot)
 const available = derived(() => workspace().status === 'current' && !!current())
 const ready = derived(() => available() && !workspace().busy && !workspace().confirmationRequired)
+const executionReady = derived(() => available() && !!current()?.actions.canRegisterSource && !execution().busy)
 const captureData = derived(() => {
   try { return { entries: workspace().source ? workspaceCaptures(workspace().source!) : [], error: '' } }
   catch { return { entries: [], error: 'The source image planes are unavailable. No previous image is shown.' } }
@@ -55,9 +63,10 @@ effect(() => {
     if (roster !== lastRoster) { lastRoster = roster; recipientId.set('') }
   }
 })
-onDestroy(() => { unsubscribe(); model.close(); token.set('') })
+onDestroy(() => { unsubscribe(); unsubscribeExecution(); model.close(); token.set('') })
 function connect() { const credential = token(); token.set(''); model.connect(incidentKey().trim(), credential) }
 function disconnect() { token.set(''); model.disconnect() }
+function startExecution() { void model.execution.start(executionScenario(), Number(executionSeconds())) }
 function openSource() { model.selectSource(sourceChoice()) }
 function openOffer() { model.selectOffer(offerChoice()) }
 async function recordObservation() {
@@ -119,6 +128,41 @@ function short(value: string) { return value.slice(0, 12) }
         </dl>
         <p :if="!current()?.viewer.canCoordinate" class="mt-4 text-neutral-400 text-sm" data-workspace-read-only>Read-only credential. Mutation controls are unavailable.</p>
         <p :if="current()?.incident.status === 'closed'" class="mt-4 text-neutral-400 text-sm">This incident is closed. Authorized history remains readable until retention; new declarations and command replays are refused.</p>
+      </section>
+
+      <section aria-labelledby="incident-execution" class="mt-6 py-6 border-neutral-700 border-t" data-execution-panel>
+        <div class="flex flex-wrap gap-4 items-start justify-between">
+          <div class="min-w-0"><h2 id="incident-execution" class="font-semibold text-lg">Owned synthetic execution</h2><p class="mt-2 max-w-3xl leading-relaxed text-neutral-400 text-sm">Run the owned collection simulator against this incident. Progress comes from its live producer. Completion keeps a temporary unsigned recording; saving it to the source catalog requires your separate decision.</p></div>
+          <p role="status" aria-live="polite" class="text-emerald-200 text-sm" data-execution-phase>{{ execution().execution?.phase ?? 'no current run' }}</p>
+        </div>
+        <form @submit.prevent="startExecution()" class="grid gap-4 sm:grid-cols-2 mt-5">
+          <div class="min-w-0"><label for="execution-scenario" class="block mb-2 text-sm">Scenario</label><select id="execution-scenario" x-model="executionScenario" class="px-3 py-3 w-full bg-neutral-900 border border-neutral-600 rounded focus-visible:outline-emerald-200"><option :for="scenario in publicSafetyScenarios" :value="scenario">{{ scenario }}</option></select></div>
+          <div class="min-w-0"><label for="execution-seconds" class="block mb-2 text-sm">Requested virtual seconds</label><input id="execution-seconds" x-model.number="executionSeconds" type="number" required min="8" max="120" step="1" class="px-3 py-3 w-full bg-neutral-900 border border-neutral-600 rounded focus-visible:outline-emerald-200"></div>
+          <button type="submit" :disabled="!executionReady() || !!execution().execution || execution().unknownStart" class="justify-self-start px-4 py-3 text-sm border border-emerald-200 rounded focus-visible:outline-emerald-200 disabled:opacity-40" data-execution-start>Start synthetic run</button>
+        </form>
+        <p :if="!current()?.actions.canRegisterSource" class="mt-3 text-neutral-400 text-sm">A current source-registering role and coordinate credential are required to start, close or admit a run.</p>
+        <p :if="execution().error" role="alert" class="mt-4 break-words text-red-200 text-sm" data-execution-error>{{ execution().error }}</p>
+        <p :if="execution().notice" role="status" class="mt-3 break-words text-neutral-300 text-sm">{{ execution().notice }}</p>
+        <div :if="execution().execution" class="mt-5 min-w-0">
+          <p class="break-all font-mono text-neutral-400 text-xs" data-execution-id>{{ execution().execution?.execution }}</p>
+          <p class="mt-2 text-neutral-400 text-sm">{{ execution().execution?.scenario }} / requested {{ execution().execution?.requestedSeconds }} seconds / producer {{ execution().execution?.producer }}</p>
+          <p :if="execution().execution?.latestEvent" class="mt-3 break-words text-sm" data-execution-event>Live synthetic event {{ execution().execution?.latestEvent?.sequence }}: {{ execution().execution?.latestEvent?.kind }} / virtual {{ execution().execution?.latestEvent?.atMs }} ms / captures {{ execution().execution?.latestEvent?.captureCount }}</p>
+          <p :if="execution().execution?.reason" class="mt-3 break-words text-neutral-300 text-sm">Reason: {{ execution().execution?.reason }}</p>
+          <p class="mt-3 break-words text-neutral-400 text-xs">Temporary availability: {{ execution().execution?.availableUntil }}. Missing metadata after expiry or process loss is unknown history.</p>
+          <div :if="execution().execution?.completion" class="mt-5 p-4 min-w-0 bg-neutral-900 border border-neutral-700 rounded" data-execution-completion>
+            <h3 class="font-medium">Completed synthetic recording</h3>
+            <p class="mt-3 break-all font-mono text-xs" data-execution-digest>{{ execution().execution?.completion?.digest }}</p>
+            <dl class="grid gap-4 sm:grid-cols-2 mt-4 text-sm">
+              <div><dt class="text-neutral-400">Bytes / events / epochs / captures</dt><dd class="mt-1">{{ execution().execution?.completion?.byteLength }} / {{ execution().execution?.completion?.eventCount }} / {{ execution().execution?.completion?.epochCount }} / {{ execution().execution?.completion?.captureCount }}</dd></div>
+              <div><dt class="text-neutral-400">Actual virtual time / survey state</dt><dd class="mt-1 break-words">{{ execution().execution?.completion?.virtualTimeMs }} ms / {{ execution().execution?.completion?.surveyStatus }}</dd></div>
+            </dl>
+            <p class="mt-4 leading-relaxed text-neutral-400 text-sm">Fault demonstrated: {{ execution().execution?.completion?.faultDemonstrated ? 'yes' : 'no' }}. A completed synthetic run does not establish mission success or searched-area coverage. Physical outputs and physical thermal verification remain disabled.</p>
+            <p :if="execution().sourceExists" class="mt-3 text-emerald-200 text-sm" data-execution-source-exists>This digest exists in the current source catalog. This does not establish which request inserted it. Open a source explicitly to inspect its imagery.</p>
+            <button type="button" @click="model.execution.admit()" :disabled="!executionReady() || execution().execution?.phase !== 'completed' || execution().execution?.admission !== 'unsubmitted' || execution().unknownAdmission || execution().sourceExists" class="mt-4 px-4 py-3 text-sm border border-emerald-200 rounded focus-visible:outline-emerald-200 disabled:opacity-40" data-execution-admit>Admit completed source</button>
+          </div>
+          <button type="button" @click="model.execution.stop()" :disabled="!executionReady() || execution().execution?.phase === 'discarded' || execution().execution?.admission === 'submitting'" class="mt-5 px-4 py-3 text-sm border border-neutral-600 rounded focus-visible:outline-emerald-200 disabled:opacity-40" data-execution-close>{{ executionLive() ? 'Stop synthetic run' : 'Discard temporary result' }}</button>
+        </div>
+        <button type="button" @click="model.execution.refresh()" :disabled="!executionReady()" class="mt-4 text-emerald-200 text-sm underline focus-visible:outline-emerald-200 disabled:opacity-40">Read current execution status</button>
       </section>
 
       <div class="grid gap-8 lg:grid-cols-2 mt-5">
