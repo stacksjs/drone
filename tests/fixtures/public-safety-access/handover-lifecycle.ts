@@ -46,7 +46,7 @@ try {
   console.log('PASS native closed historical reads and frozen handover refusal')
 
   // Normal wall time, native afterCommit callback. No clock, Auth or ORM replacement.
-  await Bun.sleep(Math.max(1, deadline - Date.now() - 1500))
+  await Bun.sleep(Math.max(1, deadline - Date.now() - 5000))
   let committed = false
   f.database.db.primary.setTransactionDefaults({ afterCommit: async () => {
     committed = true
