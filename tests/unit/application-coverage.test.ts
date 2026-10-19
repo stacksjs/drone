@@ -9,7 +9,7 @@ function config(type: 'sprayer' | 'spreader' = 'sprayer'): ApplicationConfig {
   c.exclusions = [[[1, 1], [2, 1], [2, 2], [1, 2]]]
   c.prescription = [{ id: 'zone-a', polygon: structuredClone(c.boundary), ratePerHa: type === 'sprayer' ? 200 : 100 }]
   c.routeM = [[.5, .5], [3, .5], [3, 3]]
-  c.gridResolutionM = 1; c.implement.swathM = 2; c.implement.footprintLengthM = 2; c.implement.fallTimeS = 1
+  c.gridResolutionM = 1; c.implement.swathM = 2; c.implement.footprintLengthM = 2; c.implement.fallTimeS = 1; c.calibration.closingAllowanceMs = 3000; c.calibration.maxRatePerSecond = .1
   return c
 }
 function release(atMs: number, taskId: string | null = 'apply-a', positionM: [number, number, number] = [1, 1, 0], amount = 4): ApplicationRelease {
@@ -87,4 +87,16 @@ test('both liquid and granular units retain explicit zero coverage and missing p
     expect(report.missedAreaM2).toBeCloseTo(15, 10)
     expect(report.cells.reduce((sum, cell) => sum + cell.prescribedAmount, 0)).toBeCloseTo(type === 'sprayer' ? .3 : .15, 10)
   }
+})
+
+test('rejects hidden or shared public release data before cloning or reading accessors', () => {
+  const hidden = release(100)
+  Object.defineProperty(hidden, 'secret', { get() { throw new Error('private getter invoked') } })
+  expect(() => processApplicationReleases(config(), [hidden], 2000)).toThrow('fields')
+  const extended = [release(100)]
+  Object.defineProperty(extended, 'secret', { get() { throw new Error('private getter invoked') } })
+  expect(() => processApplicationReleases(config(), extended, 2000)).toThrow('array')
+  const position = release(100)
+  Object.setPrototypeOf(position.positionM, Object.assign([], { hidden: true }))
+  expect(() => processApplicationReleases(config(), [position], 2000)).toThrow('quantities')
 })

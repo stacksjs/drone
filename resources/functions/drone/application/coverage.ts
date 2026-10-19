@@ -14,10 +14,10 @@ function releaseFields(value: unknown, fields: readonly string[]) {
   let count = 0
   for (const key in value) if (!fields.includes(key) || ++count > fields.length) throw new TypeError('Invalid application release fields')
   for (const key of fields) { const descriptor = Object.getOwnPropertyDescriptor(value, key); if (!descriptor || !descriptor.enumerable || !('value' in descriptor)) throw new TypeError('Application release accessors or missing fields') }
-  if (count !== fields.length) throw new TypeError('Missing application release fields')
+  if (count !== fields.length || Object.getOwnPropertyNames(value).length !== fields.length || Object.getOwnPropertySymbols(value).length) throw new TypeError('Unsupported application release fields')
 }
 function tuple(value: unknown, size: number): value is number[] {
-  if (!Array.isArray(value) || value.length !== size) return false
+  if (!Array.isArray(value) || Object.getPrototypeOf(value) !== Array.prototype || value.length !== size || Object.getOwnPropertyNames(value).length !== size + 1 || Object.getOwnPropertySymbols(value).length) return false
   for (let i = 0; i < size; i++) { const descriptor = Object.getOwnPropertyDescriptor(value, String(i)); if (!descriptor || !('value' in descriptor) || typeof descriptor.value !== 'number' || !Number.isFinite(descriptor.value) || Math.abs(descriptor.value) > 10000) return false }
   return true
 }
@@ -25,6 +25,7 @@ function tuple(value: unknown, size: number): value is number[] {
 export function processApplicationReleases(input: ApplicationConfig, source: readonly ApplicationRelease[], endAtMs: number): ApplicationReport {
   const config = validateApplicationConfig(input)
   if (!Number.isSafeInteger(endAtMs) || endAtMs < 0 || endAtMs > 200000 || !Array.isArray(source) || source.length > applicationCoverageLimits.releases) throw new RangeError('Application release duration or resource bound')
+  if (Object.getPrototypeOf(source) !== Array.prototype || Object.getOwnPropertyNames(source).length !== source.length + 1 || Object.getOwnPropertySymbols(source).length) throw new TypeError('Invalid application release array')
   const releases: ApplicationRelease[] = []
   let previous = -1
   for (let i = 0; i < source.length; i++) {
