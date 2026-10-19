@@ -261,11 +261,14 @@ try {
       assert.equal((await database.db.primary.selectFrom('public_safety_incidents').select('config_json').where('id', '=', initialConfig.id).executeTakeFirst())!.config_json, publicSafetyRecordingData(expiredConfig))
       const pastConfig = { ...config, id: 'custody-past', retention: { ...config.retention, hold: 'declared-review-required' as const } }
       await access.createPublicSafetyIncident({ config: pastConfig })
+      await access.changePublicSafetyMembership(pastConfig.id, { expectedVersion: 1, userId: custodian.id, role: 'evidence-custodian' })
       const pastExpired = { ...pastConfig, retention: { ...pastConfig.retention, expiresAt: new Date(Date.now() - 1).toISOString() } }
       await database.db.primary.updateTable('public_safety_incidents').set({ retain_until: pastExpired.retention.expiresAt, config_json: publicSafetyRecordingData(pastExpired) }).where('incident_key', '=', pastConfig.id).execute()
-      const pastPreview = await retention.previewPublicSafetyRetention(pastConfig.id)
+      const pastPreview = await as(custodian.token, () => retention.previewPublicSafetyRetention(pastConfig.id))
       assert.equal(pastPreview.expired, true)
-      const pastEnrollment = await retention.enrollPublicSafetyRetention(pastConfig.id, { expectedVersion: pastPreview.incidentVersion, policyVersion: 'local-managed-v1', inventoryDigest: pastPreview.inventoryDigest, requestId: randomUUID() })
+      const pastEnrollment = await as(custodian.token, () => retention.enrollPublicSafetyRetention(pastConfig.id, { expectedVersion: pastPreview.incidentVersion, policyVersion: 'local-managed-v1', inventoryDigest: pastPreview.inventoryDigest, requestId: randomUUID() }))
+      assert.equal(pastEnrollment.scope.enrolledByUserId, custodian.id)
+      assert.equal(pastEnrollment.event.actorUserId, custodian.id)
       assert.equal(pastEnrollment.scope.holdState, 'pending-review'); assert.equal(pastEnrollment.scope.reviewRequired, true)
       assert.equal(pastEnrollment.scope.reviewDueAt, null); assert.equal(pastEnrollment.scope.reviewerUserId, null)
       assert.equal(pastEnrollment.scope.expired, true); assert.equal(pastEnrollment.scope.purgeImplemented, false)
