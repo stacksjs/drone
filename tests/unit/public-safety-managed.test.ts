@@ -157,14 +157,27 @@ test('managed real writer authority fences competing reconciliation in both file
 // The native migration seam proves a real old source DB upgrade and repeated generator no-op.
 test('managed generated migrations preserve existing incident evidence', async () => {
   const root = await mkdtemp(join(tmpdir(), 'drone-incident-access-managed-upgrade-'))
+  let child: ReturnType<typeof Bun.spawn> | undefined
+  let timeout: ReturnType<typeof setTimeout> | undefined
   try {
     const config = join(root, 'bunfig.toml'); await writeFile(config, 'preload=[]\n')
-    const child = Bun.spawn([process.execPath, `--config=${config}`, '--no-env-file', `${import.meta.dir}/../fixtures/public-safety-access/managed-migration.ts`], { cwd: root, env: { ...process.env, MANAGED_OLD_SCHEMA: '1', APP_ENV: 'test', NODE_ENV: 'test', DB_CONNECTION: 'sqlite', DB_DATABASE_PATH: join(root, 'access.sqlite') }, stdout: 'pipe', stderr: 'pipe' })
-    const [code, stdout, stderr] = await Promise.all([child.exited, new Response(child.stdout).text(), new Response(child.stderr).text()])
+    const active = Bun.spawn([process.execPath, `--config=${config}`, '--no-env-file', `${import.meta.dir}/../fixtures/public-safety-access/managed-migration.ts`], { cwd: root, env: { ...process.env, APP_ENV: 'test', NODE_ENV: 'test', DB_CONNECTION: 'sqlite', DB_DATABASE_PATH: join(root, 'access.sqlite') }, stdout: 'pipe', stderr: 'pipe' })
+    child = active
+    timeout = setTimeout(() => { if (active.exitCode === null) { try { process.kill(active.pid, 'SIGKILL') } catch (error) { if (!(error instanceof Error && 'code' in error && error.code === 'ESRCH')) throw error } } }, 150000)
+    const [code, stdout, stderr] = await Promise.all([active.exited, new Response(active.stdout).text(), new Response(active.stderr).text()])
     expect(code, `${stdout}\n${stderr}`).toBe(0)
+    expect(stdout).toContain('PASS actual archived B services create the pre-managed source schema')
+    expect(stdout).toContain('PASS fresh current process applies real B+C migrations')
     expect(stdout).toContain('PASS managed generated schema upgrade preserves actual old source')
   }
-  finally { await rm(root, { recursive: true, force: true }) }
+  finally {
+    clearTimeout(timeout)
+    if (child?.exitCode === null) {
+      try { process.kill(child.pid, 'SIGKILL') } catch (error) { if (!(error instanceof Error && 'code' in error && error.code === 'ESRCH')) throw error }
+      await child.exited
+    }
+    await rm(root, { recursive: true, force: true })
+  }
 }, 180000)
 
 // Real source-derived history crosses both page limits and preserves the original custody acceptance.
