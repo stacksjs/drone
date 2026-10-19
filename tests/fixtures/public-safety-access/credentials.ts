@@ -23,9 +23,12 @@ const { exchangeOAuthAuthorizationCode } = await import('@stacksjs/auth/oauth-to
 const { enhanceRequest, runWithRequest } = await import('@stacksjs/router')
 const { setAmbientRequestContext } = await import('@stacksjs/router/request-context')
 const { createPublicSafetyIncident, readPublicSafetyIncident, readPublicSafetyAudit, closePublicSafetyIncident, PublicSafetyAccessError } = await import('../../../resources/functions/drone/public-safety/access/service')
+const managed = await import('../../../resources/functions/drone/public-safety/managed/service')
+const { publicSafetyManagedGate } = await import('../../../resources/functions/drone/public-safety/managed/policy')
 const { publicSafetyCreateGate, publicSafetyIncidentGate } = await import('../../../resources/functions/drone/public-safety/access/policy')
 setAmbientRequestContext(true)
 Gate.define('public-safety:create', publicSafetyCreateGate)
+for (const ability of ['read', 'create', 'events', 'reconcile'] as const) Gate.define(`public-safety:managed-${ability}`, (user, key) => publicSafetyManagedGate(user, key, ability))
 for (const ability of ['view', 'audit', 'manage-members', 'close'] as const) Gate.define(`public-safety:${ability}`, (user, key) => publicSafetyIncidentGate(user, key, ability))
 const as = <T>(credential: string, action: () => Promise<T>) => runWithRequest(enhanceRequest(new Request('https://incident.invalid/api/public-safety/incidents', { headers: { authorization: `Bearer ${credential}` } }) as Parameters<typeof enhanceRequest>[0]), action)
 const denied = (error: unknown) => error instanceof PublicSafetyAccessError && error.status === 401
@@ -86,6 +89,15 @@ try {
       await assert.rejects(() => readPublicSafetyAudit(config.id), denied)
       await assert.rejects(() => closePublicSafetyIncident(config.id, { expectedVersion: before.version }), denied)
       await assert.rejects(() => createPublicSafetyIncident({ config: { ...config, id: 'credential-forged-create' } }), denied)
+      const artifact = '00000000-0000-4000-8000-000000000001', requestId = '00000000-0000-4000-8000-000000000002'
+      for (const action of [
+        () => managed.listPublicSafetyManagedArtifacts(config.id),
+        () => managed.readPublicSafetyManagedArtifact(config.id, artifact),
+        () => managed.readPublicSafetyManagedArtifactFile(config.id, artifact, 1),
+        () => managed.listPublicSafetyManagedArtifactEvents(config.id, artifact),
+        () => managed.createPublicSafetyManagedDataset(config.id, { expectedVersion: 1, expectedRetentionVersion: 1, sourceDigest: 'a'.repeat(64), datasetProfile: 'owned-public-safety-dataset-v1', requestId }),
+        () => managed.reconcilePublicSafetyManagedArtifact(config.id, artifact, { expectedVersion: 1, expectedArtifactVersion: 1, requestId }),
+      ]) await assert.rejects(action, denied)
     })
     assert.deepEqual(await as(personal.plainTextToken, () => readPublicSafetyIncident(config.id)), before)
     assert.deepEqual(await as(personal.plainTextToken, () => readPublicSafetyAudit(config.id)), beforeAudit)

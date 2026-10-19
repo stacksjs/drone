@@ -178,7 +178,8 @@ export async function createPublicSafetyManagedDataset(key: string, input: unkno
         if (!identity || identity.bytes !== file.planned_bytes || identity.sha256 !== file.sha256) conflict()
         await tx.updateTable(fileTable).set({ identity_json: JSON.stringify(identity), observed_bytes: 0 }).where('id', '=', file.id).execute()
       }
-      await tx.updateTable(table).set({ receipt_json: encoded, prepared_at_iso: new Date().toISOString() }).where('id', '=', current.id).execute()
+      next.prepared_at_iso = new Date().toISOString()
+      await tx.updateTable(table).set({ receipt_json: encoded, prepared_at_iso: next.prepared_at_iso }).where('id', '=', current.id).execute()
       next.receipt_json = encoded
       return event(tx, access, next, 'ownership-recorded', body.requestId as string, fingerprint, 'prepare')
     }, { retries: 0 })
@@ -188,9 +189,11 @@ export async function createPublicSafetyManagedDataset(key: string, input: unkno
       if (!prepared || current.state !== 'prepared' || current.version !== owned.artifact.version || current.receipt_json !== JSON.stringify(prepared.receipt)) conflict()
       await boundSource(tx, access, current)
       sameRoot(root)
-      const next = await transition(tx, access, current, 'complete', { completed_at_iso: new Date().toISOString(), completed_by_user_id: access.principal.userId })
+      const next = await transition(tx, access, current, 'complete', { completed_by_user_id: access.principal.userId })
       continuity(tx, access, next)
       prepared.publishSync()
+      next.completed_at_iso = new Date().toISOString()
+      await tx.updateTable(table).set({ completed_at_iso: next.completed_at_iso }).where('id', '=', next.id).execute()
       return event(tx, access, next, 'published', body.requestId as string, fingerprint, 'publish')
     }, { retries: 0 })
   }

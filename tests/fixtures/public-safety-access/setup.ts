@@ -3,7 +3,7 @@ import { realpathSync } from 'node:fs'
 import { cp, lstat, mkdir, symlink, writeFile } from 'node:fs/promises'
 import { basename, dirname, join, resolve } from 'node:path'
 
-export async function setupIncidentDatabase(options: { prepare?: (root: string) => Promise<void>, prepareMigrations?: (root: string) => Promise<void> } = {}) {
+export async function setupIncidentDatabase(options: { prepare?: (root: string) => Promise<void>, prepareMigrations?: (root: string) => Promise<void>, reuseDatabase?: boolean } = {}) {
   const root = process.cwd(), source = resolve(import.meta.dir, '../../..')
   assert(basename(root).startsWith('drone-incident-access-'))
   assert.equal(join(realpathSync(dirname(process.env.DB_DATABASE_PATH!)), basename(process.env.DB_DATABASE_PATH!)), join(root, 'access.sqlite'))
@@ -28,11 +28,14 @@ export async function setupIncidentDatabase(options: { prepare?: (root: string) 
   const database = await import('@stacksjs/database')
   await database.ensureDatabaseConfigLoaded()
   database.initializeDbConfig({ app: { env: 'test' }, database: { default: 'sqlite', connections: { sqlite: { database: process.env.DB_DATABASE_PATH } }, queryLogging: { enabled: false } } })
-  assert.equal((await database.migrateAuthTables()).success, true)
-  const migrated = await database.runDatabaseMigration()
-  if (migrated.isErr) throw migrated.error
-  assert.equal((await database.migrateAuthTables()).success, true)
-  assert.equal((await database.migrateRbacTables()).success, true)
+  if (!options.reuseDatabase) {
+    assert.equal((await database.migrateAuthTables()).success, true)
+    const migrated = await database.runDatabaseMigration()
+    if (migrated.isErr) throw migrated.error
+    assert.equal((await database.migrateAuthTables()).success, true)
+    assert.equal((await database.migrateRbacTables()).success, true)
+  }
+  else assert((await lstat(process.env.DB_DATABASE_PATH!)).isFile(), 'Reuse requires an existing guarded disposable database')
   const { ormReady } = await import('@stacksjs/orm')
   await ormReady
   const User = (await import(join(root, 'app/Models/User.ts'))).default

@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict'
 import { mkdir, readFile } from 'node:fs/promises'
+import { openSync, closeSync } from 'node:fs'
 import { join } from 'node:path'
 import { createHash, randomUUID } from 'node:crypto'
 import { decode } from 'ts-images'
@@ -86,6 +87,11 @@ try {
     const ledger = JSON.parse(String(row.receipt_json))
     assert.equal((await readFile(ledger.completedManifest, 'utf8')).length > 0, true)
     assert(BigInt(ledger.root.birthtimeNs) > 0n)
+    const heldReader = openSync(join(ledger.directory, 'recording.json'), 'r')
+    try {
+      assert.deepEqual((await managed.readPublicSafetyManagedArtifactFile(config.id, created.artifact.key, recording.id)).bytes, data.bytes, 'a legitimate concurrent file reader is compatible with scoped mount inspection')
+    }
+    finally { closeSync(heldReader) }
     assert.equal((await retention.previewPublicSafetyRetention(config.id)).managedArtifactCount, 1)
   })
   console.log('PASS actual native managed source-derived dataset publication, replay, bytes and read-only reconciliation')

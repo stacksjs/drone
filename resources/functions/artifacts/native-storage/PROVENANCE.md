@@ -1,6 +1,6 @@
 # Explicit published Stacks source bridge
 
-The two TypeScript modules in this directory are byte-for-byte copies from
+The completed-artifact-directory.ts and prepared-completed-artifact-directory.ts modules are byte-for-byte copies from
 stacksjs/stacks commit 8c16debe212da132bb5c7322548a9daaa1c88c0f,
 storage/framework/core/storage/src/. Native implementation: 627a59acee.
 
@@ -18,3 +18,10 @@ The established app completed-directory.ts and asynchronous offline writer
 remain unchanged. Managed publication uses only the prepared synchronous
 interface. This bridge grants no filesystem ownership, authorization, SQL
 fencing, power-loss durability or deletion policy by itself.
+
+The complete temporary-workspaces.ts module is a byte-for-byte copy from published
+Stacks main 516c587bd1c553088ea5dff7f42985b9b49d0f0b. SHA-256:
+9a0fd4bde4f6bf9e82658193241699d629fb27511e1c7e6092415bb34007e096.
+Managed datasets call only inspectDirectoryMounts, which checks canonical directory
+mount exclusion without global process-reference inspection. Unknown mount visibility
+blocks. The copied retirement journal is not called and no deletion is introduced.

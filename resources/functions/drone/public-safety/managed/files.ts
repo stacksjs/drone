@@ -5,7 +5,7 @@ import { closeSync, constants, fstatSync, lstatSync, openSync, readSync, readdir
 import { basename, dirname, join, relative, resolve } from 'node:path'
 import { env } from '@stacksjs/env'
 import { publicPath, storagePath } from '@stacksjs/path'
-import { inspectTemporaryWorkspace } from '@stacksjs/storage'
+import { inspectDirectoryMounts } from '../../../artifacts/native-storage/temporary-workspaces'
 import { PublicSafetyAccessError } from '../access/errors'
 
 export const managedBytes = 32 * 1024 * 1024
@@ -91,8 +91,8 @@ function ledger(receipt: PreparedCompletedArtifactReceipt, files: readonly FileP
     const expected = file.role === 'manifest' ? receipt.pendingManifest : receipt.files.find(item => item.path === join(receipt.directory, file.relative_path))
     if (!expected || expected.bytes !== file.planned_bytes || expected.sha256 !== file.sha256 || file.identity_json !== JSON.stringify(expected)) managedUnavailable()
   }
-  // Reuse native conservative mount/process inspection; incomplete visibility is not safety evidence.
-  if (!inspectTemporaryWorkspace(receipt.directory).unused) managedUnavailable()
+  // Mount exclusion is independent of other legitimate bounded readers. Incomplete mount visibility blocks.
+  if (!inspectDirectoryMounts(receipt.directory).unmounted) managedUnavailable()
 }
 export function inspectManagedArtifact(receipt: PreparedCompletedArtifactReceipt | null, target: string, files: readonly FilePlan[]): ArtifactInspection {
   try {

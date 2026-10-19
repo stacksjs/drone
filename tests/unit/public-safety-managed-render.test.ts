@@ -29,3 +29,24 @@ test('shared public-safety renderer preserves real offline recording, derivative
   }
   finally { await rm(directory, { recursive: true, force: true }) }
 }, 60000)
+
+// The public acquisition seam bounds admissible managed capture plans without fabricating a replay recording.
+test('owned collection retains at most 256 actual shutter acknowledgments', async () => {
+  const { createPublicSafetyCamera } = await import('../../resources/functions/drone/public-safety/camera')
+  const { planPublicSafetyMission } = await import('../../resources/functions/drone/public-safety/planner')
+  const { examplePublicSafetyConfig } = await import('../../resources/functions/drone/public-safety/fixtures')
+  const { createRigidBody } = await import('../../resources/functions/drone/controls/physics')
+  const plan = planPublicSafetyMission(examplePublicSafetyConfig())
+  const source = createPublicSafetyCamera(plan), body = createRigidBody({ positionM: [0, 0, -1.5] }).snapshot()
+  try {
+    for (let sequence = 1; sequence <= 257; sequence++) {
+      const at = sequence * 100
+      source.camera.render(body, at)
+      source.camera.request({ sessionId: 'bounded-capture-fixture', sequence, issuedAtMs: at, reference: 'fixed-local-reference' })
+      if (sequence <= 256) expect(source.camera.poll(at + 20)).not.toBeNull()
+      else expect(() => source.camera.poll(at + 20)).toThrow('capture capacity exceeded')
+    }
+    expect(source.thermalAcks().length).toBe(256)
+  }
+  finally { source.camera.close() }
+}, 60000)
