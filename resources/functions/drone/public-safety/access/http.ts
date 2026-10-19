@@ -3,9 +3,9 @@ import { PublicSafetyAccessError } from './errors'
 import { authorizePublicSafetyCreate, authorizePublicSafetyIncident, changePublicSafetyMembership, closePublicSafetyIncident, createPublicSafetyIncident, readPublicSafetyAudit, readPublicSafetyIncident } from './service'
 
 const privateHeaders = { 'Cache-Control': 'private, no-store', 'Vary': 'Authorization, Cookie', 'X-Content-Type-Options': 'nosniff' }
-interface WireRequest { url: string, method: string, headers: Headers, body?: ReadableStream<Uint8Array> | null }
-type IncidentRequest = WireRequest & { getParam: (name: string) => string | undefined }
-function readBody(request: WireRequest, limit: number) {
+export interface WireRequest { url: string, method: string, headers: Headers, body?: ReadableStream<Uint8Array> | null }
+export type IncidentRequest = WireRequest & { getParam: (name: string) => string | undefined }
+export function readBody(request: WireRequest, limit: number) {
   return readJsonBody(new Request(request.url, { method: request.method, headers: request.headers, body: request.body ?? null }), limit)
 }
 
@@ -29,7 +29,7 @@ export async function incidentHttpBoundary(request: Request, next: () => Promise
   if (result.status >= 400) return Response.json({ error: result.status === 401 ? 'A valid incident access token is required' : result.status === 403 ? 'This incident action is not permitted' : result.status === 404 ? 'Incident is unavailable' : result.status === 409 ? 'Incident state conflicts with this request' : result.status === 413 ? 'Request body is too large' : result.status === 415 ? 'Content-Type must be application/json' : result.status === 422 ? 'Invalid incident request' : result.status === 400 ? 'Invalid incident JSON' : 'Incident request failed' }, { status: result.status, headers: privateHeaders })
   return privateResponse(result)
 }
-async function execute(work: () => Promise<unknown>, status = 200): Promise<Response> {
+export async function execute(work: () => Promise<unknown>, status = 200): Promise<Response> {
   try { return Response.json(await work(), { status, headers: privateHeaders }) }
   catch (error) { return failure(error) }
 }
