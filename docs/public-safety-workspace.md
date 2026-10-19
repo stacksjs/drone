@@ -115,7 +115,7 @@ uses disposable native accounts, minted credentials, generated migrations and
 file-backed SQLite. It exercises source imagery, two original observations,
 append-only review, recipient-confirmed handover, ordinary 30-second stream
 renewal, read-only access and revocation. It checks escaped text, draft binding,
-mobile overflow, empty browser storage and credential omission when JavaScript
+mobile overflow, empty local/session stores and credential omission when JavaScript
 is unavailable. It uploads only compiled public HTML and selected screenshots.
 
 On a host with an existing Chrome binary, run the same opt-in fixture:
