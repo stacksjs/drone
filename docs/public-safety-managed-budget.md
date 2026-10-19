@@ -1,6 +1,6 @@
 # Managed dataset resource qualification
 
-This is a source derivation for the current qualified encoder/runtime, The existing managed 32 MiB check still includes the manifest. Under the pinned current profile an admissible source cannot reach that check's numerical boundary because a tighter bound applies first.
+This is a source derivation for the current qualified encoder/runtime. The existing managed 32 MiB check still includes the manifest. Under the pinned current profile an admissible source cannot reach that check's numerical boundary because a tighter bound applies first.
 
 ## Source pixels constrain derivative size
 
