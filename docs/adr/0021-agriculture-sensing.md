@@ -28,7 +28,7 @@ reader and completed-artifact publication protocol; browser modules cannot impor
 Hardware/field/HIL and storage power-loss qualification remain separate acceptance under issue21.
 
 Large CLI JSON results await stdout completion, including backpressure. The async output helper
-is contributed to native `@stacksjs/cli/output` and temporarily mirrored under
+is [contributed to native `@stacksjs/cli/output`](https://github.com/stacksjs/stacks/commit/210f8284b77079f0fabfa1882df3f6b228afff26) and temporarily mirrored under
 `resources/functions/cli/output.ts` until a normal dependency release makes it available. This
 keeps compiled commands independent of the sibling Stacks checkout. Existing synchronous native
 printing remains suitable for small immediate-exit diagnostics.
