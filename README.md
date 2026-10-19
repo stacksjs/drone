@@ -50,8 +50,10 @@ connect to [separately accepted local purge](docs/public-safety-purge.md), disab
 [Recipient-confirmed incident handover](docs/public-safety-handover.md) adds atomic coordination
 transfer. Open `/incidents` for the [authorized read and command workspace](docs/public-safety-workspace.md),
 including current source context, observation/review forms and recipient acknowledgement.
-The full workflow remains in progress under #23: in-progress simulation delivery,
-sector/team assignments and operational/hardware qualification are still required.
+The same workspace [runs owned synthetic collection](docs/public-safety-execution.md)
+with live progress, cooperative stop and deliberate source admission. The full
+workflow remains in progress under #23: sector/team assignments and
+operational/hardware qualification are still required.
 See [public-safety collection and remaining scope](docs/public-safety.md). Physical outputs are inhibited.
 
 ## Owned vehicle missions

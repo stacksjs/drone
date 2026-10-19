@@ -56,9 +56,10 @@ companion application and simulator, not a native board autopilot.
 ## Sequence
 
 Public-safety collection now connects native incident roles, source-bound observations and reviews,
-recipient-confirmed handover and an authorized read/command workspace. Separately accepted local
-purge remains disabled by default. In-progress simulation with deliberate source admission,
-sector/team responsibility and operational/hardware qualification remain in
+recipient-confirmed handover and an authorized read/command workspace with
+[live synthetic execution and deliberate source admission](../public-safety-execution.md).
+Separately accepted local purge remains disabled by default. Sector/team
+responsibility and operational/hardware qualification remain in
 [#23](https://github.com/stacksjs/drone/issues/23). See [workspace semantics](../public-safety-workspace.md).
 
 Crop scouting now collects acknowledged numeric red/NIR and visible frames through the owned

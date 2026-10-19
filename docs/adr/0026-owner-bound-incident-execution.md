@@ -1,7 +1,7 @@
 # ADR 26: owner-bound incident execution
 
-Status: design accepted; implementation in progress for issue #23. Routes and
-browser controls require the execution qualification described below.
+Status: accepted; source application tracer implemented for issue #23. Native
+controller, HTTP and rendered-browser checks gate publication.
 
 The next workspace tracer runs the existing owned synthetic public-safety
 simulator, displays genuine producer progress and retains a bounded completed
@@ -51,9 +51,11 @@ its Action-owned URL must work from both source and emitted artifacts.
 Parent cancellation immediately ends eligibility for future credits, content,
 completion and admission. The producer cooperatively checks cancellation at
 its real callback boundaries. A final owned-code acknowledgement establishes
-that producer, serialization and transfer work have finished. Bun Worker close
-is a marked termination event and does not establish OS thread exit. An
-unconfirmed forced stop quarantines the scarce reservation until qualified
+that producer, serialization and transfer work have finished. The Worker accepts
+one start message, clears its handler and drains naturally after that
+acknowledgement. Bun Worker close is a marked termination event and does not
+establish OS thread exit. An unconfirmed forced stop quarantines the scarce
+reservation until qualified
 resolution or process replacement. A timer or close marker cannot release it.
 The contract provides finite logical admission and fail-closed publication;
 hard CPU/RSS bounds, instruction-level interruption and immediate reclamation
@@ -90,11 +92,21 @@ ordinary expectation before starting the controller, warming parent modules and
 retaining an additional canonical string. Nominal controller completion took
 approximately 15.69 and 14.49 seconds; parent canonical replay took 2.27 and
 2.45 seconds. All 33 sampled periodic subscriber checks succeeded. Every result
-entered replay with no pending check or busy owner heartbeat, so controlled
-pending-check overlap still requires separate evidence. Validation remains
-intact, with current authority and deadline checks after it returns. These
-measurements do not qualify Pi hardware or bound worst-case scheduling, CPU
-or memory use.
+entered replay with no pending check or busy owner heartbeat. Validation remains
+intact, with current authority and deadline checks after it returns.
+
+Separate native fixtures qualified three controlled pending-check overlaps.
+An original-owner heartbeat held across 2.68 seconds of genuine result replay
+refused completion. A subscriber check held across 2.53 seconds of replay
+returned 404 and released only that observer; the original owner completed and
+deliberately admitted the recording. During admission, a subscriber check
+crossed its budget across a 5.39-second source-work/task interval. Its actual
+SQL transaction settled before the serialized source writer committed once.
+That last interval includes validation, encoding, hashing, promise scheduling
+and writer-queue initiation; it is not an isolated CPU measurement. These are
+controlled native Gate and genuine-message scheduling fixtures, without clock
+or policy-budget changes. They do not qualify Pi hardware or bound worst-case
+scheduling, CPU or memory use.
 
 Native createBroadcastHub/createBroadcastResponse own progress framing and
 bounded pending delivery. The stream rejects replay-buffer matches and uses
@@ -139,7 +151,7 @@ restore another identity's content. Progress shows requested duration separately
 from actual virtual time, survey status and demonstrated faults. Synthetic
 counts and routes establish neither searched area nor absence of people/fire.
 
-Qualification covers genuine native Auth/Gates/SQLite and original-token,
+Qualification requires genuine native Auth/Gates/SQLite and original-token,
 membership ABA, incarnation, configuration, retention and commit races; actual
 controller cancellation, malformed/oversized/late protocols and quarantined
 capacity; positive native-parent preload and negative Worker bootstrap checks;
