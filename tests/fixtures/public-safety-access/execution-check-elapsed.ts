@@ -1,3 +1,5 @@
+/* eslint-disable ts/no-top-level-await, no-console */
+// Standalone native child: ordered awaited boot and scalar stdout are intentional.
 import assert from 'node:assert/strict'
 import { setupHandoverFixture } from './handover-setup'
 
@@ -13,19 +15,29 @@ try {
     const context = policy.captureExecutionContext(seeded.key)
     const began = performance.now()
     let replayBegan = 0, replayFinished = 0
+    let finishWork!: () => void
+    const workSettled = new Promise<void>(resolve => { finishWork = resolve })
     const checked = policy.runExecutionCheck(context, async () => {
-      await f.access.authorizePublicSafetyIncident(seeded.key, 'source-register')
-      // Controlled native Gate/check scheduling, followed by the unchanged real validator.
-      // This is an elapsed-budget regression, not an isolated replay performance bound.
-      await Bun.sleep(Math.max(1, limits.checkTimeoutMs - (performance.now() - began) - 50))
-      replayBegan = performance.now() - began
-      assert.equal(publicSafetyRecordingData(validatePublicSafetyRun(seeded.run)), publicSafetyRecordingData(seeded.run))
-      replayFinished = performance.now() - began
-      console.log(JSON.stringify({ replayBeganMs: replayBegan, replayFinishedMs: replayFinished, budgetMs: limits.checkTimeoutMs }))
-      return 'must-be-withheld'
+      try {
+        await f.access.authorizePublicSafetyIncident(seeded.key, 'source-register')
+        // Controlled native Gate/check scheduling, followed by the unchanged real validator.
+        // This is an elapsed-budget regression, not an isolated replay performance bound.
+        await Bun.sleep(Math.max(1, limits.checkTimeoutMs - (performance.now() - began) - 50))
+        replayBegan = performance.now() - began
+        assert.equal(publicSafetyRecordingData(validatePublicSafetyRun(seeded.run)), publicSafetyRecordingData(seeded.run))
+        replayFinished = performance.now() - began
+        console.log(JSON.stringify({ replayBeganMs: replayBegan, replayFinishedMs: replayFinished, budgetMs: limits.checkTimeoutMs }))
+        return 'must-be-withheld'
+      }
+      finally { finishWork() }
     })
-    await assert.rejects(() => checked, f.status(404))
-    assert(replayBegan < limits.checkTimeoutMs, `Replay began before deadline: ${replayBegan}`)
+    try { await assert.rejects(() => checked, f.status(404)) }
+    finally {
+      await workSettled
+      // Let the captured promise chain run its actual budget-release finally.
+      await Bun.sleep(0)
+    }
+    assert(replayBegan < limits.checkTimeoutMs, `Controlled replay window was not sampled: began ${replayBegan}ms, budget ${limits.checkTimeoutMs}ms`)
     assert(replayFinished > limits.checkTimeoutMs, `Real replay crossed deadline: ${replayFinished}`)
     assert.equal(executionOwner().pendingChecks, 0, 'The underlying native/replay work actually settled')
     await policy.runExecutionCheck(context, () => f.access.authorizePublicSafetyIncident(seeded.key, 'source-register'))
