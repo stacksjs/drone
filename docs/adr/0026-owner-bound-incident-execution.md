@@ -76,13 +76,16 @@ terminal retention 60 seconds. These finite policy choices have explicit refusal
 behavior and require actual controller/HTTP qualification. They are not hard
 scheduling or resource guarantees.
 
-Native measurements covered all ten existing scenarios at requested durations
-100 and 120 seconds, including full recording transfer and fresh authority on
-every credit. The nominal fixture finished its virtual survey earlier than the
-requested budget. Its Worker plus native checks took under eight seconds on the
-development host. Existing source registration blocked that host's parent loop
-for up to 2.67 seconds. Validation remains intact, with current authority and
-deadline checks after it returns. These measurements do not qualify Pi hardware.
+An isolated Worker probe transferred full recordings for all ten existing
+scenarios at requested durations 100 and 120 seconds. Production controller
+qualification separately completed nominal runs at both durations, with fresh
+native authority on each of 2,716 producer events. Those runs took approximately
+20 and 22 seconds on the development host; the virtual survey finished before
+the requested duration. Parent canonical replay took approximately 3.13 and
+2.45 seconds. Neither run entered replay with a pending heartbeat, so controlled
+pending-check overlap requires separate evidence. Validation remains intact,
+with current authority and deadline checks after it returns. These measurements
+do not qualify Pi hardware or bound worst-case scheduling, CPU or memory use.
 
 Native createBroadcastHub/createBroadcastResponse own progress framing and
 bounded pending delivery. The stream rejects replay-buffer matches and uses
