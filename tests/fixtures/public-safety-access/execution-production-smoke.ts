@@ -1,12 +1,17 @@
 /* eslint-disable ts/no-top-level-await, no-console */
 // Standalone native child: ordered awaited boot and scalar stdout are intentional.
-import type { PublicSafetyRun } from '../../../resources/functions/drone/public-safety/runtime-types'
+import type { PublicSafetyRun, PublicSafetyScenario } from '../../../resources/functions/drone/public-safety/runtime-types'
+import { publicSafetyScenarios } from '../../../resources/functions/drone/public-safety/runtime-types'
+import { simulatePublicSafety } from '../../../resources/functions/drone/public-safety/runtime'
+import { publicSafetyRecordingData } from '../../../resources/functions/drone/public-safety/evidence'
 import assert from 'node:assert/strict'
 import { createHash, randomUUID } from 'node:crypto'
 import { setupHandoverFixture } from './handover-setup'
 
 const seconds = Number(Bun.argv[2])
-assert(seconds === 100 || seconds === 120, 'Only the two bounded production nominal smoke cases are accepted')
+assert(seconds === 100 || seconds === 120, 'Only the two accepted production qualification durations are accepted')
+const scenario = (Bun.argv[3] ?? 'nominal') as PublicSafetyScenario
+assert(publicSafetyScenarios.includes(scenario), 'Only existing public-safety scenarios are accepted')
 const f = await setupHandoverFixture()
 const core = await import('../../../resources/functions/drone/public-safety/execution/service')
 const { executionOwner } = await import('../../../resources/functions/drone/public-safety/execution/state')
@@ -28,11 +33,12 @@ const pendingSubscriber = new Set<Promise<void>>()
 let queries = 0, ownerGateChecks = 0, subscriberGateChecks = 0, otherGateChecks = 0, gateMaxMs = 0
 let events = 0, lastEvent = 0, maxPending = 0, maxTimerGapMs = 0, peakSampledRss = 0, subscriberChecks = 0
 let admissionMs: number | null = null, completionMs: number | null = null, replayBracket: ReplayBracket | null = null
+let canonicalBytes: number | null = null, digest: string | null = null, faultDemonstrated: boolean | null = null, surveyStatus: string | null = null
 const subscriberFailures: { elapsedMs: number, status: number | null }[] = []
 const began = performance.now()
 const unhook = registerPersistentQueryHooks({ onQueryEnd() { queries++ } })
 try {
-  const key = `execution-production-${seconds}`
+  const key = `execution-production-${scenario}-${seconds}`
   const config = examplePublicSafetyConfig()
   config.id = key
   config.revision = 'r1'
@@ -41,6 +47,9 @@ try {
   await f.as(f.senderToken, () => f.access.createPublicSafetyIncident({ config }))
   const before = await f.snapshot(key)
   assert.equal((await f.as(f.senderToken, () => f.records.listPublicSafetySources(key))).entries.length, 0)
+  // Independent unchanged runtime oracle is computed before the live controller starts.
+  // This avoids adding synchronous replay work to a pending native check's lifetime.
+  const ordinaryCanonical = publicSafetyRecordingData(simulatePublicSafety({ config: JSON.parse(String(before.incident!.config_json)), scenario, seconds }))
   const scope = (await f.as(f.senderToken, () => readWorkspaceAccess(key))).scope
   Gate.define('public-safety:source-register', async (user, incident) => {
     const request = getCurrentRequest(), at = performance.now()
@@ -52,7 +61,7 @@ try {
   })
   const started = await asRequest('POST', 'start', () => {
     captured = core.captureExecutionContext(key)
-    return core.startIncidentExecution(captured, { intent: randomUUID(), scope, scenario: 'nominal', seconds }, new URL('../../../app/Workers/PublicSafetySimulation.ts', import.meta.url))
+    return core.startIncidentExecution(captured, { intent: randomUUID(), scope, scenario, seconds }, new URL('../../../app/Workers/PublicSafetySimulation.ts', import.meta.url))
   })
   const runBegan = performance.now()
   locator = { execution: started.execution, scope }
@@ -116,13 +125,22 @@ try {
   const recording = slot.recording
   const run = JSON.parse(recording) as PublicSafetyRun
   assert.equal(run.seconds, seconds)
-  assert.equal(run.scenario, 'nominal')
+  assert.equal(run.scenario, scenario)
+  assert(recording === ordinaryCanonical, 'Actual full production recording equals the unchanged ordinary runtime canonical bytes')
   assert.equal(run.events.length, events)
   assert.equal(current.completion!.epochCount, run.epochs.length)
   assert.equal(current.completion!.captureCount, run.captures.length)
   assert.equal(current.completion!.digest, createHash('sha256').update(recording, 'utf8').digest('hex'))
   assert.equal(current.completion!.byteLength, new TextEncoder().encode(recording).length)
-  assert.equal(current.completion!.surveyStatus, 'completed')
+  assert.equal(current.completion!.surveyStatus, run.survey.status)
+  assert.equal(current.completion!.faultDemonstrated, scenario !== 'nominal')
+  canonicalBytes = current.completion!.byteLength
+  digest = current.completion!.digest
+  faultDemonstrated = current.completion!.faultDemonstrated
+  surveyStatus = current.completion!.surveyStatus
+  assert.equal(run.survey.boardNeutral, true)
+  if (scenario === 'nominal') assert.equal(run.survey.status, 'completed')
+  else assert(['blocked', 'aborted'].includes(run.survey.status), 'Actual loss scenario stops collection with neutral outputs')
   assert.deepEqual(await f.snapshot(key), before, 'Actual completion writes no source, version or audit')
   assert.equal((await f.as(f.senderToken, () => f.records.listPublicSafetySources(key))).entries.length, 0)
   const admissionBegan = performance.now()
@@ -140,14 +158,14 @@ try {
   attachment.release()
   assert.equal((await core.closeIncidentExecution(captured!, locator)).phase, 'discarded')
   assert.equal(await core.readIncidentExecution(captured!, { scope }), null)
-  console.log(`PASS native production nominal ${seconds} actual completion and explicit admission`)
+  console.log(`PASS native production ${scenario} ${seconds} actual completion and explicit admission`)
 }
 finally {
   clearInterval(subscriberTimer)
   clearInterval(sampler)
   await Promise.allSettled([...pendingSubscriber])
   attachment?.release()
-  console.log(`EXECUTION_SMOKE ${JSON.stringify({ seconds, elapsedMs: performance.now() - began, completionMs, admissionMs, events, queries, ownerGateChecks, subscriberGateChecks, otherGateChecks, gateMaxMs, subscriberChecks, subscriberFailures, maxPending, maxTimerGapMs, peakSampledRss, replayBracket, finalPhase: slot?.phase, finalReason: slot?.reason, finalProducer: slot?.producer, finalAdmission: slot?.admission })}`)
+  console.log(`EXECUTION_SMOKE ${JSON.stringify({ scenario, seconds, elapsedMs: performance.now() - began, completionMs, admissionMs, events, canonicalBytes, digest, faultDemonstrated, surveyStatus, queries, ownerGateChecks, subscriberGateChecks, otherGateChecks, gateMaxMs, subscriberChecks, subscriberFailures, maxPending, maxTimerGapMs, peakSampledRss, replayBracket, finalPhase: slot?.phase, finalReason: slot?.reason, finalProducer: slot?.producer, finalAdmission: slot?.admission })}`)
   if (captured && locator && executionOwner().slot) {
     await core.closeIncidentExecution(captured, locator).catch(() => {})
     const stopUntil = Date.now() + limits.stopGraceMs + 1000
