@@ -2,9 +2,11 @@ import type { ApplicationConfig, ApplicationPlantSnapshot, ApplicationScenario }
 import type { ApplicationPlant, ApplicationPlantOptions } from './runtime-types'
 import { createGroundPlant } from '../vehicles/ground/plant'
 import { applicationPulseFactor, applicationScaleFactor } from './calibration'
+import { validateApplicationConfig } from './planner'
 
-/** Ground dynamics retain exactly four traction channels. Three independent normalized implement channels follow them. */
-export function createApplicationPlant(config: ApplicationConfig, options: ApplicationPlantOptions = {}): ApplicationPlant {
+/** Ground dynamics retain four traction channels, followed by three independent implement channels. Steps must be integer 1..10 milliseconds. */
+export function createApplicationPlant(configInput: ApplicationConfig, options: ApplicationPlantOptions = {}): ApplicationPlant {
+  const config = validateApplicationConfig(configInput)
   const ground = options.ground ?? createGroundPlant(), scale = applicationScaleFactor(config.calibration.scale)
   const pulseFactor = config.calibration.pulse ? applicationPulseFactor(config.calibration.pulse) : 0
   const initial = options.initialAmount ?? config.material.initialAmount
@@ -31,7 +33,8 @@ export function createApplicationPlant(config: ApplicationConfig, options: Appli
     },
     takeRelease() { const amount = release; release = 0; return amount },
     step(channels, dt, environment) {
-      if (!Array.isArray(channels) || channels.length !== 7 || channels.some(n => !Number.isFinite(n)) || channels.slice(4).some(n => n < 0 || n > 1) || !Number.isFinite(dt) || dt <= 0 || dt > .01) throw new RangeError('Invalid seven-channel application plant input')
+      const stepMs = dt * 1000
+      if (!Array.isArray(channels) || channels.length !== 7 || channels.some(n => !Number.isFinite(n)) || channels.slice(4).some(n => n < 0 || n > 1) || !Number.isSafeInteger(stepMs) || stepMs < 1 || stepMs > 10 || !Number.isSafeInteger(atMs + stepMs)) throw new RangeError('Invalid seven-channel application plant input or integer 1..10 ms step')
       ground.step(channels.slice(0, 4), dt, environment)
       primary = fault === 'stuck-valve' || fault === 'master-stuck' ? stuckPrimary : slew(primary, channels[4]!, config.calibration.primaryCloseMs, dt)
       master = fault === 'master-stuck' ? stuckMaster : slew(master, channels[5]!, config.calibration.masterCloseMs, dt)
@@ -39,7 +42,7 @@ export function createApplicationPlant(config: ApplicationConfig, options: Appli
       // An explicitly modeled gravity/leak path survives energy cutoff if both mechanical barriers stick.
       const demand = fault === 'blocked-flow' ? 0 : config.calibration.maxRatePerSecond * primary * master * (.15 + .85 * energy)
       const amount = Math.min(remaining, demand * dt)
-      flow = amount / dt; remaining -= amount; emitted += amount; release += amount; atMs += Math.round(dt * 1000)
+      flow = amount / dt; remaining -= amount; emitted += amount; release += amount; atMs += stepMs
       return snapshot()
     },
   }
