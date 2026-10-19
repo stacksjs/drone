@@ -357,13 +357,19 @@ export async function attachIncidentExecution(context: ExecutionContext, input: 
   return {
     initial: view(slot, current.deadline), check, release,
     activate: async () => {
-      await check()
-      if (released || slot.subscriber !== subscriber) unavailable()
-      if (subscriber.active) return
-      subscriber.active = true
-      clearTimeout(slot.consumerTimer)
-      if (active(slot)) pump(slot)
-      else await deliver(slot, subscriber)
+      try {
+        await check()
+        if (released || slot.subscriber !== subscriber) unavailable()
+        if (subscriber.active) return
+        subscriber.active = true
+        clearTimeout(slot.consumerTimer)
+        if (active(slot)) pump(slot)
+        else if (!await deliver(slot, subscriber)) unavailable()
+      }
+      catch (error) {
+        release()
+        throw error
+      }
     },
   }
 }
