@@ -58,7 +58,7 @@ async function blockUnit(id: number, outcome: PurgeOutcome, phase: 'build' | 'db
     if (context.row.state === 'complete' || context.row.completed_at_iso !== null) return
     requirePurgeEnabled()
     const at = new Date().toISOString()
-    await recordStep(tx, context, 'blocked', zeroPurgeProgress(), { state: 'blocked', ...(phase === 'fs' ? { fs_state: 'blocked' as const } : phase === 'db' || phase === 'build' ? { db_state: 'blocked' as const } : {}), outcome_code: outcome, blocked_at_iso: context.row.blocked_at_iso ?? at, review_due_at_iso: context.row.review_due_at_iso ?? new Date(Date.now() + 30 * 86400000).toISOString(), next_eligible_at_iso: new Date(Date.now() + 60000).toISOString() })
+    await recordStep(tx, context, 'blocked', zeroPurgeProgress(), { state: 'blocked', ...(phase === 'fs' ? { fs_state: 'blocked' as const } : phase === 'db' || phase === 'build' ? { db_state: 'blocked' as const } : {}), outcome_code: outcome, blocked_at_iso: context.row.blocked_at_iso ?? at, review_due_at_iso: context.row.review_due_at_iso ?? new Date(Date.now() + 30 * 86400000).toISOString(), next_eligible_at_iso: new Date(Date.now() + (phase === 'db' && context.row.fs_state !== 'complete' && context.row.fs_state !== 'blocked' || phase === 'fs' && context.row.db_state !== 'complete' && context.row.db_state !== 'blocked' ? 0 : 60000)).toISOString() })
   }, { retries: 0 })
 }
 async function dbUnit(tx: TransactionHandle, context: Context, maxRows: number): Promise<boolean> {
@@ -82,7 +82,16 @@ async function dbUnit(tx: TransactionHandle, context: Context, maxRows: number):
       const plan = JSON.parse(item.planned_json) as { group: keyof typeof inventoryTables, metadata: Record<string, unknown> }, table = inventoryTables[plan.group]
       const actual = asRow<Record<string, unknown>>(await tx.selectFrom(table).select(inventoryFields[plan.group]).where('id', '=', item.source_row_id).executeTakeFirst())
       if (!actual || inventoryFields[plan.group].some(field => actual[field] !== plan.metadata[field])) throw new PurgeFileBlocked('inventory-changed')
+      if (item.source_table === 'review' || item.source_table === 'observation') {
+        const observationId = item.source_table === 'review' ? actual.observation_id : actual.id
+        const owner = await tx.selectFrom('public_safety_observations').innerJoin('public_safety_sources', 'public_safety_sources.id', '=', 'public_safety_observations.source_id').select('public_safety_sources.incident_id').where('public_safety_observations.id', '=', observationId).executeTakeFirst()
+        if (!owner || owner.incident_id !== context.incident.id) throw new PurgeFileBlocked('foreign-reference')
+      }
       if (item.source_table === 'review') {
+        if (actual.previous_review_id !== null) {
+          const parent = await tx.selectFrom('public_safety_reviews').select(['id', 'observation_id']).where('id', '=', actual.previous_review_id).executeTakeFirst()
+          if (!parent || parent.id === actual.id || parent.observation_id !== actual.observation_id) throw new PurgeFileBlocked('foreign-reference')
+        }
         const child = await tx.selectFrom('public_safety_reviews').select('id').where('previous_review_id', '=', item.source_row_id).limit(1).executeTakeFirst()
         if (child) throw new PurgeFileBlocked('foreign-reference')
       }
@@ -151,12 +160,20 @@ async function fileUnit(id: number, remainingBytes: number): Promise<{ progresse
   await transaction(async tx => {
     const context = await current(tx, id), lockedItem = asRow<PurgeItemRow>(await lockRow(tx, purgeTables.item, { id: item.id })) ?? purgeConflict()
     if (lockedItem.version !== item.version || lockedItem.generation !== item.generation || lockedItem.arm_json !== item.arm_json || lockedItem.state !== 'armed') purgeConflict()
-    continuity(tx, context.row, lockedItem)
-    const delta = executePurgeFile(lockedItem)
-    await updateItem(tx, lockedItem, { state: 'verified-absent', result_code: delta.namesUnlinked > 0 ? 'observed-unlinked' : 'absence-reconciled', verified_at_iso: new Date().toISOString() })
+    if (lockedItem.version > maximumVersion - 2 || lockedItem.generation > maximumVersion - 2 || context.row.version >= maximumVersion || context.row.generation >= maximumVersion || context.incident.version >= maximumVersion) throw new PurgeFileBlocked('capacity-exceeded')
+    const claimed = await updateItem(tx, lockedItem, {})
+    continuity(tx, context.row, claimed)
+    const delta = executePurgeFile(claimed)
+    await updateItem(tx, claimed, { state: 'verified-absent', result_code: delta.namesUnlinked > 0 ? 'observed-unlinked' : 'absence-reconciled', verified_at_iso: new Date().toISOString() })
     await recordStep(tx, context, 'result', delta, { state: context.row.db_state === 'complete' ? 'running' : context.row.state, fs_state: 'running', outcome_code: null })
   }, { retries: 0 })
   return { progressed: true, chargedBytes: staged.chargedBytes!, budgetBlocked: false }
+}
+async function markFilesystemComplete(tx: TransactionHandle, context: Context): Promise<void> {
+  requirePurgeEnabled()
+  const unfinished = await tx.selectFrom(purgeTables.item).select('id').where('purge_id', '=', context.row.id).where('kind', 'in', ['artifact', 'file', 'directory']).where('state', '!=', 'verified-absent').limit(1).executeTakeFirst()
+  if (unfinished) purgeConflict()
+  await recordStep(tx, context, 'result', zeroPurgeProgress(), { fs_state: 'complete', next_eligible_at_iso: new Date(Date.now() + 60000).toISOString() })
 }
 async function minimize(tx: TransactionHandle, context: Context, maxRows: number): Promise<void> {
   requirePurgeEnabled()
@@ -233,7 +250,7 @@ export async function runPublicSafetyPurgeBatch(options: BatchOptions = {}): Pro
           if (file.budgetBlocked) break
           reservedBytes += file.chargedBytes
           if (!file.progressed) {
-            if (context.row.db_state !== 'complete') break
+            if (context.row.db_state !== 'complete') { if (context.row.fs_state !== 'complete') { await transaction(async tx => markFilesystemComplete(tx, await current(tx, selected.id)), { retries: 0 }); units++ }; break }
             phase = 'minimize'; await transaction(async tx => minimize(tx, await current(tx, selected.id), maxRows), { retries: 0 })
           }
         }

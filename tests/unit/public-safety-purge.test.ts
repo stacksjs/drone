@@ -74,3 +74,26 @@ test('accepted purge removes more than one hundred review leaves and audits in b
   }
   finally { if (child && child.exitCode === null) { child.kill('SIGKILL'); await child.exited }; await rm(root, { recursive: true, force: true }) }
 }, 180000)
+
+test.skipIf(process.platform !== 'darwin' && process.env.PUBLIC_SAFETY_PURGE_NAMESPACE_TEST !== '1')('accepted purge reserves counter capacity before irreversible effects', async () => {
+  const { runPurgeQualificationFixture } = await import('../helpers/public-safety-purge-fixture')
+  const { code, stdout, stderr } = await runPurgeQualificationFixture('purge-capacity', 165000)
+  expect(code, `${stdout}\n${stderr}`).toBe(0)
+  for (const kind of ['item-version', 'item-generation', 'purge-version', 'common-version']) expect(stdout).toContain(`PASS controlled historical ${kind} reserves`)
+}, 180000)
+
+test.skipIf(process.platform !== 'darwin' && process.env.PUBLIC_SAFETY_PURGE_NAMESPACE_TEST !== '1')('accepted purge keeps DB and filesystem arms independent through actual SQL rollback', async () => {
+  const { runPurgeQualificationFixture } = await import('../helpers/public-safety-purge-fixture')
+  const { code, stdout, stderr } = await runPurgeQualificationFixture('purge-sql', 165000)
+  expect(code, `${stdout}\n${stderr}`).toBe(0)
+  expect(stdout).toContain('PASS actual DB source-result rollback preserves payload while independent accepted filesystem arm completes')
+  for (const kind of ['arm', 'result']) expect(stdout).toContain(`PASS actual ${kind} event SQL rollback`)
+}, 180000)
+
+// Controlled invalid self-FK metadata remains subject to native FK enforcement and conservative scope validation.
+test('accepted purge refuses foreign parent, foreign child and self-parent review chains', async () => {
+  const { runPurgeQualificationFixture } = await import('../helpers/public-safety-purge-fixture')
+  const { code, stdout, stderr } = await runPurgeQualificationFixture('purge-relations', 165000)
+  expect(code, `${stdout}\n${stderr}`).toBe(0)
+  for (const kind of ['foreign-parent', 'foreign-child', 'self-parent', 'review-owner', 'observation-owner']) expect(stdout).toContain(`PASS actual controlled ${kind} review relation`)
+}, 180000)

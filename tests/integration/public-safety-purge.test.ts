@@ -51,3 +51,42 @@ test.skipIf(process.env.PUBLIC_SAFETY_PURGE_NAMESPACE_TEST !== '1')('accepted pu
   expect(code, `${stdout}\n${stderr}`).toBe(0)
   for (const fault of ['nonce', 'generation', 'phase', 'id']) expect(stdout).toContain(`PASS actual SQLite AFTER UPDATE ${fault} drift`)
 }, 180000)
+
+test.skipIf(process.env.PUBLIC_SAFETY_PURGE_NAMESPACE_TEST !== '1')('accepted purge reserves cumulative planned bytes before each filesystem unit', async () => {
+  requireQualifiedNamespace()
+  const { runPurgeQualificationFixture } = await import('../helpers/public-safety-purge-fixture')
+  const { code, stdout, stderr } = await runPurgeQualificationFixture('purge-budget', 165000)
+  expect(code, `${stdout}\n${stderr}`).toBe(0)
+  expect(stdout).toContain('PASS controlled owned partial plans enforce cumulative32MiB reservation')
+}, 180000)
+
+test.skipIf(process.env.PUBLIC_SAFETY_PURGE_NAMESPACE_TEST !== '1')('accepted purge refuses effects when result counter capacity is exhausted', async () => {
+  requireQualifiedNamespace()
+  const { runPurgeQualificationFixture } = await import('../helpers/public-safety-purge-fixture')
+  const { code, stdout, stderr } = await runPurgeQualificationFixture('purge-capacity', 165000)
+  expect(code, `${stdout}\n${stderr}`).toBe(0)
+  for (const kind of ['item-version', 'item-generation', 'purge-version', 'common-version']) expect(stdout).toContain(`PASS controlled historical ${kind} reserves`)
+}, 180000)
+
+test.skipIf(process.env.PUBLIC_SAFETY_PURGE_NAMESPACE_TEST !== '1')('accepted purge qualifies independent filesystem and DB arms through real SQL rollback', async () => {
+  requireQualifiedNamespace()
+  const { runPurgeQualificationFixture } = await import('../helpers/public-safety-purge-fixture')
+  const { code, stdout, stderr } = await runPurgeQualificationFixture('purge-sql', 165000)
+  expect(code, `${stdout}\n${stderr}`).toBe(0)
+  expect(stdout).toContain('PASS actual DB source-result rollback preserves payload while independent accepted filesystem arm completes')
+  for (const kind of ['arm', 'result']) expect(stdout).toContain(`PASS actual ${kind} event SQL rollback`)
+}, 180000)
+
+test.skipIf(process.env.PUBLIC_SAFETY_PURGE_NAMESPACE_TEST !== '1')('accepted purge qualifies captured connection close and reset refusal', async () => {
+  requireQualifiedNamespace()
+  const { qualifyPurgeConnectionRetirement } = await import('../helpers/public-safety-purge-retirement')
+  await qualifyPurgeConnectionRetirement()
+}, 180000)
+
+test.skipIf(process.env.PUBLIC_SAFETY_PURGE_NAMESPACE_TEST !== '1')('accepted purge preserves foreign and changed review ownership chains', async () => {
+  requireQualifiedNamespace()
+  const { runPurgeQualificationFixture } = await import('../helpers/public-safety-purge-fixture')
+  const { code, stdout, stderr } = await runPurgeQualificationFixture('purge-relations', 165000)
+  expect(code, `${stdout}\n${stderr}`).toBe(0)
+  for (const kind of ['foreign-parent', 'foreign-child', 'self-parent', 'review-owner', 'observation-owner']) expect(stdout).toContain(`PASS actual controlled ${kind} review relation`)
+}, 180000)

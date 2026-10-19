@@ -24,7 +24,7 @@ try {
       const preview = await purge.previewPublicSafetyPurge(fixture.key), accepted = await purge.acceptPublicSafetyPurge(fixture.key, { expectedVersion: preview.incidentVersion, expectedRetentionVersion: preview.retentionVersion, policyVersion: purgePolicy, coverage: purgeCoverage, inventoryDigest: preview.inventoryDigest, exclusions: purgeExclusions, receiptRetentionDays: 1, requestId: randomUUID() })
       const before = readFileSync(join(fixture.directory, 'recording.json'))
       const assignment = { nonce: "operation_nonce = '00000000-0000-4000-8000-000000000000'", generation: 'generation = generation + 1', phase: "state = 'blocked'", id: 'id = id + 100000' }[fixture.fault]
-      await database.db.primary.unsafe(`CREATE TRIGGER controlled_purge_fence AFTER UPDATE OF operation_nonce ON public_safety_purge_items WHEN OLD.state = 'armed' AND NEW.state = 'armed' AND NEW.operation_nonce != OLD.operation_nonce BEGIN UPDATE public_safety_purge_items SET ${assignment} WHERE id = NEW.id; END`).execute()
+      await database.db.primary.unsafe(`CREATE TRIGGER controlled_purge_fence AFTER UPDATE OF operation_nonce ON public_safety_purge_items WHEN OLD.state = 'armed' AND NEW.state = 'armed' AND NEW.operation_nonce != OLD.operation_nonce AND NEW.version = OLD.version BEGIN UPDATE public_safety_purge_items SET ${assignment} WHERE id = NEW.id; END`).execute()
       let current = accepted.purge
       for (let count = 0; count < 40 && current.state !== 'blocked'; count++) { await job.dispatchNow({ purgeKey: current.purgeKey }); current = await purge.readPublicSafetyPurge(fixture.key, current.purgeKey) }
       assert.equal(current.state, 'blocked'); assert.equal(current.fsState, 'blocked')
