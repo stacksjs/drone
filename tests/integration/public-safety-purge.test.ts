@@ -49,6 +49,14 @@ test.skipIf(process.env.PUBLIC_SAFETY_PURGE_NAMESPACE_TEST !== '1')('accepted pu
   expect(stdout).toContain('PASS actual canonical reordered duplicate retry replays one committed human event and stale new operation refuses')
 }, 180000)
 
+test.skipIf(process.env.PUBLIC_SAFETY_PURGE_NAMESPACE_TEST !== '1')('accepted purge preserves replaced and foreign-owned root or parent directories', async () => {
+  requireQualifiedNamespace()
+  const { runPurgeQualificationFixture } = await import('../helpers/public-safety-purge-fixture')
+  const { code, stdout, stderr } = await runPurgeQualificationFixture('purge-namespace-identity', 165000)
+  expect(code, `${stdout}\n${stderr}`).toBe(0)
+  for (const kind of ['root-replacement', 'parent-replacement', 'root-uid', 'parent-uid']) expect(stdout).toContain(`PASS actual ${kind} preserves`)
+}, 180000)
+
 test.skipIf(process.env.PUBLIC_SAFETY_PURGE_NAMESPACE_TEST !== '1')('accepted purge recovers genuine SIGKILL after namespace unlink', async () => {
   requireQualifiedNamespace()
   await qualifyPurgeProcessRecovery()
