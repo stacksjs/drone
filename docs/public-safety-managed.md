@@ -104,5 +104,12 @@ does not relocate or adopt existing artifacts. Unsupported or uncertain ownershi
 Drone's installed native version does not contain the prepared export. The explicit
 [source bridge provenance](../resources/functions/artifacts/native-storage/PROVENANCE.md) records
 the qualified published native source used here. It does not imply a dependency upgrade.
+Deliberate native SQLite connection retirement is tested as a terminal process boundary. The
+captured transaction correctly refuses further file effects, but current Bun/native driver
+behavior can retain a write lock until process exit after an active transaction is closed.
+[Stacks #2922](https://github.com/stacksjs/stacks/issues/2922) tracks the verified reproduction.
+These checks do not promise that the same process immediately resumes writing after forced
+connection closure. The library adds no garbage-collection workaround or replacement writer.
+
 Local process-crash and filesystem checks do not establish hardware power-loss durability,
 hostile-host protection, media erasure, uncontrolled-copy removal or purge acceptance.
