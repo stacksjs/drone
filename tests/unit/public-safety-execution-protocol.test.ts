@@ -23,6 +23,9 @@ for (const [stage, modes] of [
           const [code, stdout, stderr] = await Promise.all([running.exited, new Response(running.stdout).text(), new Response(running.stderr).text()])
           // eslint-disable-next-line no-console
           for (const line of stdout.split('\n')) if (line.startsWith('EXECUTION_PROTOCOL ')) console.log(line)
+          // Retain the exact owned Worker error diagnostic even when assertions pass.
+          // eslint-disable-next-line no-console
+          for (const line of stderr.split('\n')) if (line.startsWith('EXECUTION_PROTOCOL_WORKER_ERROR ')) console.error(line)
           expect(code, `${stdout}\n${stderr}`).toBe(0)
           expect(stdout).toContain(`PASS supplemental execution protocol ${mode}`)
         }
