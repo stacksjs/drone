@@ -5,6 +5,7 @@ import { mkdir, symlink } from 'node:fs/promises'
 import { basename, dirname, join, resolve } from 'node:path'
 import { Database } from 'bun:sqlite'
 import { setupIncidentDatabase } from './setup'
+import { retainedPreview } from '../../helpers/public-safety-retained'
 
 const root = realpathSync(process.cwd())
 assert(basename(root).startsWith('drone-incident-access-purge-migration-'))
@@ -51,7 +52,7 @@ else if (mode === 'seed' || mode === 'reconcile') {
         const registered = await records.registerPublicSafetySource(config.id, { expectedVersion: 1, recording: simulatePublicSafety({ config, seconds: 10 }) })
         const observation = await records.appendPublicSafetyObservation(config.id, { expectedVersion: 2, sourceDigest: registered.source.digest, captureId: 'photo-0001', modality: 'visible', pixel: { x: 0, y: 71 }, note: 'Old B private migration observation', uncertaintyNote: 'Old B uncertainty retained exactly' })
         await records.appendPublicSafetyReview(config.id, observation.observation.id, { expectedVersion: 3, sourceDigest: registered.source.digest, previousReviewId: null, disposition: 'unresolved', note: 'Old B private migration review' })
-        const preview = await retention.previewPublicSafetyRetention(config.id)
+        const preview = retainedPreview(await retention.previewPublicSafetyRetention(config.id))
         await retention.enrollPublicSafetyRetention(config.id, { expectedVersion: 4, policyVersion: 'local-managed-v1', inventoryDigest: preview.inventoryDigest, requestId: randomUUID() })
         writeFileSync(join(root, 'credentials.json'), JSON.stringify({ token: coordinator.token.plainTextToken, key: config.id }))
         const { registerPersistentQueryHooks } = await import('@stacksjs/query-builder')
