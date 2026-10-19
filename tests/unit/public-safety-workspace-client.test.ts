@@ -96,6 +96,26 @@ test('workspace scope changes and refusals discard the active credential and pri
   finally { model.close() }
 })
 
+test('native refresh hints trigger immediate coalesced snapshots before periodic polling', async () => {
+  let events!: BroadcastStreamClientOptions, reads = 0
+  const pending: Array<(response: Response) => void> = []
+  const model = openIncidentWorkspace({ request: async () => { reads++; return new Promise<Response>(resolve => pending.push(resolve)) }, stream: options => { events = options; return { close() {} } }, refreshMs: 60000 })
+  try {
+    model.connect('incident-a', 'private'); events.onConnected?.()
+    pending[0]!(Response.json(snapshot())); await settle()
+    expect(reads).toBe(1)
+    events.onMessage({ channel: 'server-selected', event: 'refresh', data: { refresh: true } })
+    expect(reads).toBe(2)
+    for (let index = 0; index < 10; index++) events.onMessage({ channel: 'server-selected', event: 'refresh', data: { refresh: true } })
+    expect(reads).toBe(2)
+    pending[1]!(Response.json(snapshot())); await settle()
+    expect(reads).toBe(3)
+    pending[2]!(Response.json(snapshot())); await settle()
+    expect(reads).toBe(3)
+  }
+  finally { model.close() }
+})
+
 test('observation outcome-unknown never retries and 409 requires a fresh explicit submission', async () => {
   let events!: BroadcastStreamClientOptions, writes = 0, conflict = false
   const data = snapshot()
@@ -123,6 +143,59 @@ test('observation outcome-unknown never retries and 409 requires a fresh explici
     expect(writes).toBe(2)
     expect(model.get().confirmationRequired).toBe(true)
     expect(model.get().error).toContain('context changed')
+  }
+  finally { model.close() }
+})
+
+
+test('recipient selection binds the displayed membership generation and role', async () => {
+  let events!: BroadcastStreamClientOptions, writes = 0
+  const data = snapshot(), selected = { userId: 2, role: 'reviewer' as const, membershipVersion: 1 }
+  data.selected = { source: { digest: 'a'.repeat(64) } } as unknown as WorkspaceSnapshot['selected']
+  data.recipients = { entries: [selected], cursor: 2, hasMore: false }
+  data.handover.actionability.canOffer = true
+  const model = openIncidentWorkspace({ request: async (_path, init) => { if (init?.method === 'POST') writes++; return Response.json(init?.method === 'POST' ? {} : data) }, stream: options => { events = options; return { close() {} } }, refreshMs: 60000 })
+  try {
+    model.connect('incident-a', 'private'); events.onConnected?.(); await settle()
+    expect(await model.offer(selected, 'observer', 300)).toBe(true)
+    expect(writes).toBe(1)
+    data.recipients.entries = [{ ...selected, membershipVersion: 3 }]
+    await model.refresh()
+    expect(await model.offer(selected, 'observer', 300)).toBe(false)
+    expect(writes).toBe(1)
+    expect(await model.offer(data.recipients.entries[0]!, 'observer', 300)).toBe(true)
+    data.recipients.entries = [{ ...selected, membershipVersion: 3, role: 'observer' }]
+    await model.refresh()
+    expect(await model.offer({ ...selected, membershipVersion: 3 }, 'observer', 300)).toBe(false)
+    expect(writes).toBe(2)
+  }
+  finally { model.close() }
+})
+
+test('ordinary refresh and stream renewal preserve drafts while changed viewer authority invalidates them', async () => {
+  let events!: BroadcastStreamClientOptions
+  const data = snapshot()
+  const model = openIncidentWorkspace({ request: async () => Response.json(data), stream: options => { events = options; return { close() {} } }, refreshMs: 60000 })
+  try {
+    model.connect('incident-a', 'private'); events.onConnected?.(); await settle()
+    const initial = model.get().reset
+    data.incident.version++; data.throughSequence++
+    await model.refresh()
+    expect(model.get().reset).toBe(initial)
+    events.onStatus?.(false)
+    expect(model.get().snapshot).toBeNull()
+    expect(model.get().reset).toBe(initial)
+    events.onConnected?.(); await settle()
+    expect(model.get().status).toBe('current')
+    expect(model.get().reset).toBe(initial)
+    data.incident.membership.version++
+    await model.refresh()
+    expect(model.get().reset).toBe(initial + 1)
+    data.viewer.canCoordinate = true
+    await model.refresh()
+    expect(model.get().reset).toBe(initial + 2)
+    model.disconnect()
+    expect(model.get().reset).toBe(initial + 3)
   }
   finally { model.close() }
 })

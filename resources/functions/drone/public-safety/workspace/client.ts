@@ -2,7 +2,7 @@ import type { BroadcastStreamClientOptions } from '@stacksjs/stx/composables/use
 import type { HandoverDecisionInput, HandoverOfferInput } from '../access/handover-types'
 import type { ObservationProjection, RecordPage, ReviewProjection, SourceRead } from '../access/record-types'
 import type { AssignableIncidentRole } from '../access/types'
-import type { WorkspaceOptions, WorkspaceSnapshot } from './types'
+import type { WorkspaceOptions, WorkspaceRecipient, WorkspaceSnapshot } from './types'
 import { useBroadcastStream } from '@stacksjs/stx/composables/use-broadcast-stream'
 
 export interface WorkspaceClientView {
@@ -39,20 +39,20 @@ export function openIncidentWorkspace(settings: WorkspaceClientOptions = {}) {
   let poll: ReturnType<typeof setInterval> | undefined, expiry: ReturnType<typeof setTimeout> | undefined
   let retry: { scope: string, path: string, body: HandoverOfferInput | HandoverDecisionInput } | null = null
   const pending = new Set<AbortController>()
-  let reviewSelection = 0
+  let reviewSelection = 0, authority = ''
   const publish = (patch: Partial<WorkspaceClientView>) => { view = { ...view, ...patch }; for (const listener of listeners) listener(view) }
   const base = () => `/api/public-safety/incidents/${incident}`
-  function discard() {
+  function discard(clearDrafts = true) {
     activity++
     reviewSelection++
     for (const request of pending) request.abort()
     pending.clear()
     clearTimeout(expiry)
     retry = null
-    publish({ snapshot: null, source: null, reviewObservation: null, reviews: null, busy: false, confirmationRequired: false, canRetryHandover: false, reset: view.reset + 1 })
+    publish({ snapshot: null, source: null, reviewObservation: null, reviews: null, busy: false, confirmationRequired: clearDrafts ? false : view.confirmationRequired, canRetryHandover: false, reset: view.reset + (clearDrafts ? 1 : 0) })
   }
   function disconnect(message = '', refused = false) {
-    identity++; credential = null; connected = false; dirty = false; scope = null; accountId = null
+    identity++; credential = null; connected = false; dirty = false; scope = null; accountId = null; authority = ''
     clearInterval(poll); clearTimeout(expiry)
     const previous = stream; stream = null; previous?.close()
     reading = null; options = { limit: 30 }; discard()
@@ -113,6 +113,9 @@ export function openIncidentWorkspace(settings: WorkspaceClientOptions = {}) {
             disconnect('Incident scope or account changed. Connect again to review its current identity.', true)
             return
           }
+          const nextAuthority = JSON.stringify([snapshot.incident.membership, snapshot.incident.status, snapshot.viewer.canCoordinate, snapshot.handover.assignment, snapshot.actions])
+          if (authority && authority !== nextAuthority) discard()
+          authority = nextAuthority
           scope = snapshot.scope; accountId = snapshot.viewer.accountId
           deadline(snapshot)
           publish({ snapshot, status: 'current', error: view.confirmationRequired ? view.error : '', notice: view.confirmationRequired ? view.notice : '' })
@@ -139,11 +142,11 @@ export function openIncidentWorkspace(settings: WorkspaceClientOptions = {}) {
     stream = createStream({
       endpoint: `${base()}/workspace/events`, request,
       onConnected() { if (generation === identity) { connected = true; publish({ status: 'synchronizing' }); void refresh() } },
-      onMessage(frame) { if (generation === identity && frame.event === 'workspace-invalidated') void refresh() },
+      onMessage(frame) { if (generation === identity && frame.event === 'refresh') void refresh() },
       onStatus(value) {
         if (generation !== identity) return
         connected = value
-        if (!value) { discard(); publish({ status: 'reconnecting', notice: 'Connection lost. Waiting for a fresh authorized snapshot.' }) }
+        if (!value) { discard(false); publish({ status: 'reconnecting', notice: 'Connection lost. Waiting for a fresh authorized snapshot.' }) }
       },
     })
     poll = setInterval(() => { void refresh() }, settings.refreshMs ?? 10000)
@@ -228,10 +231,10 @@ export function openIncidentWorkspace(settings: WorkspaceClientOptions = {}) {
     if (!snapshot?.actions.canReview || !observation || !reviews || reviews.hasMore) return false
     return command(`${base()}/observations/${observation.id}/reviews`, { expectedVersion: snapshot.incident.version, sourceDigest: observation.sourceDigest, previousReviewId: reviews.entries.at(-1)?.id ?? null, disposition: draft.disposition, note: draft.note })
   }
-  async function offer(recipientUserId: number, outgoingRole: AssignableIncidentRole, expiresInSeconds: number) {
-    const snapshot = view.snapshot, recipient = snapshot?.recipients?.entries.find(member => member.userId === recipientUserId)
+  async function offer(selectedRecipient: WorkspaceRecipient, outgoingRole: AssignableIncidentRole, expiresInSeconds: number) {
+    const snapshot = view.snapshot, recipient = snapshot?.recipients?.entries.find(member => member.userId === selectedRecipient.userId && member.role === selectedRecipient.role && member.membershipVersion === selectedRecipient.membershipVersion)
     if (!snapshot?.handover.actionability.canOffer || !snapshot.selected || !recipient) return false
-    const body: HandoverOfferInput = { requestId: crypto.randomUUID(), assignment: snapshot.handover.assignment, recipientUserId, recipientMembershipVersion: recipient.membershipVersion, sourceDigest: snapshot.selected.source.digest, outgoingRole, expiresInSeconds }
+    const body: HandoverOfferInput = { requestId: crypto.randomUUID(), assignment: snapshot.handover.assignment, recipientUserId: recipient.userId, recipientMembershipVersion: recipient.membershipVersion, sourceDigest: snapshot.selected.source.digest, outgoingRole, expiresInSeconds }
     return command(`${base()}/handover/offer`, body, true)
   }
   async function decide(decision: 'accept' | 'decline' | 'cancel', acknowledged = false) {

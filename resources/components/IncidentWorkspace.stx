@@ -35,7 +35,7 @@ const supportedPixel = derived(() => {
   const selected = capture(), x = Number(pixelX()), y = Number(pixelY())
   return !!selected && Number.isInteger(x) && Number.isInteger(y) && x >= 0 && y >= 0 && x < selected.width && y < selected.height && selected.support[y * selected.width + x] === 1 && (modality() === 'visible' || !!selected.temperatures[y * selected.width + x])
 })
-let lastReset = -1, lastOffer = ''
+let lastReset = -1, lastOffer = '', lastRoster = ''
 effect(() => {
   if (workspace().reset !== lastReset) {
     lastReset = workspace().reset
@@ -44,7 +44,11 @@ effect(() => {
   const offer = current()?.handover.offer
   const binding = offer?.state === 'pending' ? offer.digest : ''
   if (binding !== lastOffer) { lastOffer = binding; acknowledged.set(false) }
-  if (!current()?.recipients) recipientId.set('')
+  const snapshot = current()
+  if (snapshot) {
+    const roster = JSON.stringify(snapshot.recipients)
+    if (roster !== lastRoster) { lastRoster = roster; recipientId.set('') }
+  }
 })
 onDestroy(() => { unsubscribe(); model.close(); token.set('') })
 function connect() { const credential = token(); token.set(''); model.connect(incidentKey().trim(), credential) }
@@ -56,7 +60,10 @@ async function recordObservation() {
   if (await model.observe({ captureId: captureId(), modality: modality(), x: Number(pixelX()), y: Number(pixelY()), note: observationNote(), uncertaintyNote: uncertaintyNote() })) { observationNote.set(''); uncertaintyNote.set('') }
 }
 async function recordReview() { if (await model.review({ disposition: disposition(), note: reviewNote() })) reviewNote.set('') }
-async function offer() { if (await model.offer(Number(recipientId()), outgoingRole(), Number(ttl()))) recipientId.set('') }
+async function offer() {
+  const recipient = current()?.recipients?.entries.find(member => `${member.userId}:${member.role}:${member.membershipVersion}` === recipientId())
+  if (recipient && await model.offer(recipient, outgoingRole(), Number(ttl()))) recipientId.set('')
+}
 async function accept() { if (await model.decide('accept', acknowledged())) acknowledged.set(false) }
 function nextReviews() { const value = workspace(); if (value.reviewObservation && value.reviews) void model.loadReviews(value.reviewObservation.id, value.reviews.cursor) }
 function short(value: string) { return value.slice(0, 12) }
@@ -70,9 +77,9 @@ function short(value: string) { return value.slice(0, 12) }
     </div>
     <p class="mt-4 max-w-4xl leading-relaxed text-emerald-200 text-sm">Unsigned simulated sources. Thermal measurements and physical outputs remain unqualified. This screen does not establish searched-area coverage or legal authority.</p>
 
-    <form @submit.prevent="connect()" :if="workspace().status === 'disconnected' || workspace().status === 'refused'" class="grid gap-5 sm:grid-cols-2 mt-8 p-5 bg-neutral-900 border border-neutral-700 rounded" aria-label="Connect to an incident">
-      <div><label for="incident-key" class="block mb-2 text-sm">Incident key</label><input id="incident-key" name="incident" x-model="incidentKey" required maxlength="64" pattern="[a-z][a-z0-9-]{0,63}" autocomplete="off" spellcheck="false" class="px-3 py-3 w-full bg-neutral-950 border border-neutral-600 rounded focus-visible:outline-emerald-200"></div>
-      <div><label for="incident-token" class="block mb-2 text-sm">Personal incident credential</label><input id="incident-token" name="credential" x-model="token" type="password" required maxlength="4096" autocomplete="off" spellcheck="false" class="px-3 py-3 w-full bg-neutral-950 border border-neutral-600 rounded focus-visible:outline-emerald-200" aria-describedby="credential-help"></div>
+    <form method="post" @submit.prevent="connect()" :if="workspace().status === 'disconnected' || workspace().status === 'refused'" class="grid gap-5 sm:grid-cols-2 mt-8 p-5 bg-neutral-900 border border-neutral-700 rounded" aria-label="Connect to an incident">
+      <div><label for="incident-key" class="block mb-2 text-sm">Incident key</label><input id="incident-key" x-model="incidentKey" required maxlength="64" pattern="[a-z][a-z0-9-]{0,63}" autocomplete="off" spellcheck="false" class="px-3 py-3 w-full bg-neutral-950 border border-neutral-600 rounded focus-visible:outline-emerald-200"></div>
+      <div><label for="incident-token" class="block mb-2 text-sm">Personal incident credential</label><input id="incident-token" x-model="token" type="password" required maxlength="4096" autocomplete="off" spellcheck="false" class="px-3 py-3 w-full bg-neutral-950 border border-neutral-600 rounded focus-visible:outline-emerald-200" aria-describedby="credential-help"></div>
       <p id="credential-help" class="sm:col-span-2 leading-relaxed text-neutral-400 text-sm">Use an existing scoped personal credential provisioned through Buddy. It is sent in request headers, stays only in this connection and is discarded when you disconnect. Session and delegated credentials cannot connect.</p>
       <button type="submit" class="justify-self-start px-4 py-3 font-medium text-neutral-950 bg-emerald-200 rounded focus-visible:outline-emerald-200 focus-visible:outline-offset-4">Connect incident</button>
     </form>
@@ -181,7 +188,7 @@ function short(value: string) { return value.slice(0, 12) }
           <div class="flex flex-wrap gap-3 mt-5"><button type="button" @click="accept()" :disabled="!ready() || !current()?.handover.actionability.canAccept || !acknowledged()" class="px-4 py-3 font-medium text-neutral-950 bg-emerald-200 rounded focus-visible:outline-emerald-200 disabled:opacity-40">Accept coordination</button><button type="button" @click="model.decide('decline')" :disabled="!ready() || !current()?.handover.actionability.canDecline" class="px-4 py-3 text-sm border border-neutral-600 rounded focus-visible:outline-emerald-200 disabled:opacity-40">Decline offer</button><button type="button" @click="model.decide('cancel')" :disabled="!ready() || !current()?.handover.actionability.canCancel" class="px-4 py-3 text-sm border border-neutral-600 rounded focus-visible:outline-emerald-200 disabled:opacity-40">Cancel offer</button></div>
         </div>
         <form :if="current()?.recipients" @submit.prevent="offer()" class="grid gap-5 sm:grid-cols-2 lg:grid-cols-3 mt-6" aria-label="Offer incident coordination">
-          <div><label for="incident-recipient" class="block mb-2 text-sm">Existing active recipient</label><select id="incident-recipient" x-model="recipientId" required class="px-3 py-3 w-full bg-neutral-900 border border-neutral-600 rounded focus-visible:outline-emerald-200"><option value="">Choose an account</option><option :for="member in current()?.recipients?.entries ?? []" :value="String(member.userId)">Account {{ member.userId }} / {{ member.role }} / membership {{ member.membershipVersion }}</option></select><div class="flex gap-4 mt-3"><button type="button" @click="model.page('members', true)" class="text-emerald-200 text-xs underline focus-visible:outline-emerald-200">First recipients</button><button :if="current()?.recipients?.hasMore" type="button" @click="model.page('members')" class="text-emerald-200 text-xs underline focus-visible:outline-emerald-200">Next recipients</button></div></div>
+          <div><label for="incident-recipient" class="block mb-2 text-sm">Existing active recipient</label><select id="incident-recipient" x-model="recipientId" required class="px-3 py-3 w-full bg-neutral-900 border border-neutral-600 rounded focus-visible:outline-emerald-200"><option value="">Choose an account</option><option :for="member in current()?.recipients?.entries ?? []" :value="`${member.userId}:${member.role}:${member.membershipVersion}`">Account {{ member.userId }} / {{ member.role }} / membership {{ member.membershipVersion }}</option></select><div class="flex gap-4 mt-3"><button type="button" @click="model.page('members', true)" class="text-emerald-200 text-xs underline focus-visible:outline-emerald-200">First recipients</button><button :if="current()?.recipients?.hasMore" type="button" @click="model.page('members')" class="text-emerald-200 text-xs underline focus-visible:outline-emerald-200">Next recipients</button></div></div>
           <div><label for="incident-outgoing-role" class="block mb-2 text-sm">Your outgoing role</label><select id="incident-outgoing-role" x-model="outgoingRole" class="px-3 py-3 w-full bg-neutral-900 border border-neutral-600 rounded focus-visible:outline-emerald-200"><option value="observer">Observer</option><option value="pilot">Pilot</option><option value="reviewer">Reviewer</option><option value="evidence-custodian">Evidence custodian</option></select></div>
           <div><label for="incident-offer-ttl" class="block mb-2 text-sm">Offer lifetime in seconds</label><input id="incident-offer-ttl" x-model.number="ttl" type="number" min="30" max="1800" step="1" required class="px-3 py-3 w-full bg-neutral-900 border border-neutral-600 rounded focus-visible:outline-emerald-200"></div>
           <p class="sm:col-span-2 lg:col-span-3 text-neutral-400 text-xs">The selected admitted source anchors this offer. Recipient membership does not assert current platform eligibility; the server checks it when you offer.</p>
