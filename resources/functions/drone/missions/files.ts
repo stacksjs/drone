@@ -4,19 +4,21 @@ import { resolve } from 'node:path'
 import type { MissionTrace } from './engine'
 import { missionLimits, parseMissionTrace } from './engine'
 /** Private local simulation artifacts only. No application storage or hardware transport is opened. */
-export async function readMissionFile(path: string, options: { preserveBom?: boolean } = {}): Promise<string> {
+export async function readMissionFile(path: string, options: { preserveBom?: boolean, maxBytes?: number } = {}): Promise<string> {
+  const maxBytes = options.maxBytes ?? missionLimits.bytes
+  if (!Number.isSafeInteger(maxBytes) || maxBytes < 1 || maxBytes > 16 * 1024 * 1024) throw new RangeError('Invalid artifact read budget (1 byte..16 MiB)')
   const file = await open(path, constants.O_RDONLY | constants.O_NONBLOCK | constants.O_NOFOLLOW)
   try {
     const stat = await file.stat()
-    if (!stat.isFile() || stat.size > missionLimits.bytes) throw new RangeError('Mission file must be a regular file up to 8 MiB')
-    const buffer = new Uint8Array(missionLimits.bytes + 1)
+    if (!stat.isFile() || stat.size > maxBytes) throw new RangeError(`Artifact must be a regular file up to ${maxBytes} bytes`)
+    const buffer = new Uint8Array(maxBytes + 1)
     let used = 0
     while (used < buffer.length) {
       const { bytesRead } = await file.read(buffer, used, buffer.length - used, null)
       if (bytesRead === 0) break
       used += bytesRead
     }
-    if (used > missionLimits.bytes) throw new RangeError('Mission file exceeds 8 MiB')
+    if (used > maxBytes) throw new RangeError('Artifact exceeds its read budget')
     return new TextDecoder('utf-8', { fatal: true, ignoreBOM: options.preserveBom ?? false }).decode(buffer.subarray(0, used))
   }
   finally { await file.close() }

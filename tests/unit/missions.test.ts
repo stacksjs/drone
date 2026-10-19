@@ -146,6 +146,18 @@ import { mkdtemp, rm, stat, symlink, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { readMissionFile, writeMissionTrace } from '../../resources/functions/drone/missions/files'
+test('shared artifact reads enforce an explicitly bounded budget before reading JSON bytes', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'drone-read-budget-'))
+  try {
+    const path = join(root, 'input.json')
+    await writeFile(path, ' '.repeat(1025))
+    await expect(readMissionFile(path, { maxBytes: 1024 })).rejects.toThrow('regular file')
+    expect((await readMissionFile(path, { maxBytes: 2048 })).length).toBe(1025)
+    for (const maxBytes of [0, NaN, Infinity, 16 * 1024 * 1024 + 1])
+      await expect(readMissionFile(path, { maxBytes })).rejects.toThrow('budget')
+  }
+  finally { await rm(root, { recursive: true, force: true }) }
+})
 test('native checkpoint and recovery commands persist verified paused artifacts and reject unsafe recovery', async () => {
   const root = await mkdtemp(join(tmpdir(), 'drone-mission-checkpoint-'))
   try {
