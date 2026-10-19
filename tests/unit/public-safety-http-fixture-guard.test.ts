@@ -4,7 +4,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
 // Direct execution must reject an unowned project before writing its Session model or opening a database.
-for (const fixture of ['http.ts', 'records-http.ts', 'retention-http.ts', 'managed-http.ts']) {
+for (const fixture of ['http.ts', 'records-http.ts', 'retention-http.ts', 'managed-http.ts', 'purge-http.ts']) {
   test(`${fixture} rejects a non-fixture working directory without writes`, async () => {
     const directory = await mkdtemp(join(tmpdir(), 'drone-http-guard-'))
     try {

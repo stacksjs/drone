@@ -28,6 +28,11 @@ import PublicSafetyManagedRead from '../app/Actions/PublicSafetyManagedRead'
 import PublicSafetyManagedFile from '../app/Actions/PublicSafetyManagedFile'
 import PublicSafetyManagedEvents from '../app/Actions/PublicSafetyManagedEvents'
 import PublicSafetyManagedReconcile from '../app/Actions/PublicSafetyManagedReconcile'
+import PublicSafetyPurgePreview from '../app/Actions/PublicSafetyPurgePreview'
+import PublicSafetyPurgeAccept from '../app/Actions/PublicSafetyPurgeAccept'
+import PublicSafetyPurgeRead from '../app/Actions/PublicSafetyPurgeRead'
+import PublicSafetyPurgeEvents from '../app/Actions/PublicSafetyPurgeEvents'
+import PublicSafetyPurgeRetry from '../app/Actions/PublicSafetyPurgeRetry'
 import { incidentHttpBoundary } from '../resources/functions/drone/public-safety/access/http'
 import { incidentDataExposureBoundary } from '../resources/functions/drone/public-safety/access/exposure'
 
@@ -66,3 +71,9 @@ route.get('/public-safety/incidents/{incident}/managed-artifacts/{artifact}', Pu
 route.match(['GET', 'HEAD'], '/public-safety/incidents/{incident}/managed-artifacts/{artifact}/files/{file}', PublicSafetyManagedFile).middleware('auth')
 route.get('/public-safety/incidents/{incident}/managed-artifacts/{artifact}/events', PublicSafetyManagedEvents).middleware('auth')
 route.post('/public-safety/incidents/{incident}/managed-artifacts/{artifact}/reconcile', PublicSafetyManagedReconcile).middleware('auth').parseBody(false)
+
+route.get('/public-safety/incidents/{incident}/retention/purge/preview', PublicSafetyPurgePreview).middleware('auth')
+route.post('/public-safety/incidents/{incident}/retention/purge', PublicSafetyPurgeAccept).middleware('auth').parseBody(false)
+route.get('/public-safety/incidents/{incident}/retention/purge/{purge}', PublicSafetyPurgeRead).middleware('auth')
+route.get('/public-safety/incidents/{incident}/retention/purge/{purge}/events', PublicSafetyPurgeEvents).middleware('auth')
+route.post('/public-safety/incidents/{incident}/retention/purge/{purge}/retry', PublicSafetyPurgeRetry).middleware('auth').parseBody(false)

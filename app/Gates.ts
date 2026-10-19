@@ -1,5 +1,6 @@
 import { publicSafetyRetentionGate } from '../resources/functions/drone/public-safety/retention/policy'
 import { publicSafetyManagedGate } from '../resources/functions/drone/public-safety/managed/policy'
+import { publicSafetyPurgeGate } from '../resources/functions/drone/public-safety/purge/policy'
 import type { UserModel } from '@stacksjs/orm'
 import { defineGates } from '@stacksjs/auth'
 import { publicSafetyCreateGate, publicSafetyIncidentGate } from '../resources/functions/drone/public-safety/access/policy'
@@ -31,6 +32,11 @@ export default defineGates({
    * }
    */
   gates: {
+    'public-safety:purge-preview': (user, key: string) => publicSafetyPurgeGate(user, key, 'preview'),
+    'public-safety:purge-accept': (user, key: string) => publicSafetyPurgeGate(user, key, 'accept'),
+    'public-safety:purge-read': (user, key: string) => publicSafetyPurgeGate(user, key, 'read'),
+    'public-safety:purge-events': (user, key: string) => publicSafetyPurgeGate(user, key, 'events'),
+    'public-safety:purge-retry': (user, key: string) => publicSafetyPurgeGate(user, key, 'retry'),
     'public-safety:managed-read': (user, key: string) => publicSafetyManagedGate(user, key, 'read'),
     'public-safety:managed-create': (user, key: string) => publicSafetyManagedGate(user, key, 'create'),
     'public-safety:managed-events': (user, key: string) => publicSafetyManagedGate(user, key, 'events'),
