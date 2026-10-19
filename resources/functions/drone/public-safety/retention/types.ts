@@ -21,3 +21,5 @@ export interface RetentionEventProjection {
 export interface RetentionReceipt { scope: RetentionScopeProjection, event: RetentionEventProjection, replayed: boolean }
 export interface RetentionEventOptions { afterSequence?: number, limit?: number }
 export interface RetentionEventPage { entries: RetentionEventProjection[], cursor: number, hasMore: boolean }
+
+export interface PurgedCustodyProjection { key: string, policyVersion: 'local-managed-v1', version: number, incidentVersion: number, retainUntil: string, expired: true, purged: true, purgeKey: string, historyRetired: true, capabilities: { canRevokeMembers: boolean } }

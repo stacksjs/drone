@@ -270,7 +270,8 @@
             "hasDefault": false,
             "enumValues": [
               "active",
-              "closed"
+              "closed",
+              "purged"
             ]
           },
           {
@@ -278,7 +279,7 @@
             "type": "enum",
             "isPrimaryKey": false,
             "isUnique": false,
-            "isNullable": false,
+            "isNullable": true,
             "hasDefault": false,
             "enumValues": [
               "search-and-rescue",
@@ -292,7 +293,7 @@
             "type": "string",
             "isPrimaryKey": false,
             "isUnique": false,
-            "isNullable": false,
+            "isNullable": true,
             "hasDefault": false,
             "maxLength": 64
           },
@@ -301,7 +302,7 @@
             "type": "text",
             "isPrimaryKey": false,
             "isUnique": false,
-            "isNullable": false,
+            "isNullable": true,
             "hasDefault": false
           },
           {
@@ -1068,7 +1069,7 @@
             "type": "string",
             "isPrimaryKey": false,
             "isUnique": false,
-            "isNullable": false,
+            "isNullable": true,
             "hasDefault": false,
             "maxLength": 64
           },
@@ -1176,6 +1177,20 @@
             "isUnique": false,
             "isNullable": true,
             "hasDefault": false
+          },
+          {
+            "name": "freeze_state",
+            "type": "enum",
+            "isPrimaryKey": false,
+            "isUnique": false,
+            "isNullable": false,
+            "hasDefault": true,
+            "defaultValue": "retained",
+            "enumValues": [
+              "retained",
+              "frozen",
+              "purged"
+            ]
           }
         ],
         "indexes": [
@@ -1239,12 +1254,12 @@
             "type": "bigint",
             "isPrimaryKey": false,
             "isUnique": false,
-            "isNullable": false,
+            "isNullable": true,
             "hasDefault": false,
             "references": {
               "table": "public_safety_sources",
               "column": "id",
-              "onDelete": "restrict"
+              "onDelete": "set null"
             }
           },
           {
@@ -1871,10 +1886,899 @@
             "type": "unique"
           }
         ]
+      },
+      {
+        "table": "public_safety_purges",
+        "columns": [
+          {
+            "name": "id",
+            "type": "bigint",
+            "isPrimaryKey": true,
+            "isUnique": false,
+            "isNullable": false,
+            "hasDefault": false
+          },
+          {
+            "name": "incident_id",
+            "type": "bigint",
+            "isPrimaryKey": false,
+            "isUnique": false,
+            "isNullable": false,
+            "hasDefault": false,
+            "references": {
+              "table": "public_safety_incidents",
+              "column": "id",
+              "onDelete": "restrict"
+            }
+          },
+          {
+            "name": "retention_scope_id",
+            "type": "bigint",
+            "isPrimaryKey": false,
+            "isUnique": false,
+            "isNullable": false,
+            "hasDefault": false,
+            "references": {
+              "table": "public_safety_retention_scopes",
+              "column": "id",
+              "onDelete": "restrict"
+            }
+          },
+          {
+            "name": "accepted_by_user_id",
+            "type": "bigint",
+            "isPrimaryKey": false,
+            "isUnique": false,
+            "isNullable": false,
+            "hasDefault": false,
+            "references": {
+              "table": "users",
+              "column": "id",
+              "onDelete": "restrict"
+            }
+          },
+          {
+            "name": "purge_key",
+            "type": "string",
+            "isPrimaryKey": false,
+            "isUnique": false,
+            "isNullable": false,
+            "hasDefault": false,
+            "maxLength": 36
+          },
+          {
+            "name": "request_id",
+            "type": "string",
+            "isPrimaryKey": false,
+            "isUnique": false,
+            "isNullable": false,
+            "hasDefault": false,
+            "maxLength": 36
+          },
+          {
+            "name": "operation_nonce",
+            "type": "string",
+            "isPrimaryKey": false,
+            "isUnique": false,
+            "isNullable": false,
+            "hasDefault": false,
+            "maxLength": 36
+          },
+          {
+            "name": "policy_version",
+            "type": "enum",
+            "isPrimaryKey": false,
+            "isUnique": false,
+            "isNullable": false,
+            "hasDefault": false,
+            "enumValues": [
+              "local-managed-purge-v1"
+            ]
+          },
+          {
+            "name": "coverage",
+            "type": "enum",
+            "isPrimaryKey": false,
+            "isUnique": false,
+            "isNullable": false,
+            "hasDefault": false,
+            "enumValues": [
+              "active-db-and-registered-namespace-v1"
+            ]
+          },
+          {
+            "name": "request_digest",
+            "type": "string",
+            "isPrimaryKey": false,
+            "isUnique": false,
+            "isNullable": false,
+            "hasDefault": false,
+            "maxLength": 64
+          },
+          {
+            "name": "frozen_inventory_digest",
+            "type": "string",
+            "isPrimaryKey": false,
+            "isUnique": false,
+            "isNullable": false,
+            "hasDefault": false,
+            "maxLength": 64
+          },
+          {
+            "name": "accepted_at_iso",
+            "type": "string",
+            "isPrimaryKey": false,
+            "isUnique": false,
+            "isNullable": false,
+            "hasDefault": false,
+            "maxLength": 24
+          },
+          {
+            "name": "next_eligible_at_iso",
+            "type": "string",
+            "isPrimaryKey": false,
+            "isUnique": false,
+            "isNullable": false,
+            "hasDefault": false,
+            "maxLength": 24
+          },
+          {
+            "name": "completed_at_iso",
+            "type": "string",
+            "isPrimaryKey": false,
+            "isUnique": false,
+            "isNullable": true,
+            "hasDefault": false,
+            "maxLength": 24
+          },
+          {
+            "name": "receipt_retain_until_iso",
+            "type": "string",
+            "isPrimaryKey": false,
+            "isUnique": false,
+            "isNullable": true,
+            "hasDefault": false,
+            "maxLength": 24
+          },
+          {
+            "name": "blocked_at_iso",
+            "type": "string",
+            "isPrimaryKey": false,
+            "isUnique": false,
+            "isNullable": true,
+            "hasDefault": false,
+            "maxLength": 24
+          },
+          {
+            "name": "review_due_at_iso",
+            "type": "string",
+            "isPrimaryKey": false,
+            "isUnique": false,
+            "isNullable": true,
+            "hasDefault": false,
+            "maxLength": 24
+          },
+          {
+            "name": "accepted_incident_version",
+            "type": "integer",
+            "isPrimaryKey": false,
+            "isUnique": false,
+            "isNullable": false,
+            "hasDefault": false
+          },
+          {
+            "name": "accepted_retention_version",
+            "type": "integer",
+            "isPrimaryKey": false,
+            "isUnique": false,
+            "isNullable": false,
+            "hasDefault": false
+          },
+          {
+            "name": "version",
+            "type": "integer",
+            "isPrimaryKey": false,
+            "isUnique": false,
+            "isNullable": false,
+            "hasDefault": false
+          },
+          {
+            "name": "generation",
+            "type": "integer",
+            "isPrimaryKey": false,
+            "isUnique": false,
+            "isNullable": false,
+            "hasDefault": false
+          },
+          {
+            "name": "receipt_retention_days",
+            "type": "integer",
+            "isPrimaryKey": false,
+            "isUnique": false,
+            "isNullable": false,
+            "hasDefault": false
+          },
+          {
+            "name": "frozen_counts_json",
+            "type": "text",
+            "isPrimaryKey": false,
+            "isUnique": false,
+            "isNullable": false,
+            "hasDefault": false
+          },
+          {
+            "name": "frozen_header_json",
+            "type": "text",
+            "isPrimaryKey": false,
+            "isUnique": false,
+            "isNullable": false,
+            "hasDefault": false
+          },
+          {
+            "name": "build_cursor_json",
+            "type": "text",
+            "isPrimaryKey": false,
+            "isUnique": false,
+            "isNullable": false,
+            "hasDefault": false
+          },
+          {
+            "name": "db_cursor_json",
+            "type": "text",
+            "isPrimaryKey": false,
+            "isUnique": false,
+            "isNullable": false,
+            "hasDefault": false
+          },
+          {
+            "name": "minimize_cursor_json",
+            "type": "text",
+            "isPrimaryKey": false,
+            "isUnique": false,
+            "isNullable": false,
+            "hasDefault": false
+          },
+          {
+            "name": "materialized_counts_json",
+            "type": "text",
+            "isPrimaryKey": false,
+            "isUnique": false,
+            "isNullable": false,
+            "hasDefault": false
+          },
+          {
+            "name": "progress_counts_json",
+            "type": "text",
+            "isPrimaryKey": false,
+            "isUnique": false,
+            "isNullable": false,
+            "hasDefault": false
+          },
+          {
+            "name": "sealed_totals_json",
+            "type": "text",
+            "isPrimaryKey": false,
+            "isUnique": false,
+            "isNullable": false,
+            "hasDefault": false
+          },
+          {
+            "name": "build_digest",
+            "type": "string",
+            "isPrimaryKey": false,
+            "isUnique": false,
+            "isNullable": true,
+            "hasDefault": false,
+            "maxLength": 64
+          },
+          {
+            "name": "state",
+            "type": "enum",
+            "isPrimaryKey": false,
+            "isUnique": false,
+            "isNullable": false,
+            "hasDefault": false,
+            "enumValues": [
+              "building",
+              "ready",
+              "running",
+              "blocked",
+              "minimizing",
+              "complete"
+            ]
+          },
+          {
+            "name": "fs_state",
+            "type": "enum",
+            "isPrimaryKey": false,
+            "isUnique": false,
+            "isNullable": false,
+            "hasDefault": false,
+            "enumValues": [
+              "pending",
+              "running",
+              "blocked",
+              "complete"
+            ]
+          },
+          {
+            "name": "db_state",
+            "type": "enum",
+            "isPrimaryKey": false,
+            "isUnique": false,
+            "isNullable": false,
+            "hasDefault": false,
+            "enumValues": [
+              "pending",
+              "running",
+              "blocked",
+              "complete"
+            ]
+          },
+          {
+            "name": "outcome_code",
+            "type": "enum",
+            "isPrimaryKey": false,
+            "isUnique": false,
+            "isNullable": true,
+            "hasDefault": false,
+            "enumValues": [
+              "executor-disabled",
+              "ownership-uncertain",
+              "inspection-unavailable",
+              "identity-changed",
+              "unexpected-entry",
+              "unexpected-link",
+              "missing-unarmed",
+              "io-failed",
+              "sql-failed",
+              "inventory-changed",
+              "foreign-reference",
+              "capacity-exceeded"
+            ]
+          },
+          {
+            "name": "created_at",
+            "type": "datetime",
+            "isPrimaryKey": false,
+            "isUnique": false,
+            "isNullable": false,
+            "hasDefault": true,
+            "defaultValue": "UTC_TIMESTAMP"
+          },
+          {
+            "name": "updated_at",
+            "type": "datetime",
+            "isPrimaryKey": false,
+            "isUnique": false,
+            "isNullable": true,
+            "hasDefault": false
+          }
+        ],
+        "indexes": [
+          {
+            "name": "public_safety_purge_scope_unique",
+            "columns": [
+              "retention_scope_id"
+            ],
+            "type": "unique"
+          },
+          {
+            "name": "public_safety_purge_key_unique",
+            "columns": [
+              "purge_key"
+            ],
+            "type": "unique"
+          },
+          {
+            "name": "public_safety_purge_request_unique",
+            "columns": [
+              "incident_id",
+              "request_id"
+            ],
+            "type": "unique"
+          },
+          {
+            "name": "public_safety_purge_due",
+            "columns": [
+              "state",
+              "next_eligible_at_iso",
+              "id"
+            ],
+            "type": "index"
+          },
+          {
+            "name": "public_safety_purge_receipt_due",
+            "columns": [
+              "receipt_retain_until_iso",
+              "id"
+            ],
+            "type": "index"
+          }
+        ]
+      },
+      {
+        "table": "public_safety_purge_events",
+        "columns": [
+          {
+            "name": "id",
+            "type": "bigint",
+            "isPrimaryKey": true,
+            "isUnique": false,
+            "isNullable": false,
+            "hasDefault": false
+          },
+          {
+            "name": "purge_id",
+            "type": "bigint",
+            "isPrimaryKey": false,
+            "isUnique": false,
+            "isNullable": false,
+            "hasDefault": false,
+            "references": {
+              "table": "public_safety_purges",
+              "column": "id",
+              "onDelete": "restrict"
+            }
+          },
+          {
+            "name": "sequence",
+            "type": "integer",
+            "isPrimaryKey": false,
+            "isUnique": false,
+            "isNullable": false,
+            "hasDefault": false
+          },
+          {
+            "name": "incident_version",
+            "type": "integer",
+            "isPrimaryKey": false,
+            "isUnique": false,
+            "isNullable": false,
+            "hasDefault": false
+          },
+          {
+            "name": "retention_version",
+            "type": "integer",
+            "isPrimaryKey": false,
+            "isUnique": false,
+            "isNullable": false,
+            "hasDefault": false
+          },
+          {
+            "name": "operation_id",
+            "type": "string",
+            "isPrimaryKey": false,
+            "isUnique": false,
+            "isNullable": false,
+            "hasDefault": false,
+            "maxLength": 36
+          },
+          {
+            "name": "step",
+            "type": "enum",
+            "isPrimaryKey": false,
+            "isUnique": false,
+            "isNullable": false,
+            "hasDefault": false,
+            "enumValues": [
+              "accept",
+              "build",
+              "arm",
+              "result",
+              "db-batch",
+              "blocked",
+              "retry",
+              "minimize",
+              "complete",
+              "member-revoked"
+            ]
+          },
+          {
+            "name": "actor_kind",
+            "type": "enum",
+            "isPrimaryKey": false,
+            "isUnique": false,
+            "isNullable": false,
+            "hasDefault": false,
+            "enumValues": [
+              "human",
+              "system"
+            ]
+          },
+          {
+            "name": "actor_user_id",
+            "type": "bigint",
+            "isPrimaryKey": false,
+            "isUnique": false,
+            "isNullable": true,
+            "hasDefault": false,
+            "references": {
+              "table": "users",
+              "column": "id",
+              "onDelete": "restrict"
+            }
+          },
+          {
+            "name": "system_actor",
+            "type": "enum",
+            "isPrimaryKey": false,
+            "isUnique": false,
+            "isNullable": true,
+            "hasDefault": false,
+            "enumValues": [
+              "public-safety-local-purge-v1"
+            ]
+          },
+          {
+            "name": "request_digest",
+            "type": "string",
+            "isPrimaryKey": false,
+            "isUnique": false,
+            "isNullable": true,
+            "hasDefault": false,
+            "maxLength": 64
+          },
+          {
+            "name": "at_iso",
+            "type": "string",
+            "isPrimaryKey": false,
+            "isUnique": false,
+            "isNullable": false,
+            "hasDefault": false,
+            "maxLength": 24
+          },
+          {
+            "name": "counts_json",
+            "type": "text",
+            "isPrimaryKey": false,
+            "isUnique": false,
+            "isNullable": false,
+            "hasDefault": false
+          },
+          {
+            "name": "outcome_code",
+            "type": "enum",
+            "isPrimaryKey": false,
+            "isUnique": false,
+            "isNullable": true,
+            "hasDefault": false,
+            "enumValues": [
+              "executor-disabled",
+              "ownership-uncertain",
+              "inspection-unavailable",
+              "identity-changed",
+              "unexpected-entry",
+              "unexpected-link",
+              "missing-unarmed",
+              "io-failed",
+              "sql-failed",
+              "inventory-changed",
+              "foreign-reference",
+              "capacity-exceeded"
+            ]
+          },
+          {
+            "name": "created_at",
+            "type": "datetime",
+            "isPrimaryKey": false,
+            "isUnique": false,
+            "isNullable": false,
+            "hasDefault": true,
+            "defaultValue": "UTC_TIMESTAMP"
+          },
+          {
+            "name": "updated_at",
+            "type": "datetime",
+            "isPrimaryKey": false,
+            "isUnique": false,
+            "isNullable": true,
+            "hasDefault": false
+          }
+        ],
+        "indexes": [
+          {
+            "name": "public_safety_purge_event_sequence_unique",
+            "columns": [
+              "purge_id",
+              "sequence"
+            ],
+            "type": "unique"
+          },
+          {
+            "name": "public_safety_purge_event_operation_unique",
+            "columns": [
+              "purge_id",
+              "operation_id",
+              "step"
+            ],
+            "type": "unique"
+          }
+        ]
+      },
+      {
+        "table": "public_safety_purge_items",
+        "columns": [
+          {
+            "name": "id",
+            "type": "bigint",
+            "isPrimaryKey": true,
+            "isUnique": false,
+            "isNullable": false,
+            "hasDefault": false
+          },
+          {
+            "name": "purge_id",
+            "type": "bigint",
+            "isPrimaryKey": false,
+            "isUnique": false,
+            "isNullable": false,
+            "hasDefault": false,
+            "references": {
+              "table": "public_safety_purges",
+              "column": "id",
+              "onDelete": "restrict"
+            }
+          },
+          {
+            "name": "ordinal",
+            "type": "integer",
+            "isPrimaryKey": false,
+            "isUnique": false,
+            "isNullable": false,
+            "hasDefault": false
+          },
+          {
+            "name": "kind",
+            "type": "enum",
+            "isPrimaryKey": false,
+            "isUnique": false,
+            "isNullable": false,
+            "hasDefault": false,
+            "enumValues": [
+              "artifact",
+              "file",
+              "directory",
+              "db-row"
+            ]
+          },
+          {
+            "name": "parent_item_id",
+            "type": "bigint",
+            "isPrimaryKey": false,
+            "isUnique": false,
+            "isNullable": true,
+            "hasDefault": false,
+            "references": {
+              "table": "public_safety_purge_items",
+              "column": "id",
+              "onDelete": "restrict"
+            }
+          },
+          {
+            "name": "artifact_ordinal",
+            "type": "integer",
+            "isPrimaryKey": false,
+            "isUnique": false,
+            "isNullable": true,
+            "hasDefault": false
+          },
+          {
+            "name": "source_table",
+            "type": "enum",
+            "isPrimaryKey": false,
+            "isUnique": false,
+            "isNullable": true,
+            "hasDefault": false,
+            "enumValues": [
+              "managed-artifact",
+              "review",
+              "observation",
+              "source",
+              "audit",
+              "noncustody-membership",
+              "incident-payload"
+            ]
+          },
+          {
+            "name": "source_row_id",
+            "type": "integer",
+            "isPrimaryKey": false,
+            "isUnique": false,
+            "isNullable": true,
+            "hasDefault": false
+          },
+          {
+            "name": "planned_json",
+            "type": "text",
+            "isPrimaryKey": false,
+            "isUnique": false,
+            "isNullable": false,
+            "hasDefault": false
+          },
+          {
+            "name": "identity_json",
+            "type": "text",
+            "isPrimaryKey": false,
+            "isUnique": false,
+            "isNullable": true,
+            "hasDefault": false
+          },
+          {
+            "name": "alias_json",
+            "type": "text",
+            "isPrimaryKey": false,
+            "isUnique": false,
+            "isNullable": true,
+            "hasDefault": false
+          },
+          {
+            "name": "arm_json",
+            "type": "text",
+            "isPrimaryKey": false,
+            "isUnique": false,
+            "isNullable": true,
+            "hasDefault": false
+          },
+          {
+            "name": "planned_bytes",
+            "type": "integer",
+            "isPrimaryKey": false,
+            "isUnique": false,
+            "isNullable": true,
+            "hasDefault": false
+          },
+          {
+            "name": "observed_bytes",
+            "type": "integer",
+            "isPrimaryKey": false,
+            "isUnique": false,
+            "isNullable": true,
+            "hasDefault": false
+          },
+          {
+            "name": "planned_sha256",
+            "type": "string",
+            "isPrimaryKey": false,
+            "isUnique": false,
+            "isNullable": true,
+            "hasDefault": false,
+            "maxLength": 64
+          },
+          {
+            "name": "observed_sha256",
+            "type": "string",
+            "isPrimaryKey": false,
+            "isUnique": false,
+            "isNullable": true,
+            "hasDefault": false,
+            "maxLength": 64
+          },
+          {
+            "name": "version",
+            "type": "integer",
+            "isPrimaryKey": false,
+            "isUnique": false,
+            "isNullable": false,
+            "hasDefault": false
+          },
+          {
+            "name": "generation",
+            "type": "integer",
+            "isPrimaryKey": false,
+            "isUnique": false,
+            "isNullable": false,
+            "hasDefault": false
+          },
+          {
+            "name": "operation_nonce",
+            "type": "string",
+            "isPrimaryKey": false,
+            "isUnique": false,
+            "isNullable": false,
+            "hasDefault": false,
+            "maxLength": 36
+          },
+          {
+            "name": "state",
+            "type": "enum",
+            "isPrimaryKey": false,
+            "isUnique": false,
+            "isNullable": false,
+            "hasDefault": false,
+            "enumValues": [
+              "planned",
+              "armed",
+              "verified-absent",
+              "row-removed",
+              "blocked"
+            ]
+          },
+          {
+            "name": "result_code",
+            "type": "enum",
+            "isPrimaryKey": false,
+            "isUnique": false,
+            "isNullable": true,
+            "hasDefault": false,
+            "enumValues": [
+              "observed-unlinked",
+              "absence-reconciled",
+              "row-removed",
+              "no-preparation-observed",
+              "executor-disabled",
+              "ownership-uncertain",
+              "inspection-unavailable",
+              "identity-changed",
+              "unexpected-entry",
+              "unexpected-link",
+              "missing-unarmed",
+              "io-failed",
+              "sql-failed",
+              "inventory-changed",
+              "foreign-reference",
+              "capacity-exceeded"
+            ]
+          },
+          {
+            "name": "armed_at_iso",
+            "type": "string",
+            "isPrimaryKey": false,
+            "isUnique": false,
+            "isNullable": true,
+            "hasDefault": false,
+            "maxLength": 24
+          },
+          {
+            "name": "verified_at_iso",
+            "type": "string",
+            "isPrimaryKey": false,
+            "isUnique": false,
+            "isNullable": true,
+            "hasDefault": false,
+            "maxLength": 24
+          },
+          {
+            "name": "created_at",
+            "type": "datetime",
+            "isPrimaryKey": false,
+            "isUnique": false,
+            "isNullable": false,
+            "hasDefault": true,
+            "defaultValue": "UTC_TIMESTAMP"
+          },
+          {
+            "name": "updated_at",
+            "type": "datetime",
+            "isPrimaryKey": false,
+            "isUnique": false,
+            "isNullable": true,
+            "hasDefault": false
+          }
+        ],
+        "indexes": [
+          {
+            "name": "public_safety_purge_item_ordinal_unique",
+            "columns": [
+              "purge_id",
+              "ordinal"
+            ],
+            "type": "unique"
+          },
+          {
+            "name": "public_safety_purge_item_state",
+            "columns": [
+              "purge_id",
+              "state",
+              "ordinal"
+            ],
+            "type": "index"
+          }
+        ]
       }
     ]
   },
-  "hash": "4acfdd55f3f2c74a02d58056ab13e32eee48e877c168ec3ffb9047e2e15f3584",
+  "hash": "6240e01155fa40107f6983bc0b35a34f275d132940155678fb84b1e65c56250f",
   "dialect": "sqlite",
-  "updatedAt": "2026-10-19T06:23:31.429Z"
+  "updatedAt": "2026-10-19T15:39:46.097Z"
 }

@@ -3,7 +3,7 @@ import type { IncidentRow } from '../access/policy'
 import type { ManagedAbility } from './types'
 import { Gate } from '@stacksjs/auth/gate'
 import { db } from '@stacksjs/database/runtime'
-import { requireIncidentAccess, validateIncidentKey } from '../access/policy'
+import { requireIncidentAccess, validateIncidentKey, assertIncidentPayload, requireIncidentUnfrozen } from '../access/policy'
 import { requirePublicSafetyPrincipal } from '../access/principal'
 import { requirePublicSafetyRetentionAccess } from '../retention/policy'
 import { PublicSafetyAccessError } from '../access/errors'
@@ -22,8 +22,10 @@ export async function requirePublicSafetyManagedAccess(key: string, ability: Man
     : await requireIncidentAccess(key, ability === 'events' ? 'audit' : 'view', handle, locked)
   managedDeadline(access.incident)
   if ((ability === 'create' || ability === 'reconcile') && access.incident.status !== 'active') throw new PublicSafetyAccessError(409, 'The incident is closed')
+  assertIncidentPayload(access.incident)
+  await requireIncidentUnfrozen(handle, access.incident.id)
   projection(access.incident, access.member)
-  return access
+  return { ...access, incident: access.incident }
 }
 export async function publicSafetyManagedGate(user: unknown, key: string, ability: ManagedAbility): Promise<boolean> {
   const access = await requirePublicSafetyManagedAccess(key, ability)

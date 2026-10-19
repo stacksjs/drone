@@ -89,7 +89,7 @@ try {
       assert.equal(enrollment.scope.reviewOverdue, false)
       assert.equal(enrollment.scope.reviewerUserId, null)
       const enroll = { ...enrollmentBody, expectedVersion: fresh.incidentVersion, inventoryDigest: fresh.inventoryDigest }
-      const current = () => retention.readPublicSafetyRetention(config.id)
+      const current = async () => { const retained = await retention.readPublicSafetyRetention(config.id); assert(!('purged' in retained)); return retained }
       const holdBody = async (extra: Record<string, unknown> = {}) => ({ expectedRetentionVersion: (await current()).version, decision: 'retain', caseReference: 'case:matrix-1', reviewDueAt: new Date(Date.now() + 86400000).toISOString(), requestId: randomUUID(), ...extra })
       const snapshot = async () => ({ scope: await current(), events: await retention.listPublicSafetyRetentionEvents(config.id), members: await database.db.primary.selectFrom('public_safety_incident_members').selectAll().where('incident_id', '=', initialConfig.id).orderBy('id', 'asc').execute() })
       for (const bad of [{ requestId: `${randomUUID()}\n` }, { requestId: randomUUID().toUpperCase() }, { policyVersion: 'later' }, { inventoryDigest: `${fresh.inventoryDigest}\n` }, { expectedVersion: '1' }, { actorUserId: coordinator.id }]) await assert.rejects(() => retention.enrollPublicSafetyRetention(config.id, { ...enroll, ...bad }), status(422))
@@ -224,6 +224,7 @@ try {
       await database.db.primary.updateTable('public_safety_incidents').set({ retain_until: expiredConfig.retention.expiresAt, config_json: publicSafetyRecordingData(expiredConfig) }).where('id', '=', initialConfig.id).execute()
       for (const read of [() => access.readPublicSafetyIncident(config.id), () => records.readPublicSafetySource(config.id, source.source.digest), () => records.listPublicSafetySources(config.id), () => records.readPublicSafetyObservation(config.id, point.observation.id), () => records.listPublicSafetyObservations(config.id), () => records.listPublicSafetyReviews(config.id, point.observation.id)]) await assert.rejects(read, status(404))
       const expired = await as(custodian.token, () => retention.readPublicSafetyRetention(config.id))
+      assert(!('purged' in expired))
       assert.equal(expired.expired, true); assert.equal(expired.holdState, 'held'); assert.equal(expired.contentDeletionPerformed, false)
       await Bun.sleep(Math.max(0, Date.parse(dueSoon) - Date.now() + 10))
       const overdue = await current()
@@ -239,6 +240,7 @@ try {
       await retention.reviewPublicSafetyRetentionHold(config.id, await holdBody())
       const revokeBody = { expectedRetentionVersion: (await current()).version, userId: pilot.id, requestId: randomUUID() }
       const revoked = await retention.revokePublicSafetyCustodyMember(config.id, revokeBody)
+      assert('scope' in revoked)
       const revokedMember = await database.db.primary.selectFrom('public_safety_incident_members').selectAll().where('incident_id', '=', initialConfig.id).where('user_id', '=', pilot.id).executeTakeFirst()
       assert.equal(Number(revokedMember!.active), 0)
       assert.equal((await retention.revokePublicSafetyCustodyMember(config.id, revokeBody)).replayed, true)

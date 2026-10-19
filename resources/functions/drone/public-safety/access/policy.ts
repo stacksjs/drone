@@ -10,11 +10,19 @@ export interface IncidentRow {
   incident_key: string
   version: number
   coordinator_id: number
-  status: 'active' | 'closed'
-  purpose: 'search-and-rescue' | 'fire-observation' | 'disaster-assessment' | 'lawful-police-observation'
-  revision: string
-  config_json: string
+  status: 'active' | 'closed' | 'purged'
+  purpose: 'search-and-rescue' | 'fire-observation' | 'disaster-assessment' | 'lawful-police-observation' | null
+  revision: string | null
+  config_json: string | null
   retain_until: string
+}
+export type ContentIncidentRow = IncidentRow & { status: 'active' | 'closed', purpose: NonNullable<IncidentRow['purpose']>, revision: string, config_json: string }
+export function assertIncidentPayload(incident: IncidentRow): asserts incident is ContentIncidentRow {
+  if (incident.status === 'purged' || incident.config_json === null || incident.purpose === null || incident.revision === null) throw new PublicSafetyAccessError(404, 'Incident is unavailable')
+}
+export async function requireIncidentUnfrozen(handle: Pick<TransactionHandle, 'selectFrom'>, incidentId: number): Promise<void> {
+  const scope = asRow<{ freeze_state: string }>(await handle.selectFrom('public_safety_retention_scopes').select('freeze_state').where('incident_id', '=', incidentId).executeTakeFirst())
+  if (scope && scope.freeze_state !== 'retained') throw new PublicSafetyAccessError(409, 'Incident is frozen for accepted purge')
 }
 export interface IncidentMemberRow {
   id: number
@@ -44,6 +52,8 @@ export async function requireIncidentAccess(key: string, ability: IncidentAbilit
   const principal = await requirePublicSafetyPrincipal(ability === 'view' || ability === 'audit' ? 'read' : 'coordinate')
   const incident = locked ?? asRow<IncidentRow>(await handle.selectFrom('public_safety_incidents').selectAll().where('incident_key', '=', key).executeTakeFirst())
   if (!incident || !Number.isFinite(Date.parse(incident.retain_until)) || Date.parse(incident.retain_until) <= Date.now()) throw new PublicSafetyAccessError(404, 'Incident is unavailable')
+  assertIncidentPayload(incident)
+  await requireIncidentUnfrozen(handle, incident.id)
   const member = asRow<IncidentMemberRow>(await handle.selectFrom('public_safety_incident_members').selectAll().where('incident_id', '=', incident.id).where('user_id', '=', principal.userId).executeTakeFirst())
   if (!member || !incidentPermission(member, incident, ability)) throw new PublicSafetyAccessError(403, 'This incident action is not permitted')
   if ((ability !== 'view' && ability !== 'audit') && incident.status !== 'active') throw new PublicSafetyAccessError(409, 'The incident is closed')

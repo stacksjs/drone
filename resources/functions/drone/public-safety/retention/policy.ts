@@ -21,9 +21,15 @@ export async function requirePublicSafetyRetentionAccess(key: string, ability: R
   const member = asRow<IncidentMemberRow>(await handle.selectFrom('public_safety_incident_members').selectAll().where('incident_id', '=', incident.id).where('user_id', '=', principal.userId).executeTakeFirst())
   const coordinator = member?.role === 'coordinator' && member.user_id === incident.coordinator_id
   if (!member || member.active !== true && member.active !== 1 || !coordinator && (ability === 'revoke' || member.role !== 'evidence-custodian')) throw new PublicSafetyAccessError(403, 'This custody action is not permitted')
+  const scope = asRow<{ freeze_state: 'retained' | 'frozen' | 'purged', original_hold: 'none' | 'declared-review-required' }>(await handle.selectFrom('public_safety_retention_scopes').select(['freeze_state', 'original_hold']).where('incident_id', '=', incident.id).executeTakeFirst())
+  if (scope && scope.freeze_state !== 'retained') {
+    const purge = asRow<{ state: string, receipt_retain_until_iso: string | null }>(await handle.selectFrom('public_safety_purges').select(['state', 'receipt_retain_until_iso']).where('incident_id', '=', incident.id).executeTakeFirst())
+    if (!purge || purge.state === 'complete' && (!purge.receipt_retain_until_iso || Date.parse(purge.receipt_retain_until_iso) <= Date.now())) throw new PublicSafetyAccessError(404, 'Incident custody is unavailable')
+    return { principal, incident, member, originalHold: scope.original_hold, lifecycle: 'frozen' as const }
+  }
   const stored = projection(incident, member)
   if (publicSafetyRecordingData(stored.config) !== incident.config_json) throw new PublicSafetyAccessError(409, 'Stored incident scope is inconsistent')
-  return { principal, incident, member, originalHold: stored.config.retention.hold }
+  return { principal, incident, member, originalHold: stored.config.retention.hold, lifecycle: 'retained' as const }
 }
 export async function publicSafetyRetentionGate(user: unknown, key: string, ability: RetentionAbility): Promise<boolean> {
   const access = await requirePublicSafetyRetentionAccess(key, ability)

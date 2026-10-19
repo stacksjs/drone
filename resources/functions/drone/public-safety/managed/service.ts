@@ -1,6 +1,6 @@
 import type { TransactionHandle } from '@stacksjs/orm'
 import type { PreparedCompletedArtifactDirectory, PreparedCompletedArtifactReceipt } from '../../../artifacts/native-storage/prepared-completed-artifact-directory'
-import type { IncidentRow } from '../access/policy'
+import type { IncidentRow, ContentIncidentRow } from '../access/policy'
 import type { SourceRow } from '../access/records'
 import type { ManagedAbility, ManagedState, ManagedAction, ManagedOutcome, ManagedArtifactProjection, ManagedFileProjection, ManagedEventProjection, ManagedReceipt, ManagedListOptions, ManagedArtifactPage, ManagedArtifactRead, ManagedDownload, ManagedEventOptions, ManagedEventPage } from './types'
 import type { FilePlan } from './files'
@@ -98,7 +98,7 @@ async function event(tx: TransactionHandle, access: Access, row: ArtifactRow, ac
 }
 async function transition(tx: TransactionHandle, access: Access, row: ArtifactRow, state: ManagedState, changes: Partial<ArtifactRow> = {}): Promise<ArtifactRow> {
   if (row.version >= maximumVersion || row.generation >= maximumVersion) conflict()
-  access.incident = await advance(tx, access.incident)
+  access.incident = await advance(tx, access.incident) as ContentIncidentRow
   const next = { ...row, ...changes, state, version: row.version + 1, generation: row.generation + 1, operation_nonce: randomUUID(), latest_incident_version: access.incident.version }
   const update = await tx.updateTable(table).set({ ...changes, state, version: next.version, generation: next.generation, operation_nonce: next.operation_nonce, latest_incident_version: next.latest_incident_version, updated_at: new Date().toISOString() }).where('id', '=', row.id).where('version', '=', row.version).where('generation', '=', row.generation).where('state', '=', row.state).executeTakeFirst()
   if (mutationCount(update) !== 1) conflict()
@@ -150,7 +150,7 @@ export async function createPublicSafetyManagedDataset(key: string, input: unkno
     const current = asRow<SourceRow>(await tx.selectFrom('public_safety_sources').select(metadataFields).where('id', '=', staged.source!.id).where('incident_id', '=', access.incident.id).executeTakeFirst())
     if (!current || metadataFields.some(field => current[field as keyof SourceRow] !== staged.source![field as keyof SourceRow]) || access.incident.config_json !== staged.incident!.config_json) conflict()
     sameRoot(root)
-    access.incident = await advance(tx, access.incident)
+    access.incident = await advance(tx, access.incident) as ContentIncidentRow
     managedDeadline(access.incident)
     await tx.insertInto(table).values({ artifact_key: artifactKey, incident_id: access.incident.id, retention_scope_id: scope.id, source_id: current.id, source_digest: current.digest, source_byte_length: current.byte_length, source_created_sequence: current.created_sequence, config_digest: sha256(access.incident.config_json), source_profile: current.replay_profile, dataset_profile: 'owned-public-safety-dataset-v1', request_id: body.requestId, request_digest: fingerprint, requester_user_id: access.principal.userId, requested_at_iso: at, version: 1, generation: 1, operation_nonce: randomUUID(), state: 'intent', created_incident_version: access.incident.version, latest_incident_version: access.incident.version, requested_retention_version: scope.version, planned_root_json: JSON.stringify(root), target_path: join(root.path, artifactKey), receipt_json: null, plan_digest: sha256(JSON.stringify(plan)), file_count: plan.length, total_planned_bytes: total, manifest_sha256: plan.at(-1)!.sha256, prepared_at_iso: null, completed_at_iso: null, interrupted_at_iso: null, completed_by_user_id: null, outcome_code: null, created_at: at, updated_at: at }).execute()
     const artifact = await findArtifact(tx, access, artifactKey)

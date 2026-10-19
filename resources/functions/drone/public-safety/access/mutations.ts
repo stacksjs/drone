@@ -5,7 +5,7 @@ import { asRow, lockRow, mutationCount } from '@stacksjs/database/runtime'
 import { transaction } from '@stacksjs/orm'
 import { planPublicSafetyMission } from '../planner'
 import { PublicSafetyAccessError } from './errors'
-import { requireIncidentAccess } from './policy'
+import { requireIncidentAccess, assertIncidentPayload } from './policy'
 
 export const maximumVersion = 2147483647
 
@@ -20,6 +20,7 @@ export function expectedVersion(value: unknown): number {
   return value as number
 }
 export function projection(incident: IncidentRow, member: IncidentMemberRow): IncidentProjection {
+  assertIncidentPayload(incident)
   let plan: ReturnType<typeof planPublicSafetyMission>
   try { plan = planPublicSafetyMission(JSON.parse(incident.config_json)) }
   catch { throw new PublicSafetyAccessError(409, 'Stored incident scope is unavailable') }

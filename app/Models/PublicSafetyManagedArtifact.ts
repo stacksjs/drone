@@ -14,7 +14,7 @@ export default defineModel({
     artifactKey: { required: true, fillable: true, validation: { rule: schema.string().max(36) } },
     incidentId: { required: true, fillable: true, foreignKey: { table: 'public_safety_incidents', column: 'id', onDelete: 'restrict' }, validation: { rule: schema.number().integer().min(1) } },
     retentionScopeId: { required: true, fillable: true, foreignKey: { table: 'public_safety_retention_scopes', column: 'id', onDelete: 'restrict' }, validation: { rule: schema.number().integer().min(1) } },
-    sourceId: { required: true, fillable: true, foreignKey: { table: 'public_safety_sources', column: 'id', onDelete: 'restrict' }, validation: { rule: schema.number().integer().min(1) } },
+    sourceId: { required: false, nullable: true, fillable: true, foreignKey: { table: 'public_safety_sources', column: 'id', onDelete: 'set null' }, validation: { rule: schema.number().integer().min(1) } },
     sourceDigest: { required: true, fillable: true, validation: { rule: schema.string().max(64) } },
     sourceByteLength: { required: true, fillable: true, validation: { rule: schema.number().integer().min(1).max(16777216) } },
     sourceCreatedSequence: { required: true, fillable: true, validation: { rule: schema.number().integer().min(1).max(2147483647) } },

@@ -8,9 +8,10 @@ export default defineModel({
   indexes: [{ name: 'public_safety_retention_incident_unique', columns: ['incident_id'], unique: true }],
   attributes: {
     incidentId: { required: true, fillable: true, foreignKey: { table: 'public_safety_incidents', column: 'id', onDelete: 'restrict' }, validation: { rule: schema.number().integer().min(1) } },
+    freezeState: { required: true, fillable: true, default: 'retained', validation: { rule: schema.enum(['retained', 'frozen', 'purged']) } },
     version: { required: true, fillable: true, validation: { rule: schema.number().integer().min(1).max(2147483647) } },
     policyVersion: { required: true, fillable: true, validation: { rule: schema.enum(['local-managed-v1']) } },
-    inventoryDigest: { required: true, fillable: true, hidden: true, validation: { rule: schema.string().min(64).max(64) } },
+    inventoryDigest: { required: false, nullable: true, fillable: true, hidden: true, validation: { rule: schema.string().min(64).max(64) } },
     originalHold: { required: true, fillable: true, validation: { rule: schema.enum(['none', 'declared-review-required']) } },
     holdState: { required: true, fillable: true, validation: { rule: schema.enum(['none', 'pending-review', 'held', 'released']) } },
     caseReference: { required: false, fillable: true, hidden: true, validation: { rule: schema.string().min(1).max(128) } },

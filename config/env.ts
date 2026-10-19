@@ -15,6 +15,7 @@ import { schema } from '@stacksjs/validation/runtime'
  * deploy secrets is typed exactly like one in your local `.env`.
  */
 const envSchema = defineEnv({
+  PUBLIC_SAFETY_PURGE_ENABLED: { validation: schema.boolean(), default: false },
   PUBLIC_SAFETY_MANAGED_ROOT: { validation: schema.string(), default: '' },
   APP_NAME: {
     validation: schema.string(),

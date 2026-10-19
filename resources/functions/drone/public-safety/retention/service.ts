@@ -1,17 +1,22 @@
 import type { TransactionHandle } from '@stacksjs/orm'
 import type { IncidentRow } from '../access/policy'
-import type { RetentionAbility, OriginalHold, RetentionHoldState, RetentionPreview, RetentionScopeProjection, RetentionEventProjection, RetentionReceipt, RetentionEventOptions, RetentionEventPage, RetentionAction } from './types'
+import type { RetentionAbility, OriginalHold, RetentionHoldState, RetentionPreview, RetentionScopeProjection, RetentionEventProjection, RetentionReceipt, RetentionEventOptions, RetentionEventPage, RetentionAction, PurgedCustodyProjection } from './types'
+import type { PurgeReceipt } from '../purge/types'
+import type { PurgeRow, PurgeScopeRow, PurgeEventRow } from '../purge/internal'
+import { purgeStatus, purgeEventProjection, appendPurgeEvent, transitionPurge, purgeReceiptDeadline } from '../purge/internal'
+import { zeroPurgeProgress } from '../purge/types'
 import { createHash } from 'node:crypto'
 import { asRow, asRows, lockRow, mutationCount } from '@stacksjs/database/runtime'
 import { transaction } from '@stacksjs/orm'
 import { PublicSafetyAccessError } from '../access/errors'
 import { exactRecord, expectedVersion, advance, maximumVersion, pagination } from '../access/mutations'
+import { assertIncidentPayload } from '../access/policy'
 import { publicSafetyRecordingData } from '../evidence'
 import { authorizePublicSafetyRetention, requirePublicSafetyRetentionAccess } from './policy'
 export { PublicSafetyAccessError } from '../access/errors'
 
 interface ScopeRow {
-  id: number, incident_id: number, version: number, policy_version: 'local-managed-v1', inventory_digest: string,
+  id: number, incident_id: number, version: number, policy_version: 'local-managed-v1', inventory_digest: string | null, freeze_state: 'retained' | 'frozen' | 'purged',
   original_hold: OriginalHold, hold_state: RetentionHoldState, case_reference: string | null, review_due_at: string | null,
   reviewer_user_id: number | null, reviewed_at_iso: string | null, enrolled_by_user_id: number, enrolled_at_iso: string,
 }
@@ -77,6 +82,8 @@ async function nextScope(tx: TransactionHandle, scope: ScopeRow, changes: Partia
 
 /** Metadata pages only: never select canonical source planes or private declaration text. */
 async function inventory(tx: Reader, access: Access): Promise<Pick<RetentionPreview, 'inventoryDigest' | 'counts' | 'managedArtifactCount'>> {
+  assertIncidentPayload(access.incident)
+  if (access.lifecycle !== 'retained') conflict()
   const digest = createHash('sha256'), counts = { sources: 0, observations: 0, reviews: 0 }
   digest.update(publicSafetyRecordingData({ key: access.incident.incident_key, version: access.incident.version, retainUntil: access.incident.retain_until, originalHold: access.originalHold, config: JSON.parse(access.incident.config_json) }))
   const fields = {
@@ -143,11 +150,13 @@ export async function enrollPublicSafetyRetention(key: string, input: unknown): 
     return appendEvent(tx, await scopeRow(tx, access.incident.id), access, { action: 'enrolled', requestId: body.requestId as string, fingerprint })
   })
 }
-export async function readPublicSafetyRetention(key: string): Promise<RetentionScopeProjection> {
+export async function readPublicSafetyRetention(key: string): Promise<RetentionScopeProjection | PurgedCustodyProjection> {
   await authorizePublicSafetyRetention(key, 'read')
   return transaction(async tx => {
     const access = await requirePublicSafetyRetentionAccess(key, 'read', tx)
-    return scopeProjection(await scopeRow(tx, access.incident.id), access)
+    const scope = await scopeRow(tx, access.incident.id)
+    if (scope.freeze_state !== 'retained') return completedCustody(tx, scope, access)
+    return scopeProjection(scope, access)
   })
 }
 export async function reviewPublicSafetyRetentionHold(key: string, input: unknown): Promise<RetentionReceipt> {
@@ -159,6 +168,7 @@ export async function reviewPublicSafetyRetentionHold(key: string, input: unknow
   await authorizePublicSafetyRetention(key, 'manage')
   return transaction(async tx => {
     const access = await lockedAccess(tx, key, 'manage'), scope = await lockedScope(tx, access.incident.id)
+    if (scope.freeze_state !== 'retained') conflict()
     const existing = await replay(tx, scope, access, body.requestId as string, fingerprint)
     if (existing) return existing
     if (scope.version !== expected) conflict()
@@ -169,17 +179,18 @@ export async function reviewPublicSafetyRetentionHold(key: string, input: unknow
     return appendEvent(tx, next, access, { action: 'hold-reviewed', requestId: body.requestId as string, fingerprint, decision, caseReference, reviewDueAt })
   })
 }
-export async function listPublicSafetyRetentionEvents(key: string, options: RetentionEventOptions = {}): Promise<RetentionEventPage> {
+export async function listPublicSafetyRetentionEvents(key: string, options: RetentionEventOptions = {}): Promise<RetentionEventPage & { historyRetired?: true }> {
   const { after, limit } = pagination(options)
   await authorizePublicSafetyRetention(key, 'read')
   return transaction(async tx => {
     const access = await requirePublicSafetyRetentionAccess(key, 'read', tx), scope = await scopeRow(tx, access.incident.id)
+    if (scope.freeze_state !== 'retained') { await completedCustody(tx, scope, access); return { entries: [], cursor: scope.version, hasMore: false, historyRetired: true } }
     const rows = asRows<EventRow>(await tx.selectFrom('public_safety_retention_events').selectAll().where('scope_id', '=', scope.id).where('sequence', '>', after).orderBy('sequence', 'asc').limit(limit + 1).execute())
     const entries = rows.slice(0, limit).map(eventProjection)
     return { entries, cursor: entries.at(-1)?.sequence ?? after, hasMore: rows.length > limit }
   })
 }
-export async function revokePublicSafetyCustodyMember(key: string, input: unknown): Promise<RetentionReceipt> {
+export async function revokePublicSafetyCustodyMember(key: string, input: unknown): Promise<RetentionReceipt | PurgeReceipt> {
   const body = exactRecord(input, ['expectedRetentionVersion', 'userId', 'requestId']), expected = expectedVersion(body.expectedRetentionVersion)
   requestId(body.requestId)
   if (!Number.isSafeInteger(body.userId) || (body.userId as number) < 1) throw new PublicSafetyAccessError(422, 'Invalid custody membership')
@@ -187,6 +198,7 @@ export async function revokePublicSafetyCustodyMember(key: string, input: unknow
   await authorizePublicSafetyRetention(key, 'revoke')
   return transaction(async tx => {
     const access = await lockedAccess(tx, key, 'revoke'), scope = await lockedScope(tx, access.incident.id)
+    if (scope.freeze_state !== 'retained') return revokeFrozen(tx, scope, access, body, expected, userId)
     const existing = await replay(tx, scope, access, body.requestId as string, fingerprint)
     if (existing) return existing
     if (scope.version !== expected || userId === access.incident.coordinator_id || userId === access.principal.userId) conflict()
@@ -197,4 +209,28 @@ export async function revokePublicSafetyCustodyMember(key: string, input: unknow
     access.incident = await advance(tx, access.incident)
     return appendEvent(tx, next, access, { action: 'member-revoked', requestId: body.requestId as string, fingerprint, targetUserId: userId })
   })
+}
+
+async function completedCustody(tx: Reader, scope: ScopeRow, access: Access): Promise<PurgedCustodyProjection> {
+  const row = asRow<PurgeRow>(await tx.selectFrom('public_safety_purges').selectAll().where('retention_scope_id', '=', scope.id).executeTakeFirst())
+  if (!row || row.state !== 'complete') throw new PublicSafetyAccessError(409, 'Use the accepted purge status while custody history is retiring')
+  purgeReceiptDeadline(row)
+  return { key: access.incident.incident_key, policyVersion: 'local-managed-v1', version: scope.version, incidentVersion: access.incident.version, retainUntil: access.incident.retain_until, expired: true, purged: true, purgeKey: row.purge_key, historyRetired: true, capabilities: { canRevokeMembers: access.member.role === 'coordinator' && access.member.user_id === access.incident.coordinator_id && access.principal.canCoordinate } }
+}
+async function revokeFrozen(tx: TransactionHandle, scope: ScopeRow, access: Access, body: Record<string, unknown>, expected: number, userId: number): Promise<PurgeReceipt> {
+  const row = asRow<PurgeRow>(await lockRow(tx, 'public_safety_purges', { retention_scope_id: scope.id }))
+  if (!row) conflict()
+  purgeReceiptDeadline(row)
+  const fingerprint = hash(JSON.stringify(['revoke-frozen', access.incident.incident_key, access.principal.userId, expected, userId, body.requestId]))
+  const event = asRow<PurgeEventRow>(await tx.selectFrom('public_safety_purge_events').selectAll().where('purge_id', '=', row.id).where('operation_id', '=', body.requestId).where('step', '=', 'member-revoked').executeTakeFirst())
+  if (event) {
+    if (event.request_digest !== fingerprint || event.actor_user_id !== access.principal.userId) conflict()
+    return { purge: purgeStatus(row, access.incident, scope as PurgeScopeRow), event: purgeEventProjection(event), replayed: true }
+  }
+  if (scope.version !== expected || userId === access.incident.coordinator_id || userId === access.principal.userId) conflict()
+  const member = asRow<{ id: number, role: string, active: boolean | number, version: number }>(await tx.selectFrom('public_safety_incident_members').selectAll().where('incident_id', '=', access.incident.id).where('user_id', '=', userId).executeTakeFirst())
+  if (!member || member.active !== true && member.active !== 1 || member.role === 'coordinator' || member.version >= maximumVersion) conflict()
+  await tx.updateTable('public_safety_incident_members').set({ active: false, version: member.version + 1, revoked_by: access.principal.userId, updated_at: new Date().toISOString() }).where('id', '=', member.id).execute()
+  const nextScopeRow = await nextScope(tx, scope), next = await transitionPurge(tx, row, access.incident)
+  return { purge: purgeStatus(next.row, next.incident, nextScopeRow as PurgeScopeRow), event: await appendPurgeEvent(tx, next.row, next.incident, nextScopeRow as PurgeScopeRow, { kind: 'human', userId: access.principal.userId }, 'member-revoked', zeroPurgeProgress(), body.requestId as string, fingerprint), replayed: false }
 }

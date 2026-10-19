@@ -21,6 +21,7 @@ try {
     ]) await assert.rejects(action, status(404))
     const preview = await retention.previewPublicSafetyRetention(key), scope = await retention.readPublicSafetyRetention(key)
     assert.equal(preview.expired, true); assert.equal(preview.managedArtifactCount, 1); assert.equal(preview.counts.sources, 1)
+    assert(!('purged' in scope))
     assert.equal(scope.holdState, 'held'); assert.equal(scope.expired, true)
     const minimal = JSON.stringify({ preview, scope })
     for (const forbidden of [created.artifact.key, fixture.source.digest, file.filename, 'target_path', 'receipt_json', 'identity_json', 'sourceDigest', 'artifactKey']) assert(!minimal.includes(forbidden))
