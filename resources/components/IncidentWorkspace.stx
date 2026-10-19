@@ -1,0 +1,193 @@
+<script client>
+import type { AssignableIncidentRole } from '../functions/drone/public-safety/access/types'
+import { openIncidentWorkspace } from '../functions/drone/public-safety/workspace/client'
+import { workspaceCaptures, workspaceCapturePreview, workspacePixel } from '../functions/drone/public-safety/workspace/images'
+const model = openIncidentWorkspace()
+const workspace = state(model.get())
+const unsubscribe = model.subscribe(value => workspace.set(value))
+const incidentKey = state('')
+const token = state('')
+const sourceChoice = state('')
+const offerChoice = state('')
+const captureId = state('')
+const modality = state<'visible' | 'thermal'>('visible')
+const pixelX = state(0)
+const pixelY = state(0)
+const observationNote = state('')
+const uncertaintyNote = state('')
+const reviewNote = state('')
+const disposition = state<'unresolved' | 'supported-by-source' | 'not-supported-by-source'>('unresolved')
+const recipientId = state('')
+const outgoingRole = state<AssignableIncidentRole>('observer')
+const ttl = state(300)
+const acknowledged = state(false)
+const current = derived(() => workspace().snapshot)
+const available = derived(() => workspace().status === 'current' && !!current())
+const ready = derived(() => available() && !workspace().busy && !workspace().confirmationRequired)
+const captureData = derived(() => {
+  try { return { entries: workspace().source ? workspaceCaptures(workspace().source!) : [], error: '' } }
+  catch { return { entries: [], error: 'The source image planes are unavailable. No previous image is shown.' } }
+})
+const capture = derived(() => captureData().entries.find(value => value.id === captureId()) ?? null)
+const image = derived(() => workspaceCapturePreview(capture(), modality()))
+const pixelDescription = derived(() => workspacePixel(capture(), Number(pixelX()), Number(pixelY())))
+const supportedPixel = derived(() => {
+  const selected = capture(), x = Number(pixelX()), y = Number(pixelY())
+  return !!selected && Number.isInteger(x) && Number.isInteger(y) && x >= 0 && y >= 0 && x < selected.width && y < selected.height && selected.support[y * selected.width + x] === 1 && (modality() === 'visible' || !!selected.temperatures[y * selected.width + x])
+})
+let lastReset = -1, lastOffer = ''
+effect(() => {
+  if (workspace().reset !== lastReset) {
+    lastReset = workspace().reset
+    sourceChoice.set(''); offerChoice.set(''); captureId.set(''); observationNote.set(''); uncertaintyNote.set(''); reviewNote.set(''); recipientId.set(''); acknowledged.set(false); pixelX.set(0); pixelY.set(0)
+  }
+  const offer = current()?.handover.offer
+  const binding = offer?.state === 'pending' ? offer.digest : ''
+  if (binding !== lastOffer) { lastOffer = binding; acknowledged.set(false) }
+  if (!current()?.recipients) recipientId.set('')
+})
+onDestroy(() => { unsubscribe(); model.close(); token.set('') })
+function connect() { const credential = token(); token.set(''); model.connect(incidentKey().trim(), credential) }
+function disconnect() { token.set(''); model.disconnect() }
+function openSource() { model.selectSource(sourceChoice()) }
+function openOffer() { model.selectOffer(offerChoice()) }
+async function recordObservation() {
+  if (!supportedPixel()) return
+  if (await model.observe({ captureId: captureId(), modality: modality(), x: Number(pixelX()), y: Number(pixelY()), note: observationNote(), uncertaintyNote: uncertaintyNote() })) { observationNote.set(''); uncertaintyNote.set('') }
+}
+async function recordReview() { if (await model.review({ disposition: disposition(), note: reviewNote() })) reviewNote.set('') }
+async function offer() { if (await model.offer(Number(recipientId()), outgoingRole(), Number(ttl()))) recipientId.set('') }
+async function accept() { if (await model.decide('accept', acknowledged())) acknowledged.set(false) }
+function nextReviews() { const value = workspace(); if (value.reviewObservation && value.reviews) void model.loadReviews(value.reviewObservation.id, value.reviews.cursor) }
+function short(value: string) { return value.slice(0, 12) }
+</script>
+
+<template>
+  <section aria-labelledby="incident-title" :aria-busy="workspace().busy">
+    <div class="flex flex-wrap gap-5 items-start justify-between">
+      <div><h1 id="incident-title" class="font-semibold text-3xl tracking-tight">Incident workspace</h1><p class="mt-3 max-w-3xl leading-relaxed text-neutral-400">Current incident records and recipient-confirmed coordination. Each refresh checks your present access.</p></div>
+      <p role="status" aria-live="polite" class="px-3 py-2 text-emerald-200 text-sm bg-neutral-900 border border-neutral-700 rounded" data-workspace-status>{{ workspace().status }}</p>
+    </div>
+    <p class="mt-4 max-w-4xl leading-relaxed text-emerald-200 text-sm">Unsigned simulated sources. Thermal measurements and physical outputs remain unqualified. This screen does not establish searched-area coverage or legal authority.</p>
+
+    <form @submit.prevent="connect()" :if="workspace().status === 'disconnected' || workspace().status === 'refused'" class="grid gap-5 sm:grid-cols-2 mt-8 p-5 bg-neutral-900 border border-neutral-700 rounded" aria-label="Connect to an incident">
+      <div><label for="incident-key" class="block mb-2 text-sm">Incident key</label><input id="incident-key" name="incident" x-model="incidentKey" required maxlength="64" pattern="[a-z][a-z0-9-]{0,63}" autocomplete="off" spellcheck="false" class="px-3 py-3 w-full bg-neutral-950 border border-neutral-600 rounded focus-visible:outline-emerald-200"></div>
+      <div><label for="incident-token" class="block mb-2 text-sm">Personal incident credential</label><input id="incident-token" name="credential" x-model="token" type="password" required maxlength="4096" autocomplete="off" spellcheck="false" class="px-3 py-3 w-full bg-neutral-950 border border-neutral-600 rounded focus-visible:outline-emerald-200" aria-describedby="credential-help"></div>
+      <p id="credential-help" class="sm:col-span-2 leading-relaxed text-neutral-400 text-sm">Use an existing scoped personal credential provisioned through Buddy. It is sent in request headers, stays only in this connection and is discarded when you disconnect. Session and delegated credentials cannot connect.</p>
+      <button type="submit" class="justify-self-start px-4 py-3 font-medium text-neutral-950 bg-emerald-200 rounded focus-visible:outline-emerald-200 focus-visible:outline-offset-4">Connect incident</button>
+    </form>
+    <div :if="workspace().status !== 'disconnected' && workspace().status !== 'refused'" class="flex flex-wrap gap-4 items-center mt-6">
+      <button type="button" @click="disconnect()" class="px-4 py-2 text-sm border border-neutral-600 rounded focus-visible:outline-emerald-200">Disconnect and clear</button>
+      <button type="button" @click="model.refresh()" :disabled="!available() || workspace().busy" class="px-4 py-2 text-sm border border-neutral-600 rounded focus-visible:outline-emerald-200 disabled:opacity-40">Refresh current records</button>
+      <span :if="current()" class="text-neutral-400 text-sm">Account {{ current()?.viewer.accountId }} / {{ current()?.incident.membership.role }} / sequence {{ current()?.throughSequence }}</span>
+    </div>
+    <p :if="workspace().error" role="alert" class="mt-5 p-4 leading-relaxed text-red-200 border border-red-400 rounded">{{ workspace().error }}</p>
+    <p :if="workspace().notice" role="status" class="mt-4 text-neutral-300 text-sm">{{ workspace().notice }}</p>
+    <div :if="workspace().confirmationRequired && available()" class="flex flex-wrap gap-3 items-center mt-4">
+      <button type="button" @click="model.confirmCurrentContext()" class="px-4 py-3 text-sm border border-emerald-200 rounded focus-visible:outline-emerald-200">I reviewed current records</button>
+      <button :if="workspace().canRetryHandover" type="button" @click="model.retryHandover()" :disabled="workspace().busy" class="px-4 py-3 text-sm border border-neutral-600 rounded focus-visible:outline-emerald-200 disabled:opacity-40">Retry exact handover request</button>
+      <p class="max-w-2xl text-neutral-400 text-xs">Observation and review writes are never retried automatically. Reconcile an unknown outcome before making another declaration.</p>
+    </div>
+    <p :if="!current() && workspace().status !== 'disconnected' && workspace().status !== 'refused'" role="status" class="mt-8 py-6 text-neutral-400 border-neutral-700 border-t">Private panes are cleared until a fresh authorized snapshot arrives.</p>
+
+    <div :if="current()" class="mt-8">
+      <section aria-labelledby="incident-current" class="py-5 border-neutral-700 border-t">
+        <h2 id="incident-current" class="font-semibold text-lg">Current responsibility</h2>
+        <dl class="grid gap-5 sm:grid-cols-2 lg:grid-cols-4 mt-4 text-sm">
+          <div><dt class="text-neutral-400">Incident / revision</dt><dd class="mt-1 break-words">{{ current()?.incident.key }} / {{ current()?.incident.revision }}</dd></div>
+          <div><dt class="text-neutral-400">Declared purpose</dt><dd class="mt-1 break-words">{{ current()?.incident.purpose }}</dd></div>
+          <div><dt class="text-neutral-400">Coordinator account</dt><dd class="mt-1">{{ current()?.incident.coordinatorId }}</dd></div>
+          <div><dt class="text-neutral-400">Content available until</dt><dd class="mt-1 break-words">{{ current()?.availableUntil }}</dd></div>
+        </dl>
+        <p :if="!current()?.viewer.canCoordinate" class="mt-4 text-neutral-400 text-sm" data-workspace-read-only>Read-only credential. Mutation controls are unavailable.</p>
+        <p :if="current()?.incident.status === 'closed'" class="mt-4 text-neutral-400 text-sm">This incident is closed. Authorized history remains readable until retention; new declarations and command replays are refused.</p>
+      </section>
+
+      <div class="grid gap-8 lg:grid-cols-2 mt-5">
+        <section aria-labelledby="incident-sources" class="min-w-0">
+          <h2 id="incident-sources" class="font-semibold text-lg">Admitted source</h2>
+          <p class="mt-2 leading-relaxed text-neutral-400 text-sm">Choose an immutable source explicitly. No recording planes are included in this snapshot.</p>
+          <form @submit.prevent="openSource()" class="flex flex-wrap gap-3 items-end mt-4">
+            <div class="flex-1 min-w-0"><label for="incident-source" class="block mb-2 text-sm">Source catalog</label><select id="incident-source" x-model="sourceChoice" class="px-3 py-3 min-w-0 w-full text-neutral-100 bg-neutral-900 border border-neutral-600 rounded focus-visible:outline-emerald-200"><option value="">Choose a source</option><option :for="source in current()?.sources.entries ?? []" :value="source.digest">{{ short(source.digest) }} / sequence {{ source.createdSequence }}</option></select></div>
+            <button type="submit" :disabled="!sourceChoice() || !ready()" class="px-4 py-3 text-sm border border-neutral-600 rounded focus-visible:outline-emerald-200 disabled:opacity-40">Open source</button>
+          </form>
+          <p :if="!current()?.sources.entries.length" class="mt-4 text-neutral-400 text-sm">No admitted sources on this page.</p>
+          <div class="flex gap-4 mt-3"><button type="button" @click="model.page('sources', true)" class="text-emerald-200 text-sm underline focus-visible:outline-emerald-200">First sources</button><button :if="current()?.sources.hasMore" type="button" @click="model.page('sources')" class="text-emerald-200 text-sm underline focus-visible:outline-emerald-200">Next sources</button></div>
+          <div :if="current()?.selected" class="mt-5">
+            <p class="break-all font-mono text-neutral-300 text-xs" data-workspace-source>{{ current()?.selected?.source.digest }}</p>
+            <p class="mt-2 text-neutral-400 text-xs">Uploader account {{ current()?.selected?.source.uploaderId }} is authenticated. Source producer identity and physical thermal sensing are not verified.</p>
+            <button type="button" @click="model.loadSource()" :disabled="!ready()" class="mt-4 px-4 py-3 text-sm border border-neutral-600 rounded focus-visible:outline-emerald-200 disabled:opacity-40">Read verified source imagery</button>
+            <p :if="captureData().error" role="alert" class="mt-3 text-red-200 text-sm">{{ captureData().error }}</p>
+            <p :if="workspace().source && !captureData().entries.length" class="mt-3 text-neutral-400 text-sm">This admitted source has no confirmed captures. Unknown coverage is preserved.</p>
+            <div :if="captureData().entries.length" class="mt-5">
+              <div class="grid gap-4 sm:grid-cols-2"><div><label for="incident-capture" class="block mb-2 text-sm">Confirmed capture</label><select id="incident-capture" x-model="captureId" class="px-3 py-3 w-full bg-neutral-900 border border-neutral-600 rounded focus-visible:outline-emerald-200"><option value="">Choose a capture</option><option :for="frame in captureData().entries" :value="frame.id">{{ frame.id }}</option></select></div><div><label for="incident-modality" class="block mb-2 text-sm">Modality</label><select id="incident-modality" x-model="modality" class="px-3 py-3 w-full bg-neutral-900 border border-neutral-600 rounded focus-visible:outline-emerald-200"><option value="visible">Visible</option><option value="thermal">Synthetic thermal</option></select></div></div>
+              <figure :if="capture()" class="mt-4"><img :src="image()" :width="capture()?.width" :height="capture()?.height" alt="Actual selected pixels from an admitted unsigned synthetic source" class="block h-auto w-full bg-neutral-900 border border-neutral-700 rounded [image-rendering:pixelated]"><figcaption class="mt-3 leading-relaxed text-neutral-400 text-xs">Support 0: unknown or unobserved. Support 1: observed synthetic ground. Support 2: privacy masked. No image or capture count establishes searched-area coverage.</figcaption></figure>
+            </div>
+          </div>
+        </section>
+
+        <section aria-labelledby="incident-context" class="min-w-0">
+          <h2 id="incident-context" class="font-semibold text-lg">Source observations and review</h2>
+          <p :if="!current()?.selected" class="mt-3 text-neutral-400 text-sm">Select an admitted source to inspect its bounded context.</p>
+          <div :if="current()?.selected">
+            <p class="mt-2 text-neutral-400 text-sm">Snapshot through sequence {{ current()?.selected?.contextThroughSequence }}. Later: {{ current()?.selected?.newerContext.observations }} observations, {{ current()?.selected?.newerContext.reviews }} reviews.</p>
+            <p :if="!current()?.selected?.entries.length" class="mt-4 text-neutral-400 text-sm">No records on this context page. This does not establish absence of a person, fire or hazard.</p>
+            <ol class="mt-5 space-y-5"><li :for="entry in current()?.selected?.entries ?? []" class="pl-4 border-l border-neutral-600"><p class="text-neutral-300 text-xs">Sequence {{ entry.createdSequence }} / account {{ entry.actorId }} / {{ 'observationId' in entry ? 'review' : 'observation' }}</p><p class="mt-2 break-words text-sm" data-workspace-note>{{ entry.note }}</p><p class="mt-2 break-words text-neutral-400 text-sm">Original uncertainty: {{ entry.uncertaintyNote }}</p><p :if="'disposition' in entry" class="mt-2 text-emerald-200 text-xs">{{ entry.disposition }} / {{ entry.selfReview ? 'self-review' : 'another account' }}</p><button type="button" @click="model.loadReviews('observationId' in entry ? entry.observationId : entry.id)" :disabled="!ready()" class="mt-3 text-emerald-200 text-sm underline focus-visible:outline-emerald-200 disabled:opacity-40">Open original observation and reviews</button></li></ol>
+            <div class="flex gap-4 mt-5"><button type="button" @click="model.page('context', true)" class="text-emerald-200 text-sm underline focus-visible:outline-emerald-200">Current first page</button><button :if="current()?.selected?.hasMore" type="button" @click="model.page('context')" class="text-emerald-200 text-sm underline focus-visible:outline-emerald-200">Next fixed-cutoff page</button></div>
+          </div>
+        </section>
+      </div>
+
+      <section :if="current()?.selected" aria-labelledby="incident-declaration" class="mt-9 pt-6 border-neutral-700 border-t">
+        <h2 id="incident-declaration" class="font-semibold text-lg">Explicit source-pixel observation</h2>
+        <p class="mt-2 text-neutral-400 text-sm">Read the source imagery and choose a confirmed capture. Only original observed support permits an observation.</p>
+        <form @submit.prevent="recordObservation()" class="grid gap-5 sm:grid-cols-2 mt-5">
+          <div><label for="incident-x" class="block mb-2 text-sm">Pixel x</label><input id="incident-x" x-model.number="pixelX" type="number" min="0" :max="(capture()?.width ?? 1) - 1" step="1" required class="px-3 py-3 w-full bg-neutral-900 border border-neutral-600 rounded focus-visible:outline-emerald-200"></div>
+          <div><label for="incident-y" class="block mb-2 text-sm">Pixel y</label><input id="incident-y" x-model.number="pixelY" type="number" min="0" :max="(capture()?.height ?? 1) - 1" step="1" required class="px-3 py-3 w-full bg-neutral-900 border border-neutral-600 rounded focus-visible:outline-emerald-200"></div>
+          <p class="sm:col-span-2 text-neutral-400 text-sm" data-workspace-support>{{ pixelDescription() }}</p>
+          <div><label for="incident-note" class="block mb-2 text-sm">Observation declaration</label><textarea id="incident-note" x-model="observationNote" rows="3" required maxlength="2048" class="px-3 py-3 w-full bg-neutral-900 border border-neutral-600 rounded focus-visible:outline-emerald-200"></textarea></div>
+          <div><label for="incident-uncertainty" class="block mb-2 text-sm">Uncertainty declaration</label><textarea id="incident-uncertainty" x-model="uncertaintyNote" rows="3" required maxlength="1024" class="px-3 py-3 w-full bg-neutral-900 border border-neutral-600 rounded focus-visible:outline-emerald-200"></textarea></div>
+          <button type="submit" :disabled="!ready() || !current()?.actions.canObserve || !supportedPixel()" class="justify-self-start px-4 py-3 font-medium text-neutral-950 bg-emerald-200 rounded focus-visible:outline-emerald-200 focus-visible:outline-offset-4 disabled:opacity-40">Record observation</button>
+        </form>
+      </section>
+
+      <section :if="workspace().reviewObservation" aria-labelledby="incident-review" class="mt-9 pt-6 border-neutral-700 border-t">
+        <h2 id="incident-review" class="font-semibold text-lg">Append operator review</h2>
+        <p class="mt-3 break-words text-neutral-300 text-sm">Observation {{ workspace().reviewObservation?.id }}: {{ workspace().reviewObservation?.note }}</p>
+        <p class="mt-2 break-words text-neutral-400 text-sm">Original uncertainty: {{ workspace().reviewObservation?.uncertaintyNote }}</p>
+        <ol class="mt-4 space-y-3"><li :for="review in workspace().reviews?.entries ?? []" class="pl-4 border-l border-neutral-600"><p class="text-neutral-400 text-xs">Review {{ review.id }} / {{ review.disposition }} / account {{ review.actorId }}</p><p class="mt-1 break-words text-sm">{{ review.note }}</p></li></ol>
+        <button :if="workspace().reviews?.hasMore" type="button" @click="nextReviews()" class="mt-4 text-emerald-200 text-sm underline focus-visible:outline-emerald-200">Next reviews before appending</button>
+        <form @submit.prevent="recordReview()" class="grid gap-5 sm:grid-cols-2 mt-5">
+          <div><label for="incident-disposition" class="block mb-2 text-sm">Reviewer declaration</label><select id="incident-disposition" x-model="disposition" class="px-3 py-3 w-full bg-neutral-900 border border-neutral-600 rounded focus-visible:outline-emerald-200"><option value="unresolved">Unresolved</option><option value="supported-by-source">Supported by source</option><option value="not-supported-by-source">Not supported by source</option></select></div>
+          <div><label for="incident-review-note" class="block mb-2 text-sm">Review note</label><textarea id="incident-review-note" x-model="reviewNote" rows="3" required maxlength="2048" class="px-3 py-3 w-full bg-neutral-900 border border-neutral-600 rounded focus-visible:outline-emerald-200"></textarea></div>
+          <button type="submit" :disabled="!ready() || !current()?.actions.canReview || !workspace().reviews || workspace().reviews?.hasMore" class="justify-self-start px-4 py-3 font-medium text-neutral-950 bg-emerald-200 rounded focus-visible:outline-emerald-200 focus-visible:outline-offset-4 disabled:opacity-40">Append review</button>
+        </form>
+      </section>
+
+      <section aria-labelledby="incident-handover" class="mt-9 pt-6 border-neutral-700 border-t">
+        <h2 id="incident-handover" class="font-semibold text-lg">Incident coordination handover</h2>
+        <p class="mt-2 max-w-3xl leading-relaxed text-neutral-400 text-sm">Responsibility for the whole incident is separate from vehicle control, RC authority and pilot qualification. An offer briefing has its own source and acknowledgement cutoff.</p>
+        <form @submit.prevent="openOffer()" class="flex flex-wrap gap-3 items-end mt-4"><div class="flex-1 min-w-0"><label for="incident-offer-key" class="block mb-2 text-sm">Historical offer key</label><input id="incident-offer-key" x-model="offerChoice" maxlength="36" autocomplete="off" class="px-3 py-3 w-full bg-neutral-900 border border-neutral-600 rounded focus-visible:outline-emerald-200"></div><button type="submit" :disabled="!offerChoice() || !ready()" class="px-4 py-3 text-sm border border-neutral-600 rounded focus-visible:outline-emerald-200 disabled:opacity-40">Read offer</button></form>
+        <p :if="!current()?.handover.offer" class="mt-5 text-neutral-400 text-sm">No offer is currently visible. Unrelated members cannot enumerate participants.</p>
+        <div :if="current()?.handover.offer" class="mt-5 p-5 bg-neutral-900 border border-neutral-700 rounded">
+          <p class="font-medium" data-workspace-offer>{{ current()?.handover.offer?.state }} / offer {{ current()?.handover.offer?.key }}</p>
+          <p class="mt-3 text-sm">Outgoing account {{ current()?.handover.offer?.assignment.coordinatorId }} to recipient {{ current()?.handover.offer?.recipientUserId }}. Expires {{ current()?.handover.offer?.expiresAt }}.</p>
+          <p class="mt-3 break-all font-mono text-xs">Offer source {{ current()?.handover.offer?.source.digest }}</p>
+          <p class="mt-2 text-neutral-400 text-sm">Acknowledgement cutoff {{ current()?.handover.offer?.contextThroughSequence }}. Offer digest {{ current()?.handover.offer?.digest }}.</p>
+          <ol :if="current()?.handover.briefing" class="mt-5 space-y-4"><li :for="entry in current()?.handover.briefing?.entries ?? []"><p class="break-words text-sm">{{ entry.createdSequence }} / {{ entry.note }}</p><p class="mt-1 break-words text-neutral-400 text-xs">Original uncertainty: {{ entry.uncertaintyNote }}</p></li></ol>
+          <button :if="current()?.handover.briefing?.hasMore" type="button" @click="model.page('handover')" class="mt-3 text-emerald-200 text-sm underline focus-visible:outline-emerald-200">Next offer briefing page</button>
+          <p :if="current()?.handover.briefing" class="mt-4 text-neutral-400 text-sm">Newer unacknowledged context: {{ current()?.handover.briefing?.newerContext.observations }} observations and {{ current()?.handover.briefing?.newerContext.reviews }} reviews.</p>
+          <label :if="current()?.handover.actionability.canAccept" class="flex gap-3 items-start mt-5 leading-relaxed text-sm"><input type="checkbox" x-model="acknowledged" class="mt-1" id="incident-acknowledgement">I acknowledge this offer's exact digest, source and cutoff, including its original uncertainty. This is my assertion; the server does not prove comprehension.</label>
+          <div class="flex flex-wrap gap-3 mt-5"><button type="button" @click="accept()" :disabled="!ready() || !current()?.handover.actionability.canAccept || !acknowledged()" class="px-4 py-3 font-medium text-neutral-950 bg-emerald-200 rounded focus-visible:outline-emerald-200 disabled:opacity-40">Accept coordination</button><button type="button" @click="model.decide('decline')" :disabled="!ready() || !current()?.handover.actionability.canDecline" class="px-4 py-3 text-sm border border-neutral-600 rounded focus-visible:outline-emerald-200 disabled:opacity-40">Decline offer</button><button type="button" @click="model.decide('cancel')" :disabled="!ready() || !current()?.handover.actionability.canCancel" class="px-4 py-3 text-sm border border-neutral-600 rounded focus-visible:outline-emerald-200 disabled:opacity-40">Cancel offer</button></div>
+        </div>
+        <form :if="current()?.recipients" @submit.prevent="offer()" class="grid gap-5 sm:grid-cols-2 lg:grid-cols-3 mt-6" aria-label="Offer incident coordination">
+          <div><label for="incident-recipient" class="block mb-2 text-sm">Existing active recipient</label><select id="incident-recipient" x-model="recipientId" required class="px-3 py-3 w-full bg-neutral-900 border border-neutral-600 rounded focus-visible:outline-emerald-200"><option value="">Choose an account</option><option :for="member in current()?.recipients?.entries ?? []" :value="String(member.userId)">Account {{ member.userId }} / {{ member.role }} / membership {{ member.membershipVersion }}</option></select><div class="flex gap-4 mt-3"><button type="button" @click="model.page('members', true)" class="text-emerald-200 text-xs underline focus-visible:outline-emerald-200">First recipients</button><button :if="current()?.recipients?.hasMore" type="button" @click="model.page('members')" class="text-emerald-200 text-xs underline focus-visible:outline-emerald-200">Next recipients</button></div></div>
+          <div><label for="incident-outgoing-role" class="block mb-2 text-sm">Your outgoing role</label><select id="incident-outgoing-role" x-model="outgoingRole" class="px-3 py-3 w-full bg-neutral-900 border border-neutral-600 rounded focus-visible:outline-emerald-200"><option value="observer">Observer</option><option value="pilot">Pilot</option><option value="reviewer">Reviewer</option><option value="evidence-custodian">Evidence custodian</option></select></div>
+          <div><label for="incident-offer-ttl" class="block mb-2 text-sm">Offer lifetime in seconds</label><input id="incident-offer-ttl" x-model.number="ttl" type="number" min="30" max="1800" step="1" required class="px-3 py-3 w-full bg-neutral-900 border border-neutral-600 rounded focus-visible:outline-emerald-200"></div>
+          <p class="sm:col-span-2 lg:col-span-3 text-neutral-400 text-xs">The selected admitted source anchors this offer. Recipient membership does not assert current platform eligibility; the server checks it when you offer.</p>
+          <button type="submit" :disabled="!ready() || !current()?.handover.actionability.canOffer || !current()?.selected || !recipientId()" class="justify-self-start px-4 py-3 font-medium text-neutral-950 bg-emerald-200 rounded focus-visible:outline-emerald-200 focus-visible:outline-offset-4 disabled:opacity-40">Offer coordination</button>
+        </form>
+      </section>
+    </div>
+  </section>
+</template>
