@@ -13,6 +13,11 @@ import PublicSafetyHandoverOffer from '../app/Actions/PublicSafetyHandoverOffer'
 import PublicSafetyHandoverDecision from '../app/Actions/PublicSafetyHandoverDecision'
 import PublicSafetyWorkspace from '../app/Actions/PublicSafetyWorkspace'
 import PublicSafetyWorkspaceEvents from '../app/Actions/PublicSafetyWorkspaceEvents'
+import PublicSafetyExecutionStart from '../app/Actions/PublicSafetyExecutionStart'
+import PublicSafetyExecutionRead from '../app/Actions/PublicSafetyExecutionRead'
+import PublicSafetyExecutionClose from '../app/Actions/PublicSafetyExecutionClose'
+import PublicSafetyExecutionAdmission from '../app/Actions/PublicSafetyExecutionAdmission'
+import PublicSafetyExecutionEvents from '../app/Actions/PublicSafetyExecutionEvents'
 import PublicSafetySourceRegister from '../app/Actions/PublicSafetySourceRegister'
 import PublicSafetySourceRead from '../app/Actions/PublicSafetySourceRead'
 import PublicSafetySourceList from '../app/Actions/PublicSafetySourceList'
@@ -57,6 +62,11 @@ route.post('/public-safety/incidents/{incident}/close', PublicSafetyIncidentClos
 route.get('/public-safety/incidents/{incident}/audit', PublicSafetyIncidentAudit).middleware('auth')
 route.match(['GET', 'HEAD'], '/public-safety/incidents/{incident}/workspace', PublicSafetyWorkspace).middleware('auth').parseBody(false)
 route.match(['GET', 'HEAD'], '/public-safety/incidents/{incident}/workspace/events', PublicSafetyWorkspaceEvents).middleware('auth').parseBody(false)
+route.post('/public-safety/incidents/{incident}/workspace/execution', PublicSafetyExecutionStart).middleware('auth').parseBody(false)
+route.match(['GET', 'HEAD'], '/public-safety/incidents/{incident}/workspace/execution', PublicSafetyExecutionRead).middleware('auth').parseBody(false)
+route.match(['GET', 'HEAD'], '/public-safety/incidents/{incident}/workspace/execution/{execution}/events', PublicSafetyExecutionEvents).middleware('auth').parseBody(false)
+route.post('/public-safety/incidents/{incident}/workspace/execution/close', PublicSafetyExecutionClose).middleware('auth').parseBody(false)
+route.post('/public-safety/incidents/{incident}/workspace/execution/admission', PublicSafetyExecutionAdmission).middleware('auth').parseBody(false)
 route.get('/public-safety/incidents/{incident}/handover', PublicSafetyHandoverDesk).middleware('auth')
 route.post('/public-safety/incidents/{incident}/handover/offer', PublicSafetyHandoverOffer).middleware('auth').parseBody(false)
 route.post('/public-safety/incidents/{incident}/handover/decision', PublicSafetyHandoverDecision).middleware('auth').parseBody(false)
