@@ -8,6 +8,12 @@ const sha256 = (input: string | Uint8Array) => createHash('sha256').update(input
 /** Private exclusive offline evidence, with a completion marker. This does not implement incident access or automatic retention deletion. */
 export async function writePublicSafetyDataset(directory: string, input: PublicSafetyRun) {
   if (typeof directory !== 'string' || !directory.length || directory.length > 4096 || directory.includes('\0')) throw new TypeError('Invalid public-safety output directory')
+  const rendered = await renderPublicSafetyDataset(input)
+  return writeCompletedArtifact(directory, rendered.files, rendered.manifestJson, { directories: rendered.directories })
+}
+
+/** Filesystem-free, source-verified dataset rendering shared by offline and managed publication. */
+export async function renderPublicSafetyDataset(input: PublicSafetyRun) {
   // Complete deterministic verification and snapshot precede asynchronous encoding or filesystem creation.
   const run = validatePublicSafetyRun(input), files: { path: string, contents: string | Uint8Array }[] = []
   const images: { captureId: string, visible: string, thermal: string, support: string, width: number, height: number }[] = []
@@ -53,5 +59,5 @@ export async function writePublicSafetyDataset(directory: string, input: PublicS
     files: files.map(file => ({ path: file.path, bytes: typeof file.contents === 'string' ? new TextEncoder().encode(file.contents).length : file.contents.length, sha256: sha256(file.contents) })),
     persistence: 'exclusive-files-and-directory-fsync-before-manifest-link', hardwarePowerLossTested: false,
   }
-  return writeCompletedArtifact(directory, files, `${JSON.stringify(manifest, null, 2)}\n`, { directories: ['images'] })
+  return { files, manifestJson: `${JSON.stringify(manifest, null, 2)}\n`, directories: ['images'] }
 }

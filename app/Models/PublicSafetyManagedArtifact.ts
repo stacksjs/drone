@@ -1,0 +1,48 @@
+import { defineModel } from '@stacksjs/orm'
+import { schema } from '@stacksjs/validation/runtime'
+
+/** Private managed dataset metadata. No deletion or background execution. */
+export default defineModel({
+  name: 'PublicSafetyManagedArtifact', table: 'public_safety_managed_artifacts',
+  traits: { useTimestamps: true, useApi: false, useSearch: false, useSeeder: false }, dashboard: { enabled: false },
+  indexes: [
+    { name: 'public_safety_managed_key_unique', columns: ['artifact_key'], unique: true },
+    { name: 'public_safety_managed_request_unique', columns: ['incident_id', 'request_id'], unique: true },
+    { name: 'public_safety_managed_incident', columns: ['incident_id', 'id'], unique: false },
+  ],
+  attributes: {
+    artifactKey: { required: true, fillable: true, validation: { rule: schema.string().max(36) } },
+    incidentId: { required: true, fillable: true, foreignKey: { table: 'public_safety_incidents', column: 'id', onDelete: 'restrict' }, validation: { rule: schema.number().integer().min(1) } },
+    retentionScopeId: { required: true, fillable: true, foreignKey: { table: 'public_safety_retention_scopes', column: 'id', onDelete: 'restrict' }, validation: { rule: schema.number().integer().min(1) } },
+    sourceId: { required: true, fillable: true, foreignKey: { table: 'public_safety_sources', column: 'id', onDelete: 'restrict' }, validation: { rule: schema.number().integer().min(1) } },
+    sourceDigest: { required: true, fillable: true, validation: { rule: schema.string().max(64) } },
+    sourceByteLength: { required: true, fillable: true, validation: { rule: schema.number().integer().min(1).max(16777216) } },
+    sourceCreatedSequence: { required: true, fillable: true, validation: { rule: schema.number().integer().min(1).max(2147483647) } },
+    configDigest: { required: true, fillable: true, validation: { rule: schema.string().max(64) } },
+    sourceProfile: { required: true, fillable: true, validation: { rule: schema.enum(['owned-public-safety-collection-v1']) } },
+    datasetProfile: { required: true, fillable: true, validation: { rule: schema.enum(['owned-public-safety-dataset-v1']) } },
+    requestId: { required: true, fillable: true, validation: { rule: schema.string().max(36) } },
+    requestDigest: { required: true, fillable: true, hidden: true, validation: { rule: schema.string().max(64) } },
+    requesterUserId: { required: true, fillable: true, foreignKey: { table: 'users', column: 'id', onDelete: 'restrict' }, validation: { rule: schema.number().integer().min(1) } },
+    requestedAtIso: { required: true, fillable: true, validation: { rule: schema.string().max(24) } },
+    version: { required: true, fillable: true, validation: { rule: schema.number().integer().min(1).max(2147483647) } },
+    generation: { required: true, fillable: true, validation: { rule: schema.number().integer().min(1).max(2147483647) } },
+    operationNonce: { required: true, fillable: true, hidden: true, validation: { rule: schema.string().max(36) } },
+    state: { required: true, fillable: true, validation: { rule: schema.enum(['intent', 'prepared', 'inspecting', 'complete', 'interrupted', 'blocked']) } },
+    createdIncidentVersion: { required: true, fillable: true, validation: { rule: schema.number().integer().min(1).max(2147483647) } },
+    latestIncidentVersion: { required: true, fillable: true, validation: { rule: schema.number().integer().min(1).max(2147483647) } },
+    requestedRetentionVersion: { required: true, fillable: true, validation: { rule: schema.number().integer().min(1).max(2147483647) } },
+    plannedRootJson: { required: true, fillable: true, hidden: true, validation: { rule: schema.string().max(16384) } },
+    targetPath: { required: true, fillable: true, hidden: true, validation: { rule: schema.string().max(4096) } },
+    receiptJson: { required: false, fillable: true, hidden: true, validation: { rule: schema.string().max(4194304) } },
+    planDigest: { required: true, fillable: true, validation: { rule: schema.string().max(64) } },
+    fileCount: { required: true, fillable: true, validation: { rule: schema.number().integer().min(1).max(771) } },
+    totalPlannedBytes: { required: true, fillable: true, validation: { rule: schema.number().integer().min(1).max(33554432) } },
+    manifestSha256: { required: true, fillable: true, validation: { rule: schema.string().max(64) } },
+    preparedAtIso: { required: false, fillable: true, validation: { rule: schema.string().max(24) } },
+    completedAtIso: { required: false, fillable: true, validation: { rule: schema.string().max(24) } },
+    interruptedAtIso: { required: false, fillable: true, validation: { rule: schema.string().max(24) } },
+    completedByUserId: { required: false, fillable: true, foreignKey: { table: 'users', column: 'id', onDelete: 'restrict' }, validation: { rule: schema.number().integer().min(1) } },
+    outcomeCode: { required: false, fillable: true, validation: { rule: schema.string().max(32) } },
+  },
+} as const)
