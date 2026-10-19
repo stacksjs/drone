@@ -67,6 +67,23 @@ canonical replay and current authority precede result acceptance. A late result
 cannot restore canceled, expired or discarded work. Numeric defaults are set
 from actual native measurements and tested at the controller/HTTP boundaries.
 
+The initial settings in `config/execution.ts` are one reservation, one
+subscriber, eight pending checks, two native pending frames and 4,096 bytes per
+frame. Authorization and heartbeat intervals are two seconds; stream renewal is
+30 seconds. Consumer attach/reconnect grace is ten seconds, private credit wait
+20 seconds, wall lifetime 60 seconds, cooperative-stop grace two seconds and
+terminal retention 60 seconds. These finite policy choices have explicit refusal
+behavior and require actual controller/HTTP qualification. They are not hard
+scheduling or resource guarantees.
+
+Native measurements covered all ten existing scenarios at requested durations
+100 and 120 seconds, including full recording transfer and fresh authority on
+every credit. The nominal fixture finished its virtual survey earlier than the
+requested budget. Its Worker plus native checks took under eight seconds on the
+development host. Existing source registration blocked that host's parent loop
+for up to 2.67 seconds. Validation remains intact, with current authority and
+deadline checks after it returns. These measurements do not qualify Pi hardware.
+
 Native createBroadcastHub/createBroadcastResponse own progress framing and
 bounded pending delivery. The stream rejects replay-buffer matches and uses
 the existing opaque-chunk release pattern with fresh current authority. A
@@ -101,6 +118,12 @@ capacity; positive native-parent preload and negative Worker bootstrap checks;
 real Action source/artifact entrypoint resolution; and native HTTP/rendered STX
 progress, stop, completion and explicit admission. Required Linux CI and the
 existing source/workspace/retention/purge regressions gate publication.
+
+The first deployment target is the source Stacks application with a file-based
+Worker. An Action-owned Worker URL has separate source and emitted-file evidence.
+Complete authenticated bundled server and Docker support need their own
+qualification, including generated registry paths and shared native Gate state.
+A benign Worker artifact test does not establish those deployment properties.
 
 The process-local tracer adds no run model, durable queue, filesystem output,
 derivative cache or accepted purge-v1 inventory item. Released bytes cannot be
