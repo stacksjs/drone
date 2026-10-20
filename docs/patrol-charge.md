@@ -4,7 +4,7 @@ The private `createNavigationOccurrenceSession` in
 `resources/functions/drone/navigation/runtime.ts` accepts an optional `charge` profile when
 `contact` is also selected. Profiles are `nominal`, `no-current`, `current-stuck`,
 `stuck-relay`, `feedback-loss`, `feedback-replay` and `mains-loss`. Issue #24 remains open
-for recurrence, authenticated patrol review/audit, persistence, recovery, a full weather
+for production scheduling, authenticated patrol review/audit, persistence, recovery, a full weather
 system and physical qualification. This experiment has no charger hardware transport.
 
 Only the charge-enabled adapter exposes `requestCharge()` and `stopCharge()`. A request is
@@ -94,3 +94,6 @@ feedback, mains/contact loss, input inspection reentrancy, both flight/charge re
 orders, finite capacity and exact refusal behavior. Seven full legacy navigation results
 remain byte-identical. Physical charging, unattended operation, HIL and endurance evidence
 are outside this modeled checkpoint.
+
+A separate [finite recurrence ledger](patrol-recurrence.md) records due slots and explicit
+local reviews. Neither due slots nor flight reviews supply charge approval.

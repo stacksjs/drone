@@ -60,8 +60,13 @@ Normalize unknown input before reading current owned time, availability and rese
 Keep prior completed episodes immutable when canceling a later queued approval.
 See [the fixed model, causal order and evidence](../patrol-charge.md).
 
-Build recurrence in subsequent bounded steps.
-Scheduling must never grant actuator authority or silently retry a refused launch.
+A finite native cron ledger now selects minute-zero and minute-one slots, records
+explicit local reviews and emits a handoff description only on its one consuming call.
+It has no runtime handle or scheduler process. Fixed clocks, missed/busy decisions and
+global faults cannot recreate a prior review. The nominal integration test composes
+two actual retained flights with separate charge approval. See [the bounded recurrence
+contract](../patrol-recurrence.md).
+Production scheduling must never grant actuator authority or silently retry a refused launch.
 Native Stacks commands and application services belong outside the synchronous control
 loop. Durable review/audit, weather interlocks, failed docking and recovery, HIL and
 physical trials remain open.

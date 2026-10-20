@@ -308,8 +308,9 @@ See [navigation assumptions, evidence and remaining work](docs/navigation.md).
 
 The private retained patrol experiment keeps one vehicle across two explicitly approved
 missions, with optional [selected-pad contact](docs/patrol-contact.md) and
-[partial-charge verification and isolation](docs/patrol-charge.md). Scheduling, authenticated
-patrol review, recovery and physical docking remain open under issue #24.
+[partial-charge verification and isolation](docs/patrol-charge.md). A [finite native recurrence ledger](docs/patrol-recurrence.md) records due slots and
+explicit local reviews. Production scheduling, authenticated patrol review, recovery and
+physical docking remain open under issue #24.
 
 ## External-driver protocol services
 
