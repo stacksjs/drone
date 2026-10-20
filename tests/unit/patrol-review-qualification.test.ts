@@ -8,7 +8,7 @@ async function run(variant: string) {
   try {
     const config = join(directory, 'bunfig.toml')
     await writeFile(config, 'preload=[]\n')
-    const child = Bun.spawn([process.execPath, `--config=${config}`, '--no-env-file', join(import.meta.dir, variant === 'service-busy' ? '../fixtures/patrol-review/service-busy.ts' : variant === 'credential-kinds' ? '../fixtures/patrol-review/credential-kinds.ts' : variant === 'wire' ? '../fixtures/patrol-review/wire.ts' : variant === 'generic' ? '../fixtures/patrol-review/generic-app-boundary.ts' : variant.startsWith('after-') ? '../fixtures/patrol-review/after-gate.ts' : variant.startsWith('race-') ? '../fixtures/patrol-review/races.ts' : '../fixtures/patrol-review/qualification.ts')], { cwd: directory, env: { ...process.env, APP_ENV: 'test', NODE_ENV: 'test', DB_CONNECTION: 'sqlite', DB_DATABASE_PATH: join(directory, 'review.sqlite'), PATROL_QUALIFICATION: variant }, stdout: 'pipe', stderr: 'pipe' })
+    const child = Bun.spawn([process.execPath, `--config=${config}`, '--no-env-file', join(import.meta.dir, variant === 'service-snapshot-busy' ? '../fixtures/patrol-review/service-snapshot-busy.ts' : variant === 'service-busy' ? '../fixtures/patrol-review/service-busy.ts' : variant === 'credential-kinds' ? '../fixtures/patrol-review/credential-kinds.ts' : variant === 'wire' ? '../fixtures/patrol-review/wire.ts' : variant === 'generic' ? '../fixtures/patrol-review/generic-app-boundary.ts' : variant.startsWith('after-') ? '../fixtures/patrol-review/after-gate.ts' : variant.startsWith('race-') ? '../fixtures/patrol-review/races.ts' : '../fixtures/patrol-review/qualification.ts')], { cwd: directory, env: { ...process.env, APP_ENV: 'test', NODE_ENV: 'test', DB_CONNECTION: 'sqlite', DB_DATABASE_PATH: join(directory, 'review.sqlite'), PATROL_QUALIFICATION: variant }, stdout: 'pipe', stderr: 'pipe' })
     let timedOut = false
     const guard = setTimeout(() => {
       timedOut = true
@@ -51,3 +51,5 @@ test('native patrol wire byte media and UTF8 validation plus occurrence insertio
 test('native valid session and delegated OAuth credentials do not grant personal-token patrol access', () => run('credential-kinds'), 70000)
 
 test('native patrol actual CAS writer conflict returns observed busy503 and leaves ledger unchanged', () => run('service-busy'), 70000)
+
+test('native patrol WAL snapshot conflict returns observed busy503 without a transaction retry', () => run('service-snapshot-busy'), 70000)

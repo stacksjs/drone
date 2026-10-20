@@ -1,7 +1,7 @@
 import { expect, test } from 'bun:test'
 import assert from 'node:assert/strict'
 import vectors from '../fixtures/patrol-review/canonical-vectors.json'
-import { createRequestDigest, digests, iso, json, normalizeBinding, normalizeConsume, normalizeCreate, normalizeDecision, normalizeInput, routeDue, scopeDigest, utcMs } from '../../resources/functions/drone/navigation/review/contract'
+import { createRequestDigest, digests, isPatrolDatabaseBusy, iso, json, normalizeBinding, normalizeConsume, normalizeCreate, normalizeDecision, normalizeInput, routeDue, scopeDigest, utcMs } from '../../resources/functions/drone/navigation/review/contract'
 
 // Pure canonical policy seam, not native authentication or transaction evidence.
 test('patrol canonical bytes and SHA256 match independent literal owner key tuple and version vectors', () => {
@@ -85,4 +85,17 @@ test('patrol decision and consume accept exactly owned fields versions UUIDs and
   const consume = { expectedVersion: 5, requestId: decision.requestId, scopeDigest: decision.scopeDigest }
   expect(normalizeConsume(consume)).toEqual(consume)
   assert.throws(() => normalizeConsume({ ...consume, decision: 'approve' }), TypeError)
+})
+
+// These are classifier controls, not evidence that a native conflict occurred.
+test('patrol busy classification accepts only the two observed native Error identities', () => {
+  for (const [code, errno] of [['SQLITE_BUSY', 5], ['SQLITE_BUSY_SNAPSHOT', 517]] as const) {
+    expect(isPatrolDatabaseBusy(Object.assign(new Error('unrelated text'), { code, errno }))).toBe(true)
+    expect(isPatrolDatabaseBusy({ code, errno })).toBe(false)
+    expect(isPatrolDatabaseBusy(Object.assign(new Error(code), { code, errno: String(errno) }))).toBe(false)
+  }
+  for (const [code, errno] of [['SQLITE_BUSY', 517], ['SQLITE_BUSY_SNAPSHOT', 5], ['SQLITE_LOCKED', 6], ['SQLITE_BUSY_RECOVERY', 261], ['SQLITE_IOERR', 10], ['SQLITE_CONSTRAINT_UNIQUE', 2067]]) {
+    expect(isPatrolDatabaseBusy(Object.assign(new Error('database is locked'), { code, errno }))).toBe(false)
+  }
+  for (const value of [null, undefined, 'SQLITE_BUSY_SNAPSHOT', new Error('SQLITE_BUSY 5')]) expect(isPatrolDatabaseBusy(value)).toBe(false)
 })

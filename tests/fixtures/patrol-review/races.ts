@@ -1,15 +1,23 @@
 import assert from 'node:assert/strict'
 import { join } from 'node:path'
-import { asRows } from '@stacksjs/database/runtime'
 import { openNativeFixture, intent, uuid } from './http-fixture'
 
 async function main() {
   const context = await openNativeFixture()
+  // Native initialization follows the complete disposable fixture tree.
+  const { asRows } = await import('@stacksjs/database/runtime')
   try {
     const { token, userId } = await context.owner(), variant = process.env.PATROL_QUALIFICATION!
+    const phase = (value: 'owner-ready' | 'seeds-complete' | 'children-launched' | 'preflights-ready') => {
+      // Closed setup facts only, no credentials or request bodies.
+      // eslint-disable-next-line no-console
+      if (variant === 'race-quota') console.log(JSON.stringify({ label: 'native-patrol-quota-phase', phase: value }))
+    }
+    phase('owner-ready')
     if (variant === 'race-quota') {
       for (let n = 0; n < 15; n++) assert.equal((await context.call('POST', '/api/patrol/reviews', token.plainTextToken, { ...intent, scheduleKey: `seed-${n}`, requestId: uuid(n + 1) })).status, 201)
     }
+    phase('seeds-complete')
     const path = `/api/patrol/reviews/${intent.scheduleKey}`
     let baseline: any
     if (variant === 'race-review' || variant === 'race-consume') {
@@ -52,6 +60,7 @@ async function main() {
       })
       return { child, stdout, stderr, preflight, observation: () => ({ actualPid, preflightCount }) }
     })
+    phase('children-launched')
     let timedOut = false
     const guard = setTimeout(() => {
       timedOut = true
@@ -59,6 +68,7 @@ async function main() {
     }, 25000)
     try {
       await Promise.all(launched.map(item => item.preflight))
+      phase('preflights-ready')
       const pids = launched.map(item => item.observation().actualPid)
       assert.equal(new Set(pids).size, 2)
       assert(pids.every(pid => pid !== process.pid && pid > 0))

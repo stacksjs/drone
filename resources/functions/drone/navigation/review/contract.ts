@@ -129,5 +129,6 @@ export function transitionDigest(ownerUserId: number, scheduleKey: string, dueUt
 
 /** Exact identity observed from the installed native SQLite path, never response or message inference. */
 export function isPatrolDatabaseBusy(error: unknown): boolean {
-  return error instanceof Error && 'code' in error && error.code === 'SQLITE_BUSY' && 'errno' in error && error.errno === 5
+  return error instanceof Error && 'code' in error && 'errno' in error
+    && (error.code === 'SQLITE_BUSY' && error.errno === 5 || error.code === 'SQLITE_BUSY_SNAPSHOT' && error.errno === 517)
 }
