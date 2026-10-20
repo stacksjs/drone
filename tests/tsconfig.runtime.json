@@ -97,6 +97,7 @@
     "./unit/cinema.test.ts",
     "./unit/cinema-cli.test.ts",
     "./unit/gimbal-authority.test.ts",
-    "./unit/cinema-managed.test.ts"
+    "./unit/cinema-managed.test.ts",
+    "./unit/cinema-counted-encoder.test.ts"
   ]
 }

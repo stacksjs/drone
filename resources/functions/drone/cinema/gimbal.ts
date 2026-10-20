@@ -1,6 +1,9 @@
 import type { Quaternion } from '../estimation/frames'
 import type { SensorVector } from '../sensors/types'
 import type { CinemaEncoder, CinemaMotion, CinemaPlantRow } from './types'
+import type { CinemaCountedEncoder, CinemaEncoderCountTick } from './counted-encoder'
+import { measureCountedCinemaEncoder } from './counted-encoder'
+import { types as nodeTypes } from 'node:util'
 import { multiplyQuaternion, normalizeQuaternion, quaternionEuler } from '../estimation/frames'
 
 export const neutralOptical: Quaternion = [0.5, 0.5, 0.5, 0.5]
@@ -37,41 +40,104 @@ function substep(old: CinemaPlantRow, requested: SensorVector, requestedAtMs: nu
   if (!position.every(n => Number.isFinite(n) && Math.abs(n) <= 8)) throw new RangeError('cinema-unqualified-result')
   return { atMs: old.atMs + 4, requestedAtMs, requestedTorqueNm: copy(requested), appliedTorqueNm: applied, positionRad: position, velocityRadS: velocity, accelerationRadS2: acceleration }
 }
-/** Private owned relative-joint fixture. No physical output or injectable source. */
-export function createCinemaGimbal() {
+export interface CinemaCountedGimbal {
+  readonly rows: CinemaPlantRow[]
+  current(): CinemaPlantRow
+  render(nowMs: number): CinemaCountedEncoder
+  command(goal: SensorVector, nowMs: number): void
+  retire(nowMs: number): void
+  tail(): CinemaPlantRow[]
+}
+interface LegacyCinemaGimbal {
+  rows: CinemaPlantRow[]
+  current(): CinemaPlantRow
+  render(nowMs: number): CinemaEncoder
+  command(goal: SensorVector, measured: CinemaEncoder, nowMs: number): void
+  retire(nowMs: number): void
+  tail(): CinemaPlantRow[]
+}
+function unavailable(): never { throw new RangeError('cinema-unqualified-result') }
+function countedGoal(input: unknown): SensorVector {
+  if (nodeTypes.isProxy(input) || !Array.isArray(input) || Object.getPrototypeOf(input) !== Array.prototype) return unavailable()
+  const d = Object.getOwnPropertyDescriptors(input)
+  if (Object.getOwnPropertyDescriptor(input, 'length')?.value !== 3 || Reflect.ownKeys(input).length !== 4) return unavailable()
+  function at(i: number): number { const v = d[String(i)]; if (!v?.enumerable || !Object.hasOwn(v, 'value') || typeof v.value !== 'number' || !Number.isFinite(v.value) || Math.abs(v.value) > travel[i]!) return unavailable(); return v.value }
+  return [at(0), at(1), at(2)]
+}
+function createGimbal(kind: 'legacy'): LegacyCinemaGimbal
+function createGimbal(kind: 'counted'): CinemaCountedGimbal
+// Pickier's overload analysis misses the discriminant reads in the implementation.
+// eslint-disable-next-line pickier/no-unused-vars
+function createGimbal(kind: 'legacy' | 'counted'): LegacyCinemaGimbal | CinemaCountedGimbal {
   const rows: CinemaPlantRow[] = [{ atMs: 0, requestedAtMs: 0, requestedTorqueNm: [0, 0, 0], appliedTorqueNm: [0, 0, 0], positionRad: [0, 0, 0], velocityRadS: [0, 0, 0], accelerationRadS2: [0, 0, 0] }]
   let requested: SensorVector = [0, 0, 0], requestedAtMs = 0, lastRender: number | null = null, previousEncoder: CinemaEncoder | null = null, retired = false
-  return {
+  let previousTick: CinemaEncoderCountTick | null = null, countedPacket: CinemaCountedEncoder | null = null
+  function nextRow(old: CinemaPlantRow): CinemaPlantRow {
+    const row = substep(old, requested, requestedAtMs)
+    if (kind === 'counted' && new TextEncoder().encode(JSON.stringify(row)).length > 768) return unavailable()
+    return row
+  }
+  function render(nowMs: number): CinemaPlantRow {
+    if (retired || !Number.isSafeInteger(nowMs) || nowMs > 45000 || (lastRender === null ? nowMs !== 600 : nowMs !== lastRender + 20)) return unavailable()
+    while (rows[rows.length - 1]!.atMs < nowMs) { if (rows.length >= 11251) return unavailable(); rows.push(nextRow(rows[rows.length - 1]!)) }
+    lastRender = nowMs
+    return rows[(nowMs - 20) / 4]!
+  }
+  function command(goal: SensorVector, measured: CinemaEncoder | CinemaCountedEncoder, nowMs: number) {
+    if (retired || nowMs !== lastRender || !measured.velocityRadS) return unavailable()
+    requested = goal.map((n, i) => clamp(0.12 * (n - measured.positionRad[i]!) - 0.04 * measured.velocityRadS![i]!, 0.02)) as SensorVector
+    requestedAtMs = nowMs
+  }
+  function retire(nowMs: number): void {
+    if (kind === 'counted' && (!Number.isSafeInteger(nowMs) || lastRender === null)) return unavailable()
+    if (retired || nowMs !== lastRender) return unavailable()
+    retired = true; requested = [0, 0, 0]; requestedAtMs = nowMs
+  }
+  function tail(): CinemaPlantRow[] {
+    if (!retired) return unavailable()
+    const boundary = structuredClone(rows[rows.length - 1]!)
+    const tail: CinemaPlantRow[] = [{ ...boundary, requestedAtMs, requestedTorqueNm: [0, 0, 0] }]
+    for (let i = 0; i < 500; i++) tail.push(nextRow(tail[tail.length - 1]!))
+    return tail
+  }
+  if (kind === 'legacy') return {
     rows,
     current() { return structuredClone(rows[rows.length - 1]!) },
     render(nowMs: number): CinemaEncoder {
-      if (retired || !Number.isSafeInteger(nowMs) || nowMs > 45000 || (lastRender === null ? nowMs !== 600 : nowMs !== lastRender + 20)) throw new RangeError('cinema-unqualified-result')
-      while (rows[rows.length - 1]!.atMs < nowMs) { if (rows.length >= 11251) throw new RangeError('cinema-unqualified-result'); rows.push(substep(rows[rows.length - 1]!, requested, requestedAtMs)) }
-      lastRender = nowMs
-      const captured = rows[(nowMs - 20) / 4]!
+      const captured = render(nowMs)
       const position = captured.positionRad.map(n => Math.round(n / 0.001) * 0.001) as SensorVector
       const packet: CinemaEncoder = { sequence: previousEncoder ? previousEncoder.sequence + 1 : 1, capturedAtMs: nowMs - 20, receivedAtMs: nowMs, positionRad: position, velocityRadS: previousEncoder ? position.map((n, i) => (n - previousEncoder!.positionRad[i]!) / 0.020) as SensorVector : null, limitSwitch: !withinCinemaTravel(captured.positionRad) }
       previousEncoder = structuredClone(packet)
       return packet
     },
-    command(goal: SensorVector, measured: CinemaEncoder, nowMs: number) {
-      if (retired || nowMs !== lastRender || !measured.velocityRadS) throw new RangeError('cinema-unqualified-result')
-      requested = goal.map((n, i) => clamp(0.12 * (n - measured.positionRad[i]!) - 0.04 * measured.velocityRadS![i]!, 0.02)) as SensorVector
-      requestedAtMs = nowMs
+    command,
+    retire,
+    tail,
+  }
+  return {
+    get rows() { return structuredClone(rows) },
+    current() { return structuredClone(rows[rows.length - 1]!) },
+    render(nowMs: number): CinemaCountedEncoder {
+      const captured = render(nowMs)
+      function count(axis: number): number { const n = Math.round(captured.positionRad[axis]! / 0.001); return n === 0 ? 0 : n }
+      const current: CinemaEncoderCountTick = { sequence: previousTick ? previousTick.sequence + 1 : 1, capturedAtMs: nowMs - 20, receivedAtMs: nowMs, positionCounts: [count(0), count(1), count(2)], limitSwitch: !withinCinemaTravel(captured.positionRad) }
+      countedPacket = measureCountedCinemaEncoder({ current, previous: previousTick })
+      previousTick = current
+      return structuredClone(countedPacket)
     },
-    retire(nowMs: number): void {
-      if (retired || nowMs !== lastRender) throw new RangeError('cinema-unqualified-result')
-      retired = true; requested = [0, 0, 0]; requestedAtMs = nowMs
+    command(goal: SensorVector, nowMs: number): void {
+      if (retired || nowMs !== lastRender || !countedPacket?.velocityRadS) return unavailable()
+      const capturedGoal = countedGoal(goal)
+      command(capturedGoal, countedPacket, nowMs)
     },
-    tail(): CinemaPlantRow[] {
-      if (!retired) throw new RangeError('cinema-unqualified-result')
-      const boundary = structuredClone(rows[rows.length - 1]!)
-      const tail: CinemaPlantRow[] = [{ ...boundary, requestedAtMs, requestedTorqueNm: [0, 0, 0] }]
-      for (let i = 0; i < 500; i++) tail.push(substep(tail[tail.length - 1]!, requested, requestedAtMs))
-      return tail
-    },
+    retire,
+    tail,
   }
 }
+/** Private owned relative-joint fixture, preserving legacy floating measurement. */
+export function createCinemaGimbal() { return createGimbal('legacy') }
+/** Owned counted fixture. Commands always use its private current measurement. */
+export function createCountedCinemaGimbal(): CinemaCountedGimbal { return createGimbal('counted') }
 export function evaluateCinemaMotion(rows: CinemaPlantRow[], tail: CinemaPlantRow[]): CinemaMotion {
   const all = [...rows, ...tail.slice(1)]
   let rate = 0, acceleration = 0, jerk = 0, torque = 0, slew = 0, mechanical = true

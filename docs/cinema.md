@@ -53,3 +53,47 @@ This manager provides no authenticated identity, source transfer/resume, rate co
 The native trace is limited to 6,001 rows and 8 MiB. Cinema-specific records/images have a 12 MiB bound; the full JSON run plus LF has a 20 MiB bound and the CLI summary plus LF a 16 KiB bound. Data is neither rounded nor truncated to pass. These representation limits establish no hard CPU or peak-memory bound. Source, compiled-executable and CI qualification are tracked separately.
 
 `physicalFlightEnabled`, `physicalGimbalActuationEnabled` and `identityAuthenticated` remain false. These synthetic stills establish no measured optical calibration, physical shutter/gimbal accuracy, lens/exposure behavior, broadcast/video timing or operational readiness. All original issue #26 acceptance criteria remain unchecked. Smooth translational paths, physical integration, broader interruption/recovery, handoff and synchronized video/lens controls need further implementation and evidence.
+
+## Counted encoder prerequisite
+
+`measureCountedCinemaEncoder(input)` in `cinema/counted-encoder.ts` differentiates integer
+encoder counts before converting to radians per second. Its fixed method metadata is exported
+as the frozen `cinemaCountedEncoderMethod`: 0.001 rad per count, 20 ms sampling and delay,
+and 0.05 rad/s per count difference. One count in either direction therefore meets the same
+strict `<= 0.05` rate predicate; two counts fail it. It does not round a reported rate or add
+an epsilon to that predicate.
+
+Input is exactly `{ current, previous }`. Each tick contains `sequence`, `capturedAtMs`,
+`receivedAtMs`, three integer `positionCounts` and boolean `limitSwitch`. Both ticks must match
+the global cadence beginning at sequence 1, received 600 ms and captured 580 ms. The first
+previous tick is null; later ticks require the immediately preceding tick. Counts are bounded
+to +/-8,000 and reject negative zero. Plain own enumerable data and ordinary dense tuples
+are required. Malformed data throws `cinema-counted-encoder-input`; constructed output or
+owned-producer invariant failure uses `cinema-unqualified-result`. Returned count, delta,
+position and rate tuples are detached. These declared inputs are simulated measurements,
+without authentication or hardware qualification.
+
+`createCountedCinemaGimbal()` in `cinema/gimbal.ts` is a separate owned producer over the same
+4 ms plant and unchanged PD law. It quantizes the actual delayed physical row into counts,
+canonicalizes zero and retains its current measured packet privately. Call `render(nowMs)`
+first, then `command(goal, nowMs)` once a differentiated rate exists. The command accepts no
+caller-supplied measured packet. Goals must be ordinary dense finite three-tuples inside the
+existing joint travel; invalid commands and epochs fail before changing the request. Repeated
+valid commands at the current epoch retain last-request-wins behavior.
+
+The counted producer's `rows` accessor, `current()`, `render()` and `tail()` return deep owned
+snapshots. Mutating them does not alter future feedback or plant state. `retire(nowMs)` stops
+requests at the current rendered epoch and `tail()` returns the actual 501-row residual
+motion calculation. The published `createCinemaGimbal()` retains its three-argument
+`command(goal, measured, nowMs)`, floating-radian differentiation and direct mutable `rows`
+alias. Its existing Cinema v1 and managed v2 callers continue to use that legacy measurement.
+The two concrete arms share one plant implementation; counted feedback can produce a
+different trajectory and is not an equality claim for the new arm.
+
+The counted packet remains bounded to 512 encoded bytes, with 768-byte plant rows, at most
+11,251 live rows, 501 tail rows and the unchanged 45,000 ms horizon. This prerequisite tests
+count/cadence semantics, actual owned producer behavior, command provenance, copying and
+legacy output compatibility. It adds no translating-camera consumer or CLI command. Camera
+readiness, moving images, full-flight acceptance, physical feedback, host-death protection
+and issue #26 completion require separate evidence. The original failed 1,600 ms translating
+camera result remains failed; no window, threshold, gain or dynamics was changed here.
