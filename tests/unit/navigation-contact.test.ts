@@ -4,6 +4,21 @@ import { createRigidBody } from '../../resources/functions/drone/controls/physic
 
 const binding = { vehicleId: 'navigation-vehicle', sessionId: '123', bootId: '55', reference: '55:0,0,0,0,0' }
 
+test('selected contact includes the exact circle and vertical switch edges and excludes just beyond each', () => {
+  // This unit quaternion rotates the shoe onto north with exactly zero down offset.
+  const truth = { ...createRigidBody().snapshot(), quaternionWxyz: [0.5, 0.5, 0.5, 0.5] as [number, number, number, number] }
+  const circle = contactGeometry({ ...truth, positionM: [0.15, 0.06, -0.003] })
+  expect(circle.shoeM).toEqual([0.25, 0.06, -0.003])
+  expect(circle.horizontalM).toBe(0.15)
+  expect(circle.bit).toBe(1)
+  expect(contactGeometry({ ...truth, positionM: [0.150000001, 0.06, -0.003] }).bit).toBe(0)
+  const vertical = contactGeometry({ ...truth, positionM: [0, 0.06, 0.002] })
+  expect(vertical.shoeM).toEqual([0.1, 0.06, 0.002])
+  expect(vertical.verticalM).toBe(0.005)
+  expect(vertical.bit).toBe(1)
+  expect(contactGeometry({ ...truth, positionM: [0, 0.06, 0.002000001] }).bit).toBe(0)
+})
+
 test('selected contact uses the transformed shoe circle and vertical switch with genuine bounded delayed samples', () => {
   const truth = createRigidBody({ positionM: [0.1, 0.06, -0.103] }).snapshot()
   expect(contactGeometry(truth).bit).toBe(1)
@@ -177,6 +192,34 @@ function completedContact(profile: ContactProfile) {
   expect(completed.contact!.phase).toBe('pending')
   return { session, completed }
 }
+
+test('a contact-enabled blocked flight never opens a contact window or admits a later flight after spooldown', () => {
+  const session = createNavigationOccurrenceSession({ contact: 'nominal', scenario: 'range-loss' })
+  session.advanceTo(2000)
+  expect(session.requestOccurrence({ id: 'first', issuedAtMs: 2000, decision: 'approve' }).state).toBe('queued')
+  const failed = session.advanceTo(8000)
+  expect(failed.mission.state).toBe('blocked')
+  expect(failed.occurrences[0]!.state).toBe('blocked')
+  expect(failed.board.motorsN).toEqual([0, 0, 0, 0])
+  expect(failed.plant.motorsN.every(n => n < 0.01)).toBe(true)
+  expect(failed.contact!.verification).toBeNull()
+  expect(failed.contact!.outcomes).toHaveLength(0)
+  expect(failed.contact!.currentEligibility).toBe(false)
+  expect(session.requestOccurrence({ id: 'after-failure', issuedAtMs: 8000, decision: 'approve' })).toEqual({ state: 'refused', reason: 'recovery-required' })
+  const tail = session.advanceTo(10000)
+  expect(tail.contact!.source.sequence).toBeGreaterThan(failed.contact!.source.sequence)
+  expect(tail.contact!.verification).toBeNull()
+  expect(tail.contact!.outcomes).toHaveLength(0)
+  expect(tail.contact!.currentEligibility).toBe(false)
+  expect(tail.occurrences[0]).toEqual(failed.occurrences[0])
+  expect(tail.occurrences[1]!.attemptedAtMs).toBeNull()
+  expect(tail.trace).toEqual(failed.trace)
+  expect(tail.terminal).toEqual(failed.terminal)
+  expect(tail.counts.armAccepted).toBe(1)
+  expect(tail.counts.engageAccepted).toBe(1)
+  expect(tail.counts.nonzeroAcceptedFrames).toBe(failed.counts.nonzeroAcceptedFrames)
+  expect(session.requestOccurrence({ id: 'after-failure', issuedAtMs: 10000, decision: 'approve' }).reason).toBe('occurrence-consumed')
+})
 
 test('actual missing contact waits its full own deadline and neutral tail without truncation or later retry', () => {
   const { session, completed } = completedContact('missing')
