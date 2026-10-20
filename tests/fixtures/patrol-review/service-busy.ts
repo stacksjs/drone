@@ -1,8 +1,5 @@
 import assert from 'node:assert/strict'
 import { Database } from 'bun:sqlite'
-import { Gate } from '@stacksjs/auth/gate'
-import { isInTransaction } from '@stacksjs/database/runtime'
-import { registerPersistentQueryHooks } from '@stacksjs/query-builder'
 import { openNativeFixture, intent, uuid } from './http-fixture'
 
 // A real independent SQLite writer after native preflight, not an Auth or DB stand-in.
@@ -11,6 +8,9 @@ async function main() {
   const writer = new Database(process.env.DB_DATABASE_PATH!)
   let held = false
   try {
+    const { Gate } = await import('@stacksjs/auth/gate')
+    const { isInTransaction } = await import('@stacksjs/database/runtime')
+    const { registerPersistentQueryHooks } = await import('@stacksjs/query-builder')
     const { token, userId } = await context.owner()
     const endpoint = '/api/patrol/reviews'
     assert.equal((await context.call('POST', endpoint, token.plainTextToken, intent)).status, 201)

@@ -1,13 +1,13 @@
 import assert from 'node:assert/strict'
-import { Gate } from '@stacksjs/auth/gate'
-import { isInTransaction, sqlDateTime } from '@stacksjs/database/runtime'
-import { registerPersistentQueryHooks } from '@stacksjs/query-builder'
-import { makeHash } from '@stacksjs/security'
 import { openNativeFixture, intent, uuid } from './http-fixture'
 
 async function main() {
   const context = await openNativeFixture()
   try {
+    const { Gate } = await import('@stacksjs/auth/gate')
+    const { isInTransaction, sqlDateTime } = await import('@stacksjs/database/runtime')
+    const { registerPersistentQueryHooks } = await import('@stacksjs/query-builder')
+    const { makeHash } = await import('@stacksjs/security')
     const { token, userId } = await context.owner()
     const created = await context.call('POST', '/api/patrol/reviews', token.plainTextToken, intent)
     assert.equal(created.status, 201)
