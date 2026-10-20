@@ -722,7 +722,26 @@
       11,
       7,
       9
-    ]
+    ],
+    "implementation": {
+      "status": "partial",
+      "implemented": [
+        "Owned carried-point-mass/CG physics through the existing multirotor loop",
+        "Centered/forward carriage, prescribed zero-ejection separation and native link-loss characterization",
+        "Strict typed library, bounded native CLI summary and exact legacy-output compatibility"
+      ],
+      "remaining": [
+        "Delivery mission, site and recipient confirmation, release mechanism/ACK and custody",
+        "Endurance reserves, alternates, redundant links, degraded navigation, containment, diversion and fleet handover",
+        "Separate operational authorization/detect-and-avoid and physical/HIL qualification"
+      ],
+      "evidence": [
+        "docs/cargo-load.md",
+        "tests/unit/controls.test.ts",
+        "tests/unit/cargo-load.test.ts",
+        "tests/unit/cargo-load-cli.test.ts"
+      ]
+    }
   },
   {
     "key": "cinema",

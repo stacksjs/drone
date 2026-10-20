@@ -73,6 +73,20 @@ These profiles use owned raw sensors, estimation, mission policy, controls and a
 outputs remain inhibited. Read the [shared contract](docs/vehicles.md), [air model](docs/vehicles-air.md),
 [ground model](docs/vehicles-ground.md) and [surface corrections](docs/vehicles-surface.md) and [subsea pressure/DVL inspection](docs/vehicles-subsea.md).
 
+## Simulated carried load
+
+Characterize a centered or forward point mass, a prescribed separation and native link loss through
+our existing multirotor sensor, estimator, control and authority loop.
+
+```sh
+./buddy cargo:load-bench --scenario forward-separated
+./buddy cargo:load-bench --scenario link-loss
+```
+
+Link loss is deliberately unqualified and exits 1. This is a [bounded physics prerequisite](docs/cargo-load.md)
+for [#25](https://github.com/stacksjs/drone/issues/25); delivery, physical release, custody and endurance
+qualification remain open.
+
 ## Agriculture sensing
 
 Open `/agriculture` to run owned crop scouting, inspect raw red/NIR calibration and source pixels,
