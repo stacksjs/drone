@@ -37,18 +37,20 @@ async function failureDiagnostics() {
         const value = document.querySelector(selector)?.textContent?.trim();
         return allowed.includes(value) ? value : null;
       };
-      const start = document.querySelector('[data-execution-start]');
+      const start = document.querySelector('[data-execution-start]'), admit = document.querySelector('[data-execution-admit]');
       return {
         workspaceStatus: selected('[data-workspace-status]', ['disconnected', 'connecting', 'synchronizing', 'current', 'reconnecting', 'refused']),
         executionPhase: selected('[data-execution-phase]', ['no current run', 'waiting-for-consumer', 'running', 'stopping', 'completed', 'canceled', 'failed', 'discarded']),
         hasExecutionId: !!document.querySelector('[data-execution-id]'), hasCompletion: !!document.querySelector('[data-execution-completion]'),
-        startDisabled: start ? start.disabled === true : null, hasExecutionError: !!document.querySelector('[data-execution-error]')
+        startDisabled: start ? start.disabled === true : null, admitDisabled: admit ? admit.disabled === true : null,
+        hasSourceExists: !!document.querySelector('[data-execution-source-exists]'), hasExecutionError: !!document.querySelector('[data-execution-error]')
       };
     })()`) : Promise.resolve(null)
     const collect = Promise.allSettled([snapshot(), dom]).then(([server, page]) => ({
       label: 'execution-browser-failure-diagnostics', phase, startBaseline,
       server: server.status === 'fulfilled' ? server.value : { available: false },
       dom: page.status === 'fulfilled' ? page.value : null, browserErrorCount: diagnosticPage?.errors.length ?? null,
+      admissionRequests: diagnosticPage ? diagnosticPage.requests.filter(request => request.method === 'POST' && request.url.endsWith('/workspace/execution/admission')).length : null,
     }))
     const captured = await Promise.race([collect, timeout])
     const text = `${JSON.stringify(captured ?? { label: 'execution-browser-failure-diagnostics', available: false })}\n`
