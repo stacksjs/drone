@@ -31,8 +31,10 @@ refused, denied and overlapping identities remain consumed. Only a completed mis
 with fresh grounded/stopped observations can admit another flight. Both flights share
 the same body, raw feeds, estimator, controller, supervisor, watchdog, absolute clock
 and nominal energy ledger. Completed per-occurrence results remain frozen and replayable.
-These are unsigned local fixture decisions. Docking, charging, recurrence, authenticated
-review, persistence and a patrol CLI remain open. See [ADR 27](adr/0027-retained-patrol-runtime.md).
+These are unsigned local fixture decisions. Optional `contact: 'nominal'` adds a modeled
+selected-pad contact check after completion. See [the contact model and its limits](patrol-contact.md).
+Charging, recurrence, authenticated review, persistence, a patrol CLI and physical docking
+remain open. See [ADR 27](adr/0027-retained-patrol-runtime.md).
 
 ## Data flow and references
 

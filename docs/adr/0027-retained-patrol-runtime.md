@@ -36,7 +36,19 @@ navigator and per-flight recording restart. The retained controller keeps its no
 Each request must leave the unchanged 84 second worst-case mission budget and 2 second tail.
 These unsigned fixture decisions do not establish authenticated operator permission.
 
-Build dock/contact/charge verification and recurrence in subsequent bounded steps.
+An optional closed contact profile adds a selected-pad switch renderer and post-completion
+verifier within the same two-occurrence lifetime. The renderer alone consumes body truth.
+The host requires fresh disarmed/neutral authority, captured grounded/stopped interlocks,
+estimated alignment including full map and covariance uncertainty, and distinct positive
+samples spanning 500 ms. The 5 second pending window starts only after completion and
+disarm/revoke. Verified history remains separate from continuously checked eligibility.
+Only accepted arm plus engage retires the prior live window. Host absence freezes host
+verification while source and independent board/body continue. Each contact-enabled
+request additionally reserves the full 5 second window; the 180 second ceiling stays fixed.
+See [the declared model and evidence](../patrol-contact.md). This is simulated contact,
+without charge permission, energy credit or physical validation.
+
+Build charge verification and recurrence in subsequent bounded steps.
 Scheduling must never grant actuator authority or silently retry a refused launch.
 Native Stacks commands and application services belong outside the synchronous control
 loop. Durable review/audit, weather interlocks, failed docking and recovery, HIL and
