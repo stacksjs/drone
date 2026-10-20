@@ -3,10 +3,11 @@
 The executable audit accounts for the 274 pinned PX4 module/driver and ArduPilot library directories
 and six ArduPilot vehicle programs. Directory assignment is work ownership. It is not feature parity.
 
-The retained matrix is [parity-audit.json](parity-audit.json). It currently contains **69 behavior
+The retained matrix is [parity-audit.json](parity-audit.json). It currently contains **79 behavior
 cases**, including **26 bounded support claims** backed by **25 distinct executable test selectors**
-and **43 explicitly unsupported cases**. There are **1,337 unclassified detail dimensions**.
-No upstream firmware SITL, HIL or physical-vehicle validation is claimed by this audit.
+and **53 explicitly unsupported cases**. There are **1,327 unclassified detail dimensions**.
+The audit retains **42 pinned source records**. No upstream firmware SITL, HIL or physical-vehicle
+validation is claimed by this audit.
 
 Every assignment classifies parameters, modes, protocols, hardware and failures separately. A
 reviewed dimension means it has at least one concrete source-backed case. The `remaining` field
@@ -110,6 +111,18 @@ modeled joints, encoders and still exposures. It does not implement those firmwa
 manager ownership/discovery, normalized AUX/servo outputs, electrical behavior or device health
 policies. Generic command/parameter transport also does not supply gimbal-specific semantics.
 These cases add source-backed gaps without new executable support or firmware execution claims.
+
+Ten further unsupported cases sample pinned PX4 `camera_feedback` and `camera_capture`:
+live report-flag gating, geotag orientation selection, uORB capture/control records, feedback-source
+selection, strobe timing, pin backends and input rejection/rate faults. Four new source records
+preserve exact citations; the prior 69 cases and 38 sources stay unchanged. The feedback tag does
+not authenticate physical exposure, and the downstream MAVLink streamer remains unreviewed.
+Upstream explicitly marks capture modes 1 and 2 not fully tested; their actual exposure/sequence
+arithmetic is not treated as an ideal midpoint model. The rate counter decays on acceptable
+intervals and its fuse applies to the timer callback, not the separate GPIO path. A control ACK does
+not prove hardware enablement. Board wiring, electrical/timing calibration, PPS/RTC mapping and
+queue/restart behavior remain deeper work. The owned IMX500 first-row metadata, scoped capture
+ACK/pose association and modeled shutter remain separate capabilities, with no new parity claim.
 
 Unreviewed parameters, full firmware mode sets, serial/CAN/electrical variants, redundant estimators,
 real output paths, simulator campaigns and hardware evidence remain visible gaps owned by their

@@ -58,15 +58,15 @@
     {
       "entry": "px4:src/modules/camera_feedback",
       "issueKey": "payloads",
-      "unclassified": [
+      "unclassified": [],
+      "reviewed": [
         "parameters",
         "modes",
         "protocols",
         "hardware",
         "failures"
       ],
-      "reviewed": [],
-      "remaining": "Additional parameters, modes, protocol variants, hardware branches and failure paths require source review and independent evidence. Reviewed dimensions contain sampled behavior cases, not exhaustive equivalence."
+      "remaining": "Sampled live-report parameter, geotag orientation mode, capture-topic conversion, feedback-source selection and nonzero-input failure cases are reviewed gaps, not exhaustive equivalence. Parameter lifecycle, queued trigger ordering, pose/terrain freshness and frame calibration, complete MAVLink streaming, callback/work-queue/restart behavior and real feedback wiring remain unreviewed or unsupported. No upstream firmware, SITL, HIL or physical evidence is retained."
     },
     {
       "entry": "px4:src/modules/commander",
@@ -871,15 +871,15 @@
     {
       "entry": "px4:src/drivers/camera_capture",
       "issueKey": "payloads",
-      "unclassified": [
+      "unclassified": [],
+      "reviewed": [
         "parameters",
         "modes",
         "protocols",
         "hardware",
         "failures"
       ],
-      "reviewed": [],
-      "remaining": "Additional parameters, modes, protocol variants, hardware branches and failure paths require source review and independent evidence. Reviewed dimensions contain sampled behavior cases, not exhaustive equivalence."
+      "remaining": "Sampled strobe-delay parameter, timestamp mode branches, capture-control command/ACK, pin-backend selection and high-rate interrupt fuse are reviewed gaps, not exhaustive equivalence. Full edge/delay constraints, board macros and low-level capture drivers, PPS/RTC UTC mapping and clock discontinuities, exposure/sequence arithmetic, GPIO enable/disable behavior, overflow/statistics, allocation/restart/queue races and physical timing/electrical validation remain unreviewed or unsupported. Upstream labels modes 1 and 2 not fully tested; no firmware, SITL, HIL or physical evidence is retained."
     },
     {
       "entry": "px4:src/drivers/camera_trigger",
@@ -4259,6 +4259,54 @@
       "url": "https://github.com/ArduPilot/ardupilot/blob/afeb9c4941543d97f3e04fecf257b8f598f49a6a/libraries/AP_Mount/AP_Mount_Servo.cpp",
       "license": "GPL-3.0-or-later",
       "licenseSource": "https://github.com/ArduPilot/ardupilot/blob/afeb9c4941543d97f3e04fecf257b8f598f49a6a/COPYING.txt"
+    },
+    {
+      "id": "px4:src/modules/camera_feedback/CameraFeedback.cpp",
+      "upstream": "px4",
+      "path": "src/modules/camera_feedback/CameraFeedback.cpp",
+      "revision": "ddcaad6601be20453ec6acd0f08e567af3a7e1bb",
+      "blobSha": "877d70797942efab260255e7ae19052dcebb515f",
+      "sha256": "796ba20c151776b6dfcc9ba26cf2d4f71b31049c65ef19f1d6e042443e3783d8",
+      "lines": 257,
+      "url": "https://github.com/PX4/PX4-Autopilot/blob/ddcaad6601be20453ec6acd0f08e567af3a7e1bb/src/modules/camera_feedback/CameraFeedback.cpp",
+      "license": "BSD-3-Clause",
+      "licenseSource": "https://github.com/PX4/PX4-Autopilot/blob/ddcaad6601be20453ec6acd0f08e567af3a7e1bb/LICENSE"
+    },
+    {
+      "id": "px4:src/modules/camera_feedback/camera_feedback_params.yaml",
+      "upstream": "px4",
+      "path": "src/modules/camera_feedback/camera_feedback_params.yaml",
+      "revision": "ddcaad6601be20453ec6acd0f08e567af3a7e1bb",
+      "blobSha": "8f98420b9909150cfd3335b222075bd270cf6211",
+      "sha256": "47daada250edb670c8d3d3777a96370b42a52686d22c5903294d34bcfcad5436",
+      "lines": 18,
+      "url": "https://github.com/PX4/PX4-Autopilot/blob/ddcaad6601be20453ec6acd0f08e567af3a7e1bb/src/modules/camera_feedback/camera_feedback_params.yaml",
+      "license": "BSD-3-Clause",
+      "licenseSource": "https://github.com/PX4/PX4-Autopilot/blob/ddcaad6601be20453ec6acd0f08e567af3a7e1bb/LICENSE"
+    },
+    {
+      "id": "px4:src/drivers/camera_capture/camera_capture.cpp",
+      "upstream": "px4",
+      "path": "src/drivers/camera_capture/camera_capture.cpp",
+      "revision": "ddcaad6601be20453ec6acd0f08e567af3a7e1bb",
+      "blobSha": "843020902089f79140ca4440a34a5882106e1f16",
+      "sha256": "6fc409590240c754bcd03bc1ed0e172deeb20cbe26d775f73b548a504bc93c04",
+      "lines": 480,
+      "url": "https://github.com/PX4/PX4-Autopilot/blob/ddcaad6601be20453ec6acd0f08e567af3a7e1bb/src/drivers/camera_capture/camera_capture.cpp",
+      "license": "BSD-3-Clause",
+      "licenseSource": "https://github.com/PX4/PX4-Autopilot/blob/ddcaad6601be20453ec6acd0f08e567af3a7e1bb/LICENSE"
+    },
+    {
+      "id": "px4:src/drivers/camera_capture/camera_capture_params.yaml",
+      "upstream": "px4",
+      "path": "src/drivers/camera_capture/camera_capture_params.yaml",
+      "revision": "ddcaad6601be20453ec6acd0f08e567af3a7e1bb",
+      "blobSha": "0ab50066f3bedd3e261a60d6a6d3d1a97fa4a5bf",
+      "sha256": "8e629027c6e5ba8935b5daf39cf7e232e2e69ac7798828f12dabbcee08fe5cd2",
+      "lines": 45,
+      "url": "https://github.com/PX4/PX4-Autopilot/blob/ddcaad6601be20453ec6acd0f08e567af3a7e1bb/src/drivers/camera_capture/camera_capture_params.yaml",
+      "license": "BSD-3-Clause",
+      "licenseSource": "https://github.com/PX4/PX4-Autopilot/blob/ddcaad6601be20453ec6acd0f08e567af3a7e1bb/LICENSE"
     }
   ],
   "cases": [
@@ -5973,6 +6021,321 @@
       "limitations": [
         "Cinema does not consume AP GIMBAL_DEVICE error flags, device-information discovery, one-second attitude health or AP pre-arm checks. Cinema target-loss/vehicle RC abort is not AP RC-failsafe neutral/zero-rate behavior, three-second SysID freshness or three-second rate-command timeout.",
         "No upstream firmware SITL, HIL or physical vehicle evidence is retained for this case."
+      ]
+    },
+    {
+      "id": "px4-camera-feedback-report-parameter-gap",
+      "entry": "px4:src/modules/camera_feedback",
+      "dimension": "parameters",
+      "behavior": "PX4 CAM_CAP_REPORT live parameter gating of capture reporting, while retaining the camera_capture publication, is unsupported.",
+      "support": "unsupported",
+      "sources": [
+        {
+          "source": "px4:src/modules/camera_feedback/camera_feedback_params.yaml",
+          "line": 5,
+          "symbol": "CAM_CAP_REPORT:"
+        },
+        {
+          "source": "px4:src/modules/camera_feedback/CameraFeedback.cpp",
+          "line": 81,
+          "symbol": "if (_parameter_update_sub.updated())"
+        },
+        {
+          "source": "px4:src/modules/camera_feedback/CameraFeedback.cpp",
+          "line": 175,
+          "symbol": "capture.report = (_cam_cap_report != 0);"
+        }
+      ],
+      "evidence": [],
+      "limitations": [
+        "Generic parameter exchange is separate from this module-specific live-update/report-gate behavior. The sampled sources set a report flag; actual ground-station streaming is not independently reviewed here.",
+        "No upstream firmware execution, SITL, HIL, physical exposure feedback or executable parity evidence is retained for this gap."
+      ]
+    },
+    {
+      "id": "px4-camera-feedback-attitude-mode-gap",
+      "entry": "px4:src/modules/camera_feedback",
+      "dimension": "modes",
+      "behavior": "PX4 geotag orientation selection between a fresh yaw-locked gimbal quaternion, vehicle-heading-composed yaw-follow gimbal quaternion and vehicle-attitude fallback is unsupported.",
+      "support": "unsupported",
+      "sources": [
+        {
+          "source": "px4:src/modules/camera_feedback/CameraFeedback.cpp",
+          "line": 138,
+          "symbol": "if (_gimbal_sub.copy(&gimbal) && (hrt_elapsed_time(&gimbal.timestamp) < 1_s))"
+        },
+        {
+          "source": "px4:src/modules/camera_feedback/CameraFeedback.cpp",
+          "line": 139,
+          "symbol": "if (gimbal.device_flags & gimbal_device_attitude_status_s::DEVICE_FLAGS_YAW_LOCK)"
+        },
+        {
+          "source": "px4:src/modules/camera_feedback/CameraFeedback.cpp",
+          "line": 153,
+          "symbol": "q_gimbal = q_heading * q_gimbal;"
+        },
+        {
+          "source": "px4:src/modules/camera_feedback/CameraFeedback.cpp",
+          "line": 162,
+          "symbol": "// No gimbal orientation, use vehicle attitude"
+        }
+      ],
+      "evidence": [],
+      "limitations": [
+        "Owned relative-yaw pose association and synthetic Cinema joint geometry do not implement this PX4 topic/frame/freshness selection. This case concerns recorded orientation, not physical gimbal actuation or calibrated absolute heading.",
+        "No upstream firmware execution, SITL, HIL, physical exposure feedback or executable parity evidence is retained for this gap."
+      ]
+    },
+    {
+      "id": "px4-camera-feedback-capture-topic-gap",
+      "entry": "px4:src/modules/camera_feedback",
+      "dimension": "protocols",
+      "behavior": "PX4 camera_trigger-to-camera_capture uORB conversion carrying trigger/UTC epochs and sequence, global position, terrain distance, orientation, result and report flag is unsupported.",
+      "support": "unsupported",
+      "sources": [
+        {
+          "source": "px4:src/modules/camera_feedback/CameraFeedback.cpp",
+          "line": 117,
+          "symbol": "capture.timestamp = trig.timestamp;"
+        },
+        {
+          "source": "px4:src/modules/camera_feedback/CameraFeedback.cpp",
+          "line": 124,
+          "symbol": "capture.lat = gpos.lat;"
+        },
+        {
+          "source": "px4:src/modules/camera_feedback/CameraFeedback.cpp",
+          "line": 128,
+          "symbol": "if (gpos.terrain_alt_valid)"
+        },
+        {
+          "source": "px4:src/modules/camera_feedback/CameraFeedback.cpp",
+          "line": 177,
+          "symbol": "_capture_pub.publish(capture);"
+        }
+      ],
+      "evidence": [],
+      "limitations": [
+        "The owned local versioned capture/ACK protocol is separate. No direct CAMERA_IMAGE_CAPTURED encoder/streamer implementation is established by these anchors, and forwarded epochs are not exposure calibration.",
+        "No upstream firmware execution, SITL, HIL, physical exposure feedback or executable parity evidence is retained for this gap."
+      ]
+    },
+    {
+      "id": "px4-camera-feedback-hardware-source-gap",
+      "entry": "px4:src/modules/camera_feedback",
+      "dimension": "hardware",
+      "behavior": "PX4 selection of feedback-tagged camera-capture events over commanded-trigger events when CAM_CAP_FBACK is enabled is unsupported.",
+      "support": "unsupported",
+      "sources": [
+        {
+          "source": "px4:src/modules/camera_feedback/CameraFeedback.cpp",
+          "line": 44,
+          "symbol": "_p_cam_cap_fback = param_find(\"CAM_CAP_FBACK\");"
+        },
+        {
+          "source": "px4:src/modules/camera_feedback/CameraFeedback.cpp",
+          "line": 109,
+          "symbol": "if ((_cam_cap_fback >= 1) && !trig.feedback)"
+        },
+        {
+          "source": "px4:src/modules/camera_feedback/CameraFeedback.cpp",
+          "line": 235,
+          "symbol": "`CameraTrigger` topics are published by the `camera_trigger` module (`feedback` field set `false`)"
+        }
+      ],
+      "evidence": [],
+      "limitations": [
+        "This module consumes the feedback tag; it does not itself latch a pin or authenticate that a physical exposure occurred. The separate IMX500 first-row metadata path and modeled synchronous shutter are not this PX4 hardware-feedback source policy.",
+        "No upstream firmware execution, SITL, HIL, physical exposure feedback or executable parity evidence is retained for this gap."
+      ]
+    },
+    {
+      "id": "px4-camera-feedback-invalid-input-gap",
+      "entry": "px4:src/modules/camera_feedback",
+      "dimension": "failures",
+      "behavior": "PX4 camera_feedback suppression of capture publication until trigger, global-position and vehicle-attitude timestamps are all nonzero is unsupported.",
+      "support": "unsupported",
+      "sources": [
+        {
+          "source": "px4:src/modules/camera_feedback/CameraFeedback.cpp",
+          "line": 101,
+          "symbol": "if (trig.timestamp == 0 ||"
+        },
+        {
+          "source": "px4:src/modules/camera_feedback/CameraFeedback.cpp",
+          "line": 105,
+          "symbol": "// reject until we have valid data"
+        }
+      ],
+      "evidence": [],
+      "limitations": [
+        "Owned validation has different scoped identity/clock/pose rejection semantics. The PX4 check shown is a nonzero-epoch gate, not a proof of measurement freshness, calibrated georeferencing or sensor health.",
+        "No upstream firmware execution, SITL, HIL, physical exposure feedback or executable parity evidence is retained for this gap."
+      ]
+    },
+    {
+      "id": "px4-camera-capture-delay-parameter-gap",
+      "entry": "px4:src/drivers/camera_capture",
+      "dimension": "parameters",
+      "behavior": "PX4 CAM_CAP_DELAY strobe-delay parameter and its subtraction from captured edge timing are unsupported.",
+      "support": "unsupported",
+      "sources": [
+        {
+          "source": "px4:src/drivers/camera_capture/camera_capture_params.yaml",
+          "line": 5,
+          "symbol": "CAM_CAP_DELAY:"
+        },
+        {
+          "source": "px4:src/drivers/camera_capture/camera_capture.cpp",
+          "line": 65,
+          "symbol": "_p_strobe_delay = param_find(\"CAM_CAP_DELAY\");"
+        },
+        {
+          "source": "px4:src/drivers/camera_capture/camera_capture.cpp",
+          "line": 160,
+          "symbol": "trigger.timestamp = _trigger.hrt_edge_time - uint64_t(1000 * _strobe_delay);"
+        }
+      ],
+      "evidence": [],
+      "limitations": [
+        "The sampled parameter declares 0 to 100 ms with 0 ms default. This is not equivalent to the owned clock-offset mapping or modeled ACK delay, and no physical strobe-delay calibration is claimed.",
+        "No upstream firmware execution, SITL, HIL, physical exposure feedback or executable parity evidence is retained for this gap."
+      ]
+    },
+    {
+      "id": "px4-camera-capture-timestamp-mode-gap",
+      "entry": "px4:src/drivers/camera_capture",
+      "dimension": "modes",
+      "behavior": "PX4 CAM_CAP_MODE absolute-edge and active-high/active-low mid-exposure timestamp branches are unsupported.",
+      "support": "unsupported",
+      "sources": [
+        {
+          "source": "px4:src/drivers/camera_capture/camera_capture_params.yaml",
+          "line": 25,
+          "symbol": "CAM_CAP_MODE:"
+        },
+        {
+          "source": "px4:src/drivers/camera_capture/camera_capture.cpp",
+          "line": 158,
+          "symbol": "// MODES 1 and 2 are not fully tested"
+        },
+        {
+          "source": "px4:src/drivers/camera_capture/camera_capture.cpp",
+          "line": 166,
+          "symbol": "} else if (_camera_capture_mode == 1) { // Get timestamp of mid-exposure (active high)"
+        },
+        {
+          "source": "px4:src/drivers/camera_capture/camera_capture.cpp",
+          "line": 179,
+          "symbol": "} else { // Get timestamp of mid-exposure (active low)"
+        }
+      ],
+      "evidence": [],
+      "limitations": [
+        "The source explicitly labels modes 1 and 2 not fully tested. These are retained branch semantics, not validated timing equivalence or an idealized corrected midpoint algorithm. IMX500 sensor-first-row and fixture timestamps are distinct references.",
+        "No upstream firmware execution, SITL, HIL, physical exposure feedback or executable parity evidence is retained for this gap."
+      ]
+    },
+    {
+      "id": "px4-camera-capture-control-protocol-gap",
+      "entry": "px4:src/drivers/camera_capture",
+      "dimension": "protocols",
+      "behavior": "PX4 uORB VEHICLE_CMD_DO_TRIGGER_CONTROL handling for capture enable/disable and sequence reset, with an accepted command ACK addressed to the source system/component, is unsupported.",
+      "support": "unsupported",
+      "sources": [
+        {
+          "source": "px4:src/drivers/camera_capture/camera_capture.cpp",
+          "line": 240,
+          "symbol": "if (cmd.command == vehicle_command_s::VEHICLE_CMD_DO_TRIGGER_CONTROL)"
+        },
+        {
+          "source": "px4:src/drivers/camera_capture/camera_capture.cpp",
+          "line": 252,
+          "symbol": "if (commandParamToInt(cmd.param2) == 1)"
+        },
+        {
+          "source": "px4:src/drivers/camera_capture/camera_capture.cpp",
+          "line": 262,
+          "symbol": "command_ack.result = (uint8_t)vehicle_command_ack_s::VEHICLE_CMD_RESULT_ACCEPTED;"
+        },
+        {
+          "source": "px4:src/drivers/camera_capture/camera_capture.cpp",
+          "line": 266,
+          "symbol": "_command_ack_pub.publish(command_ack);"
+        }
+      ],
+      "evidence": [],
+      "limitations": [
+        "This samples in-module command and ACK handling, not a separately reviewed MAVLink wire decoder or guarantee that accepted ACK proves successful hardware enablement. Owned one-shot image ACKs and generic transport commands do not implement this control lifecycle.",
+        "No upstream firmware execution, SITL, HIL, physical exposure feedback or executable parity evidence is retained for this gap."
+      ]
+    },
+    {
+      "id": "px4-camera-capture-pin-backend-gap",
+      "entry": "px4:src/drivers/camera_capture",
+      "dimension": "hardware",
+      "behavior": "PX4 Camera_Capture output-function channel selection and input-capture callback backend, with a BOARD_CAPTURE_GPIO fallback when no channel is configured, are unsupported.",
+      "support": "unsupported",
+      "sources": [
+        {
+          "source": "px4:src/drivers/camera_capture/camera_capture.cpp",
+          "line": 81,
+          "symbol": "if (function == 2032) { // Camera_Capture see mixer_module/output_functions.yaml parameter metadata definition"
+        },
+        {
+          "source": "px4:src/drivers/camera_capture/camera_capture.cpp",
+          "line": 275,
+          "symbol": "#if defined(BOARD_CAPTURE_GPIO)"
+        },
+        {
+          "source": "px4:src/drivers/camera_capture/camera_capture.cpp",
+          "line": 278,
+          "symbol": "px4_arch_gpiosetevent(BOARD_CAPTURE_GPIO, true, false, true, &CameraCapture::gpio_interrupt_routine, this);"
+        },
+        {
+          "source": "px4:src/drivers/camera_capture/camera_capture.cpp",
+          "line": 300,
+          "symbol": "int ret = up_input_capture_set_callback(_capture_channel, callback, context);"
+        }
+      ],
+      "evidence": [],
+      "limitations": [
+        "Owned GPIO configuration envelopes provide no input-capture executor. This source review establishes no supported board/pin, electrical compatibility, interrupt latency or safe physical camera wiring; board definitions and low-level capture drivers remain unreviewed.",
+        "No upstream firmware execution, SITL, HIL, physical exposure feedback or executable parity evidence is retained for this gap."
+      ]
+    },
+    {
+      "id": "px4-camera-capture-rate-fault-gap",
+      "entry": "px4:src/drivers/camera_capture",
+      "dimension": "failures",
+      "behavior": "PX4 input-capture high-rate fault handling that increments a counter for edge intervals below 200 microseconds and disables future interrupts once the counter exceeds 100 is unsupported.",
+      "support": "unsupported",
+      "sources": [
+        {
+          "source": "px4:src/drivers/camera_capture/camera_capture.cpp",
+          "line": 99,
+          "symbol": "if ((edge_time - _trigger.hrt_edge_time) < 200_us)"
+        },
+        {
+          "source": "px4:src/drivers/camera_capture/camera_capture.cpp",
+          "line": 102,
+          "symbol": "if (_trigger_rate_exceeded_counter > 100)"
+        },
+        {
+          "source": "px4:src/drivers/camera_capture/camera_capture.cpp",
+          "line": 105,
+          "symbol": "up_input_capture_set(_capture_channel, Disabled, 0, nullptr, nullptr);"
+        },
+        {
+          "source": "px4:src/drivers/camera_capture/camera_capture.cpp",
+          "line": 151,
+          "symbol": "events::send(events::ID(\"camera_capture_trigger_rate_exceeded\"),"
+        }
+      ],
+      "evidence": [],
+      "limitations": [
+        "The counter decreases on acceptable intervals, so this is not described as 101 consecutive events. This is the input-capture callback path, not a demonstrated guard on the separate GPIO interrupt routine. Owned capture timeouts/lost-ACK models do not establish this interrupt-rate fuse.",
+        "No upstream firmware execution, SITL, HIL, physical exposure feedback or executable parity evidence is retained for this gap."
       ]
     }
   ]
