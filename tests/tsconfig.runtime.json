@@ -83,6 +83,7 @@
     "./unit/application-*.test.ts",
     "../resources/functions/drone/public-safety/**/*.ts",
     "./unit/public-safety-*.test.ts",
-    "./fixtures/public-safety-access/**/*.ts"
+    "./fixtures/public-safety-access/**/*.ts",
+    "./helpers/execution-browser-driver.ts"
   ]
 }

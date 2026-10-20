@@ -19,9 +19,53 @@ await mkdir(evidence, { recursive: true })
 let phase = 'initialization'
 const mark = (next: string) => { phase = next; console.log(`Execution browser phase: ${next}`) }
 const watchdog = setTimeout(() => { console.error('Execution browser watchdog expired'); void browser.close().finally(() => process.exit(1)) }, 85000)
+let diagnosticPage: Awaited<ReturnType<typeof browser.page>> | undefined
+let startBaseline: number | null = null
+async function failureDiagnostics() {
+  const abort = new AbortController()
+  let timer: ReturnType<typeof setTimeout> | undefined
+  const timeout = new Promise<null>(resolve => { timer = setTimeout(() => resolve(null), 1000) })
+  try {
+    const snapshot = async () => {
+      const response = await fetch(`${data.url}/__fixture/diagnostics`, { headers: { 'x-fixture-control': data.control }, signal: abort.signal })
+      if (!response.ok) return { available: false }
+      // The private fixture constructs only closed scalars and checks its own byte ceiling.
+      return response.json()
+    }
+    const dom = diagnosticPage ? diagnosticPage.evaluate(`(() => {
+      const selected = (selector, allowed) => {
+        const value = document.querySelector(selector)?.textContent?.trim();
+        return allowed.includes(value) ? value : null;
+      };
+      const start = document.querySelector('[data-execution-start]');
+      return {
+        workspaceStatus: selected('[data-workspace-status]', ['disconnected', 'connecting', 'synchronizing', 'current', 'reconnecting', 'refused']),
+        executionPhase: selected('[data-execution-phase]', ['no current run', 'waiting-for-consumer', 'running', 'stopping', 'completed', 'canceled', 'failed', 'discarded']),
+        hasExecutionId: !!document.querySelector('[data-execution-id]'), hasCompletion: !!document.querySelector('[data-execution-completion]'),
+        startDisabled: start ? start.disabled === true : null, hasExecutionError: !!document.querySelector('[data-execution-error]')
+      };
+    })()`) : Promise.resolve(null)
+    const collect = Promise.allSettled([snapshot(), dom]).then(([server, page]) => ({
+      label: 'execution-browser-failure-diagnostics', phase, startBaseline,
+      server: server.status === 'fulfilled' ? server.value : { available: false },
+      dom: page.status === 'fulfilled' ? page.value : null, browserErrorCount: diagnosticPage?.errors.length ?? null,
+    }))
+    const captured = await Promise.race([collect, timeout])
+    const text = `${JSON.stringify(captured ?? { label: 'execution-browser-failure-diagnostics', available: false })}\n`
+    console.error(Buffer.byteLength(text, 'utf8') <= 8192 ? text.trimEnd() : '{"label":"execution-browser-failure-diagnostics","available":false}')
+  }
+  catch { console.error('{"label":"execution-browser-failure-diagnostics","available":false}') }
+  finally {
+    clearTimeout(timer)
+    abort.abort()
+    // The owned socket close rejects pending CDP commands and clears their timers in the existing helper.
+    diagnosticPage?.close()
+  }
+}
 try {
   mark('connect original owner')
   const first = await browser.page(`${data.url}/incidents`)
+  diagnosticPage = first
   const connect = async (page: typeof first, credential: string) => {
     await page.fill('#incident-key', data.key); await page.fill('#incident-token', credential); await page.click('Connect incident')
     await page.wait("document.querySelector('[data-workspace-status]')?.textContent.trim() === 'current'", 'Native execution owner must connect')
@@ -70,6 +114,7 @@ try {
   await first.click('Discard temporary result')
   await first.wait("!document.querySelector('[data-execution-id]') && !document.querySelector('[data-execution-start]')?.disabled", 'Acknowledged finished discard releases this caller')
   await control('before-admission')
+  startBaseline = typeof baseline.startRequests === 'number' ? baseline.startRequests : null
   await first.fill('#execution-scenario', 'nominal'); await first.fill('#execution-seconds', '100')
   await first.click('Start synthetic run')
   mark('real nominal100 completion')
@@ -108,5 +153,10 @@ try {
   assert.equal(await first.evaluate("!!document.querySelector('[data-execution-id]') || document.body.textContent.includes(" + JSON.stringify(digest) + ")"), false)
   console.log('PASS actual execution browser: native live-before-return/GET renewal/stop/completion/explicit admission/read-only/revocation')
 }
-catch (error) { console.error(`Execution browser original failure at ${phase}:`, error instanceof Error ? error.message : 'unknown failure'); throw error }
+catch (error) {
+  console.error(`Execution browser original failure at ${phase}:`, error instanceof Error ? error.message : 'unknown failure')
+  try { await failureDiagnostics() }
+  catch { /* Keep the exact original failure even if diagnostic cleanup is unavailable. */ }
+  throw error
+}
 finally { clearTimeout(watchdog); await browser.close() }
