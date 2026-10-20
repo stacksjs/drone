@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "reviewedAt": "2026-10-18",
+  "reviewedAt": "2026-10-20",
   "assignments": [
     {
       "entry": "px4:src/modules/airship_att_control",
@@ -242,15 +242,15 @@
     {
       "entry": "px4:src/modules/gimbal",
       "issueKey": "payloads",
-      "unclassified": [
+      "unclassified": [],
+      "reviewed": [
         "parameters",
         "modes",
         "protocols",
         "hardware",
         "failures"
       ],
-      "reviewed": [],
-      "remaining": "Additional parameters, modes, protocol variants, hardware branches and failure paths require source review and independent evidence. Reviewed dimensions contain sampled behavior cases, not exhaustive equivalence."
+      "remaining": "Sampled gimbal parameter, input-mode, protocol-routing, AUX-output and timeout cases are reviewed gaps, not exhaustive equivalence. Full parameter constraints/reload semantics, RC arbitration, ROI frames/projection, landed limits, v1/v2 device and external-manager state/restart/error paths, parallel outputs, servo calibration/electrical behavior and firmware campaigns remain unreviewed or unsupported. The owned Cinema hover model is separate from these modes and backends. No upstream firmware SITL, HIL or physical vehicle evidence is retained."
     },
     {
       "entry": "px4:src/modules/gyro_calibration",
@@ -2725,15 +2725,15 @@
     {
       "entry": "ardupilot:libraries/AP_Mount",
       "issueKey": "payloads",
-      "unclassified": [
+      "unclassified": [],
+      "reviewed": [
         "parameters",
         "modes",
         "protocols",
         "hardware",
         "failures"
       ],
-      "reviewed": [],
-      "remaining": "Additional parameters, modes, protocol variants, hardware branches and failure paths require source review and independent evidence. Reviewed dimensions contain sampled behavior cases, not exhaustive equivalence."
+      "remaining": "Sampled mount parameter, mode, command-routing, servo-backend and health/failsafe cases are reviewed gaps, not exhaustive equivalence. Full per-instance parameter conversions/persistence, target frames and location modes, manager identity/state, vendor serial/CAN/scripting backends, telemetry/error variants, servo calibration/electrical behavior and firmware campaigns remain unreviewed or unsupported. The owned Cinema hover model is separate from AP_Mount modes and backends. No upstream firmware SITL, HIL or physical vehicle evidence is retained."
     },
     {
       "entry": "ardupilot:libraries/AP_MultiHeap",
@@ -4139,6 +4139,126 @@
       "url": "https://github.com/PX4/PX4-Autopilot/blob/ddcaad6601be20453ec6acd0f08e567af3a7e1bb/src/drivers/camera_trigger/camera_trigger_params.yaml",
       "license": "BSD-3-Clause",
       "licenseSource": "https://github.com/PX4/PX4-Autopilot/blob/ddcaad6601be20453ec6acd0f08e567af3a7e1bb/LICENSE"
+    },
+    {
+      "id": "px4:src/modules/gimbal/gimbal.cpp",
+      "upstream": "px4",
+      "path": "src/modules/gimbal/gimbal.cpp",
+      "revision": "ddcaad6601be20453ec6acd0f08e567af3a7e1bb",
+      "blobSha": "5ac76eea4da617d703927bf442ad0bbc9ce99a74",
+      "sha256": "7ec243bb890a9a0e895fa3643c5b7c8963809ce7e8942e6bd90de239ec597f04",
+      "lines": 689,
+      "url": "https://github.com/PX4/PX4-Autopilot/blob/ddcaad6601be20453ec6acd0f08e567af3a7e1bb/src/modules/gimbal/gimbal.cpp",
+      "license": "BSD-3-Clause",
+      "licenseSource": "https://github.com/PX4/PX4-Autopilot/blob/ddcaad6601be20453ec6acd0f08e567af3a7e1bb/LICENSE"
+    },
+    {
+      "id": "px4:src/modules/gimbal/gimbal_params.yaml",
+      "upstream": "px4",
+      "path": "src/modules/gimbal/gimbal_params.yaml",
+      "revision": "ddcaad6601be20453ec6acd0f08e567af3a7e1bb",
+      "blobSha": "373b4c86615c13ca2ff54726b70936ebb285fbdd",
+      "sha256": "54790785a9373f13f25dc024783503e18e3ffff6a68c3dd6a540cde4349ff92f",
+      "lines": 246,
+      "url": "https://github.com/PX4/PX4-Autopilot/blob/ddcaad6601be20453ec6acd0f08e567af3a7e1bb/src/modules/gimbal/gimbal_params.yaml",
+      "license": "BSD-3-Clause",
+      "licenseSource": "https://github.com/PX4/PX4-Autopilot/blob/ddcaad6601be20453ec6acd0f08e567af3a7e1bb/LICENSE"
+    },
+    {
+      "id": "px4:src/modules/gimbal/input_mavlink.cpp",
+      "upstream": "px4",
+      "path": "src/modules/gimbal/input_mavlink.cpp",
+      "revision": "ddcaad6601be20453ec6acd0f08e567af3a7e1bb",
+      "blobSha": "83f51b0dd8c223d531f7b667cfd060c8f6c79b6e",
+      "sha256": "9678dce8335167ad9fef41c6564b651cdb9c83112f96f3aa0b03a4f98318b001",
+      "lines": 1048,
+      "url": "https://github.com/PX4/PX4-Autopilot/blob/ddcaad6601be20453ec6acd0f08e567af3a7e1bb/src/modules/gimbal/input_mavlink.cpp",
+      "license": "BSD-3-Clause",
+      "licenseSource": "https://github.com/PX4/PX4-Autopilot/blob/ddcaad6601be20453ec6acd0f08e567af3a7e1bb/LICENSE"
+    },
+    {
+      "id": "px4:src/modules/gimbal/output.cpp",
+      "upstream": "px4",
+      "path": "src/modules/gimbal/output.cpp",
+      "revision": "ddcaad6601be20453ec6acd0f08e567af3a7e1bb",
+      "blobSha": "fce2ad8a4b84d5bcbe6fd23285e6354dc3a5e2eb",
+      "sha256": "bc336acd308ac3140289aebfee5eb984e856a737ef6cbf277fad475b0ad381af",
+      "lines": 359,
+      "url": "https://github.com/PX4/PX4-Autopilot/blob/ddcaad6601be20453ec6acd0f08e567af3a7e1bb/src/modules/gimbal/output.cpp",
+      "license": "BSD-3-Clause",
+      "licenseSource": "https://github.com/PX4/PX4-Autopilot/blob/ddcaad6601be20453ec6acd0f08e567af3a7e1bb/LICENSE"
+    },
+    {
+      "id": "px4:src/modules/gimbal/output_rc.cpp",
+      "upstream": "px4",
+      "path": "src/modules/gimbal/output_rc.cpp",
+      "revision": "ddcaad6601be20453ec6acd0f08e567af3a7e1bb",
+      "blobSha": "fd290bfcf61effa522716bacdd2ee8e92f446eac",
+      "sha256": "45dbb3de61eec2ebbc13b6be6aa15b831475396a9bfd327a7932b3d3e9895d11",
+      "lines": 233,
+      "url": "https://github.com/PX4/PX4-Autopilot/blob/ddcaad6601be20453ec6acd0f08e567af3a7e1bb/src/modules/gimbal/output_rc.cpp",
+      "license": "BSD-3-Clause",
+      "licenseSource": "https://github.com/PX4/PX4-Autopilot/blob/ddcaad6601be20453ec6acd0f08e567af3a7e1bb/LICENSE"
+    },
+    {
+      "id": "ardupilot:libraries/AP_Mount/AP_Mount.cpp",
+      "upstream": "ardupilot",
+      "path": "libraries/AP_Mount/AP_Mount.cpp",
+      "revision": "afeb9c4941543d97f3e04fecf257b8f598f49a6a",
+      "blobSha": "353eb6c703222047fb25e5e132a66a0fe72fee5b",
+      "sha256": "988e92b1940f010539f025bccbe26fa7998cdd0e5079d14e0d5da1a71271e681",
+      "lines": 1178,
+      "url": "https://github.com/ArduPilot/ardupilot/blob/afeb9c4941543d97f3e04fecf257b8f598f49a6a/libraries/AP_Mount/AP_Mount.cpp",
+      "license": "GPL-3.0-or-later",
+      "licenseSource": "https://github.com/ArduPilot/ardupilot/blob/afeb9c4941543d97f3e04fecf257b8f598f49a6a/COPYING.txt"
+    },
+    {
+      "id": "ardupilot:libraries/AP_Mount/AP_Mount_Params.cpp",
+      "upstream": "ardupilot",
+      "path": "libraries/AP_Mount/AP_Mount_Params.cpp",
+      "revision": "afeb9c4941543d97f3e04fecf257b8f598f49a6a",
+      "blobSha": "d862c7a1aca14742b4ba84457a3b46c5a72447e9",
+      "sha256": "d2769e01e72014ac43a28adc3189e45e26f5f3c956dd0cc938d568cc48eb29aa",
+      "lines": 202,
+      "url": "https://github.com/ArduPilot/ardupilot/blob/afeb9c4941543d97f3e04fecf257b8f598f49a6a/libraries/AP_Mount/AP_Mount_Params.cpp",
+      "license": "GPL-3.0-or-later",
+      "licenseSource": "https://github.com/ArduPilot/ardupilot/blob/afeb9c4941543d97f3e04fecf257b8f598f49a6a/COPYING.txt"
+    },
+    {
+      "id": "ardupilot:libraries/AP_Mount/AP_Mount_Backend.cpp",
+      "upstream": "ardupilot",
+      "path": "libraries/AP_Mount/AP_Mount_Backend.cpp",
+      "revision": "afeb9c4941543d97f3e04fecf257b8f598f49a6a",
+      "blobSha": "f8e92744a4a4289d4cb709e25496f1a7300836cb",
+      "sha256": "efbe3422118a3f89666219c207569027ca8abc84502ba4ed6342e913f68576f9",
+      "lines": 1486,
+      "url": "https://github.com/ArduPilot/ardupilot/blob/afeb9c4941543d97f3e04fecf257b8f598f49a6a/libraries/AP_Mount/AP_Mount_Backend.cpp",
+      "license": "GPL-3.0-or-later",
+      "licenseSource": "https://github.com/ArduPilot/ardupilot/blob/afeb9c4941543d97f3e04fecf257b8f598f49a6a/COPYING.txt"
+    },
+    {
+      "id": "ardupilot:libraries/AP_Mount/AP_Mount_MAVLink.cpp",
+      "upstream": "ardupilot",
+      "path": "libraries/AP_Mount/AP_Mount_MAVLink.cpp",
+      "revision": "afeb9c4941543d97f3e04fecf257b8f598f49a6a",
+      "blobSha": "8d5b0c162c410daffed0ea8ecbc697f8571ed2a7",
+      "sha256": "dbd21d3dc69b327a61b1448fb87d9f0b7aa5986d1d69a0e4d818fd3585b6b371",
+      "lines": 396,
+      "url": "https://github.com/ArduPilot/ardupilot/blob/afeb9c4941543d97f3e04fecf257b8f598f49a6a/libraries/AP_Mount/AP_Mount_MAVLink.cpp",
+      "license": "GPL-3.0-or-later",
+      "licenseSource": "https://github.com/ArduPilot/ardupilot/blob/afeb9c4941543d97f3e04fecf257b8f598f49a6a/COPYING.txt"
+    },
+    {
+      "id": "ardupilot:libraries/AP_Mount/AP_Mount_Servo.cpp",
+      "upstream": "ardupilot",
+      "path": "libraries/AP_Mount/AP_Mount_Servo.cpp",
+      "revision": "afeb9c4941543d97f3e04fecf257b8f598f49a6a",
+      "blobSha": "c98677433358fea5a797b772eac76bf21f890fce",
+      "sha256": "bcb3d65148cdfc1681a398ca507caf6e24090b1e4d90ff68a3893cb2c93b347f",
+      "lines": 163,
+      "url": "https://github.com/ArduPilot/ardupilot/blob/afeb9c4941543d97f3e04fecf257b8f598f49a6a/libraries/AP_Mount/AP_Mount_Servo.cpp",
+      "license": "GPL-3.0-or-later",
+      "licenseSource": "https://github.com/ArduPilot/ardupilot/blob/afeb9c4941543d97f3e04fecf257b8f598f49a6a/COPYING.txt"
     }
   ],
   "cases": [
@@ -5572,6 +5692,286 @@
       "evidence": [],
       "limitations": [
         "Only the stated owned analog is tested. Upstream configuration and full algorithm equivalence are not claimed.",
+        "No upstream firmware SITL, HIL or physical vehicle evidence is retained for this case."
+      ]
+    },
+    {
+      "id": "px4-gimbal-parameter-routing-gap",
+      "entry": "px4:src/modules/gimbal",
+      "dimension": "parameters",
+      "behavior": "PX4 MNT input/output/parallel-output selection, stabilization/range/rate/landed-pitch/filter parameter semantics are not implemented as an owned gimbal parameter module. Generic driver parameter exchange is separate.",
+      "support": "unsupported",
+      "sources": [
+        {
+          "source": "px4:src/modules/gimbal/gimbal_params.yaml",
+          "line": 5,
+          "symbol": "MNT_MODE_IN"
+        },
+        {
+          "source": "px4:src/modules/gimbal/gimbal_params.yaml",
+          "line": 48,
+          "symbol": "MNT_MODE_OUT2"
+        },
+        {
+          "source": "px4:src/modules/gimbal/gimbal_params.yaml",
+          "line": 197,
+          "symbol": "MNT_TAU"
+        }
+      ],
+      "evidence": [],
+      "limitations": [
+        "Generic PARAM read/write can carry names; no MNT-specific configuration, reboot/routing/range/filter semantics are established by those transport tests. Cinema constants are a fixed synthetic model, not firmware parameter defaults or calibration.",
+        "No upstream firmware SITL, HIL or physical vehicle evidence is retained for this case."
+      ]
+    },
+    {
+      "id": "px4-gimbal-input-mode-gap",
+      "entry": "px4:src/modules/gimbal",
+      "dimension": "modes",
+      "behavior": "PX4 Auto/RC/legacy ROI/legacy mount/v2/fixed input arbitration and configurable frame-stabilization modes are unavailable in the owned Cinema profile.",
+      "support": "unsupported",
+      "sources": [
+        {
+          "source": "px4:src/modules/gimbal/gimbal.cpp",
+          "line": 141,
+          "symbol": "switch (params.mnt_mode_in)"
+        },
+        {
+          "source": "px4:src/modules/gimbal/gimbal.cpp",
+          "line": 291,
+          "symbol": "switch (params.mnt_do_stab)"
+        }
+      ],
+      "evidence": [],
+      "limitations": [
+        "Cinema is one fixed local hover POI reframe; it does not implement PX4 AUTO/RC arbitration, world/body lock selection, legacy ROI or fixed input modes. Do not equate Cinema vehicle RC authority abort with gimbal input-mode takeover.",
+        "No upstream firmware SITL, HIL or physical vehicle evidence is retained for this case."
+      ]
+    },
+    {
+      "id": "px4-gimbal-manager-protocol-gap",
+      "entry": "px4:src/modules/gimbal",
+      "dimension": "protocols",
+      "behavior": "PX4 legacy mount, gimbal device v2 discovery/set-attitude and external-manager acquisition/release/status routing are not exposed as a gimbal-specific driver/session.",
+      "support": "unsupported",
+      "sources": [
+        {
+          "source": "px4:src/modules/gimbal/input_mavlink.cpp",
+          "line": 835,
+          "symbol": "VEHICLE_CMD_DO_GIMBAL_MANAGER_CONFIGURE"
+        },
+        {
+          "source": "px4:src/modules/gimbal/input_mavlink.cpp",
+          "line": 920,
+          "symbol": "VEHICLE_CMD_DO_GIMBAL_MANAGER_PITCHYAW"
+        },
+        {
+          "source": "px4:src/modules/gimbal/gimbal.cpp",
+          "line": 111,
+          "symbol": "MNT_MODE_OUT_TO_GIMBAL_MANAGER"
+        }
+      ],
+      "evidence": [],
+      "limitations": [
+        "Generic finite COMMAND_LONG/ACK transport is not a gimbal-manager/device-specific discovery, ownership, routing or feedback implementation. Cinema ACKs are private modeled still-exposure receipts, not MAVLink mount/manager/device acknowledgements.",
+        "No upstream firmware SITL, HIL or physical vehicle evidence is retained for this case."
+      ]
+    },
+    {
+      "id": "px4-gimbal-aux-device-output-gap",
+      "entry": "px4:src/modules/gimbal",
+      "dimension": "hardware",
+      "behavior": "PX4 AUX normalized gimbal_controls output, servo-function assignment, range mapping and command-derived device-attitude status publication are not implemented or physically qualified by this app.",
+      "support": "unsupported",
+      "sources": [
+        {
+          "source": "px4:src/modules/gimbal/output_rc.cpp",
+          "line": 52,
+          "symbol": "OutputRC::update"
+        },
+        {
+          "source": "px4:src/modules/gimbal/output_rc.cpp",
+          "line": 124,
+          "symbol": "OutputRC::anglesMappedToOutput"
+        }
+      ],
+      "evidence": [],
+      "limitations": [
+        "Bus configuration inventory is not an AUX/PWM backend, servo-function assignment, electrical timing or real device feedback. Cinema uses torque-slewed relative joint physics and delayed quantized modeled encoders, not normalized AUX servo output.",
+        "No upstream firmware SITL, HIL or physical vehicle evidence is retained for this case."
+      ]
+    },
+    {
+      "id": "px4-gimbal-command-timeout-gap",
+      "entry": "px4:src/modules/gimbal",
+      "dimension": "failures",
+      "behavior": "PX4 two-second stale angular-rate zeroing, unauthorized-manager command denial and conflicting parallel-output rejection are not reproduced by Cinema target-stale/authority-abort rules.",
+      "support": "unsupported",
+      "sources": [
+        {
+          "source": "px4:src/modules/gimbal/output.cpp",
+          "line": 86,
+          "symbol": "OutputBase::check_and_handle_setpoint_timeout"
+        },
+        {
+          "source": "px4:src/modules/gimbal/gimbal.cpp",
+          "line": 203,
+          "symbol": "MNT_MODE_OUT2 must differ"
+        },
+        {
+          "source": "px4:src/modules/gimbal/input_mavlink.cpp",
+          "line": 948,
+          "symbol": "VEHICLE_CMD_RESULT_DENIED"
+        }
+      ],
+      "evidence": [],
+      "limitations": [
+        "PX4 zeros finite stale angular velocities after more than two seconds; Cinema instead latches target-stale at age greater than100 ms and aborts its native simulation instrument. No equivalence to PX4 unauthorized command handling, parallel-output conflict rejection or physical neutral behavior is claimed.",
+        "No upstream firmware SITL, HIL or physical vehicle evidence is retained for this case."
+      ]
+    },
+    {
+      "id": "ap-mount-parameter-backend-gap",
+      "entry": "ardupilot:libraries/AP_Mount",
+      "dimension": "parameters",
+      "behavior": "ArduPilot MNT instance type/default mode, RC/range/neutral/retract/lead/options/attitude-send/target-refresh parameter semantics are not an owned mount parameter system. Generic PARAM transport does not supply that behavior.",
+      "support": "unsupported",
+      "sources": [
+        {
+          "source": "ardupilot:libraries/AP_Mount/AP_Mount_Params.cpp",
+          "line": 16,
+          "symbol": "AP_GROUPINFO_FLAGS"
+        },
+        {
+          "source": "ardupilot:libraries/AP_Mount/AP_Mount_Params.cpp",
+          "line": 175,
+          "symbol": "AP_GROUPINFO"
+        },
+        {
+          "source": "ardupilot:libraries/AP_Mount/AP_Mount_Params.cpp",
+          "line": 194,
+          "symbol": "AP_GROUPINFO"
+        }
+      ],
+      "evidence": [],
+      "limitations": [
+        "Generic PARAM transport does not establish AP_Mount instance parameter meaning, conversion, persistence, defaults, reboot semantics or vendor response. Cinema travel, damping, gains and clocks are fixed synthetic assumptions, not MNT parameter compatibility.",
+        "No upstream firmware SITL, HIL or physical vehicle evidence is retained for this case."
+      ]
+    },
+    {
+      "id": "ap-mount-mode-family-gap",
+      "entry": "ardupilot:libraries/AP_Mount",
+      "dimension": "modes",
+      "behavior": "ArduPilot retract/neutral/MAVLink/RC/GPS/SysID/home/next-waypoint target modes and default-mode transitions are not implemented by the closed hover-POI Cinema profile.",
+      "support": "unsupported",
+      "sources": [
+        {
+          "source": "ardupilot:libraries/AP_Mount/AP_Mount_Backend.cpp",
+          "line": 1271,
+          "symbol": "switch (get_mode())"
+        },
+        {
+          "source": "ardupilot:libraries/AP_Mount/AP_Mount.cpp",
+          "line": 278,
+          "symbol": "AP_Mount::set_mode_to_default"
+        }
+      ],
+      "evidence": [],
+      "limitations": [
+        "A fixed local selected prop and explicit shot lifecycle do not implement AP mount mode selection/default restoration, GPS/SysID/home/waypoint tracking or operator handoff. Earth/body frame conventions and units must be designed per backend rather than inferred from one Cinema quaternion composition.",
+        "No upstream firmware SITL, HIL or physical vehicle evidence is retained for this case."
+      ]
+    },
+    {
+      "id": "ap-mount-manager-device-protocol-gap",
+      "entry": "ardupilot:libraries/AP_Mount",
+      "dimension": "protocols",
+      "behavior": "ArduPilot mount command routing, manager configure identity/deconfliction, gimbal discovery/feedback and device attitude/rate/location transmission are not a gimbal-specific app protocol backend.",
+      "support": "unsupported",
+      "sources": [
+        {
+          "source": "ardupilot:libraries/AP_Mount/AP_Mount.cpp",
+          "line": 589,
+          "symbol": "AP_Mount::handle_command"
+        },
+        {
+          "source": "ardupilot:libraries/AP_Mount/AP_Mount_Backend.cpp",
+          "line": 619,
+          "symbol": "AP_Mount_Backend::handle_command_do_gimbal_manager_configure"
+        },
+        {
+          "source": "ardupilot:libraries/AP_Mount/AP_Mount_MAVLink.cpp",
+          "line": 331,
+          "symbol": "AP_Mount_MAVLink::send_target_angles"
+        }
+      ],
+      "evidence": [],
+      "limitations": [
+        "Existing generic command/parameter support does not supply mount instance routing, sender control identity, device discovery/feedback or device messages. A private camera shutter ACK is not a gimbal-manager ownership or device-set-attitude ACK; physical commands remain inhibited.",
+        "No upstream firmware SITL, HIL or physical vehicle evidence is retained for this case."
+      ]
+    },
+    {
+      "id": "ap-mount-servo-backend-output-gap",
+      "entry": "ardupilot:libraries/AP_Mount",
+      "dimension": "hardware",
+      "behavior": "ArduPilot compile-time-selected mount backends and SRV_Channels servo/brushless output semantics, vendor serial/CAN behavior and device feedback are not implemented or electrically qualified in this app.",
+      "support": "unsupported",
+      "sources": [
+        {
+          "source": "ardupilot:libraries/AP_Mount/AP_Mount.cpp",
+          "line": 132,
+          "symbol": "Type::BrushlessPWM"
+        },
+        {
+          "source": "ardupilot:libraries/AP_Mount/AP_Mount_Servo.cpp",
+          "line": 158,
+          "symbol": "AP_Mount_Servo::move_servo"
+        }
+      ],
+      "evidence": [],
+      "limitations": [
+        "Selected backend constructors prove an upstream branch exists, not every vendor electrical/protocol detail or current app support. AP servo reported attitude is demanded output without physical feedback; Cinema modeled encoder feedback cannot qualify that hardware path.",
+        "No upstream firmware SITL, HIL or physical vehicle evidence is retained for this case."
+      ]
+    },
+    {
+      "id": "ap-mount-health-failsafe-gap",
+      "entry": "ardupilot:libraries/AP_Mount",
+      "dimension": "failures",
+      "behavior": "ArduPilot mount pre-arm type/health checks, MAVLink feedback freshness/error-flag health, RC failsafe neutral-or-zero-rate behavior and stale sysid/rate policies are not covered by Cinema fixture fault handling.",
+      "support": "unsupported",
+      "sources": [
+        {
+          "source": "ardupilot:libraries/AP_Mount/AP_Mount.cpp",
+          "line": 739,
+          "symbol": "AP_Mount::pre_arm_checks"
+        },
+        {
+          "source": "ardupilot:libraries/AP_Mount/AP_Mount_MAVLink.cpp",
+          "line": 58,
+          "symbol": "AP_Mount_MAVLink::healthy"
+        },
+        {
+          "source": "ardupilot:libraries/AP_Mount/AP_Mount_Backend.cpp",
+          "line": 107,
+          "symbol": "AP_Mount_Backend::update_mnt_target_from_rc_target"
+        },
+        {
+          "source": "ardupilot:libraries/AP_Mount/AP_Mount_Backend.cpp",
+          "line": 19,
+          "symbol": "AP_MOUNT_SYSID_TIMEOUT_MS"
+        },
+        {
+          "source": "ardupilot:libraries/AP_Mount/AP_Mount_Backend.cpp",
+          "line": 1289,
+          "symbol": "mnt_target.last_rate_request_ms > 3000"
+        }
+      ],
+      "evidence": [],
+      "limitations": [
+        "Cinema does not consume AP GIMBAL_DEVICE error flags, device-information discovery, one-second attitude health or AP pre-arm checks. Cinema target-loss/vehicle RC abort is not AP RC-failsafe neutral/zero-rate behavior, three-second SysID freshness or three-second rate-command timeout.",
         "No upstream firmware SITL, HIL or physical vehicle evidence is retained for this case."
       ]
     }

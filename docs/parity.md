@@ -3,9 +3,9 @@
 The executable audit accounts for the 274 pinned PX4 module/driver and ArduPilot library directories
 and six ArduPilot vehicle programs. Directory assignment is work ownership. It is not feature parity.
 
-The retained matrix is [parity-audit.json](parity-audit.json). It currently contains **59 behavior
+The retained matrix is [parity-audit.json](parity-audit.json). It currently contains **69 behavior
 cases**, including **26 bounded support claims** backed by **25 distinct executable test selectors**
-and **33 explicitly unsupported cases**. There are **1,347 unclassified detail dimensions**.
+and **43 explicitly unsupported cases**. There are **1,337 unclassified detail dimensions**.
 No upstream firmware SITL, HIL or physical-vehicle validation is claimed by this audit.
 
 Every assignment classifies parameters, modes, protocols, hardware and failures separately. A
@@ -98,6 +98,19 @@ BMP280 acquisition/arithmetic, calibration and clock failure guards, complementa
 height estimates versus full EKF2/EKF3, rate PID/quad-X simulation, authority latches versus upstream
 arming modes, MAVLink ACK/parameter/mission subsets, camera trigger/ACK differences, and mission
 execution/recovery. All six ArduPilot vehicle mode families have explicit unsupported full-mode cases.
+Ten additional unsupported cases sample the pinned [PX4 gimbal module](https://github.com/PX4/PX4-Autopilot/tree/ddcaad6601be20453ec6acd0f08e567af3a7e1bb/src/modules/gimbal)
+and [ArduPilot AP_Mount library](https://github.com/ArduPilot/ardupilot/tree/afeb9c4941543d97f3e04fecf257b8f598f49a6a/libraries/AP_Mount),
+covering parameters, input/target modes, manager/device protocols, hardware outputs and failure
+policies. Their ten source records retain exact file hashes and line/symbol citations. The original
+59 cases and 26 support claims are unchanged. Both directories remain owned by payload issue #8;
+their reviewed dimensions retain explicit deeper work and do not constitute exhaustive review.
+
+The [owned Cinema simulation](cinema.md) implements a separate hover POI angular reframe with
+modeled joints, encoders and still exposures. It does not implement those firmware modes,
+manager ownership/discovery, normalized AUX/servo outputs, electrical behavior or device health
+policies. Generic command/parameter transport also does not supply gimbal-specific semantics.
+These cases add source-backed gaps without new executable support or firmware execution claims.
+
 Unreviewed parameters, full firmware mode sets, serial/CAN/electrical variants, redundant estimators,
 real output paths, simulator campaigns and hardware evidence remain visible gaps owned by their
 implementation issues.
