@@ -12,12 +12,12 @@ import { createRigidBody } from '../controls/physics'
 import { createPhysicsSensorFeed } from '../controls/sensors'
 import { createEstimator } from '../estimation/estimator'
 import { createSimulatedMultirotorController } from '../controls/controller'
-import { createMissionEngine, observeMission } from '../missions/engine'
+import { createMissionEngine, observeMission, missionLimits } from '../missions/engine'
 import { exampleMission, validateMission } from '../missions/plan'
 export const navigationScenarios = ['avoid-land', 'replan', 'range-loss', 'range-delay', 'position-loss', 'landing-loss', 'rc-override'] as const
 export type NavigationScenario = typeof navigationScenarios[number]
 /** One owned experiment. The legacy script is selected only by its fixed adapter below. */
-function createNavigationRuntime(options: { scenario?: NavigationScenario, seconds?: number }, legacy: boolean) {
+function createNavigationRuntime(options: { scenario?: NavigationScenario, seconds?: number }, legacy: boolean, multiple = false) {
   const scenario = options.scenario ?? 'avoid-land'
   const seconds = options.seconds ?? 70
   if (!navigationScenarios.includes(scenario) || !Number.isInteger(seconds) || seconds < 8 || seconds > 120) throw new RangeError('Invalid navigation scenario or duration (8..120 seconds)')
@@ -37,20 +37,20 @@ function createNavigationRuntime(options: { scenario?: NavigationScenario, secon
   const { plan, worstCaseMs, requiredWh } = validateMission(missionPlan)
   // The sensor fixture has this geodetic world origin. Other plans remain valid for policy replay only.
   if (plan.origin.latitudeDeg !== 0 || plan.origin.longitudeDeg !== 0 || plan.origin.ellipsoidHeightM !== 100) throw new TypeError('Physics fixture requires origin 0,0,100 WGS84 ellipsoid')
-  const engine = createMissionEngine(plan)
+  let engine = createMissionEngine(plan)
   const supervisor = createAuthoritySupervisor({ sessionId: 123n, bootId: 55n })
   const board = createSimulatedOutputWatchdog({ sessionId: 123n, bootId: 55n })
   const body = createRigidBody({ positionM: [0, 0, -0.1], groundDownM: -0.1, groundGradient: [-0.03, 0] })
   const feed = createPhysicsSensorFeed(0)
   const rangeFeed = createNavigationSensorFeed(scenario === 'range-delay' ? 240 : 60)
-  const navigator = createNavigator({ fenceRadiusM: plan.fence.radiusM, minDownM: plan.fence.minDownM })
+  let navigator = createNavigator({ fenceRadiusM: plan.fence.radiusM, minDownM: plan.fence.minDownM })
   let rangeMap: NavigationMap | null = null
   let navigation: NavigationDecision = { state: 'released', reason: 'not-started', targetM: null, route: [], marginM: null, perceptionAgeMs: null, mode: 'route', replans: 0, physicalFlightEnabled: false }
   let lastRangeSequence = 0
   let minTruthClearanceM = Infinity
   let maxLatencyMs = 0
   let detectionFault = false
-  const navTrace: { atMs: number, navigation: NavigationDecision, positionM: number[], truthPositionM: number[] }[] = []
+  let navTrace: { atMs: number, navigation: NavigationDecision, positionM: number[], truthPositionM: number[] }[] = []
   const estimator = createEstimator({ origin: plan.origin, gravityCorrection: 'initialization-only' })
   const controller = createSimulatedMultirotorController({ headingAlignment: 'initial-simulation-north' })
   let truth = body.snapshot()
@@ -60,9 +60,19 @@ function createNavigationRuntime(options: { scenario?: NavigationScenario, secon
   let mission: MissionSnapshot = engine.snapshot()
   let lastTask = ''
   let lastState = ''
-  const transitions: { atMs: number, taskId: string, state: string, reason: string }[] = []
-  const path: { atMs: number, estimatedPositionM: number[] | null, truthPositionM: number[], targetM: number[] | null, state: string, taskId: string }[] = []
-  const triggers: { atMs: number, taskId: string, channel: string, evidence: 'simulated-event' }[] = []
+  let transitions: { atMs: number, taskId: string, state: string, reason: string }[] = []
+  let path: { atMs: number, estimatedPositionM: number[] | null, truthPositionM: number[], targetM: number[] | null, state: string, taskId: string }[] = []
+  let triggers: { atMs: number, taskId: string, channel: string, evidence: 'simulated-event' }[] = []
+  // Two unchanged 84-second mission budgets plus 12 seconds of observation room.
+  const horizonMs = multiple ? 180000 : seconds * 1000
+  type Occurrence = {
+    id: string, issuedAtMs: number, decision: 'approve' | 'deny', requestedAtMs: number,
+    attemptedAtMs: number | null, startedAtMs: number | null, terminalAtMs: number | null,
+    state: 'queued' | 'refused' | 'running' | 'completed' | 'blocked' | 'aborted', reason: string,
+    binding: string | null, result: ReturnType<typeof project> | null,
+  }
+  const occurrences: Occurrence[] = []
+  let queuedOccurrence: Occurrence | null = null, currentOccurrence: Occurrence | null = null
   const counts = { hostUpdates: 0, controllerUpdates: 0, boardAccepts: 0, boardRevokes: 0, nonzeroAcceptedFrames: 0, armAccepted: 0, engageAccepted: 0 }
   let lastTickMs = -4, lastHostAtMs: number | null = null
   // Nominal powered-time proxy only. No idle-current, charge or endurance measurement.
@@ -124,16 +134,70 @@ function createNavigationRuntime(options: { scenario?: NavigationScenario, secon
       return decision
     }
     supervisor.update(observation)
+    const control = () => {
+      const imuObservation = sensors.sensors.find(s => s.kind === 'imu')?.observation
+      const measurement = imuObservation?.value as ImuMeasurement | undefined
+      counts.controllerUpdates++
+      return controller.step({ kind: 'simulation', enabled: supervisor.snapshot().state === 'autonomous', nowMs, estimate, angularRateRadS: measurement?.angularRateRadS ?? [0, 0, 0], rateCapturedAtMs: imuObservation?.estimatedCaptureMs ?? -Infinity, target: { positionM: supervisor.snapshot().target?.positionM ?? [0, 0, 0], yawRad: 0, issuedAtMs: nowMs } })
+    }
+    let explicitAction: MissionAction | undefined
+    if (multiple && queuedOccurrence) {
+      const occurrence = queuedOccurrence
+      queuedOccurrence = null
+      occurrence.attemptedAtMs = nowMs
+      occurrence.state = 'refused'
+      const qualification = qualifyOccurrence(nowMs)
+      if (nowMs - occurrence.issuedAtMs > authorityPolicy.commandAgeMs) occurrence.reason = 'approval-expired'
+      else if (nowMs + worstCaseMs + 2000 > horizonMs) occurrence.reason = 'insufficient-session-time'
+      else if (!qualification.binding || qualification.binding !== occurrence.binding) occurrence.reason = qualification.reason || 'launch-binding-changed'
+      else {
+        const armed = send('arm')
+        occurrence.reason = armed.reason
+        if (armed.commandAccepted) {
+          const engaged = send('engage', [0, 0, 0])
+          occurrence.reason = engaged.reason
+          if (engaged.commandAccepted) {
+            // Only now promote the new flight. Physical collaborators/clock/energy remain.
+            engine = createMissionEngine(plan)
+            navigator = createNavigator({ fenceRadiusM: plan.fence.radiusM, minDownM: plan.fence.minDownM })
+            mission = engine.snapshot()
+            navigation = { state: 'released', reason: 'not-started', targetM: null, route: [], marginM: null, perceptionAgeMs: null, mode: 'route', replans: 0, physicalFlightEnabled: false }
+            navTrace = []
+            transitions = []
+            path = []
+            triggers = []
+            minTruthClearanceM = Infinity
+            lastTask = ''
+            lastState = ''
+            terminal = null
+            terminalAtMs = null
+            terminalPlant = null
+            currentOccurrence = occurrence
+            occurrence.state = 'running'
+            occurrence.startedAtMs = nowMs
+            start.state = 'started'
+            start.requestedAtMs = occurrence.requestedAtMs
+            start.attemptedAtMs = nowMs
+            start.reason = engaged.reason
+            explicitAction = 'start'
+          }
+          else {
+            send('disarm')
+            revoke()
+          }
+        }
+      }
+    }
     // This fixture is an explicit operator script. The mission engine never arms itself.
     if (legacy && nowMs === 600) {
       send('arm')
       send('engage', [0, 0, 0])
     }
     if (terminal) {
+      if (multiple) control()
       revoke()
       return
     }
-    let explicitAction: MissionAction | undefined
     if (!legacy && start.state === 'queued') {
       start.attemptedAtMs = nowMs
       start.state = 'refused'
@@ -155,7 +219,10 @@ function createNavigationRuntime(options: { scenario?: NavigationScenario, secon
         }
       }
     }
-    if (!legacy && mission.state === 'ready' && explicitAction !== 'start') return
+    if (!legacy && mission.state === 'ready' && explicitAction !== 'start') {
+      if (multiple) control()
+      return
+    }
     const missionInput = observeMission({ estimate, authority: supervisor.snapshot().state, batteryPercent, onGround: observation.interlocks.onGround })
     const action: MissionAction | undefined = legacy && nowMs === 600 ? 'start' : explicitAction
     mission = engine.step(missionInput, action)
@@ -170,10 +237,7 @@ function createNavigationRuntime(options: { scenario?: NavigationScenario, secon
       send('disarm')
       revoke()
     }
-    const imuObservation = sensors.sensors.find(s => s.kind === 'imu')?.observation
-    const measurement = imuObservation?.value as ImuMeasurement | undefined
-    counts.controllerUpdates++
-    const output = controller.step({ kind: 'simulation', enabled: supervisor.snapshot().state === 'autonomous', nowMs, estimate, angularRateRadS: measurement?.angularRateRadS ?? [0, 0, 0], rateCapturedAtMs: imuObservation?.estimatedCaptureMs ?? -Infinity, target: { positionM: supervisor.snapshot().target?.positionM ?? [0, 0, 0], yawRad: 0, issuedAtMs: nowMs } })
+    const output = control()
     const frame = supervisor.gate(output, nowMs)
     if (frame) {
       if (board.accept(frame, nowMs)) {
@@ -193,6 +257,12 @@ function createNavigationRuntime(options: { scenario?: NavigationScenario, secon
       terminal = project()
       terminalAtMs = nowMs
       terminalPlant = truth
+      if (currentOccurrence) {
+        currentOccurrence.state = mission.state as 'completed' | 'blocked' | 'aborted'
+        currentOccurrence.reason = mission.reason
+        currentOccurrence.terminalAtMs = nowMs
+        currentOccurrence.result = structuredClone(terminal)
+      }
     }
   }
   function project() { return { evidence: 'owned-navigation-physics-simulation' as const, physicalFlightEnabled: false, boardOutputsInhibited: true, scenario, mission, navigation, metrics: { minTruthClearanceM, maxLatencyMs, detectionFault, precisionLandingErrorM: Math.hypot(truth.positionM[0] - 0.1, truth.positionM[1] - 0.06) }, navTrace, budget: { worstCaseMs, requiredWh }, transitions, triggers, path, trace: engine.trace(), authority: supervisor.snapshot(), board: board.snapshot(), finalTruthPositionM: truth.positionM } }
@@ -205,8 +275,8 @@ function createNavigationRuntime(options: { scenario?: NavigationScenario, secon
       energy: { usedWh, remainingWh: plan.power.availableWh - usedWh, model: 'nominal-hover-load-while-powered' as const, idleLoadMeasured: false as const, chargingEnabled: false as const },
     })
   }
-  function advanceTo(nowMs: number) {
-    if (!Number.isSafeInteger(nowMs) || nowMs < Math.max(0, lastTickMs) || nowMs > seconds * 1000 || nowMs % 4 !== 0) {
+  function advanceClock(nowMs: number) {
+    if (!Number.isSafeInteger(nowMs) || nowMs < Math.max(0, lastTickMs) || nowMs > horizonMs || nowMs % 4 !== 0) {
       endHost('invalid-session-clock')
       throw new RangeError('Navigation session clock must be monotonic, aligned and bounded')
     }
@@ -214,6 +284,9 @@ function createNavigationRuntime(options: { scenario?: NavigationScenario, secon
       lastTickMs = at
       tick(at)
     }
+  }
+  function advanceTo(nowMs: number) {
+    advanceClock(nowMs)
     return snapshot()
   }
   function requestStart() {
@@ -236,9 +309,58 @@ function createNavigationRuntime(options: { scenario?: NavigationScenario, secon
     start.reason = 'awaiting-next-host-tick'
     return { state: 'queued' as const, reason: start.reason }
   }
+  function qualifyOccurrence(nowMs: number): { binding: string | null, reason: string } {
+    const a = supervisor.snapshot(), b = board.snapshot()
+    if (!hostAvailable) return { binding: null, reason: 'host-unavailable' }
+    if (currentOccurrence && (!terminal || mission.state !== 'completed')) return { binding: null, reason: terminal ? 'recovery-required' : 'occurrence-busy' }
+    if (a.state !== 'disarmed' || b.fault !== null || b.motorsN.some(n => n !== 0)) return { binding: null, reason: 'authority-not-neutral' }
+    const observation = observeMission({ estimate, authority: a.state, batteryPercent: 100 - usedWh / plan.power.availableWh * 100, onGround: truth.groundContact })
+    const takeoff = plan.tasks.find(task => task.id === plan.start)!
+    const goal = 'positionM' in takeoff ? takeoff.positionM : plan.rallyM
+    if (lastHostAtMs === null || nowMs - lastHostAtMs > authorityPolicy.interlockAgeMs || estimate.nowMs !== nowMs || estimate.bootId !== a.bootId || b.bootId !== a.bootId || !observation.healthy || !truth.groundContact || truth.motorsN.some(n => n >= 0.01) || Math.hypot(...observation.velocityMps) >= 0.3 || Math.hypot(observation.positionM[0] - goal[0], observation.positionM[1] - goal[1]) > missionLimits.acceptanceM || Math.abs(observation.positionM[2]) > 0.2 || observation.batteryPercent < plan.power.reservePercent + requiredWh / plan.power.availableWh * 100) return { binding: null, reason: 'unqualified-launch-observation' }
+    if (scenario === 'rc-override' && nowMs >= 5000) return { binding: null, reason: 'rc-override' }
+    return { binding: JSON.stringify([plan, scenario, String(a.sessionId), String(a.bootId), observation.reference, observation.origin]), reason: '' }
+  }
+  function requestOccurrence(input: unknown) {
+    if (!input || typeof input !== 'object' || Array.isArray(input) || Object.keys(input).length !== 3 || Object.keys(input).some(key => !['id', 'issuedAtMs', 'decision'].includes(key))) {
+      endHost('invalid-occurrence-request')
+      throw new TypeError('Invalid manual occurrence request')
+    }
+    const value = input as { id: string, issuedAtMs: number, decision: 'approve' | 'deny' }
+    if (typeof value.id !== 'string' || !/^[a-z][a-z0-9-]{0,39}$/.test(value.id) || !Number.isSafeInteger(value.issuedAtMs) || value.issuedAtMs < 0 || !['approve', 'deny'].includes(value.decision)) {
+      endHost('invalid-occurrence-request')
+      throw new TypeError('Invalid manual occurrence request')
+    }
+    if (occurrences.some(item => item.id === value.id)) return { state: 'refused' as const, reason: 'occurrence-consumed' }
+    if (occurrences.length >= 2) return { state: 'refused' as const, reason: 'occurrence-capacity' }
+    const nowMs = Math.max(0, lastTickMs)
+    const item: Occurrence = { ...value, requestedAtMs: nowMs, attemptedAtMs: null, startedAtMs: null, terminalAtMs: null, state: 'refused', reason: '', binding: null, result: null }
+    occurrences.push(item)
+    const qualification = qualifyOccurrence(nowMs)
+    if (value.decision === 'deny') item.reason = 'operator-denied'
+    else if (value.issuedAtMs > nowMs || nowMs - value.issuedAtMs > authorityPolicy.commandAgeMs) item.reason = 'approval-expired-or-future'
+    else if (queuedOccurrence) item.reason = 'occurrence-busy'
+    else if (!qualification.binding) item.reason = qualification.reason
+    else if (nowMs + 20 + worstCaseMs + 2000 > horizonMs) item.reason = 'insufficient-session-time'
+    else {
+      item.binding = qualification.binding
+      item.state = 'queued'
+      item.reason = 'awaiting-next-host-tick'
+      queuedOccurrence = item
+    }
+    return { state: item.state as 'queued' | 'refused', reason: item.reason }
+  }
+  function snapshotOccurrences() {
+    return { ...snapshot(), horizonMs, occurrences: structuredClone(occurrences) }
+  }
   function endHost(reason: string) {
     hostAvailable = false
     hostUnavailableReason ??= reason
+    if (queuedOccurrence) {
+      queuedOccurrence.state = 'refused'
+      queuedOccurrence.reason = 'host-unavailable-before-attempt'
+      queuedOccurrence = null
+    }
     if (start.state === 'queued') {
       start.state = 'refused'
       start.reason = 'host-unavailable-before-attempt'
@@ -246,7 +368,7 @@ function createNavigationRuntime(options: { scenario?: NavigationScenario, secon
     // No final host update, controller output, disarm or revoke. Only the board can expire.
     return snapshot()
   }
-  return { advanceTo, snapshot, requestStart, stopHost: () => endHost('host-silent'), tick, project, ended: () => terminal !== null }
+  return { advanceTo, advanceClock, snapshot, snapshotOccurrences, requestOccurrence, requestStart, stopHost: () => endHost('host-silent'), tick, project, ended: () => terminal !== null }
 }
 /** Private single-flight experiment, bounded to 120 seconds on an absolute 4 ms clock.
  * Invalid advances permanently end host eligibility; later valid ticks still expire the board.
@@ -264,4 +386,21 @@ export function runNavigationFixture(options: { scenario?: NavigationScenario, s
     if (runtime.ended()) break
   }
   return runtime.project()
+}
+
+/** Two manual approvals on one retained plant. No schedule, dock, recharge or recovery. */
+export function createNavigationOccurrenceSession(options: { scenario?: NavigationScenario } = {}) {
+  const runtime = createNavigationRuntime({ ...options, seconds: 120 }, false, true)
+  return {
+    requestOccurrence: runtime.requestOccurrence,
+    advanceTo(nowMs: number) {
+      runtime.advanceClock(nowMs)
+      return runtime.snapshotOccurrences()
+    },
+    stopHost() {
+      runtime.stopHost()
+      return runtime.snapshotOccurrences()
+    },
+    snapshot: runtime.snapshotOccurrences,
+  }
 }
