@@ -277,6 +277,67 @@ recomputed target and fail consistency; an unused default or unvisited task rate
 Replay provides no authenticity guarantee.
 
 V1, vehicle v2 and readiness v3 remain separate public contracts. Generic recording helpers and
-mission commands accept only their existing versions. This slice connects no new simulator,
-camera, physical transport or portable command. It selects no cinematic transit or landing rates
-and does not qualify the stopped translation experiment or close the cinematography issue.
+mission commands accept only their existing versions. The pure policy does not choose cinematic
+transit or landing rates. Its separate world adapter is described below; no camera, physical
+transport or portable command is added.
+
+
+## Native task-motion world, library v4
+
+`simulateTaskMotionMission({ plan, seconds?, instrument? })` runs a concrete version-4 mission
+through the same owned rigid body, raw sensor feed, estimator, controller, authority supervisor,
+modeled output watchdog and clock as legacy `simulateMission`. It calls the native task-motion
+validator and engine directly. There is one finite legacy-1/task-motion-4 world; pure readiness-3
+remains available without a new world wrapper. Published legacy mission and Cinema formats stay
+unchanged, including live replacement/getter/receiver semantics of legacy instruments.
+
+The new options and instrument require exact own enumerable data fields, with no proxy, accessor,
+inherited or unknown fields. `plan` is required; `seconds` is an integer from 8 through 45, default
+45. The actual validated plan must use fixture origin latitude/longitude 0 and ellipsoid height
+100. An instrument requires synchronous `render(state, nowMs)` and `observe(context)` methods,
+with optional `observation(nowMs)` for bounded qualified link/battery samples. Methods are captured
+once and called with an undefined receiver. There is no disturbance, sensor-drop, recovery,
+provider, injected engine or external clock option in this new interface.
+
+Render receives cloned current truth. Observe receives exactly `nowMs`, `estimate`, `sensors`,
+`mission`, `authority`, `battery`, `link`, with an isolated actual prior native-4 mission snapshot
+and no raw truth. Return a current bound native declaration, literal `abort`, null or undefined.
+Missing, false, foreign, stale or earlier true declarations cannot release the stage. Malformed
+synchronous readiness reaches the native validator uncoerced; its recorded invalid marker blocks
+only a running readiness task. A callback throw, genuine Promise, or non-undefined render result
+causes synchronous actual-epoch abort. Caller `then` accessors are never invoked or awaited; no
+asynchronous callback result resumes the loop. Native safety still precedes abort, abort precedes
+running timeout, and timeout precedes readiness.
+
+The world uses 4ms body ticks and policy epochs from 600ms every 20ms. Its fixed operator script
+explicitly arms/engages the modeled supervisor; the mission engine gains no arming authority.
+Every path revokes board outputs in finally. Malformed setup throws fixed TypeError
+`task-motion-mission-simulation-input`. An unrecorded kernel exception or unavailable projection
+throws fixed RangeError `task-motion-mission-simulation-unavailable` after cleanup, rather than
+returning a trace prefix pretending to contain that unrecorded termination.
+
+`TaskMotionMissionSimulationContext`, `TaskMotionMissionSimulationInstrument` and
+`TaskMotionMissionSimulationRun` are concrete exported types. The result has exactly version,
+evidence, physicalFlightEnabled, boardOutputsInhibited, mission, budget, transitions, triggers,
+path, trace, authority, board and finalTruthPositionM. Version is 4 and evidence is
+`owned-task-motion-mission-physics-simulation`; flags are false/true. Snapshot/trace are actual
+native-4 values and path vectors are finite three-tuples. The raw authority/board snapshots carry
+BigInt IDs, so the complete library result is not an application JSON or recording DTO. The
+standalone qualification evidence encodes those IDs as exact decimal strings with explicit
+BigInt paths for lossless restoration; this does not add a serialization API.
+
+The fixed cadence bounds decisions/transitions at 2,221, triggers at 32 and path rows at 224.
+Native trace limits remain independently 6,001 rows/8MiB JSON plus LF, with 2,048-byte rows and a
+32,768-byte plan. These are retained-data bounds, not CPU/RSS or real-time guarantees. Replay
+uses `replayTaskMotionMission`; generic recording/mission CLI dispatch still rejects version 4.
+
+The first standalone five-task world fixture completed and landed at 25,600ms with replay equality,
+neutral board and finite bounded projections. It retained the full actual result before assertions.
+The prospectively fixed plan `cinema-dolly-task-motion-v1` used ordinary task rates 0.6m/s and
+only a two-meter dolly waypoint rate 0.2m/s, with unchanged takeoff/stage/dolly/return/land deadlines
+10,000/3,000/12,000/12,000/7,000ms, 44,000ms graph budget and 45,000ms world horizon. Stage entered
+at 4,100ms, its explicit current-epoch fixture declaration released at 5,900ms, return entered at
+16,400ms and land at 21,400ms. These rates limit the commanded target ramp, not measured vehicle
+speed. The supplied declaration establishes no camera readiness. The earlier global-0.2 failed
+landing experiment remains failed. Camera readiness streaks, translating image quality/capture
+motion/source-loss joins, physical flight and issue completion remain separate work.

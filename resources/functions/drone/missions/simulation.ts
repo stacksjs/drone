@@ -1,6 +1,8 @@
+import { types as nodeTypes } from 'node:util'
 import type { SensorVector, ImuMeasurement } from '../sensors/types'
 import type { Motors } from '../controls/model'
-import type { MissionAction, MissionSnapshot } from './engine'
+import type { MissionAction, MissionSnapshot, MissionEngine, TaskMotionMissionEngine, TaskMotionMissionSnapshot, TaskMotionMissionTrace, TaskMotionMissionDeclaration } from './engine'
+import type { MissionPlan, TaskMotionMissionPlan } from './plan'
 import type { EstimatorSnapshot } from '../estimation/estimator'
 import type { SensorSnapshot } from '../sensors/pipeline'
 import type { RigidBodyState } from '../controls/physics'
@@ -12,8 +14,8 @@ import { createRigidBody } from '../controls/physics'
 import { createPhysicsSensorFeed } from '../controls/sensors'
 import { createEstimator } from '../estimation/estimator'
 import { createSimulatedMultirotorController } from '../controls/controller'
-import { createMissionEngine, observeMission, recoverMission } from './engine'
-import { exampleMission, validateMission } from './plan'
+import { createMissionEngine, createTaskMotionMissionEngine, observeMission, recoverMission } from './engine'
+import { exampleMission, validateMission, validateTaskMotionMission } from './plan'
 export const missionScenarios = ['nominal', 'pause-resume', 'recovery', 'abort', 'rc-override', 'reserve', 'branch-return'] as const
 export type MissionScenario = typeof missionScenarios[number]
 /** Qualified external fixture observations. Neither field can increase modeled authority. */
@@ -70,15 +72,150 @@ function qualifiedObservation(value: unknown, nowMs: number, nominalBattery: num
   }
   return result
 }
+
+export interface TaskMotionMissionSimulationContext {
+  nowMs: number
+  estimate: EstimatorSnapshot
+  sensors: SensorSnapshot
+  mission: TaskMotionMissionSnapshot
+  authority: AuthorityState
+  battery: AuthorityObservation['battery']
+  link: AuthorityObservation['link']
+}
+export interface TaskMotionMissionSimulationInstrument {
+  render(state: RigidBodyState, nowMs: number): void
+  observe(context: TaskMotionMissionSimulationContext): 'abort' | TaskMotionMissionDeclaration | null | undefined
+  observation?(nowMs: number): MissionSimulationObservation
+}
+type SimulationBudget = { worstCaseMs: number, requiredWh: number }
+type Transition = { atMs: number, taskId: string, state: string, reason: string }
+type Trigger = { atMs: number, taskId: string, channel: string, evidence: 'simulated-event' }
+type SimulationPath = { atMs: number, estimatedPositionM: number[] | null, truthPositionM: number[], targetM: number[] | null, state: string, taskId: string }
+type AuthoritySnapshot = ReturnType<ReturnType<typeof createAuthoritySupervisor>['snapshot']>
+type BoardSnapshot = ReturnType<ReturnType<typeof createSimulatedOutputWatchdog>['snapshot']>
+interface LegacySimulationRun {
+  evidence: 'owned-mission-physics-simulation'
+  physicalFlightEnabled: boolean
+  boardOutputsInhibited: boolean
+  scenario: MissionScenario
+  recovered: boolean
+  mission: MissionSnapshot
+  budget: SimulationBudget
+  transitions: Transition[]
+  triggers: Trigger[]
+  path: SimulationPath[]
+  trace: ReturnType<MissionEngine['trace']>
+  authority: AuthoritySnapshot
+  board: BoardSnapshot
+  finalTruthPositionM: SensorVector
+}
+export interface TaskMotionMissionSimulationRun {
+  version: 4
+  evidence: 'owned-task-motion-mission-physics-simulation'
+  physicalFlightEnabled: false
+  boardOutputsInhibited: true
+  mission: TaskMotionMissionSnapshot
+  budget: SimulationBudget
+  transitions: Transition[]
+  triggers: Trigger[]
+  path: { atMs: number, estimatedPositionM: SensorVector | null, truthPositionM: SensorVector, targetM: SensorVector | null, state: string, taskId: string }[]
+  trace: TaskMotionMissionTrace
+  authority: AuthoritySnapshot
+  board: BoardSnapshot
+  finalTruthPositionM: SensorVector
+}
+interface CapturedTaskMotionInstrument {
+  render(state: RigidBodyState, nowMs: number): unknown
+  observe(context: TaskMotionMissionSimulationContext): unknown
+  observation?: (nowMs: number) => unknown
+}
+type WorldArm = { kind: 'legacy', engine: MissionEngine, mission: MissionSnapshot, scenario: MissionScenario, recovered: boolean, options: { instrument?: MissionSimulationInstrument } } | { kind: 'task-motion', engine: TaskMotionMissionEngine, mission: TaskMotionMissionSnapshot, instrument: CapturedTaskMotionInstrument | undefined }
+type WorldResult = { kind: 'legacy', run: LegacySimulationRun } | { kind: 'task-motion', run: TaskMotionMissionSimulationRun }
+const intrinsicThen = Promise.prototype.then
+function taskMotionUnavailable(): never { throw new RangeError('task-motion-mission-simulation-unavailable') }
+function vector(values: number[]): SensorVector {
+  if (values.length !== 3 || values.some(v => !Number.isFinite(v))) taskMotionUnavailable()
+  return [values[0]!, values[1]!, values[2]!]
+}
+function taskMotionSynchronous(value: unknown): unknown {
+  // Initial classification never reads a caller's then/prototype or unwraps a proxy.
+  if (!nodeTypes.isProxy(value) && nodeTypes.isPromise(value)) {
+    try { intrinsicThen.call(value, () => {}, () => {}) } catch { /* Producer effects are not an owned-loop continuation. */ }
+    throw new TypeError('Asynchronous readiness instrument')
+  }
+  return value
+}
+function ownData(value: unknown, allowed: string[], required: string[]): Record<string, unknown> {
+  if (!value || typeof value !== 'object' || nodeTypes.isProxy(value) || Object.getPrototypeOf(value) !== Object.prototype) throw new TypeError()
+  const descriptors = Object.getOwnPropertyDescriptors(value), keys = Reflect.ownKeys(descriptors)
+  if (keys.some(k => typeof k !== 'string' || !allowed.includes(k)) || required.some(k => !Object.hasOwn(descriptors, k))) throw new TypeError()
+  const out: Record<string, unknown> = {}
+  for (const key of keys) {
+    if (typeof key !== 'string') throw new TypeError()
+    const d = descriptors[key]!
+    if (!d.enumerable || !Object.hasOwn(d, 'value')) throw new TypeError()
+    out[key] = d.value
+  }
+  return out
+}
+function captureTaskMotionObservation(value: unknown): MissionSimulationObservation {
+  const data = ownData(value, ['link', 'battery'], [])
+  const out: MissionSimulationObservation = {}
+  if (Object.hasOwn(data, 'link')) {
+    const link = ownData(data.link, ['capturedAtMs', 'connected'], ['capturedAtMs', 'connected'])
+    if (typeof link.capturedAtMs !== 'number' || typeof link.connected !== 'boolean') throw new TypeError()
+    out.link = { capturedAtMs: link.capturedAtMs, connected: link.connected }
+  }
+  if (Object.hasOwn(data, 'battery')) {
+    const battery = ownData(data.battery, ['capturedAtMs', 'remainingPercent'], ['capturedAtMs', 'remainingPercent'])
+    if (typeof battery.capturedAtMs !== 'number' || typeof battery.remainingPercent !== 'number') throw new TypeError()
+    out.battery = { capturedAtMs: battery.capturedAtMs, remainingPercent: battery.remainingPercent }
+  }
+  return out
+}
+/** Concrete native-v4 execution on the same owned body/feed/estimator/control loop as v1. */
+export function simulateTaskMotionMission(options: { plan: unknown, seconds?: number, instrument?: TaskMotionMissionSimulationInstrument }): TaskMotionMissionSimulationRun {
+  let plan: TaskMotionMissionPlan, budget: SimulationBudget, seconds: number, instrument: CapturedTaskMotionInstrument | undefined
+  try {
+    const d = ownData(options, ['plan', 'seconds', 'instrument'], ['plan'])
+    seconds = Object.hasOwn(d, 'seconds') ? (typeof d.seconds === 'number' ? d.seconds : NaN) : 45
+    if (!Number.isInteger(seconds) || seconds < 8 || seconds > 45) throw new TypeError()
+    const validated = validateTaskMotionMission(d.plan)
+    plan = validated.plan; budget = { worstCaseMs: validated.worstCaseMs, requiredWh: validated.requiredWh }
+    if (plan.origin.latitudeDeg !== 0 || plan.origin.longitudeDeg !== 0 || plan.origin.ellipsoidHeightM !== 100) throw new TypeError()
+    if (Object.hasOwn(d, 'instrument')) {
+      const callbacks = ownData(d.instrument, ['render', 'observe', 'observation'], ['render', 'observe'])
+      const render = callbacks.render, observe = callbacks.observe, observation = callbacks.observation
+      if (typeof render !== 'function' || nodeTypes.isProxy(render) || typeof observe !== 'function' || nodeTypes.isProxy(observe) || Object.hasOwn(callbacks, 'observation') && (typeof observation !== 'function' || nodeTypes.isProxy(observation))) throw new TypeError()
+      instrument = { render: (state, n) => Reflect.apply(render, undefined, [state, n]), observe: context => Reflect.apply(observe, undefined, [context]), ...(typeof observation === 'function' ? { observation: (n: number) => Reflect.apply(observation, undefined, [n]) } : {}) }
+    }
+  }
+  catch { throw new TypeError('task-motion-mission-simulation-input') }
+  try {
+    const engine = createTaskMotionMissionEngine(plan)
+    const result = runWorld(plan, budget, seconds, { kind: 'task-motion', engine, mission: engine.snapshot(), instrument })
+    if (result.kind !== 'task-motion') taskMotionUnavailable()
+    return result.run
+  }
+  catch { taskMotionUnavailable() }
+}
+
 /** Actual owned raw-sensor/estimator/control pipeline, with a separately ticking modeled board. */
-export function simulateMission(options: { plan?: unknown, scenario?: MissionScenario, seconds?: number, instrument?: MissionSimulationInstrument } = {}) {
+export function simulateMission(options: { plan?: unknown, scenario?: MissionScenario, seconds?: number, instrument?: MissionSimulationInstrument } = {}): LegacySimulationRun {
   const scenario = options.scenario ?? 'nominal'
   const seconds = options.seconds ?? 45
   if (!missionScenarios.includes(scenario) || !Number.isInteger(seconds) || seconds < 8 || seconds > 120) throw new RangeError('Invalid mission scenario or duration (8..120 seconds)')
   const { plan, worstCaseMs, requiredWh } = validateMission(options.plan ?? exampleMission())
   // The sensor fixture has this geodetic world origin. Other plans remain valid for policy replay only.
   if (plan.origin.latitudeDeg !== 0 || plan.origin.longitudeDeg !== 0 || plan.origin.ellipsoidHeightM !== 100) throw new TypeError('Physics fixture requires origin 0,0,100 WGS84 ellipsoid')
-  let engine = createMissionEngine(plan)
+  const engine = createMissionEngine(plan)
+  const result = runWorld(plan, { worstCaseMs, requiredWh }, seconds, { kind: 'legacy', engine, mission: engine.snapshot(), scenario, recovered: false, options })
+  if (result.kind !== 'legacy') throw new TypeError('Invalid mission simulation projection')
+  return result.run
+}
+
+function runWorld(plan: MissionPlan | TaskMotionMissionPlan, budget: { worstCaseMs: number, requiredWh: number }, seconds: number, arm: WorldArm): WorldResult {
+  const scenario = arm.kind === 'legacy' ? arm.scenario : 'nominal'
   const supervisor = createAuthoritySupervisor({ sessionId: 123n, bootId: 55n })
   const board = createSimulatedOutputWatchdog({ sessionId: 123n, bootId: 55n })
   const body = createRigidBody({ positionM: [0, 0, -0.1], groundDownM: -0.1 })
@@ -89,18 +226,16 @@ export function simulateMission(options: { plan?: unknown, scenario?: MissionSce
   let estimate = estimator.snapshot(0)
   let sensors = feed.advanceTo(0)
   let command: Motors = [0, 0, 0, 0]
-  let mission: MissionSnapshot = engine.snapshot()
   let lastTask = ''
   let lastState = ''
-  let recovered = false
   let previousObservation: MissionSimulationObservation = {}
   const transitions: { atMs: number, taskId: string, state: string, reason: string }[] = []
   const path: { atMs: number, estimatedPositionM: number[] | null, truthPositionM: number[], targetM: number[] | null, state: string, taskId: string }[] = []
   const triggers: { atMs: number, taskId: string, channel: string, evidence: 'simulated-event' }[] = []
   try { for (let nowMs = 0; nowMs <= seconds * 1000; nowMs += 4) {
     command = board.tick(nowMs).motorsN
-    if (nowMs > 600) truth = body.step(command, 0.004, options.instrument?.disturbance?.(nowMs))
-    const dropped = options.instrument?.dropSensors?.(nowMs)
+    if (nowMs > 600) truth = body.step(command, 0.004, arm.kind === 'legacy' ? arm.options.instrument?.disturbance?.(nowMs) : undefined)
+    const dropped = arm.kind === 'legacy' ? arm.options.instrument?.dropSensors?.(nowMs) : undefined
     feed.capture(truth, nowMs, dropped?.imu, dropped?.position)
     sensors = feed.advanceTo(nowMs)
     estimate = estimator.update(sensors)
@@ -108,8 +243,8 @@ export function simulateMission(options: { plan?: unknown, scenario?: MissionSce
     const nominalBattery = scenario === 'reserve' && nowMs >= 5000 ? 29 : (scenario === 'branch-return' ? 75 : 100) - plan.power.hoverW * Math.max(0, nowMs - 600) / 3600000 / plan.power.availableWh * 100
     let supplied: MissionSimulationObservation = {}, instrumentInvalid = false
     try {
-      const provider = options.instrument?.observation
-      const update = provider === undefined ? {} : qualifiedObservation(synchronousResult(provider(nowMs)), nowMs, nominalBattery, previousObservation)
+      const provider = arm.kind === 'legacy' ? arm.options.instrument?.observation : arm.instrument?.observation
+      const update = provider === undefined ? {} : qualifiedObservation(arm.kind === 'legacy' ? synchronousResult(provider(nowMs)) : captureTaskMotionObservation(taskMotionSynchronous(provider(nowMs))), nowMs, nominalBattery, previousObservation)
       // Omission or withdrawal is not a new measurement and cannot restore a resource or refresh its age.
       supplied = qualifiedObservation({ ...previousObservation, ...update }, nowMs, 100, previousObservation)
       previousObservation = supplied
@@ -124,7 +259,7 @@ export function simulateMission(options: { plan?: unknown, scenario?: MissionSce
       interlocks: { capturedAtMs: nowMs, killActive: false, onGround: nowMs === 600 || truth.groundContact, motorsStopped: truth.motorsN.every(n => n < 0.01) },
       battery: { capturedAtMs: supplied.battery?.capturedAtMs ?? nowMs, remainingPercent: batteryPercent }, link: instrumentInvalid ? { capturedAtMs: nowMs, connected: false } : supplied.link ?? { capturedAtMs: nowMs, connected: true },
     }
-    const send = (action: 'arm' | 'engage' | 'renew' | 'disarm', targetM = mission.targetM) => {
+    const send = (action: 'arm' | 'engage' | 'renew' | 'disarm', targetM = arm.mission.targetM) => {
       const s = supervisor.snapshot()
       return supervisor.update(observation, { version: 1, sessionId: s.sessionId, bootId: s.bootId, epoch: s.epoch, sequence: s.sequence + 1, issuedAtMs: nowMs, action, mode: 'position', leaseMs: 100, target: { positionM: targetM ?? [0, 0, 0], yawRad: 0 } })
     }
@@ -132,25 +267,41 @@ export function simulateMission(options: { plan?: unknown, scenario?: MissionSce
     // This fixture is an explicit operator script. The mission engine never arms itself.
     if (nowMs === 600) { send('arm'); send('engage', [0, 0, 0]) }
     const missionInput = observeMission({ estimate, authority: supervisor.snapshot().state, batteryPercent, onGround: observation.interlocks.onGround })
-    let action: MissionAction | undefined = nowMs === 600 ? 'start' : undefined
     let instrumentAbort = instrumentInvalid
-    if (options.instrument) {
-      try {
-        if (synchronousResult(options.instrument.render(structuredClone(truth), nowMs)) !== undefined) throw new TypeError('Invalid mission render callback result')
-        const result = synchronousResult(options.instrument.observe(structuredClone({ nowMs, estimate, sensors, mission, authority: supervisor.snapshot().state, battery: observation.battery, link: observation.link })))
-        if (result !== undefined) instrumentAbort = true
+    if (arm.kind === 'legacy') {
+      let action: MissionAction | undefined = nowMs === 600 ? 'start' : undefined
+      if (arm.options.instrument) {
+        try {
+          if (synchronousResult(arm.options.instrument.render(structuredClone(truth), nowMs)) !== undefined) throw new TypeError('Invalid mission render callback result')
+          const result = synchronousResult(arm.options.instrument.observe(structuredClone({ nowMs, estimate, sensors, mission: arm.mission, authority: supervisor.snapshot().state, battery: observation.battery, link: observation.link })))
+          if (result !== undefined) instrumentAbort = true
+        }
+        catch { instrumentAbort = true }
       }
-      catch { instrumentAbort = true }
+      if (scenario === 'pause-resume' && nowMs === 5000) action = 'pause'
+      if ((scenario === 'pause-resume' || scenario === 'recovery') && nowMs === 7000) action = 'resume'
+      if (scenario === 'abort' && nowMs === 5000) action = 'abort'
+      if (instrumentAbort) action = 'abort'
+      if (scenario === 'recovery' && nowMs === 5000 && !instrumentAbort) {
+        arm.engine = recoverMission(JSON.parse(JSON.stringify(arm.engine.trace())), missionInput)
+        arm.mission = arm.engine.snapshot(); arm.recovered = true
+      }
+      else arm.mission = arm.engine.step(missionInput, action)
     }
-    if (scenario === 'pause-resume' && nowMs === 5000) action = 'pause'
-    if ((scenario === 'pause-resume' || scenario === 'recovery') && nowMs === 7000) action = 'resume'
-    if (scenario === 'abort' && nowMs === 5000) action = 'abort'
-    if (instrumentAbort) action = 'abort'
-    if (scenario === 'recovery' && nowMs === 5000 && !instrumentAbort) {
-      engine = recoverMission(JSON.parse(JSON.stringify(engine.trace())), missionInput)
-      mission = engine.snapshot(); recovered = true
+    else {
+      let readiness: unknown = null
+      if (arm.instrument) {
+        try {
+          if (taskMotionSynchronous(arm.instrument.render(structuredClone(truth), nowMs)) !== undefined) throw new TypeError('Invalid readiness render result')
+          const result = taskMotionSynchronous(arm.instrument.observe(structuredClone({ nowMs, estimate, sensors, mission: arm.mission, authority: supervisor.snapshot().state, battery: observation.battery, link: observation.link })))
+          if (result === 'abort') instrumentAbort = true
+          else readiness = result
+        }
+        catch { instrumentAbort = true }
+      }
+      arm.mission = arm.engine.step(missionInput, instrumentAbort ? 'abort' : nowMs === 600 ? 'start' : undefined, instrumentAbort ? null : readiness)
     }
-    else mission = engine.step(missionInput, action)
+    const mission = arm.mission
     if (mission.payload) triggers.push({ atMs: nowMs, ...mission.payload, evidence: 'simulated-event' })
     if (mission.state === 'running' || mission.state === 'paused') send('renew')
     else { send('disarm'); board.revoke() }
@@ -168,5 +319,7 @@ export function simulateMission(options: { plan?: unknown, scenario?: MissionSce
     if (!['running', 'paused'].includes(mission.state)) break
   } }
   finally { board.revoke() }
-  return { evidence: 'owned-mission-physics-simulation' as const, physicalFlightEnabled: false, boardOutputsInhibited: true, scenario, recovered, mission, budget: { worstCaseMs, requiredWh }, transitions, triggers, path, trace: engine.trace(), authority: supervisor.snapshot(), board: board.snapshot(), finalTruthPositionM: truth.positionM }
+  if (arm.kind === 'legacy') return { kind: 'legacy', run: { evidence: 'owned-mission-physics-simulation', physicalFlightEnabled: false, boardOutputsInhibited: true, scenario, recovered: arm.recovered, mission: arm.mission, budget, transitions, triggers, path, trace: arm.engine.trace(), authority: supervisor.snapshot(), board: board.snapshot(), finalTruthPositionM: truth.positionM } }
+  if (transitions.length > 2221 || triggers.length > 32 || path.length > 224) taskMotionUnavailable()
+  return { kind: 'task-motion', run: { version: 4, evidence: 'owned-task-motion-mission-physics-simulation', physicalFlightEnabled: false, boardOutputsInhibited: true, mission: arm.mission, budget, transitions, triggers, path: path.map(row => ({ ...row, estimatedPositionM: row.estimatedPositionM ? vector(row.estimatedPositionM) : null, truthPositionM: vector(row.truthPositionM), targetM: row.targetM ? vector(row.targetM) : null })), trace: arm.engine.trace(), authority: supervisor.snapshot(), board: board.snapshot(), finalTruthPositionM: vector(truth.positionM) } }
 }
