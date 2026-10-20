@@ -17,6 +17,7 @@ import type { CameraPayloadAdapter, PayloadBusContract, PayloadCaptureAck } from
 import { createPayloadCaptureSession, jpegDimensions } from '../../resources/functions/drone/payloads/capture'
 import { createReplayCameraPayload, payloadFixtureJpeg } from '../../resources/functions/drone/payloads/replay'
 import { openCameraPayloadProcess } from '../../resources/functions/drone/payloads/process'
+import { PayloadCaptureError } from '../../resources/functions/drone/payloads/types'
 import { validatePayloadBus, payloadInventory } from '../../resources/functions/drone/payloads/catalog'
 import { runPayloadBench, payloadJson } from '../../resources/functions/drone/payloads/bench'
 import { savePayloadCapture } from '../../resources/functions/drone/payloads/artifact'
@@ -146,8 +147,31 @@ const worker = resolve(import.meta.dir, '../fixtures/payloads/worker.ts')
 const workerConfig = resolve(import.meta.dir, '../fixtures/process/bunfig.toml')
 const peerCommand = (fault: string, ...args: string[]) => [process.execPath, '--no-env-file', `--config=${workerConfig}`, worker, fault, ...args]
 const openPeer = (fault = 'none') => openCameraPayloadProcess({ command: peerCommand(fault), evidence: 'fixture' })
+type ClockScenario = 'positive' | 'sync-rtt' | 'future-ack' | 'combined-boundary' | 'combined-over'
+// Real fragmented IPC, with authored samples at the existing public clock seam.
+async function clockPeer(scenario: ClockScenario, samples: readonly number[]) {
+  const directory = await mkdtemp(join(tmpdir(), 'drone-payload-clock-')), trace = join(directory, 'commands.jsonl')
+  let consumed = 0
+  const now = () => {
+    const value = samples[consumed++]
+    if (value === undefined) throw new Error('Authored payload clock exhausted')
+    return value
+  }
+  try {
+    const adapter = await openCameraPayloadProcess({ command: [process.execPath, '--no-env-file', `--config=${workerConfig}`, resolve(import.meta.dir, '../fixtures/payloads/clock-worker.ts'), scenario, trace], evidence: 'fixture', now })
+    const session = createPayloadCaptureSession({ adapter, poses: createPayloadPoseTimeline(), now })
+    return {
+      session,
+      consumed: () => consumed,
+      trace: async () => (await readFile(trace, 'utf8')).trim().split('\n').map(line => JSON.parse(line)),
+      async close() { session.close(); await rm(directory, { recursive: true, force: true }) },
+    }
+  }
+  catch (error) { await rm(directory, { recursive: true, force: true }); throw error }
+}
+
 test('bounded child IPC handles fragmented records and maps the child monotonic clock', async () => {
-  const adapter = await openPeer(), session = createPayloadCaptureSession({ adapter, poses: createPayloadPoseTimeline() })
+  const peer = await clockPeer('positive', [1000, 1000, 1000, 1004, 1010, 1010, 1020, 1020, 1020, 1024, 1030, 1030]), session = peer.session
   try {
     const capture = await session.capture()
     expect(capture.camera.evidence).toBe('fixture')
@@ -156,8 +180,61 @@ test('bounded child IPC handles fragmented records and maps the child monotonic 
     expect(capture.byteLength).toBe(137)
     expect(capture.association.status).toBe('unavailable')
     const again = await session.capture(); expect(again.command.sequence).toBe(2)
+    expect([capture.capturedAtMs, again.capturedAtMs]).toEqual([1006, 1026])
+    expect([capture.clockUncertaintyMs, again.clockUncertaintyMs]).toEqual([2.5, 2.5])
+    expect(await peer.trace()).toEqual([{ kind: 'sync', sequence: 1 }, { kind: 'capture', sequence: 1 }, { kind: 'sync', sequence: 2 }, { kind: 'capture', sequence: 2 }])
+    expect(peer.consumed()).toBe(12)
   }
-  finally { session.close() }
+  finally { await peer.close() }
+}, 60000)
+
+test('controlled child IPC rejects excessive sync RTT before emitting a capture request', async () => {
+  const peer = await clockPeer('sync-rtt', [1000, 1000, 1000, 1012])
+  try {
+    const error = await peer.session.capture().then(() => null, error => error as unknown)
+    expect(error).toBeInstanceOf(PayloadCaptureError)
+    expect(error).toMatchObject({ code: 'invalid', message: 'Camera clock synchronization exceeded uncertainty budget' })
+    await expect(peer.session.capture()).rejects.toThrow('closed')
+    expect(await peer.trace()).toEqual([{ kind: 'sync', sequence: 1 }])
+    expect(peer.consumed()).toBe(4)
+  }
+  finally { await peer.close() }
+}, 60000)
+
+test('controlled child IPC rejects a mapped future ACK and retires after one capture request', async () => {
+  const peer = await clockPeer('future-ack', [1000, 1000, 1000, 1004, 1010])
+  try {
+    const error = await peer.session.capture().then(() => null, error => error as unknown)
+    expect(error).toBeInstanceOf(PayloadCaptureError)
+    expect(error).toMatchObject({ code: 'invalid', message: 'Capture ACK identity, time or capabilities invalid' })
+    await expect(peer.session.capture()).rejects.toThrow('closed')
+    expect(await peer.trace()).toEqual([{ kind: 'sync', sequence: 1 }, { kind: 'capture', sequence: 1 }])
+    expect(peer.consumed()).toBe(5)
+  }
+  finally { await peer.close() }
+}, 60000)
+
+test('controlled child IPC accepts exactly five milliseconds combined uncertainty and rejects above it', async () => {
+  const boundary = await clockPeer('combined-boundary', [1000, 1000, 1000, 1008, 1010, 1010])
+  try {
+    const capture = await boundary.session.capture()
+    expect(capture.clockUncertaintyMs).toBe(5)
+    expect(capture.capturedAtMs).toBe(1006)
+    expect(capture.byteLength).toBe(137)
+    expect(await boundary.trace()).toEqual([{ kind: 'sync', sequence: 1 }, { kind: 'capture', sequence: 1 }])
+    expect(boundary.consumed()).toBe(6)
+  }
+  finally { await boundary.close() }
+  const over = await clockPeer('combined-over', [1000, 1000, 1000, 1008, 1010])
+  try {
+    const error = await over.session.capture().then(() => null, error => error as unknown)
+    expect(error).toBeInstanceOf(PayloadCaptureError)
+    expect(error).toMatchObject({ code: 'invalid', message: 'Capture ACK identity, time or capabilities invalid' })
+    await expect(over.session.capture()).rejects.toThrow('closed')
+    expect(await over.trace()).toEqual([{ kind: 'sync', sequence: 1 }, { kind: 'capture', sequence: 1 }])
+    expect(over.consumed()).toBe(5)
+  }
+  finally { await over.close() }
 }, 60000)
 
 test('child disconnection, stale clocks and wrong-boot ACKs retire the process', async () => {
