@@ -36,6 +36,7 @@
     "./unit/missions.test.ts",
     "./unit/mission-resume.test.ts",
     "./unit/mission-observations.test.ts",
+    "./unit/mission-readiness.test.ts",
     "../resources/functions/drone/navigation/**/*.ts",
     "./unit/navigation.test.ts",
     "./unit/navigation-session.test.ts",

@@ -211,3 +211,43 @@ Issue #10 remains open for durable correlated whole-runtime checkpoints, payload
 reconciliation, external driver translation, richer energy/terrain/rally planning and restart/HIL
 failure evidence. Hardware acceptance, real landing detection, obstacle-aware return and physical
 mission control remain separate gates. See [ADR 10](adr/0010-owned-missions.md).
+
+## Native readiness policy, library v3
+
+The separate pure quadcopter readiness profile adds `validateReadinessMission`,
+`createReadinessMissionEngine`, `replayReadinessMission` and `parseReadinessMissionTrace`.
+It does not change v1 plans or the vehicle-v2 profile. Existing mission commands and the generic
+recording dispatcher continue to reject this new version. No simulator, physical output or camera
+readiness producer is connected by this library slice.
+
+A v3 plan has exactly one `readiness-loiter` task. It retains the native position hold and requires
+both 1,500 ms of continuous native arrival acceptance and a fresh selected `ready: true` declaration
+before taking its planned next edge. Its 3,000 ms timeout wins at equality. Missing, false, stale or
+foreign declarations withhold release without pausing the timer; an earlier true is never cached.
+Loss of native arrival acceptance resets its native dwell. The graph budget is at most 44,000 ms.
+
+A declaration binds plan ID, actual admitted run-start epoch, actual task-entry epoch, task ID,
+selected source ID, estimator reference and the current observation epoch. These are local declared
+labels, not authenticated identities. The engine observes authority and retains its normal health,
+fence, reserve and endurance checks. A declaration cannot arm, start, override a fault, choose another
+edge or select another target. The new action set is only `start` and `abort`; pause, resume and
+recovery remain unsupported for this profile.
+
+LIVE input accepts exact own-data fields in any order and projects canonical output. Malformed
+readiness becomes the fixed `invalid` marker. That marker blocks only a running readiness task;
+elsewhere it is recorded and inert. REPLAY requires exact canonical schemas and key order, then
+recomputes every decision. A consistently edited refused declaration can still replay: traces are
+unsigned evidence and do not prove a producer's readiness assertion or physical readiness.
+
+The 6,001-row and 8 MiB JSON-plus-LF limits are independent. Actual bytes are checked before
+committing a step; no row is evicted. Invalid observation/action errors and capacity errors permanently
+end the new engine's step availability. Its readable snapshot is then an out-of-band blocked state
+with released target and payload. Its trace remains only the last accepted replayable prefix, which
+does not contain or recreate that unrecorded termination. Every later step throws the same bounded
+error before examining inputs. A normally recorded `invalid` readiness refusal is different and can
+be replayed with its blocked result. Legacy error behavior remains unchanged.
+
+This is a pure declared-policy prerequisite. Connecting it to the one-world camera instrument,
+proving the actual 26-sample camera readiness streak, translating exposures, source loss, image quality
+and landing requires separate consumer work. It does not qualify the earlier failed fixed-dwell
+translation experiment or close the remaining cinematography requirements.
