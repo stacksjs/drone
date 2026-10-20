@@ -1,3 +1,5 @@
+import type { ContactProfile, ContactBinding, ContactPacket, ContactHostObservation, ContactVerification } from './contact'
+import { contactProfiles, contactModel, createContactFeed, initialContactVerification, reduceContactVerification, contactEligibility } from './contact'
 import type { ImuMeasurement } from '../sensors/types'
 import type { Motors } from '../controls/model'
 import type { MissionAction, MissionSnapshot } from '../missions/engine'
@@ -17,7 +19,8 @@ import { exampleMission, validateMission } from '../missions/plan'
 export const navigationScenarios = ['avoid-land', 'replan', 'range-loss', 'range-delay', 'position-loss', 'landing-loss', 'rc-override'] as const
 export type NavigationScenario = typeof navigationScenarios[number]
 /** One owned experiment. The legacy script is selected only by its fixed adapter below. */
-function createNavigationRuntime(options: { scenario?: NavigationScenario, seconds?: number }, legacy: boolean, multiple = false) {
+function createNavigationRuntime(options: { scenario?: NavigationScenario, seconds?: number }, legacy: boolean, multiple = false, contactProfile?: ContactProfile) {
+  if (contactProfile !== undefined && (!multiple || !contactProfiles.includes(contactProfile))) throw new TypeError('Invalid contact profile')
   const scenario = options.scenario ?? 'avoid-land'
   const seconds = options.seconds ?? 70
   if (!navigationScenarios.includes(scenario) || !Number.isInteger(seconds) || seconds < 8 || seconds > 120) throw new RangeError('Invalid navigation scenario or duration (8..120 seconds)')
@@ -73,6 +76,14 @@ function createNavigationRuntime(options: { scenario?: NavigationScenario, secon
   }
   const occurrences: Occurrence[] = []
   let queuedOccurrence: Occurrence | null = null, currentOccurrence: Occurrence | null = null
+  let contactFeed: ReturnType<typeof createContactFeed> | null = null
+  let contactContext: (ContactBinding & { origin: string }) | null = null
+  let contactPacket: ContactPacket | null = null, contactHost: ContactHostObservation | null = null
+  let contactVerification: ContactVerification | null = null, contactMonitoring = false
+  const contactOutcomes: { occurrenceId: string, completedAtMs: number, deadlineMs: number, verifiedAtMs: number | null, phase: ContactVerification['phase'], reason: string, alignment: ContactVerification['alignment'] }[] = []
+  function retainContactOutcome() {
+    if (contactVerification && contactVerification.phase !== 'pending' && !contactOutcomes.some(item => item.occurrenceId === contactVerification!.binding.occurrenceId)) contactOutcomes.push({ occurrenceId: contactVerification.binding.occurrenceId, completedAtMs: contactVerification.completedAtMs, deadlineMs: contactVerification.deadlineMs, verifiedAtMs: contactVerification.verifiedAtMs, phase: contactVerification.phase, reason: contactVerification.reason, alignment: structuredClone(contactVerification.alignment) })
+  }
   const counts = { hostUpdates: 0, controllerUpdates: 0, boardAccepts: 0, boardRevokes: 0, nonzeroAcceptedFrames: 0, armAccepted: 0, engageAccepted: 0 }
   let lastTickMs = -4, lastHostAtMs: number | null = null
   // Nominal powered-time proxy only. No idle-current, charge or endurance measurement.
@@ -90,6 +101,10 @@ function createNavigationRuntime(options: { scenario?: NavigationScenario, secon
     if (nowMs > (legacy ? 600 : 0)) {
       if (!legacy && (command.some(n => n > 0) || truth.motorsN.some(n => n >= 0.01))) usedWh += plan.power.hoverW * 4 / 3600000
       truth = body.step(command, 0.004)
+    }
+    if (contactFeed) {
+      contactFeed.capture(nowMs, truth)
+      contactPacket = contactFeed.advanceTo(nowMs)
     }
     if (!hostAvailable) return
     feed.capture(truth, nowMs, scenario === 'position-loss' && nowMs >= 6000)
@@ -134,6 +149,13 @@ function createNavigationRuntime(options: { scenario?: NavigationScenario, secon
       return decision
     }
     supervisor.update(observation)
+    if (contactProfile) {
+      contactHost = { nowMs, estimate, interlocks: observation.interlocks, authority: supervisor.snapshot(), board: board.snapshot(), map: rangeMap, packet: contactPacket }
+      if (contactMonitoring && contactVerification) {
+        contactVerification = reduceContactVerification(contactVerification, contactHost)
+        retainContactOutcome()
+      }
+    }
     const control = () => {
       const imuObservation = sensors.sensors.find(s => s.kind === 'imu')?.observation
       const measurement = imuObservation?.value as ImuMeasurement | undefined
@@ -148,7 +170,7 @@ function createNavigationRuntime(options: { scenario?: NavigationScenario, secon
       occurrence.state = 'refused'
       const qualification = qualifyOccurrence(nowMs)
       if (nowMs - occurrence.issuedAtMs > authorityPolicy.commandAgeMs) occurrence.reason = 'approval-expired'
-      else if (nowMs + worstCaseMs + 2000 > horizonMs) occurrence.reason = 'insufficient-session-time'
+      else if (nowMs + worstCaseMs + (contactProfile ? contactModel.windowMs : 0) + 2000 > horizonMs) occurrence.reason = 'insufficient-session-time'
       else if (!qualification.binding || qualification.binding !== occurrence.binding) occurrence.reason = qualification.reason || 'launch-binding-changed'
       else {
         const armed = send('arm')
@@ -157,6 +179,8 @@ function createNavigationRuntime(options: { scenario?: NavigationScenario, secon
           const engaged = send('engage', [0, 0, 0])
           occurrence.reason = engaged.reason
           if (engaged.commandAccepted) {
+            // Only accepted arm plus engage retires live contact eligibility.
+            if (contactProfile) contactMonitoring = false
             // Only now promote the new flight. Physical collaborators/clock/energy remain.
             engine = createMissionEngine(plan)
             navigator = createNavigator({ fenceRadiusM: plan.fence.radiusM, minDownM: plan.fence.minDownM })
@@ -262,6 +286,10 @@ function createNavigationRuntime(options: { scenario?: NavigationScenario, secon
         currentOccurrence.reason = mission.reason
         currentOccurrence.terminalAtMs = nowMs
         currentOccurrence.result = structuredClone(terminal)
+        if (contactProfile && contactContext && mission.state === 'completed') {
+          contactVerification = initialContactVerification({ ...contactContext, occurrenceId: currentOccurrence.id }, nowMs, contactVerification ?? undefined)
+          contactMonitoring = true
+        }
       }
     }
   }
@@ -313,6 +341,12 @@ function createNavigationRuntime(options: { scenario?: NavigationScenario, secon
     const a = supervisor.snapshot(), b = board.snapshot()
     if (!hostAvailable) return { binding: null, reason: 'host-unavailable' }
     if (currentOccurrence && (!terminal || mission.state !== 'completed')) return { binding: null, reason: terminal ? 'recovery-required' : 'occurrence-busy' }
+    if (contactProfile && currentOccurrence) {
+      if (!contactHost || contactHost.nowMs !== nowMs || a.lastCheckedAtMs !== nowMs) return { binding: null, reason: 'contact-observation-not-current' }
+      if (!contactMonitoring || contactVerification?.phase !== 'verified') return { binding: null, reason: contactVerification?.phase === 'recovery-required' ? 'contact-recovery-required' : 'contact-not-verified' }
+      const check = contactEligibility({ ...contactHost, nowMs, estimate, map: rangeMap, packet: contactPacket, authority: a, board: b }, contactVerification.binding)
+      if (check.reason) return { binding: null, reason: check.reason }
+    }
     if (a.state !== 'disarmed' || b.fault !== null || b.motorsN.some(n => n !== 0)) return { binding: null, reason: 'authority-not-neutral' }
     const observation = observeMission({ estimate, authority: a.state, batteryPercent: 100 - usedWh / plan.power.availableWh * 100, onGround: truth.groundContact })
     const takeoff = plan.tasks.find(task => task.id === plan.start)!
@@ -346,8 +380,12 @@ function createNavigationRuntime(options: { scenario?: NavigationScenario, secon
     else if (value.issuedAtMs > nowMs || nowMs - value.issuedAtMs > authorityPolicy.commandAgeMs) item.reason = 'approval-expired-or-future'
     else if (queuedOccurrence) item.reason = 'occurrence-busy'
     else if (!qualification.binding) item.reason = qualification.reason
-    else if (nowMs + 20 + worstCaseMs + 2000 > horizonMs) item.reason = 'insufficient-session-time'
+    else if (nowMs + 20 + worstCaseMs + (contactProfile ? contactModel.windowMs : 0) + 2000 > horizonMs) item.reason = 'insufficient-session-time'
     else {
+      if (contactProfile && !contactFeed) {
+        contactContext = { vehicleId: 'navigation-vehicle', sessionId: String(supervisor.snapshot().sessionId), bootId: String(estimate.bootId), reference: `${estimate.bootId}:${Object.values(estimate.resets).join(',')}`, origin: JSON.stringify(estimate.localPosition!.origin) }
+        contactFeed = createContactFeed(contactProfile, contactContext)
+      }
       item.binding = qualification.binding
       item.state = 'queued'
       item.reason = 'awaiting-next-host-tick'
@@ -356,7 +394,9 @@ function createNavigationRuntime(options: { scenario?: NavigationScenario, secon
     return { state: item.state as 'queued' | 'refused', reason: item.reason }
   }
   function snapshotOccurrences() {
-    return { ...snapshot(), horizonMs, occurrences: structuredClone(occurrences) }
+    const common = { ...snapshot(), horizonMs, occurrences: structuredClone(occurrences) }
+    const contact = contactProfile ? structuredClone({ profile: contactProfile, phase: contactMonitoring ? contactVerification!.phase : 'awaiting-completion' as const, source: contactFeed?.snapshot() ?? { nowMs: -1, sequence: 0, queued: 0, latest: null }, hostObservedAtMs: contactHost?.nowMs ?? null, interlocks: contactHost?.interlocks ?? null, verification: contactVerification, outcomes: contactOutcomes, currentEligibility: hostAvailable && contactMonitoring && contactVerification?.phase === 'verified' && contactHost?.nowMs === Math.max(0, lastTickMs) && contactEligibility(contactHost, contactVerification.binding).reason === '' }) : undefined
+    return { ...common, ...(contact ? { contact } : {}) }
   }
   function endHost(reason: string) {
     hostAvailable = false
@@ -394,8 +434,8 @@ export function runNavigationFixture(options: { scenario?: NavigationScenario, s
 }
 
 /** Two manual approvals on one retained plant. No schedule, dock, recharge or recovery. */
-export function createNavigationOccurrenceSession(options: { scenario?: NavigationScenario } = {}) {
-  const runtime = createNavigationRuntime({ ...options, seconds: 120 }, false, true)
+export function createNavigationOccurrenceSession(options: { scenario?: NavigationScenario, contact?: ContactProfile } = {}) {
+  const runtime = createNavigationRuntime({ scenario: options.scenario, seconds: 120 }, false, true, options.contact)
   return {
     requestOccurrence: runtime.requestOccurrence,
     advanceTo(nowMs: number) {
