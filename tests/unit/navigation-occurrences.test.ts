@@ -312,3 +312,101 @@ test('a failed occurrence cannot launch again after its actual neutral motor tai
   expect(after.board.motorsN).toEqual([0, 0, 0, 0])
   expect(session.requestOccurrence({ id: 'after-failure', issuedAtMs: 10000, decision: 'approve' }).reason).toBe('occurrence-consumed')
 })
+
+
+test('accessor approval input is refused without reading its changing decision or creating an occurrence', () => {
+  const session = createNavigationOccurrenceSession()
+  session.advanceTo(2000)
+  let getterReads = 0
+  const input = { id: 'accessor', issuedAtMs: 2000, get decision() { return ++getterReads <= 2 ? 'deny' : 'approve' } }
+  let returned: unknown, error: unknown
+  try { returned = session.requestOccurrence(input) }
+  catch (caught) { error = caught }
+  const after = session.advanceTo(2020)
+  // Observe the actual arm/frame before neutral cleanup, even on the old-source RED.
+  session.stopHost()
+  session.advanceTo(2600)
+  // eslint-disable-next-line no-console
+  console.log(`NAVIGATION_ACCESSOR_APPROVAL ${JSON.stringify({ getterReads, returned, errorName: error instanceof Error ? error.name : null, storedDecision: after.occurrences[0]?.decision, attemptedAtMs: after.occurrences[0]?.attemptedAtMs, armAccepted: after.counts.armAccepted, engageAccepted: after.counts.engageAccepted, output: after.board.motorsN, hostAvailable: after.hostAvailable })}`)
+  expect(error).toBeInstanceOf(TypeError)
+  expect(returned).toBeUndefined()
+  expect(getterReads).toBe(0)
+  expect(after.occurrences).toHaveLength(0)
+  expect(after.hostAvailable).toBe(false)
+  expect(after.hostUnavailableReason).toBe('invalid-occurrence-request')
+  expect(after.counts.armAccepted).toBe(0)
+  expect(after.counts.engageAccepted).toBe(0)
+  expect(after.board.motorsN).toEqual([0, 0, 0, 0])
+})
+
+
+test('throwing accessors and inspection traps end host eligibility without cleanup before independent frame expiry', () => {
+  for (const fault of ['getter', 'ownKeys', 'prototype'] as const) {
+    const session = createNavigationOccurrenceSession()
+    session.advanceTo(2000)
+    session.requestOccurrence({ id: 'flying', issuedAtMs: 2000, decision: 'approve' })
+    const frame = session.advanceTo(2020)
+    expect(frame.board.motorsN.some(n => n > 0)).toBe(true)
+    let getterReads = 0, trapCalls = 0
+    const data = { id: 'bad', issuedAtMs: 2020, decision: 'approve' }
+    const input = fault === 'getter'
+      ? { id: 'bad', issuedAtMs: 2020, get decision() {
+          getterReads++
+          throw new Error('untrusted getter')
+        } }
+      : new Proxy(data, fault === 'ownKeys'
+        ? { ownKeys() {
+            trapCalls++
+            throw new Error('untrusted keys')
+          } }
+        : { getPrototypeOf() {
+            trapCalls++
+            throw new Error('untrusted prototype')
+          } })
+    let error: unknown
+    try { session.requestOccurrence(input) }
+    catch (caught) { error = caught }
+    const rejected = session.snapshot()
+    const expired = session.advanceTo(frame.board.expiresAtMs!)
+    const tail = session.advanceTo(frame.board.expiresAtMs! + 500)
+    expect(error).toBeInstanceOf(TypeError)
+    expect((error as Error).message).toBe('Invalid manual occurrence request')
+    expect(getterReads).toBe(0)
+    expect(trapCalls).toBe(fault === 'getter' ? 0 : 1)
+    expect(rejected.hostAvailable).toBe(false)
+    expect(rejected.hostUnavailableReason).toBe('invalid-occurrence-request')
+    expect(rejected.board).toEqual(frame.board)
+    expect(rejected.counts).toEqual(frame.counts)
+    expect(rejected.occurrences).toEqual(frame.occurrences)
+    expect(expired.board.fault).toBe('output-lease-expired')
+    expect(expired.board.motorsN).toEqual([0, 0, 0, 0])
+    expect(tail.counts).toEqual(frame.counts)
+    expect(tail.sensors).toEqual(frame.sensors)
+    expect(tail.estimate).toEqual(frame.estimate)
+    expect(tail.authority).toEqual(frame.authority)
+    expect(tail.board.bootId).toBe(frame.board.bootId)
+    expect(tail.board.sequence).toBe(frame.board.sequence)
+    expect(tail.plant.motorsN.every(n => n < 0.01)).toBe(true)
+  }
+})
+
+test('occurrence input accepts only exact enumerable own data fields on a plain object', () => {
+  const plain = () => ({ id: 'invalid', issuedAtMs: 2000, decision: 'approve' })
+  const symbol = { ...plain(), [Symbol('hidden')]: true }
+  const hidden = Object.defineProperty(plain(), 'hidden', { value: true })
+  const nonEnumerable = Object.defineProperty(plain(), 'decision', { value: 'approve', enumerable: false })
+  const inherited = Object.assign(Object.create({ inherited: true }), plain())
+  const inheritedFields = Object.create(plain())
+  const nullPrototype = Object.assign(Object.create(null), plain())
+  for (const input of [symbol, hidden, nonEnumerable, inherited, inheritedFields, nullPrototype, { ...plain(), extra: true }, { id: 'invalid', issuedAtMs: 2000 }, [], null]) {
+    const session = createNavigationOccurrenceSession()
+    session.advanceTo(2000)
+    expect(() => session.requestOccurrence(input)).toThrow(TypeError)
+    const after = session.advanceTo(2020)
+    expect(after.hostAvailable).toBe(false)
+    expect(after.occurrences).toHaveLength(0)
+    expect(after.counts.armAccepted).toBe(0)
+    expect(after.counts.engageAccepted).toBe(0)
+    expect(after.board.motorsN).toEqual([0, 0, 0, 0])
+  }
+})

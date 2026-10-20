@@ -322,19 +322,24 @@ function createNavigationRuntime(options: { scenario?: NavigationScenario, secon
     return { binding: JSON.stringify([plan, scenario, String(a.sessionId), String(a.bootId), observation.reference, observation.origin]), reason: '' }
   }
   function requestOccurrence(input: unknown) {
-    if (!input || typeof input !== 'object' || Array.isArray(input) || Object.keys(input).length !== 3 || Object.keys(input).some(key => !['id', 'issuedAtMs', 'decision'].includes(key))) {
-      endHost('invalid-occurrence-request')
-      throw new TypeError('Invalid manual occurrence request')
+    let value: { id: string, issuedAtMs: number, decision: 'approve' | 'deny' }
+    try {
+      if (!input || typeof input !== 'object' || Object.getPrototypeOf(input) !== Object.prototype) throw new TypeError('Invalid occurrence shape')
+      const descriptors = Object.getOwnPropertyDescriptors(input)
+      const fields = ['id', 'issuedAtMs', 'decision']
+      if (Reflect.ownKeys(descriptors).length !== fields.length || fields.some(field => !descriptors[field] || !descriptors[field]!.enumerable || !('value' in descriptors[field]!))) throw new TypeError('Invalid occurrence fields')
+      const id = descriptors.id!.value, issuedAtMs = descriptors.issuedAtMs!.value, decision = descriptors.decision!.value
+      if (typeof id !== 'string' || !/^[a-z][a-z0-9-]{0,39}$/.test(id) || !Number.isSafeInteger(issuedAtMs) || issuedAtMs < 0 || !['approve', 'deny'].includes(decision)) throw new TypeError('Invalid occurrence values')
+      value = { id, issuedAtMs, decision }
     }
-    const value = input as { id: string, issuedAtMs: number, decision: 'approve' | 'deny' }
-    if (typeof value.id !== 'string' || !/^[a-z][a-z0-9-]{0,39}$/.test(value.id) || !Number.isSafeInteger(value.issuedAtMs) || value.issuedAtMs < 0 || !['approve', 'deny'].includes(value.decision)) {
+    catch {
       endHost('invalid-occurrence-request')
       throw new TypeError('Invalid manual occurrence request')
     }
     if (occurrences.some(item => item.id === value.id)) return { state: 'refused' as const, reason: 'occurrence-consumed' }
     if (occurrences.length >= 2) return { state: 'refused' as const, reason: 'occurrence-capacity' }
     const nowMs = Math.max(0, lastTickMs)
-    const item: Occurrence = { ...value, requestedAtMs: nowMs, attemptedAtMs: null, startedAtMs: null, terminalAtMs: null, state: 'refused', reason: '', binding: null, result: null }
+    const item: Occurrence = { id: value.id, issuedAtMs: value.issuedAtMs, decision: value.decision, requestedAtMs: nowMs, attemptedAtMs: null, startedAtMs: null, terminalAtMs: null, state: 'refused', reason: '', binding: null, result: null }
     occurrences.push(item)
     const qualification = qualifyOccurrence(nowMs)
     if (value.decision === 'deny') item.reason = 'operator-denied'
