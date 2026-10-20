@@ -3,9 +3,9 @@ import { mkdtemp, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
-// Controlled actual native Gate scheduling plus genuine production messages/replay.
+// Controlled native Gate, genuine replay and separately measured synchronous parent stall.
 // This does not claim normal-host timing, HTTP delivery, hard interruption or OS join.
-test('native pending owner heartbeat settles before genuine final ACK after real replay deadline', async () => {
+test('native owner heartbeat elapsed fence precedes timer tasks after genuine replay', async () => {
   const root = await mkdtemp(join(tmpdir(), 'drone-incident-access-execution-heartbeat-owner-'))
   let child: ReturnType<typeof Bun.spawn> | undefined
   try {
@@ -18,7 +18,7 @@ test('native pending owner heartbeat settles before genuine final ACK after real
       // eslint-disable-next-line no-console
       for (const line of stdout.split('\n')) if (line.startsWith('OWNER_HEARTBEAT ')) console.log(line)
       expect(code, `${stdout}\n${stderr}`).toBe(0)
-      expect(stdout).toContain('PASS native pending owner heartbeat refuses real nominal replay after elapsed deadline')
+      expect(stdout).toContain('PASS native owner heartbeat elapsed fence precedes timer tasks after genuine replay and controlled parent stall')
     }
     finally { clearTimeout(timer) }
   }

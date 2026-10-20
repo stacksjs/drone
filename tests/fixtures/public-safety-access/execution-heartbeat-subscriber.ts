@@ -1,5 +1,5 @@
 /* eslint-disable ts/no-top-level-await, no-console */
-// Controlled real GET check and genuine Worker FIFO, not actual SSE delivery or CPU interruption.
+// Real GET check and genuine replay plus separate parent stall, not SSE delivery or CPU cost.
 import assert from 'node:assert/strict'
 import { randomUUID } from 'node:crypto'
 import { setupHandoverFixture } from './handover-setup'
@@ -22,6 +22,7 @@ interface SubscriberSlot {
   pendingEvent: object | null, phase: string, reason: string | null, producer: string,
   candidate: object | null, recording: string | null, completion: object | null,
   admission: string, subscriber: unknown, wallDeadline: number,
+  binding: { authorityUntil: number, retainUntil: string },
 }
 const key = 'execution-heartbeat-sub'
 const makeRequest = (operation: string, method = 'GET') => enhanceRequest(new Request(`https://incident.invalid/api/public-safety/incidents/${key}/workspace/execution/${operation}`, { method, headers: { authorization: `Bearer ${f.senderToken}` } }) as Parameters<typeof enhanceRequest>[0])
@@ -43,6 +44,9 @@ const gateEntered = new Promise<void>(resolve => { enteredGate = resolve })
 const gateBodySettled = new Promise<void>(resolve => { finishGateBody = resolve })
 let gateCaptured = false, gateBodyDone = false, releasedForCheckFailure = false
 let gateAt = 0, checkAt = 0, replayMs = 0, checkElapsedMs = 0, settledElapsedMs = 0
+let requestedSupplementalBlockMs = 0, supplementalParentBlockMs = 0, conservativeGateWindowMs = 0
+let sentinelFired = false, settledBeforeSentinel = false
+let sentinelTimer: ReturnType<typeof setTimeout> | undefined
 let entryPending = 0, entryOwnerBusy = false, forwardedAcks = 0, completedBeforeAck = 0
 let resultReceipt: unknown, sourceInsertObserved = false, sourceCommits = 0, sourceAudits = 0
 let unhookWrites: (() => void) | undefined
@@ -167,19 +171,38 @@ try {
   assert.equal(entryPending, 1)
   assert.equal(entryOwnerBusy, false)
   assert.equal(slot.phase, 'running')
+  assert(performance.now() - checkAt < limits.checkTimeoutMs, 'Prior-call elapsed upper bound remains below the native check budget at sentinel arm')
+  assert.equal(checkReturned, false)
+  assert(Object.is(checkError, undefined))
+  assert.equal(releasedForCheckFailure, false)
+  assert(performance.now() - gateAt < limits.checkTimeoutMs, 'Conservative Gate-entry window still precedes its full native check budget')
+  sentinelTimer = setTimeout(() => { sentinelFired = true }, 0)
   const at = performance.now()
   observe.call(worker, heldResult)
   replayMs = performance.now() - at
   resultDelegated = true
   assert(slot.candidate)
   assert.equal(slot.producer, 'pending')
+  // Supplement only this private scratch word; producer controls stay untouched.
+  requestedSupplementalBlockMs = Math.max(0, gateAt + limits.checkTimeoutMs + 50 - performance.now())
+  if (requestedSupplementalBlockMs > 0) {
+    const blockAt = performance.now()
+    assert.equal(Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, requestedSupplementalBlockMs), 'timed-out')
+    supplementalParentBlockMs = performance.now() - blockAt
+  }
+  conservativeGateWindowMs = performance.now() - gateAt
+  assert(conservativeGateWindowMs > limits.checkTimeoutMs)
+  assert(Date.now() < slot.wallDeadline && Date.now() < slot.binding.authorityUntil && Date.now() < Date.parse(slot.binding.retainUntil), 'Wall, token and incident retention deadlines remain future')
   releaseGate()
   await gateBodySettled
   await checkPromise
   checkElapsedMs = performance.now() - checkAt
-  await wait(() => executionOwner().pendingChecks === 0 && !slot!.ownerCheckBusy, 'Actual subscriber SQL and any later owner check settled')
+  assert.equal(executionOwner().pendingChecks, 0, 'Actual native SQL settled before the check outcome')
+  assert.equal(slot.ownerCheckBusy, false)
   settledElapsedMs = performance.now() - gateAt
-  assert(replayMs > limits.checkTimeoutMs, `Controlled window not sampled: actual replay ${replayMs}ms did not cross ${limits.checkTimeoutMs}ms`)
+  settledBeforeSentinel = !sentinelFired
+  assert.equal(settledBeforeSentinel, true, 'Native subscriber decision must precede the earlier-due timer sentinel')
+  clearTimeout(sentinelTimer)
   assert(checkError instanceof f.access.PublicSafetyAccessError && checkError.status === 404)
   assert.equal(checkReturned, false)
   assert.equal(gateBodyDone, true)
@@ -242,10 +265,11 @@ try {
   await wait(() => closeCodes.length > 0 && executionOwner().pendingChecks === 0, 'Native close marker and actual pending settlement')
   assert.deepEqual(closeCodes, [0])
   assert.deepEqual(workerErrors, [])
-  console.log('PASS native subscriber timeout across real replay preserves owner completion and explicit admission')
+  console.log('PASS native subscriber elapsed fence before timer tasks preserves owner completion and explicit admission')
 }
 finally {
   holdChecks = false
+  clearTimeout(sentinelTimer)
   releaseGate()
   if (gateCaptured) await gateBodySettled
   if (checkPromise) await checkPromise
@@ -262,7 +286,7 @@ finally {
     while (slot.producer === 'pending' && Date.now() < until) await Bun.sleep(20)
     if (slot.producer === 'pending') slot.worker?.terminate()
   }
-  console.log(`SUBSCRIBER_HEARTBEAT ${JSON.stringify({ controlledTiming: true, requestedSeconds: 100, checkBudgetMs: limits.checkTimeoutMs, resultReceipt, entryPending, entryOwnerBusy, gateCaptured, gateBodyDone, replayMs, checkElapsedMs, settledElapsedMs, checkReturned, checkStatus: checkError instanceof f.access.PublicSafetyAccessError ? checkError.status : null, releasedForCheckFailure, forwardedAcks, completedBeforeAck, sourceInsertObserved, sourceCommits, sourceAudits, workerErrors, closeCodes, final: state(), closeMarkerIsOsJoin: false })}`)
+  console.log(`SUBSCRIBER_HEARTBEAT ${JSON.stringify({ controlledTiming: true, requestedSeconds: 100, checkBudgetMs: limits.checkTimeoutMs, resultReceipt, entryPending, entryOwnerBusy, gateCaptured, gateBodyDone, replayMs, requestedSupplementalBlockMs, supplementalParentBlockMs, conservativeGateWindowMs, settledBeforeSentinel, sentinelFired, checkElapsedMs, settledElapsedMs, checkReturned, checkStatus: checkError instanceof f.access.PublicSafetyAccessError ? checkError.status : null, releasedForCheckFailure, forwardedAcks, completedBeforeAck, sourceInsertObserved, sourceCommits, sourceAudits, workerErrors, closeCodes, final: state(), closeMarkerIsOsJoin: false })}`)
   unhookHints()
   setServer(null)
   await f.database.closeDatabaseConnection()

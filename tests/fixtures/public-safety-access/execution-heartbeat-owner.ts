@@ -1,5 +1,5 @@
 /* eslint-disable ts/no-top-level-await, no-console */
-// Controlled actual heartbeat/replay overlap, not natural timing or instruction cancellation.
+// Actual heartbeat/replay plus a separately measured parent stall, not natural CPU cost.
 import type { ExecutionWorkerMessage } from '../../../resources/functions/drone/public-safety/execution/protocol'
 import assert from 'node:assert/strict'
 import { randomUUID } from 'node:crypto'
@@ -21,6 +21,7 @@ interface HeartbeatSlot {
   processing: boolean, pendingEvent: object | null, phase: string, reason: string | null,
   producer: string, candidate: object | null, recording: string | null,
   completion: object | null, admission: string, wallDeadline: number,
+  binding: { authorityUntil: number, retainUntil: string },
 }
 let slot: HeartbeatSlot | undefined, heldResult: MessageEvent | undefined
 let context: ReturnType<typeof core.captureExecutionContext> | undefined
@@ -37,6 +38,9 @@ const enteredGate = new Promise<void>(resolve => { announceGate = resolve })
 let finishGateBody!: () => void
 const settledGateBody = new Promise<void>(resolve => { finishGateBody = resolve })
 let gateAt = 0, replayMs = 0, gateElapsedAtReplayEnd = 0, gateElapsedAtCheckSettlement = 0
+let requestedSupplementalBlockMs = 0, supplementalParentBlockMs = 0, conservativeGateWindowMs = 0, microtaskTurns = 0
+let sentinelFired = false, settledBeforeSentinel = false
+let sentinelTimer: ReturnType<typeof setTimeout> | undefined
 let entryPending = 0, entryOwnerBusy = false, completedViews = 0, events = 0, forwardedRealAcks = 0
 let delegatedGateCalls = 0, postResultGateCalls = 0, sameOwnerRequestCalls = 0, postResultOwnerBusyCalls = 0
 interface StateObservation { phase: string, reason: string | null, producer: string, pending: number, ownerBusy: boolean, processing: boolean, wallRemainingMs: number }
@@ -202,6 +206,9 @@ try {
   assert.equal(entryOwnerBusy, true)
   assert.equal(slot.phase, 'running')
   assert(Date.now() < slot.wallDeadline, 'No wall deadline substitution for the targeted check budget')
+  assert(performance.now() - gateAt < limits.checkTimeoutMs, 'Capture must still precede the actual native check budget')
+  // Earlier-due sentinel must not run before the real native decision settles.
+  sentinelTimer = setTimeout(() => { sentinelFired = true }, 0)
   const at = performance.now()
   observe.call(worker, resultEvent)
   replayMs = performance.now() - at
@@ -209,12 +216,27 @@ try {
   gateElapsedAtReplayEnd = performance.now() - gateAt
   assert(slot.candidate, 'The exact production result handler completed unchanged full canonical validation')
   assert.equal(slot.producer, 'pending', 'The genuine final ACK is still retained, not fabricated')
+  // Fixture-only synchronous parent stall, separate from unchanged genuine replay.
+  requestedSupplementalBlockMs = Math.max(0, gateAt + limits.checkTimeoutMs + 50 - performance.now())
+  if (requestedSupplementalBlockMs > 0) {
+    const blockAt = performance.now()
+    assert.equal(Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, requestedSupplementalBlockMs), 'timed-out')
+    supplementalParentBlockMs = performance.now() - blockAt
+  }
+  conservativeGateWindowMs = performance.now() - gateAt
+  assert(conservativeGateWindowMs > limits.checkTimeoutMs)
+  assert(Date.now() < slot.wallDeadline && Date.now() < slot.binding.authorityUntil && Date.now() < Date.parse(slot.binding.retainUntil), 'Wall, token and incident retention deadlines remain future')
   releaseGate()
-  await settleNativeCheck()
+  // Bounded microtasks preserve the elapsed-fence proof; task waits are cleanup only.
+  for (; (executionOwner().pendingChecks || slot.ownerCheckBusy) && microtaskTurns < 4096; microtaskTurns++) await Promise.resolve()
+  assert.equal(executionOwner().pendingChecks, 0, 'Actual native transaction settled within the bounded microtask drain')
+  assert.equal(slot.ownerCheckBusy, false)
+  settledBeforeSentinel = !sentinelFired
+  assert.equal(settledBeforeSentinel, true, 'Native owner decision must precede the earlier-due timer sentinel')
+  clearTimeout(sentinelTimer)
   gateElapsedAtCheckSettlement = performance.now() - gateAt
   recordInactive()
   assert.equal(gateBodySettled, true)
-  assert(replayMs > limits.checkTimeoutMs, `Controlled window not sampled: real replay ${replayMs}ms did not itself cross ${limits.checkTimeoutMs}ms`)
   assert.equal(slot.phase, 'stopping')
   assert.equal(slot.reason, 'authority-unavailable')
   assert.equal(slot.candidate, null)
@@ -239,10 +261,11 @@ try {
   assert.deepEqual(await f.snapshot(config.id), before)
   assert.equal((await f.as(f.senderToken, () => f.records.listPublicSafetySources(config.id))).entries.length, 0)
   assert.equal((await core.closeIncidentExecution(context!, locator)).phase, 'discarded')
-  console.log('PASS native pending owner heartbeat refuses real nominal replay after elapsed deadline')
+  console.log('PASS native owner heartbeat elapsed fence precedes timer tasks after genuine replay and controlled parent stall')
 }
 finally {
   captureHeartbeat = false
+  clearTimeout(sentinelTimer)
   recordInactive()
   releaseGate()
   await settleNativeCheck()
@@ -255,6 +278,6 @@ finally {
     while (slot.producer === 'pending' && Date.now() < until) await Bun.sleep(20)
     if (slot.producer === 'pending') slot.worker?.terminate()
   }
-  console.log(`OWNER_HEARTBEAT ${JSON.stringify({ controlledTiming: true, requestedSeconds: 100, checkBudgetMs: limits.checkTimeoutMs, wallBudgetMs: limits.runWallMs, entryPending, entryOwnerBusy, resultReceipt, firstInactive, inactiveResultDelegated, workerErrors, wrapperExceptions, genuineAcks, delegatedGateCalls, postResultGateCalls, sameOwnerRequestCalls, postResultOwnerBusyCalls, actualGateBodySettled: gateBodySettled, replayMs, gateElapsedAtReplayEnd, gateElapsedAtCheckSettlement, forwardedRealAcks, completedViews, events, finalPhase: slot?.phase, finalReason: slot?.reason, finalProducer: slot?.producer })}`)
+  console.log(`OWNER_HEARTBEAT ${JSON.stringify({ controlledTiming: true, requestedSeconds: 100, checkBudgetMs: limits.checkTimeoutMs, wallBudgetMs: limits.runWallMs, entryPending, entryOwnerBusy, resultReceipt, firstInactive, inactiveResultDelegated, workerErrors, wrapperExceptions, genuineAcks, delegatedGateCalls, postResultGateCalls, sameOwnerRequestCalls, postResultOwnerBusyCalls, actualGateBodySettled: gateBodySettled, replayMs, requestedSupplementalBlockMs, supplementalParentBlockMs, conservativeGateWindowMs, microtaskTurns, settledBeforeSentinel, sentinelFired, gateElapsedAtReplayEnd, gateElapsedAtCheckSettlement, forwardedRealAcks, completedViews, events, finalPhase: slot?.phase, finalReason: slot?.reason, finalProducer: slot?.producer })}`)
   await f.database.closeDatabaseConnection()
 }

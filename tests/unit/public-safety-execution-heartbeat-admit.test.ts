@@ -3,8 +3,8 @@ import { mkdtemp, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
-// Actual source admission/native SQL ordering, no exact validator CPU or HTTP claim.
-test('native subscriber timeout during source-work task span preserves actual admission COMMIT', async () => {
+// Actual source/native SQL with a separate parent stall, no exact validator CPU or HTTP claim.
+test('native subscriber elapsed fence before next timer task preserves actual admission COMMIT', async () => {
   const root = await mkdtemp(join(tmpdir(), 'drone-incident-access-execution-heartbeat-admit-'))
   let child: ReturnType<typeof Bun.spawn> | undefined
   try {
@@ -17,7 +17,7 @@ test('native subscriber timeout during source-work task span preserves actual ad
       // eslint-disable-next-line no-console
       for (const line of stdout.split('\n')) if (line.startsWith('ADMISSION_HEARTBEAT ') || line.startsWith('ADMISSION_OVERLAP_OUTCOME ')) console.log(line)
       expect(code, `${stdout}\n${stderr}`).toBe(0)
-      expect(stdout).toContain('PASS native subscriber timeout across actual source-work span preserves single admission COMMIT')
+      expect(stdout).toContain('PASS native subscriber elapsed fence before next timer task preserves single actual admission COMMIT')
     }
     finally { clearTimeout(timer) }
   }

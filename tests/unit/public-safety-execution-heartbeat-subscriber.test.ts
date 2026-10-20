@@ -3,8 +3,8 @@ import { mkdtemp, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
-// Actual native core/GET authority; explicit observer release mirrors HTTP, not an SSE claim.
-test('native subscriber timeout across real replay preserves original owner completion and admission', async () => {
+// Actual native GET, genuine replay and separate parent stall; observer release is not SSE delivery.
+test('native subscriber elapsed fence before timer tasks preserves owner completion and admission', async () => {
   const root = await mkdtemp(join(tmpdir(), 'drone-incident-access-execution-heartbeat-subscriber-'))
   let child: ReturnType<typeof Bun.spawn> | undefined
   try {
@@ -17,7 +17,7 @@ test('native subscriber timeout across real replay preserves original owner comp
       // eslint-disable-next-line no-console
       for (const line of stdout.split('\n')) if (line.startsWith('SUBSCRIBER_HEARTBEAT ')) console.log(line)
       expect(code, `${stdout}\n${stderr}`).toBe(0)
-      expect(stdout).toContain('PASS native subscriber timeout across real replay preserves owner completion and explicit admission')
+      expect(stdout).toContain('PASS native subscriber elapsed fence before timer tasks preserves owner completion and explicit admission')
     }
     finally { clearTimeout(timer) }
   }

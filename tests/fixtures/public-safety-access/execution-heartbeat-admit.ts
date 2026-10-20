@@ -1,5 +1,5 @@
 /* eslint-disable ts/no-top-level-await, no-console */
-// Controlled native source-work/task bracket, not exact canonical CPU or HTTP transport.
+// Native source work plus separate parent stall, not exact canonical CPU or HTTP transport.
 import assert from 'node:assert/strict'
 import { randomUUID } from 'node:crypto'
 import { setupHandoverFixture } from './handover-setup'
@@ -19,7 +19,8 @@ const limits = (await import('../../../config/execution')).default
 interface AdmissionSlot {
   worker: Worker | null, phase: string, reason: string | null, producer: string,
   ownerCheckBusy: boolean, recording: string | null, admission: string,
-  metadataDeadline: number, subscriber: unknown,
+  metadataDeadline: number, subscriber: unknown, wallDeadline: number,
+  binding: { authorityUntil: number, retainUntil: string },
 }
 const key = 'execution-h-admit'
 const request = (operation: string, method = 'GET') => enhanceRequest(new Request(`https://incident.invalid/api/public-safety/incidents/${key}/workspace/execution/${operation}`, { method, headers: { authorization: `Bearer ${f.senderToken}` } }) as Parameters<typeof enhanceRequest>[0])
@@ -48,7 +49,10 @@ let initialAuthorityCommitAt = 0, subscriberNativeCommitAt = 0, firstWriterDmlAt
 let preflightReleaseAt = 0, subscriberCheckAt = 0, subscriberGateAt = 0, zeroTaskAt = 0, subscriberSettledAt = 0
 let entryPending = 0, entryOwnerBusy = false, zeroTaskPending = 0, zeroTaskBodyHeld = false
 let zeroTaskOwnsReservation = false, zeroTaskRecordingRetained = false, zeroTaskAdmission: string | null = null
-let releaseTask: ReturnType<typeof setTimeout> | undefined
+let releaseTask: ReturnType<typeof setTimeout> | undefined, sentinelTimer: ReturnType<typeof setTimeout> | undefined
+let requestedSupplementalBlockMs = 0, supplementalParentBlockMs = 0, conservativeGateWindowMs = 0
+let sentinelFired = false, releaseBeforeSentinel = false, settledBeforeSentinel = false, pendingAtSubscriberCommit = 0
+let pendingAtSubscriberOutcome = -1, nativeCommitBeforeOutcome = false
 const order: string[] = []
 const state = () => slot ? { phase: slot.phase, reason: slot.reason, producer: slot.producer, admission: slot.admission, pending: executionOwner().pendingChecks, ownerBusy: slot.ownerCheckBusy, recordingRetained: !!slot.recording } : null
 const wait = async (predicate: () => boolean, message: string, timeout = 5000) => {
@@ -157,6 +161,7 @@ try {
       if (getCurrentRequest() === subscriberRequest && subscriberCaptured && !subscriberNativeCommits) {
         subscriberNativeCommits++
         subscriberNativeCommitAt = performance.now()
+        pendingAtSubscriberCommit = executionOwner().pendingChecks
         order.push('subscriber-actual-native-commit')
       }
       if (getCurrentRequest() !== admitRequest) return
@@ -191,7 +196,12 @@ try {
     subscriberError = error
     subscriber!.release()
     releasedForSubscriberFailure = true
-  }).finally(() => { subscriberSettledAt = performance.now() })
+  }).finally(() => {
+    subscriberSettledAt = performance.now()
+    settledBeforeSentinel = !sentinelFired
+    pendingAtSubscriberOutcome = executionOwner().pendingChecks
+    nativeCommitBeforeOutcome = subscriberNativeCommits === 1 && subscriberBodyDone
+  })
   await wait(() => subscriberCaptured, 'Actual subscriber native transaction acquires SQL while preflight is outside TX')
   await subscriberReady
   entryPending = executionOwner().pendingChecks
@@ -203,7 +213,13 @@ try {
   assert.equal(sourceAudit, 0)
   assert.equal(executionOwner().slot, originalSlot)
   assert(slot.recording)
+  assert(performance.now() - subscriberCheckAt < limits.checkTimeoutMs, 'Prior-call elapsed upper bound remains below the native check budget at sentinel arm')
+  assert.equal(subscriberReturned, false)
+  assert(Object.is(subscriberError, undefined))
+  assert.equal(releasedForSubscriberFailure, false)
+  assert(performance.now() - subscriberGateAt < limits.checkTimeoutMs, 'Conservative Gate-entry window still precedes its full native check budget')
   releaseTask = setTimeout(() => {
+    releaseBeforeSentinel = !sentinelFired
     zeroTaskAt = performance.now()
     zeroTaskPending = executionOwner().pendingChecks
     zeroTaskBodyHeld = !subscriberBodyDone
@@ -213,6 +229,17 @@ try {
     order.push('zero-task-releases-subscriber-native-gate')
     releaseSubscriber()
   }, 0)
+  // The release task is due first; the next task must not beat native GET settlement.
+  sentinelTimer = setTimeout(() => { sentinelFired = true }, 0)
+  requestedSupplementalBlockMs = Math.max(0, subscriberGateAt + limits.checkTimeoutMs + 50 - performance.now())
+  if (requestedSupplementalBlockMs > 0) {
+    const blockAt = performance.now()
+    assert.equal(Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, requestedSupplementalBlockMs), 'timed-out')
+    supplementalParentBlockMs = performance.now() - blockAt
+  }
+  conservativeGateWindowMs = performance.now() - subscriberGateAt
+  assert(conservativeGateWindowMs > limits.checkTimeoutMs)
+  assert(Date.now() < slot.wallDeadline && Date.now() < slot.metadataDeadline && Date.now() < slot.binding.authorityUntil && Date.now() < Date.parse(slot.binding.retainUntil), 'Wall, token, result and incident retention deadlines remain future')
   preflightReleaseAt = performance.now()
   order.push('release-actual-source-preflight')
   releasePreflight()
@@ -223,7 +250,12 @@ try {
   f.database.db.primary.setTransactionDefaults({ afterCommit: undefined, onRollback: undefined })
   const sources = await f.as(f.senderToken, () => f.records.listPublicSafetySources(key))
   console.log(`ADMISSION_OVERLAP_OUTCOME ${JSON.stringify({ admitRejected, admitStatus: errorStatus(admitError), sourceCount: sources.entries.length, actualSourceCommits: sourceCommits, admission: slot.admission, sourceWorkTaskSpanMs: zeroTaskAt - preflightReleaseAt })}`)
-  assert(zeroTaskAt - preflightReleaseAt > limits.checkTimeoutMs, `Controlled window not sampled: actual source-work/task span ${zeroTaskAt - preflightReleaseAt}ms did not cross ${limits.checkTimeoutMs}ms; this is not exact canonical CPU`)
+  assert(subscriberSettledAt - subscriberGateAt > limits.checkTimeoutMs)
+  assert.equal(releaseBeforeSentinel, true)
+  assert.equal(settledBeforeSentinel, true, 'Actual native GET outcome and SQL settlement must precede the next timer sentinel')
+  assert(pendingAtSubscriberCommit >= 1, 'Native pending budget remains owned through actual SQL COMMIT')
+  assert.equal(pendingAtSubscriberOutcome, 0)
+  assert.equal(nativeCommitBeforeOutcome, true)
   assert.equal(zeroTaskPending, 1)
   assert.equal(zeroTaskBodyHeld, true)
   assert.equal(zeroTaskOwnsReservation, true)
@@ -260,13 +292,14 @@ try {
   assert.equal(hints.length, beforeHints + 1)
   assert.equal((await core.readIncidentExecution(context!, { scope }))!.admission, 'confirmed')
   assert.equal((await core.closeIncidentExecution(context!, locator)).phase, 'discarded')
-  console.log('PASS native subscriber timeout across actual source-work span preserves single admission COMMIT')
+  console.log('PASS native subscriber elapsed fence before next timer task preserves single actual admission COMMIT')
 }
 finally {
   const beforeCleanup = state()
   armPreflight = false
   armSubscriber = false
   clearTimeout(releaseTask)
+  clearTimeout(sentinelTimer)
   releasePreflight()
   releaseSubscriber()
   if (subscriberPromise) await subscriberPromise
@@ -284,7 +317,7 @@ finally {
     while (slot.producer === 'pending' && Date.now() < until) await Bun.sleep(20)
     if (slot.producer === 'pending') slot.worker?.terminate()
   }
-  console.log(`ADMISSION_HEARTBEAT ${JSON.stringify({ controlledTiming: true, requestedSeconds: 100, checkBudgetMs: limits.checkTimeoutMs, entryPending, entryOwnerBusy, initialAuthorityCommits, initialAuthorityCommitAt, preflightCaptured, preflightBodyDone, subscriberCaptured, subscriberBodyDone, subscriberCheckElapsedMs: subscriberSettledAt && subscriberCheckAt ? subscriberSettledAt - subscriberCheckAt : 0, subscriberGateElapsedMs: subscriberSettledAt && subscriberGateAt ? subscriberSettledAt - subscriberGateAt : 0, sourceWorkTaskSpanMs: zeroTaskAt && preflightReleaseAt ? zeroTaskAt - preflightReleaseAt : 0, spanIsExactCanonicalCpu: false, zeroTaskPending, zeroTaskBodyHeld, zeroTaskOwnsReservation, zeroTaskRecordingRetained, zeroTaskAdmission, subscriberReturned, subscriberStatus: errorStatus(subscriberError), releasedForSubscriberFailure, subscriberNativeCommits, subscriberNativeCommitAt, firstWriterDmlAt, sourceAdvance, sourceInsert, sourceAudit, checkedGuardReads, sourceCommits, sourceCommitAt, nativeRollbacks, admitStatus: errorStatus(admitError), order, errors, closeCodes, beforeCleanup, final: state(), closeMarkerIsOsJoin: false })}`)
+  console.log(`ADMISSION_HEARTBEAT ${JSON.stringify({ controlledTiming: true, requestedSeconds: 100, checkBudgetMs: limits.checkTimeoutMs, entryPending, entryOwnerBusy, initialAuthorityCommits, initialAuthorityCommitAt, preflightCaptured, preflightBodyDone, subscriberCaptured, subscriberBodyDone, subscriberCheckElapsedMs: subscriberSettledAt && subscriberCheckAt ? subscriberSettledAt - subscriberCheckAt : 0, subscriberGateElapsedMs: subscriberSettledAt && subscriberGateAt ? subscriberSettledAt - subscriberGateAt : 0, sourceWorkTaskSpanMs: zeroTaskAt && preflightReleaseAt ? zeroTaskAt - preflightReleaseAt : 0, requestedSupplementalBlockMs, supplementalParentBlockMs, conservativeGateWindowMs, releaseBeforeSentinel, settledBeforeSentinel, sentinelFired, pendingAtSubscriberCommit, pendingAtSubscriberOutcome, nativeCommitBeforeOutcome, spanIsExactCanonicalCpu: false, zeroTaskPending, zeroTaskBodyHeld, zeroTaskOwnsReservation, zeroTaskRecordingRetained, zeroTaskAdmission, subscriberReturned, subscriberStatus: errorStatus(subscriberError), releasedForSubscriberFailure, subscriberNativeCommits, subscriberNativeCommitAt, firstWriterDmlAt, sourceAdvance, sourceInsert, sourceAudit, checkedGuardReads, sourceCommits, sourceCommitAt, nativeRollbacks, admitStatus: errorStatus(admitError), order, errors, closeCodes, beforeCleanup, final: state(), closeMarkerIsOsJoin: false })}`)
   unhookHints()
   setServer(null)
   await f.database.closeDatabaseConnection()
