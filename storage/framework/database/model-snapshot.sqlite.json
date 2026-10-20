@@ -2854,10 +2854,436 @@
             "type": "index"
           }
         ]
+      },
+      {
+        "table": "patrol_review_audits",
+        "columns": [
+          {
+            "name": "id",
+            "type": "integer",
+            "isPrimaryKey": true,
+            "isUnique": false,
+            "isNullable": false,
+            "hasDefault": false
+          },
+          {
+            "name": "schedule_id",
+            "type": "integer",
+            "isPrimaryKey": false,
+            "isUnique": false,
+            "isNullable": false,
+            "hasDefault": false,
+            "references": {
+              "table": "patrol_review_schedules",
+              "column": "id",
+              "onDelete": "restrict"
+            }
+          },
+          {
+            "name": "sequence",
+            "type": "integer",
+            "isPrimaryKey": false,
+            "isUnique": false,
+            "isNullable": false,
+            "hasDefault": false
+          },
+          {
+            "name": "actor_id",
+            "type": "bigint",
+            "isPrimaryKey": false,
+            "isUnique": false,
+            "isNullable": false,
+            "hasDefault": false,
+            "references": {
+              "table": "users",
+              "column": "id",
+              "onDelete": "restrict"
+            }
+          },
+          {
+            "name": "token_id",
+            "type": "integer",
+            "isPrimaryKey": false,
+            "isUnique": false,
+            "isNullable": false,
+            "hasDefault": false
+          },
+          {
+            "name": "action",
+            "type": "enum",
+            "isPrimaryKey": false,
+            "isUnique": false,
+            "isNullable": false,
+            "hasDefault": false,
+            "enumValues": [
+              "created",
+              "approved",
+              "denied",
+              "consumed"
+            ]
+          },
+          {
+            "name": "request_id",
+            "type": "string",
+            "isPrimaryKey": false,
+            "isUnique": false,
+            "isNullable": false,
+            "hasDefault": false,
+            "maxLength": 36
+          },
+          {
+            "name": "request_digest",
+            "type": "string",
+            "isPrimaryKey": false,
+            "isUnique": false,
+            "isNullable": false,
+            "hasDefault": false,
+            "maxLength": 64
+          },
+          {
+            "name": "at_iso",
+            "type": "string",
+            "isPrimaryKey": false,
+            "isUnique": false,
+            "isNullable": false,
+            "hasDefault": false,
+            "maxLength": 24
+          },
+          {
+            "name": "details_json",
+            "type": "string",
+            "isPrimaryKey": false,
+            "isUnique": false,
+            "isNullable": false,
+            "hasDefault": false,
+            "maxLength": 512
+          }
+        ],
+        "indexes": [
+          {
+            "name": "patrol_review_audit_sequence_unique",
+            "columns": [
+              "schedule_id",
+              "sequence"
+            ],
+            "type": "unique"
+          },
+          {
+            "name": "patrol_review_audit_request_unique",
+            "columns": [
+              "schedule_id",
+              "request_id"
+            ],
+            "type": "unique"
+          }
+        ]
+      },
+      {
+        "table": "patrol_review_occurrences",
+        "columns": [
+          {
+            "name": "id",
+            "type": "integer",
+            "isPrimaryKey": true,
+            "isUnique": false,
+            "isNullable": false,
+            "hasDefault": false
+          },
+          {
+            "name": "schedule_id",
+            "type": "integer",
+            "isPrimaryKey": false,
+            "isUnique": false,
+            "isNullable": false,
+            "hasDefault": false,
+            "references": {
+              "table": "patrol_review_schedules",
+              "column": "id",
+              "onDelete": "restrict"
+            }
+          },
+          {
+            "name": "due_utc_ms",
+            "type": "integer",
+            "isPrimaryKey": false,
+            "isUnique": false,
+            "isNullable": false,
+            "hasDefault": false
+          },
+          {
+            "name": "scope_digest",
+            "type": "string",
+            "isPrimaryKey": false,
+            "isUnique": false,
+            "isNullable": false,
+            "hasDefault": false,
+            "maxLength": 64
+          },
+          {
+            "name": "state",
+            "type": "enum",
+            "isPrimaryKey": false,
+            "isUnique": false,
+            "isNullable": false,
+            "hasDefault": false,
+            "enumValues": [
+              "awaiting-review",
+              "approved",
+              "denied",
+              "consumed"
+            ]
+          },
+          {
+            "name": "decision",
+            "type": "enum",
+            "isPrimaryKey": false,
+            "isUnique": false,
+            "isNullable": true,
+            "hasDefault": false,
+            "enumValues": [
+              "approve",
+              "deny"
+            ]
+          },
+          {
+            "name": "reviewer_id",
+            "type": "bigint",
+            "isPrimaryKey": false,
+            "isUnique": false,
+            "isNullable": true,
+            "hasDefault": false,
+            "references": {
+              "table": "users",
+              "column": "id",
+              "onDelete": "restrict"
+            }
+          },
+          {
+            "name": "reviewer_token_id",
+            "type": "integer",
+            "isPrimaryKey": false,
+            "isUnique": false,
+            "isNullable": true,
+            "hasDefault": false
+          },
+          {
+            "name": "reviewed_at_iso",
+            "type": "string",
+            "isPrimaryKey": false,
+            "isUnique": false,
+            "isNullable": true,
+            "hasDefault": false,
+            "maxLength": 24
+          },
+          {
+            "name": "expires_at_iso",
+            "type": "string",
+            "isPrimaryKey": false,
+            "isUnique": false,
+            "isNullable": true,
+            "hasDefault": false,
+            "maxLength": 24
+          },
+          {
+            "name": "review_request_id",
+            "type": "string",
+            "isPrimaryKey": false,
+            "isUnique": false,
+            "isNullable": true,
+            "hasDefault": false,
+            "maxLength": 36
+          },
+          {
+            "name": "consumed_at_iso",
+            "type": "string",
+            "isPrimaryKey": false,
+            "isUnique": false,
+            "isNullable": true,
+            "hasDefault": false,
+            "maxLength": 24
+          },
+          {
+            "name": "consume_request_id",
+            "type": "string",
+            "isPrimaryKey": false,
+            "isUnique": false,
+            "isNullable": true,
+            "hasDefault": false,
+            "maxLength": 36
+          }
+        ],
+        "indexes": [
+          {
+            "name": "patrol_review_occurrence_due_unique",
+            "columns": [
+              "schedule_id",
+              "due_utc_ms"
+            ],
+            "type": "unique"
+          },
+          {
+            "name": "patrol_review_occurrence_review_unique",
+            "columns": [
+              "schedule_id",
+              "review_request_id"
+            ],
+            "type": "unique"
+          },
+          {
+            "name": "patrol_review_occurrence_consume_unique",
+            "columns": [
+              "schedule_id",
+              "consume_request_id"
+            ],
+            "type": "unique"
+          }
+        ]
+      },
+      {
+        "table": "patrol_review_schedules",
+        "columns": [
+          {
+            "name": "id",
+            "type": "integer",
+            "isPrimaryKey": true,
+            "isUnique": false,
+            "isNullable": false,
+            "hasDefault": false
+          },
+          {
+            "name": "owner_user_id",
+            "type": "bigint",
+            "isPrimaryKey": false,
+            "isUnique": false,
+            "isNullable": false,
+            "hasDefault": false,
+            "references": {
+              "table": "users",
+              "column": "id",
+              "onDelete": "restrict"
+            }
+          },
+          {
+            "name": "schedule_key",
+            "type": "string",
+            "isPrimaryKey": false,
+            "isUnique": false,
+            "isNullable": false,
+            "hasDefault": false,
+            "maxLength": 40
+          },
+          {
+            "name": "revision",
+            "type": "integer",
+            "isPrimaryKey": false,
+            "isUnique": false,
+            "isNullable": false,
+            "hasDefault": false
+          },
+          {
+            "name": "version",
+            "type": "integer",
+            "isPrimaryKey": false,
+            "isUnique": false,
+            "isNullable": false,
+            "hasDefault": false
+          },
+          {
+            "name": "profile",
+            "type": "enum",
+            "isPrimaryKey": false,
+            "isUnique": false,
+            "isNullable": false,
+            "hasDefault": false,
+            "enumValues": [
+              "nominal"
+            ]
+          },
+          {
+            "name": "recurrence_profile",
+            "type": "enum",
+            "isPrimaryKey": false,
+            "isUnique": false,
+            "isNullable": false,
+            "hasDefault": false,
+            "enumValues": [
+              "minute-zero-one-v1"
+            ]
+          },
+          {
+            "name": "anchor_utc_ms",
+            "type": "integer",
+            "isPrimaryKey": false,
+            "isUnique": false,
+            "isNullable": false,
+            "hasDefault": false
+          },
+          {
+            "name": "horizon_ms",
+            "type": "integer",
+            "isPrimaryKey": false,
+            "isUnique": false,
+            "isNullable": false,
+            "hasDefault": false
+          },
+          {
+            "name": "input_json",
+            "type": "text",
+            "isPrimaryKey": false,
+            "isUnique": false,
+            "isNullable": false,
+            "hasDefault": false
+          },
+          {
+            "name": "binding_json",
+            "type": "text",
+            "isPrimaryKey": false,
+            "isUnique": false,
+            "isNullable": false,
+            "hasDefault": false
+          },
+          {
+            "name": "input_digest",
+            "type": "string",
+            "isPrimaryKey": false,
+            "isUnique": false,
+            "isNullable": false,
+            "hasDefault": false,
+            "maxLength": 64
+          },
+          {
+            "name": "binding_digest",
+            "type": "string",
+            "isPrimaryKey": false,
+            "isUnique": false,
+            "isNullable": false,
+            "hasDefault": false,
+            "maxLength": 64
+          },
+          {
+            "name": "created_at_iso",
+            "type": "string",
+            "isPrimaryKey": false,
+            "isUnique": false,
+            "isNullable": false,
+            "hasDefault": false,
+            "maxLength": 24
+          }
+        ],
+        "indexes": [
+          {
+            "name": "patrol_review_schedule_owner_key_unique",
+            "columns": [
+              "owner_user_id",
+              "schedule_key"
+            ],
+            "type": "unique"
+          }
+        ]
       }
     ]
   },
-  "hash": "4b51d3875cdf7ab223936f7cb6e4a6c474ccc8c9bdc4a44c1eb44a20a95ebcab",
+  "hash": "2a1c595f796043a5f491fca15fab7c445f21d2d64f6342e3dd88687cd21a7d9e",
   "dialect": "sqlite",
-  "updatedAt": "2026-10-19T17:36:40.463Z"
+  "updatedAt": "2026-10-20T06:38:47.371Z"
 }

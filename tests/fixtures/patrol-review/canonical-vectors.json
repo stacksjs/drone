@@ -1,0 +1,51 @@
+{
+  "provenance": "Independent Python hashlib SHA256 over manually specified frozen object order; literal values, no production imports.",
+  "body": {
+    "requestId": "11111111-1111-4111-8111-111111111111",
+    "scheduleKey": "vector",
+    "input": {
+      "profile": "nominal",
+      "unsignedLocalReview": true,
+      "enableCharge": false,
+      "decisions": [
+        {
+          "kind": "flight",
+          "id": "first",
+          "atMs": 2000,
+          "dueUtcMs": 1767225600000,
+          "decision": "approve"
+        },
+        {
+          "kind": "flight",
+          "id": "second",
+          "atMs": 60000,
+          "dueUtcMs": 1767225660000,
+          "decision": "approve"
+        }
+      ]
+    },
+    "binding": {
+      "vehicleId": "navigation-vehicle",
+      "padId": "pad",
+      "planId": "local-survey-demo",
+      "profile": "nominal-contact-partial-charge-v1",
+      "sessionId": "123",
+      "bootId": "55",
+      "reference": "55:0,0,0,0,0",
+      "origin": "{\"latitudeDeg\":0,\"longitudeDeg\":0,\"ellipsoidHeightM\":100}"
+    }
+  },
+  "inputBytes": "{\"profile\":\"nominal\",\"unsignedLocalReview\":true,\"enableCharge\":false,\"decisions\":[{\"kind\":\"flight\",\"id\":\"first\",\"atMs\":2000,\"dueUtcMs\":1767225600000,\"decision\":\"approve\"},{\"kind\":\"flight\",\"id\":\"second\",\"atMs\":60000,\"dueUtcMs\":1767225660000,\"decision\":\"approve\"}]}",
+  "bindingBytes": "{\"vehicleId\":\"navigation-vehicle\",\"padId\":\"pad\",\"planId\":\"local-survey-demo\",\"profile\":\"nominal-contact-partial-charge-v1\",\"sessionId\":\"123\",\"bootId\":\"55\",\"reference\":\"55:0,0,0,0,0\",\"origin\":\"{\\\"latitudeDeg\\\":0,\\\"longitudeDeg\\\":0,\\\"ellipsoidHeightM\\\":100}\"}",
+  "inputDigest": "66b9481d94223515f4e476e3b97904c8fa0922834d475cd248de0c3d2077caf7",
+  "bindingDigest": "c002961cc70ab252b9f24fc3ce25b0ad8b28f079b36b58cf1965e77d9c514010",
+  "scopeOwner7KeyVectorA": "8507e07d9818f1460ec5bf6cb6daad5613f62bbf5cf22d99dfe6a35b4550a948",
+  "scopeOwner8KeyVectorA": "cc090eb86137d280955564fc487022077e0adf2cbf342fcb6fea4148b5d5a488",
+  "scopeOwner7OtherKeyA": "b0051a0909936632e0fa9cd01b4977c7742601c1b44d09bf8ff71de3a7dc873a",
+  "scopeOwner7KeyVectorB": "c06ce472b647c291c0908088bc834e37a40b4b6f757d2f3dce9bc92aa3bb1840",
+  "createOwner7": "6946a4fa53ca051c1f70f1be200ef42debc09878047148ad8d9aad84ed42df6c",
+  "approveVersion1": "59de38214badde854c915dd725bb26f1e50dd96c7c6ff60f9b9b3b42d0facd63",
+  "approveVersion2": "37e268b324910dd78795fe8b99573c6a718b42378d97b85e86ace2e32a819a44",
+  "denyVersion1": "62f7421214bc117943e7f716e811c134d827b3b7b4592b830e0ec30f8d463ac9",
+  "consumeVersion2": "b18dc8c651a037641fc7812e3019ca646db64a535365a100ae8394020cd621af"
+}

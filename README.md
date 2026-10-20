@@ -326,8 +326,10 @@ and charge decisions also require a fresh charge opt-in. Neutral replay needs ne
 ./buddy patrol:replay /tmp/patrol-neutral
 ```
 
-Production scheduling, authenticated patrol review, recovery and physical docking remain
-open under issue #24.
+The [authenticated patrol review API](docs/patrol-review.md) records owner-only intent,
+approval, denial and one durable consumption acknowledgment through native Stacks Auth,
+Gates and SQLite. These records do not launch a vehicle or grant charging authority.
+Production scheduling, runtime handoff, recovery and physical docking remain open under issue #24.
 
 ## External-driver protocol services
 

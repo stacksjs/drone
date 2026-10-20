@@ -54,7 +54,9 @@ pending and verified host silence, exact switch edges, and a blocked contact-ena
 Legacy seven-scenario result bytes remain unchanged. The contact-only experiment keeps an
 unmeasured nominal hover-load proxy without recharge credit. A separate optional
 [partial-charge model](patrol-charge.md) adds explicit permission, instrument verification
-and isolation. Measured hardware current, a full weather system, scheduling, persistence,
-authenticated patrol review, a patrol workspace, physical docking and recovery remain open.
+and isolation. The separate [authenticated review ledger](patrol-review.md) persists
+owner-only intent and review metadata without launch or charging authority. Measured
+hardware current, a full weather system, production scheduling, runtime handoff/recovery,
+a patrol workspace and physical docking remain open.
 The [finite patrol command](patrol-cli.md) composes this modeled contact verifier with
 explicit unsigned decisions; it adds no physical contact evidence.

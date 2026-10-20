@@ -1,3 +1,4 @@
+import { patrolReviewGate } from '../resources/functions/drone/navigation/review/policy'
 import { publicSafetyHandoverGate } from '../resources/functions/drone/public-safety/access/handover-policy'
 import { publicSafetyRetentionGate } from '../resources/functions/drone/public-safety/retention/policy'
 import { publicSafetyManagedGate } from '../resources/functions/drone/public-safety/managed/policy'
@@ -33,6 +34,11 @@ export default defineGates({
    * }
    */
   gates: {
+    'patrol:create': user => patrolReviewGate(user, 'create'),
+    'patrol:read': user => patrolReviewGate(user, 'read'),
+    'patrol:review': user => patrolReviewGate(user, 'review'),
+    'patrol:approve': user => patrolReviewGate(user, 'approve'),
+    'patrol:consume': user => patrolReviewGate(user, 'consume'),
     'public-safety:workspace-read': (user, key: string) => publicSafetyIncidentGate(user, key, 'view'),
     'public-safety:handover-read': (user, key: string) => publicSafetyHandoverGate(user, key, 'read'),
     'public-safety:handover-write': (user, key: string) => publicSafetyHandoverGate(user, key, 'write'),

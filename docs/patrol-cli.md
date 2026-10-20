@@ -74,7 +74,8 @@ flight must actually complete with its own verified contact; approved charging m
 isolate its own episode. A queued request or final relay-off value alone cannot establish success.
 The retained model continues to the horizon without a fabricated final stop or revoke.
 
-Issue #24 remains open for authenticated permissions and durable audit/consumption, restart and
-concurrency outcomes, a patrol workspace, production scheduling, broader weather/recovery behavior
-and physical qualification. This command adds no physical transport, unattended operation,
-physical battery ratings or endurance evidence.
+The separate [authenticated review ledger](patrol-review.md) persists owner-only intent,
+decisions and consumption metadata without invoking this command or handing off to a runtime.
+Issue #24 remains open for a patrol workspace, production scheduling, runtime recovery, broader
+weather behavior and physical qualification. This command adds no physical transport, unattended
+operation, physical battery ratings or endurance evidence.

@@ -43,6 +43,8 @@
     "./unit/patrol.test.ts",
     "./unit/patrol-cli.test.ts",
     "./unit/patrol-recording.test.ts",
+    "./unit/patrol-review*.test.ts",
+    "./fixtures/patrol-review/**/*.ts",
     "../resources/functions/drone/antenna/**/*.ts",
     "./unit/antenna.test.ts",
     "./fixtures/antenna/**/*.ts",

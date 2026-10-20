@@ -4,8 +4,9 @@ The private `createNavigationOccurrenceSession` in
 `resources/functions/drone/navigation/runtime.ts` accepts an optional `charge` profile when
 `contact` is also selected. Profiles are `nominal`, `no-current`, `current-stuck`,
 `stuck-relay`, `feedback-loss`, `feedback-replay` and `mains-loss`. Issue #24 remains open
-for production scheduling, authenticated patrol review/audit, persistence, recovery, a full weather
-system and physical qualification. This experiment has no charger hardware transport.
+for production scheduling, runtime recovery, a full weather system and physical qualification.
+The separate [authenticated review ledger](patrol-review.md) persists owner-only intent and
+review metadata without granting charge or launch authority. This experiment has no charger hardware transport.
 
 Only the charge-enabled adapter exposes `requestCharge()` and `stopCharge()`. A request is
 an unsigned local decision with exactly `{ id, occurrenceId, issuedAtMs, decision }`, where

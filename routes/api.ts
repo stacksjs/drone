@@ -1,3 +1,8 @@
+import PatrolReviewConsume from '../app/Actions/PatrolReviewConsume'
+import PatrolReviewDecide from '../app/Actions/PatrolReviewDecide'
+import PatrolReviewCreate from '../app/Actions/PatrolReviewCreate'
+import PatrolReviewRead from '../app/Actions/PatrolReviewRead'
+import { patrolHttpBoundary } from '../resources/functions/drone/navigation/review/http'
 import { createTypedRouter, route } from '@stacksjs/router'
 import DroneStatus from '../app/Actions/DroneStatus'
 import CameraState from '../app/Actions/CameraState'
@@ -48,6 +53,7 @@ import { incidentDataExposureBoundary } from '../resources/functions/drone/publi
 
 route.use(incidentDataExposureBoundary)
 route.use(incidentHttpBoundary)
+route.use(patrolHttpBoundary)
 
 export const api = createTypedRouter().get('/drone/capabilities', DroneStatus)
   .get('/camera/state', CameraState)
@@ -97,3 +103,8 @@ route.post('/public-safety/incidents/{incident}/retention/purge', PublicSafetyPu
 route.get('/public-safety/incidents/{incident}/retention/purge/{purge}', PublicSafetyPurgeRead).middleware('auth')
 route.get('/public-safety/incidents/{incident}/retention/purge/{purge}/events', PublicSafetyPurgeEvents).middleware('auth')
 route.post('/public-safety/incidents/{incident}/retention/purge/{purge}/retry', PublicSafetyPurgeRetry).middleware('auth').parseBody(false)
+
+route.post('/patrol/reviews', PatrolReviewCreate).middleware('PatrolAuth').parseBody(false)
+route.get('/patrol/reviews/{schedule}', PatrolReviewRead).middleware('PatrolAuth')
+route.post('/patrol/reviews/{schedule}/occurrences/{due}/decision', PatrolReviewDecide).middleware('PatrolAuth').parseBody(false)
+route.post('/patrol/reviews/{schedule}/occurrences/{due}/consume', PatrolReviewConsume).middleware('PatrolAuth').parseBody(false)

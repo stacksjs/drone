@@ -54,10 +54,11 @@ contact window and 2 second tail. The second start budget fits the unchanged hor
 60000 + 20 + 84000 + 5000 + 2000 = 151020 ms, below 180000 ms. A positive local review
 followed by runtime refusal stays consumed, without a retry or restored approval.
 
-Issue #24 remains open for production scheduling, authenticated patrol permissions and
-audit, persistence/concurrency/restart outcomes, a patrol workspace, weather,
-recovery and physical qualification. This ledger does not qualify unattended docking,
-charging or field operation.
+The separate [authenticated review ledger](patrol-review.md) persists owner-only intent,
+decisions and consumption metadata through native Auth, Gates and SQLite. It does not
+connect those records to this simulation or authorize launch. Issue #24 remains open for
+production scheduling, runtime handoff/recovery, a patrol workspace, weather and physical
+qualification. This finite recurrence model does not qualify unattended docking, charging or field operation.
 
 The [finite patrol command](patrol-cli.md) now composes this ledger and retained model
 with explicit unsigned decision files. Its neutral default never supplies a review or charge
