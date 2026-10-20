@@ -58,6 +58,7 @@ test('native final Boolean normalization is explicit with an existing file while
       expect(run.timedOut).toBe(false)
     }
     for (const [label, flags] of [
+      ['final-string-false-review', ['--decisions', path, '--unsigned-local-review=false']],
       ['final-negative-review', ['--decisions', path, '--unsigned-local-review', '--no-unsigned-local-review']],
       ['repeated-profile-value', ['--decisions', path, '--unsigned-local-review', '--profile', 'nominal', '--profile', 'nominal']],
       ['repeated-decision-value', ['--decisions', path, '--decisions', path, '--unsigned-local-review']],
@@ -71,6 +72,13 @@ test('native final Boolean normalization is explicit with an existing file while
       expect(run.timedOut).toBe(false)
     }
     await writeFile(path, fileText([{ kind: 'charge', id: 'charge-denied', occurrenceId: 'patrol-slot-zero', atMs: 0, decision: 'deny' }]))
+    const stringFalseCharge = await command(['patrol:simulate', '--decisions', path, '--unsigned-local-review', '--enable-charge=false']).withTimeout(60000)
+    // eslint-disable-next-line no-console
+    console.log(JSON.stringify({ label: 'final-string-false-charge', exitCode: stringFalseCharge.exitCode, timedOut: stringFalseCharge.timedOut, stdoutBytes: Buffer.byteLength(stringFalseCharge.stdout) }))
+    expect(stringFalseCharge.exitCode).toBe(1)
+    expect(stringFalseCharge.stdout).toBe('')
+    expect(stringFalseCharge.stderr).not.toContain(path)
+    expect(stringFalseCharge.timedOut).toBe(false)
     const denied = await command(['patrol:simulate', '--decisions', path, '--unsigned-local-review', '--enable-charge', '--enable-charge']).withTimeout(60000)
     // eslint-disable-next-line no-console
     console.log(JSON.stringify({ label: 'repeated-bare-charge', exitCode: denied.exitCode, timedOut: denied.timedOut, stdoutBytes: Buffer.byteLength(denied.stdout) }))
