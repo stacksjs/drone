@@ -22,8 +22,17 @@ The mission trace stops at its first terminal decision while the board, motor dy
 raw sensors and estimator continue. `stopHost()` instead stops every host update and
 revocation; the independent board expires its last frame while cached host observations
 remain explicitly stale. Invalid clocks permanently remove host launch eligibility.
-Snapshots are detached copies. This first step has no repeated occurrences, docking,
-charging, scheduler, persistence or new CLI. See [ADR 27](adr/0027-retained-patrol-runtime.md).
+Snapshots are detached copies. This single-attempt interface remains bounded to 120 seconds.
+
+The separate private `createNavigationOccurrenceSession` accepts at most two distinct
+`requestOccurrence({ id, issuedAtMs, decision: 'approve' | 'deny' })` attempts over a fixed
+180 second experiment. Each fresh approval is bound at request and actual arm time;
+refused, denied and overlapping identities remain consumed. Only a completed mission
+with fresh grounded/stopped observations can admit another flight. Both flights share
+the same body, raw feeds, estimator, controller, supervisor, watchdog, absolute clock
+and nominal energy ledger. Completed per-occurrence results remain frozen and replayable.
+These are unsigned local fixture decisions. Docking, charging, recurrence, authenticated
+review, persistence and a patrol CLI remain open. See [ADR 27](adr/0027-retained-patrol-runtime.md).
 
 ## Data flow and references
 

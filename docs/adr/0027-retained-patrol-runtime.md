@@ -26,8 +26,18 @@ not measured battery current, idle consumption, charging or an endurance qualifi
 Keep mission traces separate from current vehicle state so terminal evidence cannot be
 mistaken for live telemetry.
 
-Build repeated occurrences, dock/contact/charge verification and recurrence in subsequent
-bounded steps. Each occurrence needs separate explicit permission; scheduling must never
-grant actuator authority or silently retry a refused launch. Native Stacks commands and
-application services belong outside the synchronous control loop. Durable review/audit,
-weather interlocks, failed docking and recovery, HIL and physical trials remain open.
+A separate private `createNavigationOccurrenceSession` experiment supports at most two
+manual approve/deny identities in 180 seconds. Each approval binds the current qualified
+plan, session, boot and estimator reference at request and arm time. Refused attempts stay
+consumed; an overlapping request cannot replace or disarm the active mission. Repetition
+requires a completed mission and fresh grounded/stopped checks. Only the mission engine,
+navigator and per-flight recording restart. The retained controller keeps its normal
+20 ms disabled cadence between flights, and energy and sensor/actuator sequences continue.
+Each request must leave the unchanged 84 second worst-case mission budget and 2 second tail.
+These unsigned fixture decisions do not establish authenticated operator permission.
+
+Build dock/contact/charge verification and recurrence in subsequent bounded steps.
+Scheduling must never grant actuator authority or silently retry a refused launch.
+Native Stacks commands and application services belong outside the synchronous control
+loop. Durable review/audit, weather interlocks, failed docking and recovery, HIL and
+physical trials remain open.
