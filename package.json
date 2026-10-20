@@ -34,6 +34,7 @@
     "@stacksjs/actions": "^0.75.221",
     "@stacksjs/auth": "^0.75.221",
     "@stacksjs/cli": "^0.75.221",
+    "@stacksjs/cron": "0.75.221",
     "@stacksjs/database": "^0.75.221",
     "@stacksjs/env": "^0.75.221",
     "@stacksjs/error-handling": "^0.75.221",
