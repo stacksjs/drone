@@ -19,7 +19,7 @@ test('native patrol command defaults to one bounded neutral JSON summary with no
 test('native flags reject false strings and invalid combinations before opening a file or running the experiment', async () => {
   for (const args of [
     ['--profile', 'physical'], ['--unsigned-local-review'], ['--enable-charge'], ['--decisions', '/private-patrol-sentinel'],
-    ['--unsigned-local-review=false'], ['--enable-charge=false'], ['--unsigned-local-review', '--unsigned-local-review', '--decisions', '/private-patrol-sentinel'],
+    ['--unsigned-local-review=false'], ['--enable-charge=false'],
     ['--unsigned-local-review=false', '--decisions', '/private-patrol-sentinel'], ['--unknown-patrol-flag'], ['--decisions'], ['--profile'],
   ]) {
     const result = await command(['patrol:simulate', ...args]).withTimeout(60000)
@@ -33,6 +33,64 @@ test('native flags reject false strings and invalid combinations before opening 
   const negative = await command(['patrol:simulate', '--no-unsigned-local-review', '--no-enable-charge']).withTimeout(60000)
   expect(negative.exitCode).toBe(0)
   expect(JSON.parse(negative.stdout).status).toBe('neutral-preview')
+}, 70000)
+
+test('native final Boolean normalization is explicit with an existing file while repeated value options reject', async () => {
+  const directory = await mkdtemp(join(tmpdir(), 'patrol-final-options-'))
+  const path = join(directory, 'decisions.json')
+  try {
+    await writeFile(path, fileText([]))
+    // Native merge replaces previous values when the LAST value is an actual Boolean.
+    for (const [label, flags] of [
+      ['repeated-bare-review', ['--unsigned-local-review', '--unsigned-local-review']],
+      ['false-string-then-bare-review', ['--unsigned-local-review=false', '--unsigned-local-review']],
+    ] as const) {
+      const run = await command(['patrol:simulate', '--decisions', path, ...flags]).withTimeout(60000)
+      // eslint-disable-next-line no-console
+      console.log(JSON.stringify({ label, exitCode: run.exitCode, timedOut: run.timedOut, stdoutBytes: Buffer.byteLength(run.stdout) }))
+      expect(run.exitCode).toBe(0)
+      const result = JSON.parse(run.stdout)
+      expect(result.status).toBe('neutral-preview')
+      expect(result.counts.flightRequests).toBe(0)
+      expect(result.counts.chargeRequests).toBe(0)
+      expect(result.counts.armsAccepted).toBe(0)
+      expect(result.counts.chargeFramesAccepted).toBe(0)
+      expect(run.timedOut).toBe(false)
+    }
+    for (const [label, flags] of [
+      ['final-negative-review', ['--decisions', path, '--unsigned-local-review', '--no-unsigned-local-review']],
+      ['repeated-profile-value', ['--decisions', path, '--unsigned-local-review', '--profile', 'nominal', '--profile', 'nominal']],
+      ['repeated-decision-value', ['--decisions', path, '--decisions', path, '--unsigned-local-review']],
+    ] as const) {
+      const run = await command(['patrol:simulate', ...flags]).withTimeout(60000)
+      // eslint-disable-next-line no-console
+      console.log(JSON.stringify({ label, exitCode: run.exitCode, timedOut: run.timedOut, stdoutBytes: Buffer.byteLength(run.stdout) }))
+      expect(run.exitCode).toBe(1)
+      expect(run.stdout).toBe('')
+      expect(run.stderr).not.toContain(path)
+      expect(run.timedOut).toBe(false)
+    }
+    await writeFile(path, fileText([{ kind: 'charge', id: 'charge-denied', occurrenceId: 'patrol-slot-zero', atMs: 0, decision: 'deny' }]))
+    const denied = await command(['patrol:simulate', '--decisions', path, '--unsigned-local-review', '--enable-charge', '--enable-charge']).withTimeout(60000)
+    // eslint-disable-next-line no-console
+    console.log(JSON.stringify({ label: 'repeated-bare-charge', exitCode: denied.exitCode, timedOut: denied.timedOut, stdoutBytes: Buffer.byteLength(denied.stdout) }))
+    expect(denied.exitCode).toBe(0)
+    const result = JSON.parse(denied.stdout)
+    expect(result.status).toBe('reviewed-denials')
+    expect(result.decisions[0].reason).toBe('charge-operator-denied')
+    expect(result.decisions[0].fulfilled).toBe(true)
+    expect(result.counts.chargeRequests).toBe(1)
+    expect(result.counts.flightRequests).toBe(0)
+    expect(result.counts.armsAccepted).toBe(0)
+    expect(result.counts.chargeFramesAccepted).toBe(0)
+    expect(denied.timedOut).toBe(false)
+    const finalNegative = await command(['patrol:simulate', '--decisions', path, '--unsigned-local-review', '--enable-charge', '--no-enable-charge']).withTimeout(60000)
+    expect(finalNegative.exitCode).toBe(1)
+    expect(finalNegative.stdout).toBe('')
+    expect(finalNegative.stderr).not.toContain(path)
+    expect(finalNegative.timedOut).toBe(false)
+  }
+  finally { await rm(directory, { recursive: true, force: true }) }
 }, 70000)
 
 test('native decision reader accepts exactly 8192 bytes but refuses oversized invalid UTF8 BOM symlink directory and FIFO input', async () => {
