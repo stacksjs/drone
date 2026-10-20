@@ -398,7 +398,12 @@ test('occurrence input accepts only exact enumerable own data fields on a plain 
   const inherited = Object.assign(Object.create({ inherited: true }), plain())
   const inheritedFields = Object.create(plain())
   const nullPrototype = Object.assign(Object.create(null), plain())
-  for (const input of [symbol, hidden, nonEnumerable, inherited, inheritedFields, nullPrototype, { ...plain(), extra: true }, { id: 'invalid', issuedAtMs: 2000 }, [], null]) {
+  const invalidValues = [
+    ...['', '1invalid', 'Uppercase', 'a'.repeat(41), 12].map(id => ({ ...plain(), id })),
+    ...[NaN, -1, Infinity, 2000.5, '2000'].map(issuedAtMs => ({ ...plain(), issuedAtMs })),
+    { ...plain(), decision: 'launch' },
+  ]
+  for (const input of [symbol, hidden, nonEnumerable, inherited, inheritedFields, nullPrototype, { ...plain(), extra: true }, { id: 'invalid', issuedAtMs: 2000 }, [], null, ...invalidValues]) {
     const session = createNavigationOccurrenceSession()
     session.advanceTo(2000)
     expect(() => session.requestOccurrence(input)).toThrow(TypeError)
