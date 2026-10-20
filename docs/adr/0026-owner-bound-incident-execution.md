@@ -108,6 +108,13 @@ controlled native Gate and genuine-message scheduling fixtures, without clock
 or policy-budget changes. They do not qualify Pi hardware or bound worst-case
 scheduling, CPU or memory use.
 
+Those isolated measurements describe individual runs. The routine overlap
+fixtures record genuine replay or source work separately from a bounded parent
+stall added when needed to cross the pending native check's unchanged budget.
+Native settlement must precede a due timer sentinel, distinguishing the elapsed
+fence from an ordinary timeout callback. The added stall is scheduling control,
+not a measurement of validator cost.
+
 Native createBroadcastHub/createBroadcastResponse own progress framing and
 bounded pending delivery. The stream rejects replay-buffer matches and uses
 the existing opaque-chunk release pattern with fresh current authority. A
