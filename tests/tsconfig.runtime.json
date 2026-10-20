@@ -42,6 +42,7 @@
     "./unit/navigation-recurrence.test.ts",
     "./unit/patrol.test.ts",
     "./unit/patrol-cli.test.ts",
+    "./unit/patrol-recording.test.ts",
     "../resources/functions/drone/antenna/**/*.ts",
     "./unit/antenna.test.ts",
     "./fixtures/antenna/**/*.ts",

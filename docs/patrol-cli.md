@@ -63,7 +63,10 @@ There is no automatic retry. Genuine operator denial remains distinct from other
 The command prints one compact JSON summary, limited to 16384 UTF-8 bytes including its newline.
 It includes each decision's fulfillment, its own historical mission/contact evidence, charge
 verification and measured modeled isolation, separate true and credited energy, host freshness
-and actual request/acceptance counters. It does not dump traces or record a replay artifact.
+and actual request/acceptance counters. Optional `--output <directory>` publishes the same
+summary with normalized input and a completion manifest before printing it. The directory must
+not already exist. See the [recording and replay contract](patrol-recording.md) for bounds,
+fresh replay consent and publication failure behavior. The command does not dump traces.
 
 `neutral-preview`, `reviewed-denials` and `completed` exit successfully. Any unfulfilled explicit
 decision, final fault or nonneutral output produces `failed` and a nonzero exit. An approved

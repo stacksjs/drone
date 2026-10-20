@@ -37,8 +37,9 @@ Optional `charge: 'nominal'` additionally requires explicit charge approval and 
 observed isolation before another flight. See [the partial-charge model](patrol-charge.md).
 A [finite native recurrence ledger](patrol-recurrence.md) keeps due slots separate from
 explicit local reviews. A [finite patrol command](patrol-cli.md) composes this model with
-explicit unsigned decision files and separate charge opt-in. Production scheduling,
-authenticated review, persistence, a patrol workspace and physical docking remain open.
+explicit unsigned decision files and separate charge opt-in. Optional [recording and replay](patrol-recording.md)
+retains bounded input and an exact summary for a fresh model comparison. Production scheduling,
+authenticated review and durable authority, runtime recovery, a patrol workspace and physical docking remain open.
 See [ADR 27](adr/0027-retained-patrol-runtime.md).
 
 ## Data flow and references

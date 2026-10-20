@@ -317,6 +317,15 @@ preview and accepts explicit decision files with separate charge opt-in:
 ./buddy patrol:simulate --decisions examples/patrol-decisions.json --unsigned-local-review --enable-charge
 ```
 
+Optional [recording and replay](docs/patrol-recording.md) retains bounded input and summary
+files. Replay reruns the same model. Recorded decisions require fresh local review,
+and charge decisions also require a fresh charge opt-in. Neutral replay needs neither:
+
+```sh
+./buddy patrol:simulate --output /tmp/patrol-neutral
+./buddy patrol:replay /tmp/patrol-neutral
+```
+
 Production scheduling, authenticated patrol review, recovery and physical docking remain
 open under issue #24.
 
