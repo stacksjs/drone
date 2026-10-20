@@ -1,3 +1,5 @@
+import type { ChargeProfile } from './charge'
+import { createChargeDomain, chargeProfiles, normalizeChargeApproval } from './charge'
 import type { ContactProfile, ContactBinding, ContactPacket, ContactHostObservation, ContactVerification } from './contact'
 import { contactProfiles, contactModel, createContactFeed, initialContactVerification, reduceContactVerification, contactEligibility } from './contact'
 import type { ImuMeasurement } from '../sensors/types'
@@ -19,8 +21,10 @@ import { exampleMission, validateMission } from '../missions/plan'
 export const navigationScenarios = ['avoid-land', 'replan', 'range-loss', 'range-delay', 'position-loss', 'landing-loss', 'rc-override'] as const
 export type NavigationScenario = typeof navigationScenarios[number]
 /** One owned experiment. The legacy script is selected only by its fixed adapter below. */
-function createNavigationRuntime(options: { scenario?: NavigationScenario, seconds?: number }, legacy: boolean, multiple = false, contactProfile?: ContactProfile) {
+function createNavigationRuntime(options: { scenario?: NavigationScenario, seconds?: number }, legacy: boolean, multiple = false, contactProfile?: ContactProfile, chargeProfile?: ChargeProfile) {
   if (contactProfile !== undefined && (!multiple || !contactProfiles.includes(contactProfile))) throw new TypeError('Invalid contact profile')
+  if (chargeProfile !== undefined && (!contactProfile || !chargeProfiles.includes(chargeProfile))) throw new TypeError('Charge requires a closed contact profile')
+  const charge = chargeProfile ? createChargeDomain(chargeProfile) : null
   const scenario = options.scenario ?? 'avoid-land'
   const seconds = options.seconds ?? 70
   if (!navigationScenarios.includes(scenario) || !Number.isInteger(seconds) || seconds < 8 || seconds > 120) throw new RangeError('Invalid navigation scenario or duration (8..120 seconds)')
@@ -96,12 +100,15 @@ function createNavigationRuntime(options: { scenario?: NavigationScenario, secon
     counts.boardRevokes++
     board.revoke()
   }
+  function policyRemainingWh() { return charge ? charge.remainingWh(usedWh) : plan.power.availableWh - usedWh }
   function tick(nowMs: number) {
+    const priorUsedWh = usedWh
     command = board.tick(nowMs).motorsN
     if (nowMs > (legacy ? 600 : 0)) {
       if (!legacy && (command.some(n => n > 0) || truth.motorsN.some(n => n >= 0.01))) usedWh += plan.power.hoverW * 4 / 3600000
       truth = body.step(command, 0.004)
     }
+    charge?.tick(nowMs, usedWh - priorUsedWh)
     if (contactFeed) {
       contactFeed.capture(nowMs, truth)
       contactPacket = contactFeed.advanceTo(nowMs)
@@ -132,7 +139,7 @@ function createNavigationRuntime(options: { scenario?: NavigationScenario, secon
     if (legacy && nowMs < 600 || nowMs % 20 !== 0) return
     lastHostAtMs = nowMs
     counts.hostUpdates++
-    const batteryPercent = 100 - (legacy ? plan.power.hoverW * Math.max(0, nowMs - 600) / 3600000 : usedWh) / plan.power.availableWh * 100
+    const batteryPercent = charge ? policyRemainingWh() / plan.power.availableWh * 100 : 100 - (legacy ? plan.power.hoverW * Math.max(0, nowMs - 600) / 3600000 : usedWh) / plan.power.availableWh * 100
     const runtime = board.snapshot()
     const observation = {
       kind: 'simulation' as const, nowMs, estimate,
@@ -156,6 +163,7 @@ function createNavigationRuntime(options: { scenario?: NavigationScenario, secon
         retainContactOutcome()
       }
     }
+    charge?.observe({ nowMs, usedWh, estimate, authority: supervisor.snapshot(), board: board.snapshot(), interlocks: observation.interlocks, contactEligible: contactMonitoring && contactVerification?.phase === 'verified' && contactHost !== null && contactEligibility(contactHost, contactVerification.binding).reason === '', contactVerification, occurrenceId: currentOccurrence?.id ?? null, flightQueued: queuedOccurrence !== null })
     const control = () => {
       const imuObservation = sensors.sensors.find(s => s.kind === 'imu')?.observation
       const measurement = imuObservation?.value as ImuMeasurement | undefined
@@ -300,7 +308,7 @@ function createNavigationRuntime(options: { scenario?: NavigationScenario, secon
       nowMs: Math.max(0, lastTickMs), lifecycle: !hostAvailable ? board.snapshot().fault || hostUnavailableReason === 'invalid-session-clock' ? 'recovery-required' as const : 'host-silent' as const : terminal ? 'terminal' as const : mission.state === 'ready' ? 'waiting' as const : 'running' as const,
       hostAvailable, hostDataStale: !hostAvailable, hostUnavailableReason, lastHostAtMs, start, counts,
       mission, navigation, authority: supervisor.snapshot(), board: board.snapshot(), plant: truth, sensors, estimate, trace: engine.trace(), terminal, terminalAtMs, terminalPlant,
-      energy: { usedWh, remainingWh: plan.power.availableWh - usedWh, model: 'nominal-hover-load-while-powered' as const, idleLoadMeasured: false as const, chargingEnabled: false as const },
+      energy: { usedWh, remainingWh: policyRemainingWh(), ...(charge ? { availableWh: plan.power.availableWh, verifiedCreditWh: charge.snapshot(hostAvailable).host.verifiedCreditWh } : {}), model: 'nominal-hover-load-while-powered' as const, idleLoadMeasured: false as const, chargingEnabled: charge ? true as const : false as const },
     })
   }
   function advanceClock(nowMs: number) {
@@ -341,6 +349,8 @@ function createNavigationRuntime(options: { scenario?: NavigationScenario, secon
     const a = supervisor.snapshot(), b = board.snapshot()
     if (!hostAvailable) return { binding: null, reason: 'host-unavailable' }
     if (currentOccurrence && (!terminal || mission.state !== 'completed')) return { binding: null, reason: terminal ? 'recovery-required' : 'occurrence-busy' }
+    const chargeEligibility = charge?.launchEligibility(nowMs)
+    if (chargeEligibility) return { binding: null, reason: chargeEligibility }
     if (contactProfile && currentOccurrence) {
       if (!contactHost || contactHost.nowMs !== nowMs || a.lastCheckedAtMs !== nowMs) return { binding: null, reason: 'contact-observation-not-current' }
       if (!contactMonitoring || contactVerification?.phase !== 'verified') return { binding: null, reason: contactVerification?.phase === 'recovery-required' ? 'contact-recovery-required' : 'contact-not-verified' }
@@ -348,7 +358,7 @@ function createNavigationRuntime(options: { scenario?: NavigationScenario, secon
       if (check.reason) return { binding: null, reason: check.reason }
     }
     if (a.state !== 'disarmed' || b.fault !== null || b.motorsN.some(n => n !== 0)) return { binding: null, reason: 'authority-not-neutral' }
-    const observation = observeMission({ estimate, authority: a.state, batteryPercent: 100 - usedWh / plan.power.availableWh * 100, onGround: truth.groundContact })
+    const observation = observeMission({ estimate, authority: a.state, batteryPercent: charge ? policyRemainingWh() / plan.power.availableWh * 100 : 100 - usedWh / plan.power.availableWh * 100, onGround: truth.groundContact })
     const takeoff = plan.tasks.find(task => task.id === plan.start)!
     const goal = 'positionM' in takeoff ? takeoff.positionM : plan.rallyM
     if (lastHostAtMs === null || nowMs - lastHostAtMs > authorityPolicy.interlockAgeMs || estimate.nowMs !== nowMs || estimate.bootId !== a.bootId || b.bootId !== a.bootId || !observation.healthy || !truth.groundContact || truth.motorsN.some(n => n >= 0.01) || Math.hypot(...observation.velocityMps) >= 0.3 || Math.hypot(observation.positionM[0] - goal[0], observation.positionM[1] - goal[1]) > missionLimits.acceptanceM || Math.abs(observation.positionM[2]) > 0.2 || observation.batteryPercent < plan.power.reservePercent + requiredWh / plan.power.availableWh * 100) return { binding: null, reason: 'unqualified-launch-observation' }
@@ -396,7 +406,22 @@ function createNavigationRuntime(options: { scenario?: NavigationScenario, secon
   function snapshotOccurrences() {
     const common = { ...snapshot(), horizonMs, occurrences: structuredClone(occurrences) }
     const contact = contactProfile ? structuredClone({ profile: contactProfile, phase: contactMonitoring ? contactVerification!.phase : 'awaiting-completion' as const, source: contactFeed?.snapshot() ?? { nowMs: -1, sequence: 0, queued: 0, latest: null }, hostObservedAtMs: contactHost?.nowMs ?? null, interlocks: contactHost?.interlocks ?? null, verification: contactVerification, outcomes: contactOutcomes, currentEligibility: hostAvailable && contactMonitoring && contactVerification?.phase === 'verified' && contactHost?.nowMs === Math.max(0, lastTickMs) && contactEligibility(contactHost, contactVerification.binding).reason === '' }) : undefined
-    return { ...common, ...(contact ? { contact } : {}) }
+    return { ...common, ...(contact ? { contact } : {}), ...(charge ? { charge: charge.snapshot(hostAvailable) } : {}) }
+  }
+  function requestCharge(input: unknown) {
+    if (!charge) throw new TypeError('Charging is disabled')
+    try {
+      const approval = normalizeChargeApproval(input)
+      return charge.request(approval, Math.max(0, lastTickMs), hostAvailable, queuedOccurrence !== null)
+    }
+    catch {
+      endHost('invalid-charge-request')
+      throw new TypeError('Invalid manual charge request')
+    }
+  }
+  function stopCharge() {
+    if (charge && hostAvailable) charge.stop(Math.max(0, lastTickMs))
+    return snapshotOccurrences()
   }
   function endHost(reason: string) {
     hostAvailable = false
@@ -413,7 +438,7 @@ function createNavigationRuntime(options: { scenario?: NavigationScenario, secon
     // No final host update, controller output, disarm or revoke. Only the board can expire.
     return snapshot()
   }
-  return { advanceTo, advanceClock, snapshot, snapshotOccurrences, requestOccurrence, requestStart, stopHost: () => endHost('host-silent'), tick, project, ended: () => terminal !== null }
+  return { advanceTo, advanceClock, snapshot, snapshotOccurrences, requestOccurrence, requestCharge, stopCharge, requestStart, stopHost: () => endHost('host-silent'), tick, project, ended: () => terminal !== null }
 }
 /** Private single-flight experiment, bounded to 120 seconds on an absolute 4 ms clock.
  * Invalid advances permanently end host eligibility; later valid ticks still expire the board.
@@ -433,11 +458,12 @@ export function runNavigationFixture(options: { scenario?: NavigationScenario, s
   return runtime.project()
 }
 
-/** Two manual approvals on one retained plant. No schedule, dock, recharge or recovery. */
-export function createNavigationOccurrenceSession(options: { scenario?: NavigationScenario, contact?: ContactProfile } = {}) {
-  const runtime = createNavigationRuntime({ scenario: options.scenario, seconds: 120 }, false, true, options.contact)
+/** Two manual flight approvals on one retained plant, with optional modeled contact and partial charge. */
+export function createNavigationOccurrenceSession(options: { scenario?: NavigationScenario, contact?: ContactProfile, charge?: ChargeProfile } = {}) {
+  const runtime = createNavigationRuntime({ scenario: options.scenario, seconds: 120 }, false, true, options.contact, options.charge)
   return {
     requestOccurrence: runtime.requestOccurrence,
+    ...(options.charge ? { requestCharge: runtime.requestCharge, stopCharge: runtime.stopCharge } : {}),
     advanceTo(nowMs: number) {
       runtime.advanceClock(nowMs)
       return runtime.snapshotOccurrences()
