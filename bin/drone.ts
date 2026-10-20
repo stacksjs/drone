@@ -27,6 +27,7 @@ import MissionsRecover from '../app/Commands/MissionsRecover'
 import MissionsResume from '../app/Commands/MissionsResume'
 
 import NavigationSimulate from '../app/Commands/NavigationSimulate'
+import PatrolSimulate from '../app/Commands/PatrolSimulate'
 
 import AntennaBench from '../app/Commands/AntennaBench'
 import AirSimulate from '../app/Commands/AirSimulate'
@@ -79,6 +80,7 @@ MissionsCheckpoint(app)
 MissionsRecover(app)
 MissionsResume(app)
 NavigationSimulate(app)
+PatrolSimulate(app)
 AntennaBench(app)
 AirSimulate(app)
 GroundSimulate(app)
@@ -109,4 +111,7 @@ PublicSafetyReplay(app)
 app.help()
 app.version('0.1.0')
 try { await app.parse(process.argv) }
-catch (error) { printError(error instanceof Error ? error.message : String(error)); process.exitCode = 1 }
+catch (error) {
+  printError(error instanceof Error ? error.message : String(error))
+  process.exitCode = 1
+}
