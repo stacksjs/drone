@@ -15,6 +15,16 @@ The same command builds into the standalone Stacks CLI. `--seconds` is an intege
 or replanning run must complete; deliberately faulted scenarios must block, or the command fails.
 The public function returns mission and navigation traces; CLI output summarizes their row counts.
 
+The private `createNavigationSession` in `navigation/runtime.ts` adds a retained vehicle
+experiment for issue #24. It waits for one explicit `requestStart()`, consumes that attempt
+even if refused, and advances on a bounded absolute virtual clock through `advanceTo()`.
+The mission trace stops at its first terminal decision while the board, motor dynamics,
+raw sensors and estimator continue. `stopHost()` instead stops every host update and
+revocation; the independent board expires its last frame while cached host observations
+remain explicitly stale. Invalid clocks permanently remove host launch eligibility.
+Snapshots are detached copies. This first step has no repeated occurrences, docking,
+charging, scheduler, persistence or new CLI. See [ADR 27](adr/0027-retained-patrol-runtime.md).
+
 ## Data flow and references
 
 1. The original synthetic range renderer produces quantized BODY_FRD vectors, capture/receipt epochs,
