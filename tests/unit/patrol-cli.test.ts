@@ -1,6 +1,7 @@
 import { expect, test } from 'bun:test'
 import { command } from '@stacksjs/testing'
-import { mkdtemp, rm, symlink, writeFile } from 'node:fs/promises'
+import { spawn } from 'node:child_process'
+import { mkdtemp, readFile, readdir, rm, symlink, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
@@ -14,6 +15,153 @@ test('native patrol command defaults to one bounded neutral JSON summary with no
   expect(result.counts.armsAccepted).toBe(0)
   expect(result.counts.chargeFramesAccepted).toBe(0)
   expect(Buffer.byteLength(run.stdout)).toBeLessThanOrEqual(16384)
+}, 70000)
+
+test('actual closed stdout reports failure while its already published neutral dataset remains independently replayable', async () => {
+  const directory = await mkdtemp(join(tmpdir(), 'patrol-response-withheld-'))
+  try {
+    const target = join(directory, 'dataset')
+    const child = spawn(process.execPath, ['bin/drone.ts', 'patrol:simulate', '--output', target], { cwd: process.cwd(), stdio: ['ignore', 'pipe', 'pipe'] })
+    child.stdout.destroy()
+    let stderr = '', timedOut = false
+    child.stderr.on('data', (chunk: Buffer) => {
+      stderr += chunk.toString('utf8')
+      if (Buffer.byteLength(stderr) > 8192) child.kill('SIGKILL')
+    })
+    const guard = setTimeout(() => {
+      timedOut = true
+      child.kill('SIGKILL')
+    }, 60000)
+    let code: number | null
+    try {
+      code = await new Promise<number | null>((resolve, reject) => {
+        child.once('error', reject)
+        child.once('close', resolve)
+      })
+    }
+    finally { clearTimeout(guard) }
+    expect(timedOut).toBe(false)
+    expect(code).toBe(1)
+    expect(stderr).toContain('Patrol simulation failed')
+    expect(stderr).not.toContain(target)
+    const replay = await command(['patrol:replay', target]).withTimeout(60000)
+    expect(replay.exitCode).toBe(0)
+    expect(JSON.parse(replay.stdout).verified).toBe(true)
+    expect(JSON.parse(replay.stdout).summary.status).toBe('neutral-preview')
+  }
+  finally { await rm(directory, { recursive: true, force: true }) }
+}, 70000)
+
+test('native approved recording needs fresh replay consent from final options with the actual completed file present', async () => {
+  const directory = await mkdtemp(join(tmpdir(), 'patrol-record-consent-'))
+  const path = join(directory, 'decisions.json')
+  const target = join(directory, 'dataset')
+  try {
+    await writeFile(path, fileText([flight(), { kind: 'charge', id: 'partial', atMs: 47000, occurrenceId: 'patrol-slot-zero', decision: 'approve' }, flight('approve', 60000, 'second', anchor + 60000)]))
+    const recorded = await command(['patrol:simulate', '--decisions', path, '--unsigned-local-review', '--enable-charge', '--output', target]).withTimeout(60000)
+    expect(recorded.exitCode).toBe(0)
+    const bytes = await readFile(join(target, 'recording.json'), 'utf8')
+    expect(JSON.parse(bytes).engine.version).toBe(Bun.version)
+    for (const flags of [[], ['--unsigned-local-review'], ['--unsigned-local-review=false', '--enable-charge'], ['--unsigned-local-review', '--enable-charge=false'], ['--unsigned-local-review', '--no-unsigned-local-review', '--enable-charge'], ['--unsigned-local-review', '--enable-charge', '--no-enable-charge'], ['--unsigned-local-review=false', '--unsigned-local-review=false', '--enable-charge'], ['--unsigned-local-review', '--enable-charge=false', '--enable-charge=false']]) {
+      const refused = await command(['patrol:replay', target, ...flags]).withTimeout(60000)
+      expect(refused.exitCode).toBe(1)
+      expect(refused.stdout).toBe('')
+      expect(refused.stderr).not.toContain(target)
+      expect(refused.timedOut).toBe(false)
+    }
+    const replayed = await command(['patrol:replay', target, '--unsigned-local-review=false', '--unsigned-local-review', '--enable-charge', '--enable-charge']).withTimeout(60000)
+    expect(replayed.exitCode).toBe(0)
+    expect(JSON.parse(replayed.stdout).verified).toBe(true)
+    expect(JSON.parse(replayed.stdout).summary).toEqual(JSON.parse(recorded.stdout))
+    expect(await readFile(join(target, 'recording.json'), 'utf8')).toBe(bytes)
+  }
+  finally { await rm(directory, { recursive: true, force: true }) }
+}, 70000)
+
+test('native completed-directory replay exposes consistency separately from model status and preserves completed file bytes', async () => {
+  const directory = await mkdtemp(join(tmpdir(), 'patrol-replay-'))
+  try {
+    const target = join(directory, 'dataset')
+    expect((await command(['patrol:simulate', '--output', target]).withTimeout(60000)).exitCode).toBe(0)
+    const names = await readdir(target)
+    const original = await Promise.all(names.map(name => readFile(join(target, name))))
+    const run = await command(['patrol:replay', target]).withTimeout(60000)
+    expect(run.exitCode).toBe(0)
+    const result = JSON.parse(run.stdout)
+    expect(result.verified).toBe(true)
+    expect(result.fullTraceVerified).toBe(false)
+    expect(result.runtimeStateRestored).toBe(false)
+    expect(result.summary.status).toBe('neutral-preview')
+    expect(result.summary.counts.armsAccepted).toBe(0)
+    expect(Buffer.byteLength(run.stdout)).toBeLessThanOrEqual(17408)
+    expect(await readdir(target)).toEqual(names)
+    expect(await Promise.all(names.map(name => readFile(join(target, name))))).toEqual(original)
+  }
+  finally { await rm(directory, { recursive: true, force: true }) }
+}, 70000)
+
+test('native diagnostically complete failed recording replays consistently while preserving failure exit status', async () => {
+  const directory = await mkdtemp(join(tmpdir(), 'patrol-failed-record-'))
+  try {
+    const path = join(directory, 'decisions.json')
+    const target = join(directory, 'dataset')
+    await writeFile(path, fileText([flight('approve', 5000)]))
+    const recorded = await command(['patrol:simulate', '--decisions', path, '--unsigned-local-review', '--output', target]).withTimeout(60000)
+    expect(recorded.exitCode).toBe(1)
+    expect(JSON.parse(recorded.stdout).status).toBe('failed')
+    expect(JSON.parse(await readFile(join(target, 'manifest.json'), 'utf8')).kind).toBe('patrol-input-summary-dataset')
+    const replayed = await command(['patrol:replay', target, '--unsigned-local-review']).withTimeout(60000)
+    expect(replayed.exitCode).toBe(1)
+    expect(JSON.parse(replayed.stdout).verified).toBe(true)
+    expect(JSON.parse(replayed.stdout).summary).toEqual(JSON.parse(recorded.stdout))
+    expect(JSON.parse(replayed.stdout).summary.counts.armsAccepted).toBe(0)
+  }
+  finally { await rm(directory, { recursive: true, force: true }) }
+}, 70000)
+
+test('native explicit output publishes one neutral recording and preserves the original summary projection', async () => {
+  const directory = await mkdtemp(join(tmpdir(), 'patrol-output-'))
+  try {
+    const target = join(directory, 'dataset')
+    const run = await command(['patrol:simulate', '--output', target]).withTimeout(60000)
+    expect(run.exitCode).toBe(0)
+    const summary = JSON.parse(run.stdout)
+    expect(summary.status).toBe('neutral-preview')
+    expect(Object.keys(summary)).toHaveLength(17)
+    expect(summary.counts.armsAccepted).toBe(0)
+    expect(summary.counts.chargeFramesAccepted).toBe(0)
+    expect(await readFile(join(target, 'summary.json'), 'utf8')).toBe(run.stdout)
+    expect(JSON.parse(await readFile(join(target, 'manifest.json'), 'utf8')).kind).toBe('patrol-input-summary-dataset')
+  }
+  finally { await rm(directory, { recursive: true, force: true }) }
+}, 70000)
+
+test('native output value arrays empty values and missing values refuse with an existing valid decision file and untouched parent', async () => {
+  const directory = await mkdtemp(join(tmpdir(), 'patrol-output-options-'))
+  try {
+    const path = join(directory, 'decisions.json')
+    const target = join(directory, 'new-dataset')
+    await writeFile(path, fileText([]))
+    const before = await readdir(directory)
+    for (const [label, flags] of [
+      ['repeated-output-value', ['--output', target, '--output', target]],
+      ['empty-output-value', ['--output', '']],
+      ['missing-output-value', ['--output']],
+    ] as const) {
+      const run = await command(['patrol:simulate', '--decisions', path, '--unsigned-local-review', ...flags]).withTimeout(60000)
+      // eslint-disable-next-line no-console
+      console.log(JSON.stringify({ label, exitCode: run.exitCode, timedOut: run.timedOut, stdoutBytes: Buffer.byteLength(run.stdout) }))
+      if (label === 'missing-output-value') expect(run.exitCode).not.toBe(0)
+      else expect(run.exitCode).toBe(1)
+      expect(run.stdout).not.toContain('owned-patrol-simulation')
+      expect(run.stderr).not.toContain(path)
+      expect(run.stderr).not.toContain(target)
+      expect(run.timedOut).toBe(false)
+      expect(await readdir(directory)).toEqual(before)
+      expect(await readFile(path, 'utf8')).toBe(fileText([]))
+    }
+  }
+  finally { await rm(directory, { recursive: true, force: true }) }
 }, 70000)
 
 test('native flags reject false strings and invalid combinations before opening a file or running the experiment', async () => {

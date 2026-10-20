@@ -28,6 +28,7 @@ import MissionsResume from '../app/Commands/MissionsResume'
 
 import NavigationSimulate from '../app/Commands/NavigationSimulate'
 import PatrolSimulate from '../app/Commands/PatrolSimulate'
+import PatrolReplay from '../app/Commands/PatrolReplay'
 
 import AntennaBench from '../app/Commands/AntennaBench'
 import AirSimulate from '../app/Commands/AirSimulate'
@@ -81,6 +82,7 @@ MissionsRecover(app)
 MissionsResume(app)
 NavigationSimulate(app)
 PatrolSimulate(app)
+PatrolReplay(app)
 AntennaBench(app)
 AirSimulate(app)
 GroundSimulate(app)

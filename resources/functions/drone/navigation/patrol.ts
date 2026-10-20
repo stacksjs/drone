@@ -16,7 +16,7 @@ function fields(d: PropertyDescriptorMap, keys: string[]) {
   return Object.fromEntries(keys.map(k => [k, d[k]!.value]))
 }
 /** Normalize the complete unknown input before creating any owned world or review ledger. */
-function normalize(input: unknown) {
+export function normalizePatrolInput(input: unknown) {
   try {
     const d = inspect(input)
     const allowed = ['profile', 'unsignedLocalReview', 'enableCharge', 'decisions']
@@ -65,7 +65,7 @@ function flightBinding(s: Snapshot) {
 const decimal = (value: bigint | null) => value === null ? null : String(value)
 /** Finite model only. Native scans create review metadata, never automatic authority. */
 export function simulatePatrol(input: unknown = {}) {
-  const options = normalize(input)
+  const options = normalizePatrolInput(input)
   const session = createNavigationOccurrenceSession({ contact: 'nominal', charge: 'nominal' })
   const ledger = createPatrolRecurrence({ scheduleId: 'patrol-demo', revision: 1, profile: 'minute-zero-one-v1', anchorUtcMs, anchorMonoMs: 0 })
   const decisions: Outcome[] = []
@@ -165,3 +165,6 @@ export function simulatePatrol(input: unknown = {}) {
   if (Buffer.byteLength(`${text}\n`, 'utf8') > 16384) throw new RangeError('patrol-summary-size')
   return result
 }
+
+export type PatrolInput = ReturnType<typeof normalizePatrolInput>
+export type PatrolSummary = ReturnType<typeof simulatePatrol>
