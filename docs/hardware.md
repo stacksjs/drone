@@ -5,14 +5,61 @@ and a **US$900-1,400 budget**. Research date: October 17, 2026, America/Los_Ange
 Country is not confirmed; radio variants and regulatory purchases must match the country of use.
 Do not buy a second Pi. These are off-the-shelf hardware parts assembled at home with your own application software.
 
+## Start with the owned-runtime bench
+
+For your own runtime, start with the Pi accessories and AI Camera below, then this separate
+Pico 2 bench kit. The firmware currently produces neutral diagnostic outputs. The
+[runtime guide](runtime.md) defines its wiring and measurements; add the
+[sensor profile](sensors.md) as a later bench stage. No airframe or external autopilot firmware
+is needed to begin that work.
+
+Bench prices checked October 20, 2026. These are additional to the airframe table, before tax,
+shipping and tools you do not already own. Listed prices come from the linked suppliers;
+allowances are estimates. Confirm stock before ordering.
+
+| Qty | Bench part | USD | Purpose |
+| --- | --- | --- | --- |
+| 1 | [Raspberry Pi Pico 2](https://www.raspberrypi.com/products/raspberry-pi-pico-2/), non-wireless model | $5 listed | Matches the implemented `pico2` firmware target |
+| 1 | [Adafruit CP2102N Friend, product 5335](https://www.adafruit.com/product/5335) | $5.95 listed | USB-UART with 3.3 V signals; its 5 V power pin is a separate rail |
+| 1 | [SparkFun TOL-18627 logic analyser](https://www.sparkfun.com/usb-logic-analyzer-24mhz-8-channel.html) | $26.95 listed | 8 channels, up to 24 MHz, PulseView support; initial UART and tick/reset pulse inspection |
+| 1 set | USB data cables for both boards, headers, jumper leads and 10 kOhm pulldown | $15-25 allowance | Assembly and the neutral test-pin pulldown specified in the runtime guide |
+
+Allow roughly **$55-70** for this basic bench kit. The analyser's supplier warns that the pin
+beside input 6 may not be ground; use its documented ground connection. This entry-level analyser
+is not evidence of adequate 8 MHz SPI waveform characterization. An oscilloscope, debug probe,
+soldering equipment and sensor boards are additional costs if needed. Borrow instruments when
+possible to preserve the aircraft budget.
+
+For the later sensor stage, the implemented profile requires an **ICM-42688-P SPI breakout**,
+**BMP280 at I2C address 0x76**, and **u-blox M10-class UART NAV-PVT**. Match the exact part,
+exposed signals and voltage to the [sensor bench guide](sensors.md). The
+[Adafruit BMP280, product 2651](https://www.adafruit.com/product/2651) lists at $9.95.
+Use its [pinout guide](https://learn.adafruit.com/adafruit-bmp280-barometric-pressure-plus-temperature-sensor-breakout/pinouts)
+for breakout connections. [Bosch's datasheet, section 5.2](https://www.bosch-sensortec.com/media/boschsensortec/downloads/datasheets/bst-bmp280-ds001.pdf#page=28)
+specifies SDO tied to ground for address 0x76. BME280 and BMP390 are different chips and are
+not accepted by this profile. The
+[SparkFun MAX-M10S, GPS-18037](https://www.sparkfun.com/sparkfun-gnss-receiver-breakout-max-m10s-qwiic.html)
+lists at $45.95, requires a separate compatible SMA antenna and uses 3.3 V power/signals. Its
+[UART defaults](https://docs.sparkfun.com/SparkFun_u-blox_MAX-M10S/hardware_overview/) are 38400 baud;
+configure it externally for this profile's 115200 baud and NAV-PVT at 1-5 Hz before use. Its page
+shows mixed stock/backorder labels, so availability is unconfirmed. No specific IMU breakout or
+complete sensor assembly has been physically qualified here. Keep sensor procurement separate
+from the basic bench subtotal and the existing aircraft estimate.
+
 ## Recommended base: Holybro X500 v2 development kit
 
 Choose **Pixhawk 6C + M10 GPS**, not the frame-only or ARF option.
 The [manufacturer listing](https://holybro.com/products/px4-development-kit-x500-v2) showed **$609**
 for that variant when researched. It includes frame, landing gear, four 2216 KV920 motors, four
 20 A ESCs, power distribution, power module, GPS and telemetry radios. Avoid buying those parts twice.
-The kit arrives with PX4; the adapter in this project targets **ArduCopter**, so install the supported
-ArduCopter build for the exact Pixhawk 6C board before bench integration.
+This project implements separate ArduPilot and PX4 drivers. Their command paths currently target
+local quadcopter SITL; physical telemetry is receive-only and physical flight commands remain disabled.
+Choose flight-controller firmware independently of the owned mission and camera logic. No firmware
+flash or physical-flight qualification follows from this shopping list.
+
+The separate [owned board runtime](runtime.md) uses a Pico 2 for bench development. Pixhawk 6C flight
+firmware, physical control and measured aircraft validation remain separate roadmap work. Keep the
+Pi 5 for Stacks mission and camera logic.
 
 Choose a legal telemetry frequency locally. The manufacturer offers 433 and 915 MHz; its regional
 labels are a starting point, not permission to use that band in every country. RC control is a separate link.
@@ -43,8 +90,11 @@ The links identify the product or specification to shop for.
 | 1 set | Pi/camera mounting plate, M2.5 standoffs, locking hardware, strain relief and straps | $20-35 | Validate cooler clearance, centre of gravity, GPS clearance, and camera view outside the propeller arcs |
 | 1 set | Extra matching 1045 CW/CCW props, multimeter, smoke stopper, LiPo storage bag | $35-60 | Kit has some spare props; a soldering iron/crimper adds cost if you do not already own one |
 
-With one battery the table totals roughly **$1,135-1,260**, excluding tax/shipping and regional compliance gear.
-A second battery adds $45-60. Reserve the rest of the budget for connectors, tools, and Remote ID if required.
+With one battery the airframe table totals roughly **$1,035-1,160**, excluding tax/shipping,
+regional compliance gear, the separate runtime bench and additional tools. Including the basic
+$55-70 runtime bench allowance gives roughly **$1,090-1,230**, before those exclusions and later
+sensor purchases. A second battery adds $45-60. Reserve the rest of the budget for connectors,
+tools and Remote ID if required; check the complete cart against your budget before ordering.
 Do not order expensive gimbals, RTK receivers or depth cameras for the first build.
 
 ## Camera choice
@@ -97,10 +147,11 @@ and [Remote ID guidance](https://www.faa.gov/uas/getting_started/remote_id). Out
 
 ## Buying order
 
-1. Pi bench accessories and camera, RC transmitter and receiver. Run the simulator and camera examples.
-2. Full kit, one 4S battery and charger, then assemble with props removed.
-3. Dedicated Pi power and mounting after bench current and weight measurements.
-4. Regional compliance gear before outdoor flights; a second battery once the build works.
+1. Pi bench accessories and camera, then the Pico 2 bench kit for the owned runtime. Run the simulator and camera examples; collect the separate runtime measurements before adding sensors.
+2. RC transmitter and receiver when preparing the airframe.
+3. Full kit, one 4S battery and charger, then assemble with props removed.
+4. Dedicated Pi power and mounting after bench current and weight measurements.
+5. Regional compliance gear before outdoor flights; a second battery once the build works.
 
 Manufacturer hover-time figures do not predict endurance with your Pi, camera, regulator and battery.
 Measure the complete aircraft mass and thrust margin, then obtain endurance from cautious validation.
