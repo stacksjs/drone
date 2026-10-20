@@ -141,3 +141,10 @@ Issue #11 remains open for physical range/camera extrinsic and time calibration,
 occlusion models, independently measured uncertainty and braking bounds, dynamic obstacle motion,
 full terrain-aware mission semantics, long follow/orbit campaigns, HIL and hardware trials. Nothing
 in this release enables physical flight. See [ADR 11](adr/0011-owned-navigation.md).
+
+## Synthetic environmental collection
+
+The [environment sampling prerequisite](environment.md) runs a two-height mission through this
+owned runtime, with capture-time estimated geotags and guarded collection-policy revisions. Site
+closure requests native abort; it does not replace the native fence or establish physical wildlife
+exclusion distances. The native mission's terminal state remains visible alongside fault qualification.

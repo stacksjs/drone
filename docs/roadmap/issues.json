@@ -764,7 +764,25 @@
       10,
       8,
       9
-    ]
+    ],
+    "implementation": {
+      "status": "partial",
+      "implemented": [
+        "Owned hover POI angular reference and lagged/quantized three-axis gimbal",
+        "Three session/reference-bound modeled still captures with exposure pose and bounded ACK handling",
+        "Latched target/camera/mechanical/authority loss and native command summary"
+      ],
+      "remaining": [
+        "Translational dolly/orbit paths and physical gimbal/camera calibration/integration",
+        "Lens/exposure control, video timecode and broadcast synchronization",
+        "Operator handoff, interruption/resume and physical/HIL qualification"
+      ],
+      "evidence": [
+        "docs/cinema.md",
+        "tests/unit/cinema.test.ts",
+        "tests/unit/cinema-cli.test.ts"
+      ]
+    }
   },
   {
     "key": "environment",

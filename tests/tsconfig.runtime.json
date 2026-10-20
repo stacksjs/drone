@@ -87,6 +87,11 @@
     "../resources/functions/drone/public-safety/**/*.ts",
     "./unit/public-safety-*.test.ts",
     "./fixtures/public-safety-access/**/*.ts",
-    "./helpers/execution-browser-driver.ts"
+    "./helpers/execution-browser-driver.ts",
+    "../resources/functions/drone/environment/**/*.ts",
+    "./unit/environment.test.ts",
+    "../resources/functions/drone/cinema/**/*.ts",
+    "./unit/cinema.test.ts",
+    "./unit/cinema-cli.test.ts"
   ]
 }

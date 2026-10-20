@@ -119,6 +119,34 @@ Material, calibration, weather and unqualified local requirements travel with pr
 records. Physical calibration, field dose/drift, local authorization and HIL remain open in
 [#22](https://github.com/stacksjs/drone/issues/22). Read [application semantics and limits](docs/application.md).
 
+## Synthetic environmental sampling
+
+Run an owned two-height airborne mission with a calibrated digital cell index, capture-time
+estimated position, conditional uncertainty and unsigned local provenance.
+
+```sh
+./buddy environment:simulate --output /tmp/new-environment-dataset
+./buddy environment:simulate --profile sensor-loss
+```
+
+Expected faults preserve their native aborted status even when their demonstration qualifies.
+Read [dataset semantics and limits](docs/environment.md). Physical samples, wildlife workflows and
+operational qualification remain in [#27](https://github.com/stacksjs/drone/issues/27).
+
+## Simulated camera reframe
+
+Coordinate one selected synthetic POI, an owned hover mission, a lagged gimbal and three modeled
+still captures with explicit loss/ACK handling.
+
+```sh
+./buddy cinema:simulate --scenario body-disturbance
+./buddy cinema:simulate --scenario target-loss
+```
+
+Read [camera path semantics and limits](docs/cinema.md). This partial angular reframe keeps physical
+gimbals, translational dolly/orbit paths, lens/video control and handoff open in
+[#26](https://github.com/stacksjs/drone/issues/26).
+
 ## Camera tracking
 
 Open `/camera` after configuring a unique `DRONE_CAMERA_TOKEN` in your ignored `.env`. Choose
