@@ -97,6 +97,46 @@ jobs:
           "$binary" patrol:replay "$RUNNER_TEMP/patrol-neutral" | bun -e 'const result = await Bun.stdin.json(); if (result.verified !== true || result.comparison !== "exact-compact-summary-json" || result.authentication !== "unsigned-consistency" || result.runtimeStateRestored !== false || result.fullTraceVerified !== false || result.physicalFlightEnabled !== false || result.summary.status !== "neutral-preview") throw new Error("Invalid neutral patrol replay")'
           "$binary" patrol:simulate --decisions "$GITHUB_WORKSPACE/examples/patrol-decisions.json" --unsigned-local-review --enable-charge --output "$RUNNER_TEMP/patrol-approved" | bun -e 'const text = await Bun.stdin.text(); const summary = JSON.parse(text); if (text !== await Bun.file(`${process.env.RUNNER_TEMP}/patrol-approved/summary.json`).text() || summary.status !== "completed" || summary.flights.length !== 2 || summary.physicalFlightEnabled !== false) throw new Error("Invalid approved patrol recording")'
           "$binary" patrol:replay "$RUNNER_TEMP/patrol-approved" --unsigned-local-review --enable-charge | bun -e 'const result = await Bun.stdin.json(); if (result.verified !== true || result.comparison !== "exact-compact-summary-json" || result.authentication !== "unsigned-consistency" || result.runtimeStateRestored !== false || result.fullTraceVerified !== false || result.physicalFlightEnabled !== false || result.summary.status !== "completed" || result.summary.flights.length !== 2) throw new Error("Invalid approved patrol replay")'
+      - name: Qualify compiled cargo characterization outside the checkout
+        working-directory: ${{ runner.temp }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          binary="$GITHUB_WORKSPACE/storage/runtime-build/cli/drone"
+          for scenario in centered-carried forward-carried forward-separated link-loss; do
+            expected=0
+            if [ "$scenario" = link-loss ]; then expected=1; fi
+            actual=0
+            "$binary" cargo:load-bench --scenario "$scenario" > "$RUNNER_TEMP/cargo-$scenario.json" || actual=$?
+            test "$actual" -eq "$expected"
+            bun -e 'const [file, scenario] = process.argv.slice(1); const raw = await Bun.file(file).text(); const s = JSON.parse(raw); if (Buffer.byteLength(raw) > 16384 || s.scenario !== scenario || s.status !== (scenario === "link-loss" ? "unqualified" : "characterized") || s.physicalFlightEnabled !== false || s.boardOutputsInhibited !== true || Object.values(s.capabilities).some(Boolean) || s.final.landingPerformed !== false) throw new Error("Invalid compiled cargo characterization")' "$RUNNER_TEMP/cargo-$scenario.json" "$scenario"
+          done
+      - name: Qualify compiled environmental datasets outside the checkout
+        working-directory: ${{ runner.temp }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          binary="$GITHUB_WORKSPACE/storage/runtime-build/cli/drone"
+          for profile in nominal sensor-loss site-closure; do
+            directory="$RUNNER_TEMP/environment-$profile"
+            "$binary" environment:simulate --profile "$profile" --output "$directory" > "$RUNNER_TEMP/environment-$profile.json"
+            bun -e 'const [file, directory, profile] = process.argv.slice(1); const raw = await Bun.file(file).text(); const s = JSON.parse(raw); const mraw = await Bun.file(`${directory}/manifest.json`).text(); const m = JSON.parse(mraw); const digest = value => new Bun.CryptoHasher("sha256").update(value).digest("hex"); if (Buffer.byteLength(raw) > 16384 || s.profile !== profile || s.qualified !== true || s.physicalFlightEnabled !== false || s.nativeMissionState !== (profile === "nominal" ? "completed" : "aborted") || s.dataset.files !== 5 || s.dataset.manifestSha256 !== digest(mraw) || m.summary.dataset !== null || m.contentAuthentication !== "unsigned-content-hashes") throw new Error("Invalid compiled environment dataset"); let bytes = Buffer.byteLength(mraw); for (const f of m.files) { const data = await Bun.file(`${directory}/${f.path}`).arrayBuffer(); if (data.byteLength !== f.byteLength || digest(data) !== f.sha256) throw new Error("Changed compiled environment content"); bytes += data.byteLength; } if (bytes !== s.dataset.bytes || bytes > 16777216) throw new Error("Invalid compiled environment byte accounting")' "$RUNNER_TEMP/environment-$profile.json" "$directory" "$profile"
+            "$binary" missions:replay "$directory/mission.json"
+          done
+      - name: Qualify compiled cinema outcomes outside the checkout
+        working-directory: ${{ runner.temp }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          binary="$GITHUB_WORKSPACE/storage/runtime-build/cli/drone"
+          for scenario in nominal body-disturbance target-loss mechanical-limit camera-loss wrong-ack rc-override; do
+            expected=1
+            case "$scenario" in nominal|body-disturbance) expected=0 ;; esac
+            actual=0
+            "$binary" cinema:simulate --scenario "$scenario" > "$RUNNER_TEMP/cinema-$scenario.json" || actual=$?
+            test "$actual" -eq "$expected"
+            bun -e 'const [file, scenario, expected] = process.argv.slice(1); const raw = await Bun.file(file).text(); const s = JSON.parse(raw); if (Buffer.byteLength(raw) > 16384 || s.scenario !== scenario || s.status !== (expected === "0" ? "completed" : "halted") || s.physicalFlightEnabled !== false || s.physicalGimbalActuationEnabled !== false || s.identityAuthenticated !== false || s.mission.boardNeutral !== true || expected === "0" && (s.captures.length !== 3 || s.captures.some(c => c.state !== "confirmed" || c.postStepAdmission !== "valid" || c.quality.qualified !== true))) throw new Error("Invalid compiled cinema outcome")' "$RUNNER_TEMP/cinema-$scenario.json" "$scenario" "$expected"
+          done
       - run: $GITHUB_WORKSPACE/storage/runtime-build/cli/drone antenna:bench --scenario nominal --seconds 10
         working-directory: ${{ runner.temp }}
       - run: $GITHUB_WORKSPACE/storage/runtime-build/cli/drone air:simulate --scenario nominal --seconds 120
