@@ -20,12 +20,13 @@ const { executionOwner } = await import('../../../resources/functions/drone/publ
 const { executionWords: words } = await import('../../../resources/functions/drone/public-safety/execution/protocol')
 let holdArmed = false, holdUsed = false, held = false, releaseCredit: (() => void) | undefined
 let delayStart = true, releaseStart: (() => void) | undefined
-let streamStarts = 0, startRequests = 0, closeStream: (() => Promise<void>) | undefined
+let streamStarts = 0, startRequests = 0, admissionRequests = 0, closeStream: (() => Promise<void>) | undefined
 
 // Diagnostic state belongs only to this disposable fixture, never the execution controller.
-type RouteClass = 'execution-start' | 'execution-close' | 'execution-events' | 'execution-status' | 'workspace-read'
+type RouteClass = 'execution-start' | 'execution-close' | 'execution-admission' | 'execution-events' | 'execution-status' | 'workspace-read'
 interface ResponseObservation { route: RouteClass, method: 'GET' | 'HEAD' | 'POST', status: number | null, elapsedMs: number | null }
-let lastStart: { ordinal: number, settled: boolean, status: number | null, elapsedMs: number | null } | null = null
+interface MutationObservation { ordinal: number, settled: boolean, status: number | null, elapsedMs: number | null }
+let lastStart: MutationObservation | null = null, lastAdmission: MutationObservation | null = null
 const responses: ResponseObservation[] = [], ordinals = new WeakMap<object, number>()
 let nextOrdinal = 0
 const scalar = (value: unknown) => typeof value === 'number' && Number.isFinite(value) && Math.abs(value) <= Number.MAX_SAFE_INTEGER ? value : null
@@ -50,7 +51,7 @@ function diagnosticSnapshot() {
   }
   return {
     available: true, pendingChecks: scalar(owner.pendingChecks),
-    fixture: { startRequests, streamStarts, holdArmed, held, holdUsed }, lastStart, responses: responses.slice(),
+    fixture: { startRequests, admissionRequests, streamStarts, holdArmed, held, holdUsed }, lastStart, lastAdmission, responses: responses.slice(),
     slot: slot === null ? null : {
       ordinal: ordinal(slot),
       phase: choice(field(slot, 'phase'), ['waiting-for-consumer', 'running', 'stopping', 'completed', 'canceled', 'failed', 'discarded'] satisfies ExecutionView['phase'][]),
@@ -72,6 +73,7 @@ function diagnosticSnapshot() {
 function routeClass(path: string, method: string): RouteClass | null {
   if (method === 'POST' && path.endsWith('/workspace/execution')) return 'execution-start'
   if (method === 'POST' && path.endsWith('/workspace/execution/close')) return 'execution-close'
+  if (method === 'POST' && path.endsWith('/workspace/execution/admission')) return 'execution-admission'
   if (method !== 'GET' && method !== 'HEAD') return null
   if (/\/workspace\/execution\/[a-f0-9-]+\/events$/.test(path)) return 'execution-events'
   if (path.endsWith('/workspace/execution')) return 'execution-status'
@@ -146,7 +148,9 @@ route.use(async (request: Request, next: () => Promise<Response | null> | Respon
   const pathname = new URL(request.url).pathname
   const kind = routeClass(pathname, request.method), began = performance.now()
   const startOrdinal = kind === 'execution-start' ? ++startRequests : null
+  const admissionOrdinal = kind === 'execution-admission' ? ++admissionRequests : null
   if (startOrdinal !== null) lastStart = { ordinal: startOrdinal, settled: false, status: null, elapsedMs: null }
+  if (admissionOrdinal !== null) lastAdmission = { ordinal: admissionOrdinal, settled: false, status: null, elapsedMs: null }
   let status: number | null = null
   try {
     const response = await next()
@@ -174,6 +178,7 @@ route.use(async (request: Request, next: () => Promise<Response | null> | Respon
         responses.push({ route: kind, method: request.method, status, elapsedMs })
         if (responses.length > 16) responses.shift()
         if (startOrdinal !== null && lastStart?.ordinal === startOrdinal) lastStart = { ordinal: startOrdinal, settled: true, status, elapsedMs }
+        if (admissionOrdinal !== null && lastAdmission?.ordinal === admissionOrdinal) lastAdmission = { ordinal: admissionOrdinal, settled: true, status, elapsedMs }
         const slot = executionOwner().slot
         if (startOrdinal !== null && status === 202 && slot && typeof slot === 'object') ordinal(slot)
       }
