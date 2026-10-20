@@ -55,6 +55,10 @@ contact window and 2 second tail. The second start budget fits the unchanged hor
 followed by runtime refusal stays consumed, without a retry or restored approval.
 
 Issue #24 remains open for production scheduling, authenticated patrol permissions and
-audit, persistence/concurrency/restart outcomes, a patrol CLI/workspace, weather,
+audit, persistence/concurrency/restart outcomes, a patrol workspace, weather,
 recovery and physical qualification. This ledger does not qualify unattended docking,
 charging or field operation.
+
+The [finite patrol command](patrol-cli.md) now composes this ledger and retained model
+with explicit unsigned decision files. Its neutral default never supplies a review or charge
+approval. The command does not register a scheduler or add production launch permission.

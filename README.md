@@ -306,11 +306,19 @@ sensor and braking calibration remain open. Metric follow/orbit goal interfaces 
 
 See [navigation assumptions, evidence and remaining work](docs/navigation.md).
 
-The private retained patrol experiment keeps one vehicle across two explicitly approved
+The retained patrol experiment keeps one vehicle across two explicitly approved
 missions, with optional [selected-pad contact](docs/patrol-contact.md) and
 [partial-charge verification and isolation](docs/patrol-charge.md). A [finite native recurrence ledger](docs/patrol-recurrence.md) records due slots and
-explicit local reviews. Production scheduling, authenticated patrol review, recovery and
-physical docking remain open under issue #24.
+explicit local reviews. The [finite patrol command](docs/patrol-cli.md) defaults to a neutral
+preview and accepts explicit decision files with separate charge opt-in:
+
+```sh
+./buddy patrol:simulate
+./buddy patrol:simulate --decisions examples/patrol-decisions.json --unsigned-local-review --enable-charge
+```
+
+Production scheduling, authenticated patrol review, recovery and physical docking remain
+open under issue #24.
 
 ## External-driver protocol services
 

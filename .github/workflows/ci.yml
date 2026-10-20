@@ -87,6 +87,10 @@ jobs:
         working-directory: ${{ runner.temp }}
       - run: $GITHUB_WORKSPACE/storage/runtime-build/cli/drone navigation:simulate --scenario replan
         working-directory: ${{ runner.temp }}
+      - run: $GITHUB_WORKSPACE/storage/runtime-build/cli/drone patrol:simulate
+        working-directory: ${{ runner.temp }}
+      - run: $GITHUB_WORKSPACE/storage/runtime-build/cli/drone patrol:simulate --decisions "$GITHUB_WORKSPACE/examples/patrol-decisions.json" --unsigned-local-review --enable-charge
+        working-directory: ${{ runner.temp }}
       - run: $GITHUB_WORKSPACE/storage/runtime-build/cli/drone antenna:bench --scenario nominal --seconds 10
         working-directory: ${{ runner.temp }}
       - run: $GITHUB_WORKSPACE/storage/runtime-build/cli/drone air:simulate --scenario nominal --seconds 120

@@ -36,8 +36,9 @@ selected-pad contact check after completion. See [the contact model and its limi
 Optional `charge: 'nominal'` additionally requires explicit charge approval and independently
 observed isolation before another flight. See [the partial-charge model](patrol-charge.md).
 A [finite native recurrence ledger](patrol-recurrence.md) keeps due slots separate from
-explicit local reviews. Production scheduling, authenticated review, persistence, a patrol
-CLI and physical docking remain open.
+explicit local reviews. A [finite patrol command](patrol-cli.md) composes this model with
+explicit unsigned decision files and separate charge opt-in. Production scheduling,
+authenticated review, persistence, a patrol workspace and physical docking remain open.
 See [ADR 27](adr/0027-retained-patrol-runtime.md).
 
 ## Data flow and references

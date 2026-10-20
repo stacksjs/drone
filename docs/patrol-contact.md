@@ -55,4 +55,6 @@ Legacy seven-scenario result bytes remain unchanged. The contact-only experiment
 unmeasured nominal hover-load proxy without recharge credit. A separate optional
 [partial-charge model](patrol-charge.md) adds explicit permission, instrument verification
 and isolation. Measured hardware current, a full weather system, scheduling, persistence,
-authenticated patrol review, a patrol CLI, physical docking and recovery remain open.
+authenticated patrol review, a patrol workspace, physical docking and recovery remain open.
+The [finite patrol command](patrol-cli.md) composes this modeled contact verifier with
+explicit unsigned decisions; it adds no physical contact evidence.

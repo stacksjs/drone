@@ -1,0 +1,27 @@
+{
+  "version": 1,
+  "profile": "nominal",
+  "decisions": [
+    {
+      "kind": "flight",
+      "id": "review-zero",
+      "atMs": 2000,
+      "dueUtcMs": 1767225600000,
+      "decision": "approve"
+    },
+    {
+      "kind": "charge",
+      "id": "charge-zero",
+      "atMs": 47000,
+      "occurrenceId": "patrol-slot-zero",
+      "decision": "approve"
+    },
+    {
+      "kind": "flight",
+      "id": "review-one",
+      "atMs": 60000,
+      "dueUtcMs": 1767225660000,
+      "decision": "approve"
+    }
+  ]
+}
