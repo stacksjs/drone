@@ -5,8 +5,8 @@ import type { EstimatorSnapshot } from '../estimation/estimator'
 import type { SensorVector } from '../sensors/types'
 import type { GeodeticOrigin } from '../estimation/frames'
 import { validVector } from '../controls/model'
-import type { MissionPlan, MissionTask, ReadinessMissionPlan, ReadinessMissionTask } from './plan'
-import { validateMission, validateReadinessMission } from './plan'
+import type { MissionPlan, MissionTask, ReadinessMissionPlan, ReadinessMissionTask, TaskMotionMissionPlan } from './plan'
+import { validateMission, validateReadinessMission, validateTaskMotionMission } from './plan'
 
 export type MissionAction = 'start' | 'pause' | 'resume' | 'abort' | 'recover'
 export type MissionState = 'ready' | 'running' | 'paused' | 'completed' | 'aborted' | 'blocked'
@@ -51,8 +51,11 @@ export function observeMission(input: { estimate: EstimatorSnapshot, authority: 
     positionM: p ? [...p.positionM] as SensorVector : [NaN, NaN, NaN], velocityMps: p ? [...p.velocityMps] as SensorVector : [NaN, NaN, NaN], authority: input.authority, batteryPercent: input.batteryPercent, onGround: input.onGround,
   }
 }
-type PolicyTask = MissionTask | ReadinessMissionTask
+type PolicyRate = { kind: 'global' } | { kind: 'task', speedMps: number }
+type PolicyTask = (MissionTask | ReadinessMissionTask) & { rate: PolicyRate }
 type PolicyPlan = Omit<MissionPlan, 'version' | 'tasks'> & { tasks: PolicyTask[] }
+function globalPolicy(plan: MissionPlan | ReadinessMissionPlan): PolicyPlan { return { ...plan, tasks: plan.tasks.map((t): PolicyTask => ({ ...t, rate: { kind: 'global' } })) } }
+function taskMotionPolicy(plan: TaskMotionMissionPlan): PolicyPlan { return { ...plan, tasks: plan.tasks.map((t): PolicyTask => ({ ...t, rate: t.kind === 'abort' || t.kind === 'payload' || t.kind === 'branch' ? { kind: 'global' } : { kind: 'task', speedMps: t.speedMps } })) } }
 type PolicyReason = ReadinessMissionReason | 'operator-pause' | 'operator-resume' | 'checkpoint-recovered-awaiting-resume'
 interface PolicyState { state: MissionState, taskId: string, lastNow: number | null, startedAt: number | null, taskEnteredAt: number | null, reference: string | null, taskElapsedMs: number, settledMs: number, holdM: SensorVector | null, targetM: SensorVector | null, payload: MissionSnapshot['payload'], reason: PolicyReason }
 function initialPolicy(plan: PolicyPlan): PolicyState { return { state: 'ready', taskId: plan.start, lastNow: null, startedAt: null, taskEnteredAt: null, reference: null, taskElapsedMs: 0, settledMs: 0, holdM: null, targetM: null, payload: null, reason: 'awaiting-operator-start' } }
@@ -102,7 +105,8 @@ function transitionPolicy(plan: PolicyPlan, worstCaseMs: number, previous: Polic
       const goal = policyTarget(plan, t)!
       const previous = targetM ?? o.positionM
       const distance = Math.hypot(...goal.map((n, i) => n - previous[i]!))
-      const scale = distance === 0 ? 1 : Math.min(1, (plan.speedMps ?? 0.6) * executionDt / 1000 / distance)
+      const rate = t.rate.kind === 'task' ? t.rate.speedMps : (plan.speedMps ?? 0.6)
+      const scale = distance === 0 ? 1 : Math.min(1, rate * executionDt / 1000 / distance)
       targetM = goal.map((n, i) => previous[i]! + (n - previous[i]!) * scale) as SensorVector
       const reached = Math.hypot(...o.positionM.map((n, i) => n - goal[i]!)) <= missionLimits.acceptanceM && Math.hypot(...o.velocityMps) < 0.3 && (t.kind !== 'land' || o.onGround)
       settledMs = reached ? settledMs + executionDt : 0
@@ -120,7 +124,8 @@ function legacySnapshot(s: PolicyState): MissionSnapshot { return { version: 1, 
 /** Pure simulation policy. Authority owns arming, leases, output gating and revocation. */
 export function createMissionEngine(input: unknown) {
   const { plan, worstCaseMs } = validateMission(input)
-  let current = initialPolicy(plan)
+  const policy = globalPolicy(plan)
+  let current = initialPolicy(policy)
   const rows: MissionTraceRow[] = []
   function snapshot(): MissionSnapshot { return legacySnapshot(current) }
   return {
@@ -132,7 +137,7 @@ export function createMissionEngine(input: unknown) {
       if (!o || !exactKeys(o, ['kind', 'nowMs', 'reference', 'origin', 'healthy', 'positionM', 'velocityMps', 'authority', 'batteryPercent', 'onGround']) || !o.origin || !exactKeys(o.origin, ['latitudeDeg', 'longitudeDeg', 'ellipsoidHeightM']) || o.kind !== 'simulation' || !Number.isSafeInteger(o.nowMs) || o.nowMs < 0 || (current.lastNow !== null && o.nowMs <= current.lastNow) || typeof o.reference !== 'string' || o.reference.length > 120 || !/^[1-9][0-9]{0,19}:[0-9]+,[0-9]+,[0-9]+,[0-9]+,[0-9]+$/.test(o.reference)
         || !validVector(o.positionM) || !validVector(o.velocityMps) || !sameOrigin(o.origin, plan.origin) || typeof o.healthy !== 'boolean' || typeof o.onGround !== 'boolean' || !authorityStates.includes(o.authority) || !Number.isFinite(o.batteryPercent) || o.batteryPercent < 0 || o.batteryPercent > 100
         || (action !== undefined && !['start', 'pause', 'resume', 'abort', 'recover'].includes(action))) { current = blockedPolicy(current, 'invalid-observation-or-clock'); throw new TypeError('Invalid mission observation or clock') }
-      current = transitionPolicy(plan, worstCaseMs, current, o, action, null)
+      current = transitionPolicy(policy, worstCaseMs, current, o, action, null)
       const result = snapshot()
       rows.push({ observation: o, action: action ?? null, result: structuredClone(result) })
       return result
@@ -241,7 +246,8 @@ const readinessBytes = (value: unknown) => new TextEncoder().encode(JSON.stringi
 /** Concrete v3 wrapper: preview/encode before committing any accepted policy state. */
 export function createReadinessMissionEngine(input: unknown) {
   const { plan, worstCaseMs } = validateReadinessMission(input)
-  let current = initialPolicy(plan), poison: TypeError | RangeError | null = null
+  const policy = globalPolicy(plan)
+  let current = initialPolicy(policy), poison: TypeError | RangeError | null = null
   const rows: ReadinessMissionTraceRow[] = []
   let encodedBytes = readinessBytes({ version: 3, evidence: 'owned-readiness-mission-simulation', plan, rows: [] }) + 1
   function snapshot(): ReadinessMissionSnapshot { return readinessSnapshot(current) }
@@ -266,7 +272,7 @@ export function createReadinessMissionEngine(input: unknown) {
         if (current.lastNow !== null && o.nowMs <= current.lastNow || !sameOrigin(o.origin, plan.origin) || action !== undefined && action !== 'start' && action !== 'abort') return unavailable('invalid')
       }
       catch { if (poison) throw poison; return unavailable('invalid') }
-      const release = captureReadiness(readiness), next = transitionPolicy(plan, worstCaseMs, current, o, action, release), result = readinessSnapshot(next)
+      const release = captureReadiness(readiness), next = transitionPolicy(policy, worstCaseMs, current, o, action, release), result = readinessSnapshot(next)
       const row: ReadinessMissionTraceRow = { observation: o, action: action ?? null, readiness: release, result }
       const rowBytes = readinessBytes(row), addition = rowBytes + (rows.length ? 1 : 0)
       if (rowBytes > 2048 || addition > missionLimits.bytes - encodedBytes) return unavailable('capacity')
@@ -329,4 +335,105 @@ export function parseReadinessMissionTrace(text: string): ReadinessMissionTrace 
   try { value = JSON.parse(text) }
   catch { return readinessInvalid() }
   return replayReadinessMission(value).trace()
+}
+
+export type TaskMotionMissionAction = ReadinessMissionAction
+export type TaskMotionMissionObservation = ReadinessMissionObservation
+export type TaskMotionMissionDeclaration = ReadinessMissionDeclaration
+export type TaskMotionMissionWire = ReadinessMissionWire
+export type TaskMotionMissionReason = ReadinessMissionReason
+export interface TaskMotionMissionSnapshot { version: 4, evidence: 'owned-task-motion-mission-simulation', physicalFlightEnabled: false, state: Exclude<MissionState, 'paused'>, taskId: string, targetM: SensorVector | null, payload: MissionSnapshot['payload'], reason: TaskMotionMissionReason, elapsedMs: number, runStartedAtMs: number | null, taskEnteredAtMs: number | null }
+export interface TaskMotionMissionTraceRow { observation: TaskMotionMissionObservation, action: TaskMotionMissionAction | null, readiness: TaskMotionMissionWire, result: TaskMotionMissionSnapshot }
+export interface TaskMotionMissionTrace { version: 4, evidence: 'owned-task-motion-mission-simulation', plan: TaskMotionMissionPlan, rows: TaskMotionMissionTraceRow[] }
+function taskMotionInvalid(): never { throw new TypeError('Invalid task-motion mission trace') }
+
+function taskMotionSnapshot(s: PolicyState): TaskMotionMissionSnapshot {
+  const reason = readinessReasons.find(r => r === s.reason)
+  if (!reason || s.state === 'paused') return taskMotionInvalid()
+  return { version: 4, evidence: 'owned-task-motion-mission-simulation', physicalFlightEnabled: false, state: s.state, taskId: s.taskId, targetM: s.targetM ? [...s.targetM] : null, payload: s.payload ? { ...s.payload } : null, reason, elapsedMs: s.startedAt === null || s.lastNow === null ? 0 : s.lastNow - s.startedAt, runStartedAtMs: s.startedAt, taskEnteredAtMs: s.taskEnteredAt }
+}
+
+/** Concrete v4 wrapper: preview/encode before committing any accepted policy state. */
+export function createTaskMotionMissionEngine(input: unknown) {
+  const { plan, worstCaseMs } = validateTaskMotionMission(input)
+  const policy = taskMotionPolicy(plan)
+  let current = initialPolicy(policy), poison: TypeError | RangeError | null = null
+  const rows: TaskMotionMissionTraceRow[] = []
+  let encodedBytes = readinessBytes({ version: 4, evidence: 'owned-task-motion-mission-simulation', plan, rows: [] }) + 1
+  function snapshot(): TaskMotionMissionSnapshot { return taskMotionSnapshot(current) }
+  function unavailable(kind: 'invalid' | 'capacity'): never {
+    poison = kind === 'invalid' ? new TypeError('Invalid task-motion mission observation or action') : new RangeError('Task-motion mission trace capacity exhausted')
+    current = blockedPolicy(current, kind === 'invalid' ? 'invalid-observation-or-clock' : 'mission-trace-capacity')
+    throw poison
+  }
+  return {
+    snapshot,
+    trace(): TaskMotionMissionTrace {
+      const out: TaskMotionMissionTrace = { version: 4, evidence: 'owned-task-motion-mission-simulation', plan: structuredClone(plan), rows: structuredClone(rows) }
+      if (readinessBytes(out) + 1 !== encodedBytes || encodedBytes > missionLimits.bytes) throw new RangeError('Task-motion mission trace capacity exhausted')
+      return out
+    },
+    step(observation: TaskMotionMissionObservation, action?: TaskMotionMissionAction, readiness?: unknown): TaskMotionMissionSnapshot {
+      if (poison) throw poison
+      if (rows.length >= missionLimits.rows) return unavailable('capacity')
+      let o: TaskMotionMissionObservation
+      try {
+        o = captureReadinessObservation(observation)
+        if (current.lastNow !== null && o.nowMs <= current.lastNow || !sameOrigin(o.origin, plan.origin) || action !== undefined && action !== 'start' && action !== 'abort') return unavailable('invalid')
+      }
+      catch { if (poison) throw poison; return unavailable('invalid') }
+      const release = captureReadiness(readiness), next = transitionPolicy(policy, worstCaseMs, current, o, action, release), result = taskMotionSnapshot(next)
+      const row: TaskMotionMissionTraceRow = { observation: o, action: action ?? null, readiness: release, result }
+      const rowBytes = readinessBytes(row), addition = rowBytes + (rows.length ? 1 : 0)
+      if (rowBytes > 2048 || addition > missionLimits.bytes - encodedBytes) return unavailable('capacity')
+      current = next; rows.push(row); encodedBytes += addition
+      return structuredClone(result)
+    },
+  }
+}
+export type TaskMotionMissionEngine = ReturnType<typeof createTaskMotionMissionEngine>
+
+function captureTaskMotionSnapshot(value: unknown): TaskMotionMissionSnapshot {
+  const d = readinessData(value, ['version', 'evidence', 'physicalFlightEnabled', 'state', 'taskId', 'targetM', 'payload', 'reason', 'elapsedMs', 'runStartedAtMs', 'taskEnteredAtMs'], true)
+  if (d.version !== 4 || d.evidence !== 'owned-task-motion-mission-simulation' || d.physicalFlightEnabled !== false) return taskMotionInvalid()
+  const state = (['ready', 'running', 'completed', 'aborted', 'blocked'] as const).find(s => s === d.state), reason = readinessReasons.find(r => r === d.reason)
+  if (!state || !reason) return taskMotionInvalid()
+  let payload: TaskMotionMissionSnapshot['payload'] = null
+  if (d.payload !== null) { const p = readinessData(d.payload, ['taskId', 'channel'], true); if (p.channel !== 'camera-still') return taskMotionInvalid(); payload = { taskId: readinessId(p.taskId), channel: 'camera-still' } }
+  return { version: 4, evidence: 'owned-task-motion-mission-simulation', physicalFlightEnabled: false, state, taskId: readinessId(d.taskId), targetM: d.targetM === null ? null : readinessVector(d.targetM), payload, reason, elapsedMs: readinessEpoch(d.elapsedMs), runStartedAtMs: d.runStartedAtMs === null ? null : readinessEpoch(d.runStartedAtMs), taskEnteredAtMs: d.taskEnteredAtMs === null ? null : readinessEpoch(d.taskEnteredAtMs) }
+}
+
+/** Replay checks canonical data first, then recomputes every actual decision. Unsigned evidence. */
+export function replayTaskMotionMission(input: unknown): TaskMotionMissionEngine {
+  let trace: TaskMotionMissionTrace
+  try {
+    const d = readinessData(input, ['version', 'evidence', 'plan', 'rows'], true)
+    if (d.version !== 4 || d.evidence !== 'owned-task-motion-mission-simulation') return taskMotionInvalid()
+    const plan = validateTaskMotionMission(d.plan).plan; readinessOrder(d.plan, plan)
+    const rows = readinessArray(d.rows, missionLimits.rows).map((value): TaskMotionMissionTraceRow => {
+      const r = readinessData(value, ['observation', 'action', 'readiness', 'result'], true)
+      if (r.action !== null && r.action !== 'start' && r.action !== 'abort') return taskMotionInvalid()
+      return { observation: captureReadinessObservation(r.observation, true), action: r.action, readiness: captureReadiness(r.readiness, true), result: captureTaskMotionSnapshot(r.result) }
+    })
+    trace = { version: 4, evidence: 'owned-task-motion-mission-simulation', plan, rows }
+    if (trace.rows.some(r => readinessBytes(r) > 2048)) return taskMotionInvalid()
+    if (readinessBytes(trace) + 1 > missionLimits.bytes) throw new RangeError('Task-motion mission trace exceeds 8 MiB')
+  }
+  catch (error) { if (error instanceof RangeError && error.message === 'Task-motion mission trace exceeds 8 MiB') throw error; return taskMotionInvalid() }
+  const engine = createTaskMotionMissionEngine(trace.plan)
+  for (const row of trace.rows) {
+    let result: TaskMotionMissionSnapshot
+    try { result = engine.step(row.observation, row.action ?? undefined, row.readiness) }
+    catch { return taskMotionInvalid() }
+    if (JSON.stringify(result) !== JSON.stringify(row.result)) throw new TypeError('Task-motion mission trace decision mismatch')
+  }
+  return engine
+}
+export function parseTaskMotionMissionTrace(text: string): TaskMotionMissionTrace {
+  if (typeof text !== 'string') return taskMotionInvalid()
+  if (new TextEncoder().encode(text).length > missionLimits.bytes) throw new RangeError('Task-motion mission trace exceeds 8 MiB')
+  let value: unknown
+  try { value = JSON.parse(text) }
+  catch { return taskMotionInvalid() }
+  return replayTaskMotionMission(value).trace()
 }

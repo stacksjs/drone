@@ -115,9 +115,42 @@ export type ReadinessMissionPlan = Omit<MissionPlan, 'version' | 'speedMps' | 't
 function containsGeometry(plan: { fence: MissionPlan['fence'] }, position: unknown): position is SensorVector {
   return validVector(position) && Math.hypot(position[0], position[1]) <= plan.fence.radiusM && position[2] >= plan.fence.minDownM && position[2] <= 0
 }
-/** Disjoint v3 policy input. Legacy validation and its input acceptance are unchanged. */
+export type TaskMotionMissionTask =
+  | { id: string, kind: 'takeoff' | 'waypoint', speedMps: number, positionM: SensorVector, timeoutMs: number, next: string }
+  | { id: string, kind: 'land', speedMps: number, positionM: SensorVector, timeoutMs: number }
+  | { id: string, kind: 'loiter', speedMps: number, positionM: SensorVector, durationMs: number, timeoutMs: number, next: string }
+  | { id: string, kind: 'readiness-loiter', speedMps: number, positionM: SensorVector, durationMs: 1500, timeoutMs: 3000, sourceId: string, next: string }
+  | { id: string, kind: 'return', speedMps: number, timeoutMs: number, next: string }
+  | { id: string, kind: 'payload', channel: 'camera-still', next: string }
+  | { id: string, kind: 'branch', batteryAtLeast: number, then: string, otherwise: string }
+  | { id: string, kind: 'abort' }
+export type TaskMotionMissionPlan = Omit<ReadinessMissionPlan, 'version' | 'tasks'> & { version: 4, tasks: TaskMotionMissionTask[] }
+type BoundedMissionCapture = { kind: 'readiness', plan: ReadinessMissionPlan, worstCaseMs: number, requiredWh: number } | { kind: 'task-motion', plan: TaskMotionMissionPlan, worstCaseMs: number, requiredWh: number }
+function taskMotionProjection(t: ReadinessMissionTask, speedMps: number | undefined): TaskMotionMissionTask {
+  if (t.kind === 'abort' || t.kind === 'payload' || t.kind === 'branch') return t
+  if (speedMps === undefined) throw new TypeError('Invalid task-motion mission plan')
+  if (t.kind === 'return') return { id: t.id, kind: t.kind, speedMps, timeoutMs: t.timeoutMs, next: t.next }
+  if (t.kind === 'land') return { id: t.id, kind: t.kind, speedMps, positionM: t.positionM, timeoutMs: t.timeoutMs }
+  if (t.kind === 'takeoff' || t.kind === 'waypoint') return { id: t.id, kind: t.kind, speedMps, positionM: t.positionM, timeoutMs: t.timeoutMs, next: t.next }
+  if (t.kind === 'readiness-loiter') return { id: t.id, kind: t.kind, speedMps, positionM: t.positionM, durationMs: t.durationMs, timeoutMs: t.timeoutMs, sourceId: t.sourceId, next: t.next }
+  if (t.kind === 'loiter') return { id: t.id, kind: t.kind, speedMps, positionM: t.positionM, durationMs: t.durationMs, timeoutMs: t.timeoutMs, next: t.next }
+  throw new TypeError('Invalid task-motion mission plan')
+}
+/** Existing v3 capture keeps its strict whitelist, defaults, errors and projection. */
 export function validateReadinessMission(input: unknown): { plan: ReadinessMissionPlan, worstCaseMs: number, requiredWh: number } {
-  const invalid = (): never => { throw new TypeError('Invalid readiness mission plan') }
+  const captured = captureBoundedMission(input, 'readiness')
+  if (captured.kind !== 'readiness') throw new TypeError('Invalid readiness mission plan')
+  return { plan: captured.plan, worstCaseMs: captured.worstCaseMs, requiredWh: captured.requiredWh }
+}
+/** Disjoint v4 capture resolves spatial task rates without changing legacy schemas. */
+export function validateTaskMotionMission(input: unknown): { plan: TaskMotionMissionPlan, worstCaseMs: number, requiredWh: number } {
+  const captured = captureBoundedMission(input, 'task-motion')
+  if (captured.kind !== 'task-motion') throw new TypeError('Invalid task-motion mission plan')
+  return { plan: captured.plan, worstCaseMs: captured.worstCaseMs, requiredWh: captured.requiredWh }
+}
+/** Disjoint v3 policy input. Legacy validation and its input acceptance are unchanged. */
+function captureBoundedMission(input: unknown, profile: 'readiness' | 'task-motion'): BoundedMissionCapture {
+  const invalid = (): never => { throw new TypeError(profile === 'readiness' ? 'Invalid readiness mission plan' : 'Invalid task-motion mission plan') }
   const data = (value: unknown, fields: string[], optional: string[] = []): Record<string, unknown> => {
     if (!value || typeof value !== 'object' || nodeTypes.isProxy(value) || Object.getPrototypeOf(value) !== Object.prototype) return invalid()
     const own = Reflect.ownKeys(value)
@@ -143,7 +176,7 @@ export function validateReadinessMission(input: unknown): { plan: ReadinessMissi
     return [numeric(d[0]!.value, -1e6, 1e6), numeric(d[1]!.value, -1e6, 1e6), numeric(d[2]!.value, -1e6, 1e6)]
   }
   const raw = data(input, ['version', 'id', 'frame', 'altitude', 'terrain', 'origin', 'fence', 'rallyM', 'power', 'start', 'speedMps', 'tasks'], ['speedMps'])
-  if (raw.version !== 3 || raw.frame !== 'LOCAL_NED' || raw.altitude !== 'ORIGIN_RELATIVE_DOWN' || raw.terrain !== 'FLAT_ORIGIN_PLANE') return invalid()
+  if (raw.version !== (profile === 'readiness' ? 3 : 4) || raw.frame !== 'LOCAL_NED' || raw.altitude !== 'ORIGIN_RELATIVE_DOWN' || raw.terrain !== 'FLAT_ORIGIN_PLANE') return invalid()
   const o = data(raw.origin, ['latitudeDeg', 'longitudeDeg', 'ellipsoidHeightM']), f = data(raw.fence, ['radiusM', 'minDownM']), p = data(raw.power, ['availableWh', 'hoverW', 'reservePercent'])
   const origin = { latitudeDeg: numeric(o.latitudeDeg, -90, 90), longitudeDeg: numeric(o.longitudeDeg, -180, 180), ellipsoidHeightM: numeric(o.ellipsoidHeightM, -500, 10000) }
   const fence = { radiusM: numeric(f.radiusM, 1, authorityPolicy.fenceRadiusM - 1), minDownM: numeric(f.minDownM, authorityPolicy.minDownM + 0.5, -1) }
@@ -151,21 +184,25 @@ export function validateReadinessMission(input: unknown): { plan: ReadinessMissi
   if (!containsGeometry({ fence }, rallyM) || rallyM[2] > -0.5) return invalid()
   const list = raw.tasks
   if (nodeTypes.isProxy(list) || !Array.isArray(list) || Object.getPrototypeOf(list) !== Array.prototype || list.length < 2 || list.length > 32 || Reflect.ownKeys(list).length !== list.length + 1) return invalid()
-  const taskDescriptors = Object.getOwnPropertyDescriptors(list), tasks: ReadinessMissionTask[] = []
+  const taskDescriptors = Object.getOwnPropertyDescriptors(list), tasks: ReadinessMissionTask[] = [], rates = new Map<string, number>()
+  const defaultRate = profile === 'task-motion' ? (Object.hasOwn(raw, 'speedMps') ? numeric(raw.speedMps, 0.05, 0.6) : 0.6) : null
+  function spatialData(value: unknown, fields: string[]): Record<string, unknown> { return profile === 'readiness' ? data(value, fields) : data(value, [...fields, 'speedMps'], ['speedMps']) }
   for (let i = 0; i < list.length; i++) {
     const descriptor = taskDescriptors[i]
     if (!descriptor?.enumerable || !Object.hasOwn(descriptor, 'value')) return invalid()
     const v = descriptor.value
-    const captured = data(v, ['id', 'kind', 'positionM', 'timeoutMs', 'durationMs', 'sourceId', 'next', 'channel', 'batteryAtLeast', 'then', 'otherwise'], ['positionM', 'timeoutMs', 'durationMs', 'sourceId', 'next', 'channel', 'batteryAtLeast', 'then', 'otherwise'])
+    const fields = ['id', 'kind', 'positionM', 'timeoutMs', 'durationMs', 'sourceId', 'next', 'channel', 'batteryAtLeast', 'then', 'otherwise']
+    const optional = ['positionM', 'timeoutMs', 'durationMs', 'sourceId', 'next', 'channel', 'batteryAtLeast', 'then', 'otherwise']
+    const captured = profile === 'readiness' ? data(v, fields, optional) : data(v, [...fields, 'speedMps'], [...optional, 'speedMps'])
     const k = captured.kind
     let t: ReadinessMissionTask
     if (k === 'abort') { const d = data(captured, ['id', 'kind']); t = { id: id(d.id), kind: k } }
     else if (k === 'branch') { const d = data(captured, ['id', 'kind', 'batteryAtLeast', 'then', 'otherwise']); t = { id: id(d.id), kind: k, batteryAtLeast: numeric(d.batteryAtLeast, power.reservePercent + 1, 100), then: id(d.then), otherwise: id(d.otherwise) } }
     else if (k === 'payload') { const d = data(captured, ['id', 'kind', 'channel', 'next']); if (d.channel !== 'camera-still') return invalid(); t = { id: id(d.id), kind: k, channel: 'camera-still', next: id(d.next) } }
-    else if (k === 'return') { const d = data(captured, ['id', 'kind', 'timeoutMs', 'next']); t = { id: id(d.id), kind: k, timeoutMs: numeric(d.timeoutMs, 1000, 20000), next: id(d.next) } }
+    else if (k === 'return') { const d = spatialData(captured, ['id', 'kind', 'timeoutMs', 'next']); t = { id: id(d.id), kind: k, timeoutMs: numeric(d.timeoutMs, 1000, 20000), next: id(d.next) } }
     else if (k === 'takeoff' || k === 'waypoint' || k === 'land' || k === 'loiter' || k === 'readiness-loiter') {
       const fields = ['id', 'kind', 'positionM', ...(k === 'loiter' || k === 'readiness-loiter' ? ['durationMs'] : []), 'timeoutMs', ...(k === 'readiness-loiter' ? ['sourceId'] : []), ...(k === 'land' ? [] : ['next'])]
-      const d = data(captured, fields), positionM = vector(d.positionM), timeoutMs = numeric(d.timeoutMs, 1000, 20000)
+      const d = spatialData(captured, fields), positionM = vector(d.positionM), timeoutMs = numeric(d.timeoutMs, 1000, 20000)
       if (!containsGeometry({ fence }, positionM) || (k === 'land' ? positionM[2] !== 0 : positionM[2] > -0.5)) return invalid()
       if (k === 'land') t = { id: id(d.id), kind: k, positionM, timeoutMs }
       else if (k === 'takeoff' || k === 'waypoint') t = { id: id(d.id), kind: k, positionM, timeoutMs, next: id(d.next) }
@@ -173,15 +210,22 @@ export function validateReadinessMission(input: unknown): { plan: ReadinessMissi
       else { const durationMs = numeric(d.durationMs, 100, 10000); if (durationMs + 500 > timeoutMs) return invalid(); t = { id: id(d.id), kind: k, positionM, durationMs, timeoutMs, next: id(d.next) } }
     }
     else return invalid()
+    if (profile === 'task-motion' && (k === 'takeoff' || k === 'waypoint' || k === 'land' || k === 'loiter' || k === 'readiness-loiter' || k === 'return')) { if (defaultRate === null) return invalid(); rates.set(t.id, Object.hasOwn(captured, 'speedMps') ? numeric(captured.speedMps, 0.05, 0.6) : defaultRate) }
     tasks.push(t)
   }
-  const plan: ReadinessMissionPlan = { version: 3, id: id(raw.id), frame: 'LOCAL_NED', altitude: 'ORIGIN_RELATIVE_DOWN', terrain: 'FLAT_ORIGIN_PLANE', origin, fence, rallyM, power, start: id(raw.start), speedMps: Object.hasOwn(raw, 'speedMps') ? numeric(raw.speedMps, 0.05, 0.6) : 0.6, tasks }
-  if (tasks.filter(t => t.kind === 'readiness-loiter').length !== 1 || tasks.find(t => t.id === plan.start)?.kind !== 'takeoff' || tasks.some(t => t.id !== plan.start && t.kind === 'takeoff')) return invalid()
+  const facts: Omit<ReadinessMissionPlan, 'version'> = { id: id(raw.id), frame: 'LOCAL_NED', altitude: 'ORIGIN_RELATIVE_DOWN', terrain: 'FLAT_ORIGIN_PLANE', origin, fence, rallyM, power, start: id(raw.start), speedMps: defaultRate ?? (Object.hasOwn(raw, 'speedMps') ? numeric(raw.speedMps, 0.05, 0.6) : 0.6), tasks }
+  if (tasks.filter(t => t.kind === 'readiness-loiter').length !== 1 || tasks.find(t => t.id === facts.start)?.kind !== 'takeoff' || tasks.some(t => t.id !== facts.start && t.kind === 'takeoff')) return invalid()
   let worstCaseMs: number
-  try { worstCaseMs = missionGraphBudget(tasks.map(t => ({ id: t.id, durationMs: 'timeoutMs' in t ? t.timeoutMs : 20, edges: t.kind === 'branch' ? [t.then, t.otherwise] : 'next' in t ? [t.next] : [] })), plan.start, 44000) }
+  try { worstCaseMs = missionGraphBudget(tasks.map(t => ({ id: t.id, durationMs: 'timeoutMs' in t ? t.timeoutMs : 20, edges: t.kind === 'branch' ? [t.then, t.otherwise] : 'next' in t ? [t.next] : [] })), facts.start, 44000) }
   catch { return invalid() }
   const requiredWh = power.hoverW * worstCaseMs / 3600000
-  if (requiredWh > power.availableWh * (1 - power.reservePercent / 100)) throw new RangeError('Readiness mission endurance budget cannot preserve reserve')
+  if (requiredWh > power.availableWh * (1 - power.reservePercent / 100)) throw new RangeError(profile === 'readiness' ? 'Readiness mission endurance budget cannot preserve reserve' : 'Task-motion mission endurance budget cannot preserve reserve')
+  if (profile === 'readiness') {
+    const plan: ReadinessMissionPlan = { version: 3, ...facts }
+    if (new TextEncoder().encode(JSON.stringify(plan)).length > 32768) return invalid()
+    return { kind: 'readiness', plan, worstCaseMs, requiredWh }
+  }
+  const plan: TaskMotionMissionPlan = { version: 4, ...facts, tasks: tasks.map(t => taskMotionProjection(t, rates.get(t.id))) }
   if (new TextEncoder().encode(JSON.stringify(plan)).length > 32768) return invalid()
-  return { plan, worstCaseMs, requiredWh }
+  return { kind: 'task-motion', plan, worstCaseMs, requiredWh }
 }

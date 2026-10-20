@@ -251,3 +251,32 @@ This is a pure declared-policy prerequisite. Connecting it to the one-world came
 proving the actual 26-sample camera readiness streak, translating exposures, source loss, image quality
 and landing requires separate consumer work. It does not qualify the earlier failed fixed-dwell
 translation experiment or close the remaining cinematography requirements.
+
+
+## Native task-motion policy, library v4
+
+The concrete pure APIs `validateTaskMotionMission`, `createTaskMotionMissionEngine`,
+`replayTaskMotionMission` and `parseTaskMotionMissionTrace` add native version 4 with evidence
+`owned-task-motion-mission-simulation`. Spatial tasks may declare `speedMps` in the existing
+0.05..0.6 m/s target-ramp domain. Omission resolves once to the plan default, itself 0.6 when
+omitted. Every canonical spatial task contains its resolved rate immediately after `kind`.
+Nonspatial tasks reject rates; `return` still uses the rally point and rejects a position field.
+
+One shared transition policy uses the current task's rate before advancing. A successor's rate
+first applies on the next decision. This changes the commanded position-target ramp, not actual
+vehicle speed, acceleration, jerk, controller gains, dwell or deadlines. Endurance remains the
+declared longest-path hover-power budget and does not establish physical reachability.
+
+V4 retains the v3 readiness bindings, 1,500 ms minimum dwell, 3,000 ms timeout, 44,000 ms graph
+budget and 45,000 ms observation domain. Safety takes priority over applicable operator abort,
+abort over running task timeout, and timeout over readiness. It supports only start and abort.
+Its canonical schema, unsigned replay, permanent invalid-input/capacity poison, replayable accepted
+prefix and independent 6,001-row/8 MiB JSON-plus-LF limits follow the v3 rules above. Replay requires
+resolved task rates in exact canonical order. Editing an active unsaturated rate can change a
+recomputed target and fail consistency; an unused default or unvisited task rate can still replay.
+Replay provides no authenticity guarantee.
+
+V1, vehicle v2 and readiness v3 remain separate public contracts. Generic recording helpers and
+mission commands accept only their existing versions. This slice connects no new simulator,
+camera, physical transport or portable command. It selects no cinematic transit or landing rates
+and does not qualify the stopped translation experiment or close the cinematography issue.
