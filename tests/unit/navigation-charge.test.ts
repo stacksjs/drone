@@ -3,6 +3,27 @@ import { createChargeOutputWatchdog, qualifyChargeEnvironment } from '../../reso
 
 const frame = (sequence = 1, issuedAtMs = 0) => ({ version: 1, kind: 'modeled-charge-enable', scope: 'episode-one', sessionId: 123n, bootId: 77n, epoch: 1, sequence, issuedAtMs, expiresAtMs: issuedAtMs + 60, enable: true })
 
+test('a charge option is captured once so its adapter methods agree with the constructed runtime', () => {
+  for (const initial of ['nominal', undefined] as const) {
+    let reads = 0
+    const options = {
+      contact: 'nominal' as const,
+      get charge(): 'nominal' | undefined {
+        reads++
+        return reads === 1 ? initial : initial === 'nominal' ? undefined : 'nominal'
+      },
+    }
+    const session = createNavigationOccurrenceSession(options)
+    const enabled = initial === 'nominal'
+    // eslint-disable-next-line no-console
+    console.log(`NAVIGATION_CHARGE_OPTION_CAPTURE ${JSON.stringify({ initial: initial ?? 'disabled', reads, runtimeEnabled: Object.hasOwn(session.snapshot(), 'charge'), requestMethod: Object.hasOwn(session, 'requestCharge'), stopMethod: Object.hasOwn(session, 'stopCharge') })}`)
+    expect(reads).toBe(1)
+    expect(Object.hasOwn(session.snapshot(), 'charge')).toBe(enabled)
+    expect(Object.hasOwn(session, 'requestCharge')).toBe(enabled)
+    expect(Object.hasOwn(session, 'stopCharge')).toBe(enabled)
+  }
+})
+
 test('private one-channel charge adapter retains native deadline-first expiry and cannot revive a fault', () => {
   const board = createChargeOutputWatchdog('episode-one')
   expect(board.accept(frame(), 0)).toBe(true)
@@ -163,6 +184,30 @@ test('genuine charge host silence leaves output unchanged then native expiry and
   expect(tail.charge!.plant.grossGainWh).toBeGreaterThan(active.charge!.plant.grossGainWh)
   expect(tail.charge!.plant.currentA).toBeLessThan(.02)
   expect(tail.charge!.plant.relayClosed).toBe(false)
+})
+
+test('a stop request after host silence leaves the live charge lease for independent expiry', () => {
+  const { session } = startCharging()
+  const active = session.advanceTo(49000)
+  const deadline = active.charge!.output.expiresAtMs!
+  const absent = session.stopHost()
+  const stopped = session.stopCharge!()
+  expect(active.charge!.output.values).toEqual([1])
+  expect(stopped.charge).toEqual(absent.charge)
+  expect(stopped.charge!.output).toEqual(active.charge!.output)
+  expect(stopped.charge!.host).toEqual(active.charge!.host)
+  expect(stopped.counts).toEqual(active.counts)
+  expect(stopped.authority).toEqual(active.authority)
+  const expired = session.advanceTo(deadline)
+  const tail = session.advanceTo(deadline + 1000)
+  expect(expired.charge!.output.fault).toBe('output-lease-expired')
+  expect(expired.charge!.output.values).toEqual([0])
+  expect(tail.charge!.host).toEqual(active.charge!.host)
+  expect(tail.charge!.episodes).toEqual(active.charge!.episodes)
+  expect(tail.charge!.host.revokes).toBe(active.charge!.host.revokes)
+  expect(tail.charge!.plant.grossGainWh).toBeGreaterThan(active.charge!.plant.grossGainWh)
+  expect(tail.charge!.plant.currentA).toBeLessThan(.02)
+  expect(tail.charge!.currentEligibility).toBe(false)
 })
 
 test('explicit stop is idempotent and requested off cannot establish isolation before genuine new settled captures', () => {

@@ -460,10 +460,11 @@ export function runNavigationFixture(options: { scenario?: NavigationScenario, s
 
 /** Two manual flight approvals on one retained plant, with optional modeled contact and partial charge. */
 export function createNavigationOccurrenceSession(options: { scenario?: NavigationScenario, contact?: ContactProfile, charge?: ChargeProfile } = {}) {
-  const runtime = createNavigationRuntime({ scenario: options.scenario, seconds: 120 }, false, true, options.contact, options.charge)
+  const chargeProfile = options.charge
+  const runtime = createNavigationRuntime({ scenario: options.scenario, seconds: 120 }, false, true, options.contact, chargeProfile)
   return {
     requestOccurrence: runtime.requestOccurrence,
-    ...(options.charge ? { requestCharge: runtime.requestCharge, stopCharge: runtime.stopCharge } : {}),
+    ...(chargeProfile ? { requestCharge: runtime.requestCharge, stopCharge: runtime.stopCharge } : {}),
     advanceTo(nowMs: number) {
       runtime.advanceClock(nowMs)
       return runtime.snapshotOccurrences()

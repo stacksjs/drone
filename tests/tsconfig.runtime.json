@@ -38,6 +38,7 @@
     "./unit/navigation-session.test.ts",
     "./unit/navigation-occurrences.test.ts",
     "./unit/navigation-contact.test.ts",
+    "./unit/navigation-charge.test.ts",
     "../resources/functions/drone/antenna/**/*.ts",
     "./unit/antenna.test.ts",
     "./fixtures/antenna/**/*.ts",
