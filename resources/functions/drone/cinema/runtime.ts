@@ -3,8 +3,12 @@ import type { RigidBodyState } from '../controls/physics'
 import type { SensorVector } from '../sensors/types'
 import type { MissionSimulationContext } from '../missions/simulation'
 import type { VehicleMeasurementPose } from '../vehicles/types'
-import type { CinemaActualCapture, CinemaCapture, CinemaEncoder, CinemaFault, CinemaFaultCode, CinemaImage, CinemaReason, CinemaRetirement, CinemaRun, CinemaScenario, CinemaSelection, CinemaTarget } from './types'
+import type { CinemaActualCapture, CinemaCapture, CinemaEncoder, CinemaFaultCode, CinemaImage, CinemaReason, CinemaRetirement, CinemaRun, CinemaScenario, CinemaSelection, CinemaTarget } from './types'
 import { cinemaScenarios } from './types'
+import type { CinemaShot } from './types'
+import type { GimbalCommandToken, GimbalInhibitCode } from '../payloads/gimbal-authority'
+import { createGimbalAuthority } from '../payloads/gimbal-authority'
+import type { CinemaManagedRun, CinemaManagedScenario, CinemaManagerEvidence } from './managed-types'
 import { simulateMission } from '../missions/simulation'
 import { validateMission } from '../missions/plan'
 import { predictVehicleMeasurementPose, vehicleReference } from '../vehicles/measurements'
@@ -50,10 +54,93 @@ function poseAt(context: MissionSimulationContext): VehicleMeasurementPose | nul
 /** One private mission instrument owns all angular tracking and shutter state. */
 export function simulateCinema(input: unknown = {}): CinemaRun {
   const scenario = captureScenario(input)
-  try { return runCinema(scenario) }
+  try { return runCore<never>(scenario, null).run }
   catch { unavailable() }
 }
-function runCinema(scenario: CinemaScenario): CinemaRun {
+type CoreFault<E extends GimbalInhibitCode> = { atMs: number, code: CinemaFaultCode | E }
+type CoreCapture<E extends GimbalInhibitCode> = Omit<CinemaCapture, 'reason'> & { reason: CinemaCapture['reason'] | E }
+type CoreShot<E extends GimbalInhibitCode> = Omit<CinemaShot, 'firstFault'> & { firstFault: CoreFault<E> | null }
+type CoreRun<E extends GimbalInhibitCode> = Omit<CinemaRun, 'reason' | 'shot' | 'captures'> & { reason: CinemaReason | E, shot: CoreShot<E>, captures: CoreCapture<E>[] }
+interface ManagedGate<E extends GimbalInhibitCode> {
+  step(nowMs: number, startedAtMs: number | null, goal: SensorVector): { goal: SensorVector, fault: E | null }
+  capture(sequence: 1 | 2 | 3, atMs: number): void
+  retire(atMs: number): void
+  evidence(): CinemaManagerEvidence
+}
+
+function captureManagedScenario(input: unknown): CinemaManagedScenario {
+  try {
+    if (!input || typeof input !== 'object' || nodeTypes.isProxy(input) || Object.getPrototypeOf(input) !== Object.prototype) throw new TypeError()
+    const d = Object.getOwnPropertyDescriptors(input), keys = Reflect.ownKeys(d)
+    if (keys.some(k => k !== 'scenario') || keys.length > 1) throw new TypeError()
+    const v = d.scenario
+    if (!v) return 'nominal'
+    if (!v.enumerable || !Object.hasOwn(v, 'value')) throw new TypeError()
+    if (v.value === 'nominal' || v.value === 'source-expiry-with-foreign') return v.value
+    throw new TypeError()
+  }
+  catch { throw new TypeError('cinema-managed-input') }
+}
+export { cinemaManagedScenarios } from './managed-types'
+export type { CinemaManagedRun, CinemaManagedScenario } from './managed-types'
+/** Disjoint concrete v2 API; the same single world and controller own both runs. */
+export function simulateManagedCinema(input: unknown = {}): CinemaManagedRun {
+  const scenario = captureManagedScenario(input)
+  try {
+    const result = runCore<GimbalInhibitCode>('nominal', createManagedGate(scenario))
+    if (!result.manager) unavailable()
+    const { evaluation, ...base } = result.run
+    const run: CinemaManagedRun = { ...base, version: 2, evidence: 'owned-managed-cinema-hover-reframe-simulation', profile: 'managed-hover-poi-reframe-v1', scenario, manager: result.manager, evaluation }
+    validateRun(run)
+    return run
+  }
+  catch { unavailable() }
+}
+function createManagedGate(scenario: CinemaManagedScenario): ManagedGate<GimbalInhibitCode> {
+  const travel: SensorVector = [20 * Math.PI / 180, 45 * Math.PI / 180, 45 * Math.PI / 180]
+  const authority = createGimbalAuthority({ version: 1, sessionId: 'cinema-gimbal-source-v1', epoch: 1, sourceKind: 'autonomy', sourceId: 'cinema-autonomy-v1', reference, maxJointAngleRad: travel })
+  const captureCommands: CinemaManagerEvidence['captureCommands'] = [], foreignRejections: CinemaManagerEvidence['foreignRejections'] = []
+  let retiredAt: number | null = null
+  function step(nowMs: number, startedAtMs: number | null, goal: SensorVector) {
+    const previous = authority.snapshot().lastAccepted, offset = startedAtMs === null ? null : nowMs - startedAtMs
+    const foreign = scenario === 'source-expiry-with-foreign' && offset === 1000
+    const selected = scenario === 'nominal' || offset === null || offset <= 940 || offset === 1020
+    const command = foreign ? { version: 1, sessionId: 'cinema-gimbal-source-v1', epoch: 1, sourceKind: 'operator', sourceId: 'foreign-operator-v1', reference, sequence: 1, issuedAtMs: nowMs, leaseMs: 80, mode: 'joint-angle', jointAngleRad: [0, 0, 0] } : selected ? { version: 1, sessionId: 'cinema-gimbal-source-v1', epoch: 1, sourceKind: 'autonomy', sourceId: 'cinema-autonomy-v1', reference, sequence: (previous?.sequence ?? 0) + 1, issuedAtMs: nowMs, leaseMs: 80, mode: 'joint-angle', jointAngleRad: goal } : undefined
+    const decision = authority.step({ nowMs, reference, authorityGranted: true, neutralRequested: false, manualOverride: false }, command)
+    if (decision.rejection === 'foreign') {
+      if (!previous) unavailable()
+      retain(foreignRejections, { atMs: nowMs, sourceKind: 'operator', sourceId: 'foreign-operator-v1', selectedIssuedAtMs: previous.issuedAtMs, selectedExpiresAtMs: previous.expiresAtMs, rejection: 'foreign' }, 1, 512)
+    }
+    const fault = decision.snapshot.firstInhibit?.code ?? null
+    if (!fault && !decision.goalRad) unavailable()
+    const held: SensorVector = decision.goalRad ?? [0, 0, 0]
+    return { goal: held, fault }
+  }
+  function capture(captureSequence: 1 | 2 | 3, atMs: number) {
+    const command = authority.snapshot().lastAccepted
+    if (!command) unavailable()
+    retain(captureCommands, { captureSequence, atMs, command }, 3, 512)
+  }
+  function retire(atMs: number) { authority.retire(atMs); retiredAt = atMs }
+  function evidence(): CinemaManagerEvidence {
+    const snapshot = authority.snapshot(), first = snapshot.firstInhibit
+    if (retiredAt === null || snapshot.phase !== 'retired' || first && first.atMs === null) unavailable()
+    const transitions = snapshot.transitions.map(t => { if (t.atMs === null) unavailable(); return { atMs: t.atMs, from: t.from, to: t.to, reason: t.reason } })
+    const out: CinemaManagerEvidence = {
+      version: 1, evidence: 'owned-selected-gimbal-source-simulation', physicalActuationEnabled: false, identityAuthenticated: false,
+      policy: { profile: 'relative-joint-angle-v1', frame: 'BODY_FRD_RELATIVE_JOINTS', commandAgeMs: 100, minLeaseMs: 20, maxLeaseMs: 100, maxPolicyGapMs: 40, travelRad: [[-travel[0], travel[0]], [-travel[1], travel[1]], [-travel[2], travel[2]]] },
+      selection: { kind: 'autonomy', sourceId: 'cinema-autonomy-v1', sessionId: 'cinema-gimbal-source-v1', reference },
+      lastAccepted: snapshot.lastAccepted, firstInhibit: first && first.atMs !== null ? { atMs: first.atMs, code: first.code } : null, retirement: { atMs: retiredAt, directive: 'zero-requested-torque' },
+      counters: { acceptedCommands: snapshot.counters.acceptedCommands, rejectedForeignCommands: snapshot.counters.rejectedForeignCommands, rejectedSelectedCommands: snapshot.counters.rejectedSelectedCommands, commandsAfterRetirement: 0 }, transitions, captureCommands, foreignRejections,
+    }
+    const tokenValid = (t: GimbalCommandToken) => t.epoch === 1 && Number.isInteger(t.sequence) && t.sequence >= 1 && t.sequence <= 2251 && t.issuedAtMs >= 0 && t.issuedAtMs <= 45000 && t.expiresAtMs === t.issuedAtMs + 80 && t.goalRad.length === 3 && t.goalRad.every((v, i) => Number.isFinite(v) && Math.abs(v) <= travel[i]!)
+    if (snapshot.counters.observations > 2251 || snapshot.counters.rejectedUnattributedCommands !== 0 || out.counters.acceptedCommands > 2251 || out.counters.rejectedForeignCommands > 1 || out.counters.rejectedSelectedCommands > 2251 || !out.lastAccepted || !tokenValid(out.lastAccepted) || out.captureCommands.some(j => !tokenValid(j.command)) || transitions.some(t => t.atMs < 0 || t.atMs > 45000) || first && (first.atMs === null || first.atMs < 0 || first.atMs > 45000) || retiredAt < 0 || retiredAt > 45000) unavailable()
+    if (bytes(out.policy) > 1024 || bytes(out.selection) > 512 || bytes(out.lastAccepted) > 512 || bytes(out.firstInhibit) > 256 || bytes(out.retirement) > 128 || bytes(out.counters) > 256 || transitions.length > 16 || transitions.some(t => bytes(t) > 256) || bytes(out) + 1 > 12288) unavailable()
+    return structuredClone(out)
+  }
+  return { step, capture, retire, evidence }
+}
+function runCore<E extends GimbalInhibitCode>(scenario: CinemaScenario, gate: ManagedGate<E> | null): { run: CoreRun<E>, manager: CinemaManagerEvidence | null } {
   const model = cinemaModel(), position: SensorVector = scenario === 'mechanical-limit' ? [0.1, 4, -1.2] : [4, 0, -1.2]
   const selection: CinemaSelection = { id: 'selected-prop', revision: 1, source: 'synthetic-local-poi', origin: { latitudeDeg: 0, longitudeDeg: 0, ellipsoidHeightM: 100 }, reference, positionM: [...position] }
   const { plan, worstCaseMs } = validateMission({ version: 1, id: 'cinema-hover-v1', frame: 'LOCAL_NED', altitude: 'ORIGIN_RELATIVE_DOWN', terrain: 'FLAT_ORIGIN_PLANE', origin: { latitudeDeg: 0, longitudeDeg: 0, ellipsoidHeightM: 100 }, fence: { radiusM: 12, minDownM: -5 }, rallyM: [0, 0, -1.2], power: { availableWh: 20, hoverW: 200, reservePercent: 30 }, start: 'takeoff', speedMps: 0.6, tasks: [{ id: 'takeoff', kind: 'takeoff', positionM: [0, 0, -1.2], timeoutMs: 12000, next: 'shot' }, { id: 'shot', kind: 'loiter', positionM: [0, 0, -1.2], durationMs: 10000, timeoutMs: 14000, next: 'land' }, { id: 'land', kind: 'land', positionM: [0, 0, 0], timeoutMs: 12000 }] })
@@ -69,19 +156,19 @@ function runCinema(scenario: CinemaScenario): CinemaRun {
     capturedActual = { bodyPositionM: [...body.positionM], bodyQuaternionWxyz: [...body.quaternionWxyz], jointPositionRad: [...joint.positionRad], appliedTorqueNm: [...joint.appliedTorqueNm] }
     return { rgba: Uint8Array.from(capturedImage.rgba), thermalCentiKelvin: null }
   }, { fault: scenario === 'camera-loss' ? 'loss' : scenario === 'wrong-ack' ? 'wrong-ack' : 'none', faultAfterMs: 0 })
-  const targets: CinemaTarget[] = [], encoders: CinemaEncoder[] = [], captures: CinemaCapture[] = []
+  const targets: CinemaTarget[] = [], encoders: CinemaEncoder[] = [], captures: CoreCapture<E>[] = []
   const counters = { trackingCommands: 0, shutterAttempts: 0, ackReceipts: 0, confirmedCaptures: 0, uncertainCaptures: 0, trackingCommandsAfterRetirement: 0, shutterAttemptsAfterRetirement: 0 }
   let loiter: number | null = null, latestStart: number | null = null, readySince: number | null = null, readyCount = 0, started: number | null = null, completed: number | null = null
-  let firstFault: CinemaFault | null = null, retirement: CinemaRetirement | null = null, pending: CinemaCapture | null = null, invariantFailed = false
+  let firstFault: CoreFault<E> | null = null, retirement: CinemaRetirement | null = null, pending: CoreCapture<E> | null = null, invariantFailed = false
   let previousEncoder: CinemaEncoder | null = null, previousTarget: CinemaTarget | null = null, readyPreviousAt: number | null = null
   function retire(cause: CinemaRetirement['cause'], nowMs: number) {
     if (retirement) return
     if (!actual || lastNow !== nowMs) unavailable()
     retirement = { atMs: nowMs, cause, requestedTorqueNm: [0, 0, 0], bodyPositionM: [...actual.positionM], bodyQuaternionWxyz: [...actual.quaternionWxyz] }
-    gimbal.retire(nowMs); camera.close()
+    gimbal.retire(nowMs); camera.close(); gate?.retire(nowMs)
     if (pending) { pending.state = 'uncertain'; pending.reason = firstFault?.code ?? 'capture-pending-at-retirement'; counters.uncertainCaptures++; pending = null }
   }
-  function fault(code: CinemaFaultCode, nowMs: number): 'abort' {
+  function fault(code: CinemaFaultCode | E, nowMs: number): 'abort' {
     if (!firstFault) firstFault = { atMs: nowMs, code }
     retire('fault', nowMs)
     return 'abort'
@@ -121,6 +208,9 @@ function runCinema(scenario: CinemaScenario): CinemaRun {
       readyPreviousAt = n
       if (readyCount === 26 && n % 40 === 0 && n <= latestStart! && !pending) started = n
     }
+    const admitted = gate?.step(n, started, goal)
+    if (admitted?.fault) return fault(admitted.fault, n)
+    const commandedGoal = admitted?.goal ?? goal
     // Higher-priority context, target and encoder failures above win over an ACK at the same epoch.
     if (pending) {
       const ack = camera.poll(n)
@@ -139,14 +229,14 @@ function runCinema(scenario: CinemaScenario): CinemaRun {
       completed = n; retire('shot-completed', n); return undefined
     }
     if (retirement) { counters.trackingCommandsAfterRetirement++; unavailable() }
-    gimbal.command(goal, encoder, n); counters.trackingCommands++
+    gimbal.command(commandedGoal, encoder, n); counters.trackingCommands++
     if (started !== null) {
       const relative = n - started
       if (relative === 1000 || relative === 3000 || relative === 7000) {
         if (pending || captures.length >= 3) unavailable()
         if (retirement) { counters.shutterAttemptsAfterRetirement++; unavailable() }
-        const capture: CinemaCapture = { sequence: (captures.length + 1) as 1 | 2 | 3, state: 'uncertain', reason: 'capture-pending-at-retirement', sessionId: 'cinema-hover-v1', reference, targetId: 'selected-prop', targetRevision: 1, shotOffsetMs: relative, issuedAtMs: n, capturedAtMs: null, deadlineMs: n + 80, calibrationId: 'synthetic-cinema-forward-v1', exposureLabelUs: 1000, pose: structuredClone(pose), encoder: structuredClone(encoder), actual: null, image: null, ack: null, postStepAdmission: 'valid', quality: cinemaImageQuality(null, offset) }
-        captures.push(capture); pending = capture; counters.shutterAttempts++; capturedImage = null; capturedActual = null
+        const capture: CoreCapture<E> = { sequence: (captures.length + 1) as 1 | 2 | 3, state: 'uncertain', reason: 'capture-pending-at-retirement', sessionId: 'cinema-hover-v1', reference, targetId: 'selected-prop', targetRevision: 1, shotOffsetMs: relative, issuedAtMs: n, capturedAtMs: null, deadlineMs: n + 80, calibrationId: 'synthetic-cinema-forward-v1', exposureLabelUs: 1000, pose: structuredClone(pose), encoder: structuredClone(encoder), actual: null, image: null, ack: null, postStepAdmission: 'valid', quality: cinemaImageQuality(null, offset) }
+        captures.push(capture); gate?.capture(capture.sequence, n); pending = capture; counters.shutterAttempts++; capturedImage = null; capturedActual = null
         try {
           camera.request({ sessionId: capture.sessionId, sequence: capture.sequence, issuedAtMs: n, reference })
           const exposed = exposureAtRequest()
@@ -212,8 +302,8 @@ function runCinema(scenario: CinemaScenario): CinemaRun {
   const opticalErrors = captures.flatMap(c => c.quality.errorPx === null ? [] : [c.quality.errorPx])
   const frames = { exposed: captures.filter(c => c.image !== null).length, confirmed: captures.filter(c => c.state === 'confirmed').length, qualified: captures.filter(c => c.state === 'confirmed' && c.postStepAdmission === 'valid' && c.quality.qualified).length, maxErrorPx: opticalErrors.length ? Math.max(...opticalErrors) : null }
   const neutral = result.board.motorsN.every(n => n === 0)
-  let status: CinemaRun['status'] = 'completed', reason: CinemaReason = 'qualified'
-  const retainedFault = (() : CinemaFault | null => firstFault)()
+  let status: CinemaRun['status'] = 'completed', reason: CinemaReason | E = 'qualified'
+  const retainedFault = (() : CoreFault<E> | null => firstFault)()
   const retainedRetirement = (() : CinemaRetirement | null => retirement)()
   if (!retainedRetirement) unavailable()
   if (retainedFault) { status = 'halted'; reason = retainedFault.code }
@@ -224,12 +314,17 @@ function runCinema(scenario: CinemaScenario): CinemaRun {
   else if (!neutral) { status = 'failed'; reason = 'mission-nonneutral' }
   else if (!motion.withinDynamicBounds || !motion.withinMechanicalBounds) { status = 'failed'; reason = 'motion-bounds' }
   else if (captures.length !== 3 || frames.confirmed !== 3 || frames.qualified !== 3) { status = 'failed'; reason = 'frame-quality' }
-  const run: CinemaRun = {
+  const run: CoreRun<E> = {
     version: 1, evidence: 'owned-cinema-hover-reframe-simulation', profile: 'hover-poi-reframe-v1', scenario, status, reason, physicalFlightEnabled: false, physicalGimbalActuationEnabled: false, identityAuthenticated: false, selection, model,
     mission: { trace: result.trace, terminalState: result.mission.state, terminalReason: result.mission.reason, boardMotorsN: [...result.board.motorsN], boardFault: result.board.fault, boardNeutral: neutral, finalTruthPositionM: [...result.finalTruthPositionM] },
     shot: { phase: firstFault ? 'fault' : completed !== null ? 'completed' : started !== null || retainedRetirement.cause === 'window-missed' ? 'incomplete' : 'not-started', loiterObservedAtMs: loiter, latestStartMs: latestStart, readySinceMs: readySince, readySampleCount: readyCount, startedAtMs: started, completedAtMs: completed, reference: started === null ? null : reference, firstFault: retainedFault, retirement: retainedRetirement, counters },
     gimbal: { rows: gimbal.rows, tail }, targetObservations: targets, encoderObservations: encoders, captures, reconciliation, evaluation: { motion, frames, qualified: status === 'completed' },
   }
+  validateRun(run)
+  return { run, manager: gate?.evidence() ?? null }
+}
+function validateRun<E extends GimbalInhibitCode>(run: CoreRun<E> | CinemaManagedRun): void {
+  const { model, captures, reconciliation, selection } = run, gimbal = run.gimbal, tail = run.gimbal.tail, targets = run.targetObservations, encoders = run.encoderObservations, counters = run.shot.counters
   checkDomain(run)
   if (run.mission.trace.rows.length > 6001 || bytes(run.mission.trace) + 1 > 8388608 || bytes(model) > 16384 || bytes(run) + 1 > 20971520) unavailable()
   for (const row of [...run.gimbal.rows, ...run.gimbal.tail]) if (bytes(row) > 768) unavailable()
@@ -243,5 +338,4 @@ function runCinema(scenario: CinemaScenario): CinemaRun {
   if (!nativeCode(mission.terminalReason) || mission.boardFault !== null && !nativeCode(mission.boardFault) || mission.trace.rows.some(r => !nativeCode(r.result.reason) || r.observation.nowMs > 45000)) unavailable()
   if (separators > 32768 || bytes({ ...cinema, mission: metadata }) + 1 > 12582912 || bytes({ selection, shot: run.shot, evaluation: run.evaluation, reconciliation, mission: { ...mission, trace: null } }) > 32768) unavailable()
   if (counters.trackingCommandsAfterRetirement !== 0 || counters.shutterAttemptsAfterRetirement !== 0) unavailable()
-  return run
 }

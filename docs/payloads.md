@@ -147,6 +147,18 @@ its dependent domain issues, including [survey #18](https://github.com/stacksjs/
 [LiDAR #19](https://github.com/stacksjs/drone/issues/19), [sampling #14](https://github.com/stacksjs/drone/issues/14)
 and [gimbals #26](https://github.com/stacksjs/drone/issues/26).
 
+## Owned angle-source authority
+
+`createGimbalAuthority(configuration)` in `resources/functions/drone/payloads/gimbal-authority.ts` is a pure owned-library manager with exactly `step(observation, command?)`, `snapshot()` and `retire(nowMs)`. Configuration selects one immutable operator or autonomy writer, session, epoch, reference and symmetric relative-joint travel. Inputs are closed plain enumerable own data; dense three-angle tuples are copied, with proxy/accessor refusal before invoking caller code. Constructor rejection is the fixed `gimbal-authority-input` TypeError. Invalid runtime observations or safely attributed selected commands inhibit with a closed code instead of printing caller detail.
+
+Commands are relative BODY_FRD joint roll/pitch/yaw radians, not rates or world/body lock modes. Selected scope, increasing positive uint32 sequence and issue epoch, age at most 100 ms, an integer 20..100 ms lease and exact travel must qualify. Out-of-range angles are refused, never wrapped or clipped. A safely identified foreign writer, or an unattributed malformed packet, cannot replace the selected angle, advance its watermark or refresh its issuance expiry. An identified malformed selected packet latches even before authority is granted. Valid selected input while ungranted stays waiting without accepting or leasing. Local source tags convey provenance, not authentication or cross-restart replay protection.
+
+A live step first validates observation structure, monotonic integer clock, a maximum 40 ms policy gap and the 4,096-observation cap. Successful preflight then orders manual override, explicit neutral, revoked active vehicle authority, reference change, active source expiry and packet consideration. Exact expiry wins before a renewal. Terminal steps are inert and cannot grow counters or resume. An inhibited decision has no current angle and requests zero torque; its last accepted token remains historical. Snapshots never advance a clock or renew a lease and are detached from caller mutations.
+
+Normal `retire` closes without using a goal or consuming an observation, even after an expired historical lease or large gap. A valid nondecreasing close records `session-retired`; an invalid close while waiting/active latches `gimbal-clock-discontinuity` at a null event time. Invalid close while inhibited is unchanged; a later valid close preserves the first fault; retired calls remain inert. Only live `step` enforces lease/gap before goal use. This deliberate-close distinction provides no independent watchdog.
+
+Snapshot JSON plus LF is capped at 8,192 bytes; decisions at 12,288, with finite counters and at most 16 transitions. These are representation bounds. [Managed Cinema](cinema.md#owned-selected-gimbal-source) connects the admitted angle to the existing delayed-encoder PD and plant, and exercises source expiry at a real exposure/ACK tie. The public pure tests of manual/neutral commands establish only directive/latch behavior. No physical gimbal bus, source handoff, sticks, authenticated writer or host-death neutralization is implemented; the hardware inventory and original issue criteria remain open.
+
 ## Acceptance still required on hardware
 
 1. Record Pi/OS/SDK versions, actual IMX500 identity, cable/connector, power and thermal state.
