@@ -33,8 +33,10 @@ the same body, raw feeds, estimator, controller, supervisor, watchdog, absolute 
 and nominal energy ledger. Completed per-occurrence results remain frozen and replayable.
 These are unsigned local fixture decisions. Optional `contact: 'nominal'` adds a modeled
 selected-pad contact check after completion. See [the contact model and its limits](patrol-contact.md).
-Charging, recurrence, authenticated review, persistence, a patrol CLI and physical docking
-remain open. See [ADR 27](adr/0027-retained-patrol-runtime.md).
+Optional `charge: 'nominal'` additionally requires explicit charge approval and independently
+observed isolation before another flight. See [the partial-charge model](patrol-charge.md).
+Recurrence, authenticated review, persistence, a patrol CLI and physical docking remain open.
+See [ADR 27](adr/0027-retained-patrol-runtime.md).
 
 ## Data flow and references
 

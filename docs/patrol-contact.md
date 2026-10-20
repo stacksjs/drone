@@ -51,7 +51,8 @@ observations, not hardware tolerances or physical docking evidence.
 Tests exercise actual missing/intermittent full deadlines and neutral motor tails,
 wrong-pad identity, genuine stale feedback at call versus arm, regressed original packets,
 pending and verified host silence, exact switch edges, and a blocked contact-enabled flight.
-Legacy seven-scenario result bytes remain unchanged. No measured battery current, charging,
-weather interlock, scheduler, persistence, authenticated review, patrol CLI, hardware docking
-or recovery is provided by this experiment. The cumulative energy field remains an
-unmeasured nominal hover-load proxy, without recharge credit.
+Legacy seven-scenario result bytes remain unchanged. The contact-only experiment keeps an
+unmeasured nominal hover-load proxy without recharge credit. A separate optional
+[partial-charge model](patrol-charge.md) adds explicit permission, instrument verification
+and isolation. Measured hardware current, a full weather system, scheduling, persistence,
+authenticated patrol review, a patrol CLI, physical docking and recovery remain open.

@@ -48,7 +48,19 @@ request additionally reserves the full 5 second window; the 180 second ceiling s
 See [the declared model and evidence](../patrol-contact.md). This is simulated contact,
 without charge permission, energy credit or physical validation.
 
-Build charge verification and recurrence in subsequent bounded steps.
+An optional closed partial-charge profile now adds explicit one-use charge approval,
+a private one-channel adapter over the unchanged watchdog kernel, and independently
+evolving relay/current/pack instruments. Charging requires disarmed flight authority
+and current qualified contact. Positive current and independently consistent stored
+energy must verify before conservative credit enters the policy ledger. Stop retires
+permission immediately; later fresh measurements must prove electrical isolation.
+Electrical isolation remains distinct from contact/environment readiness and latched
+recovery. A queued flight blocks charge, and queued or active charge blocks a new flight.
+Normalize unknown input before reading current owned time, availability and reservations.
+Keep prior completed episodes immutable when canceling a later queued approval.
+See [the fixed model, causal order and evidence](../patrol-charge.md).
+
+Build recurrence in subsequent bounded steps.
 Scheduling must never grant actuator authority or silently retry a refused launch.
 Native Stacks commands and application services belong outside the synchronous control
 loop. Durable review/audit, weather interlocks, failed docking and recovery, HIL and
