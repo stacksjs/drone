@@ -20,6 +20,9 @@ export async function epochRepository(directory: string, duplicateSnapshotKey = 
   async function publish(epoch: 1 | 2, version: number, releaseSequence: number) {
     if (epoch === 2) await writeFile(join(directory, 'metadata/2.root.json'), root(2))
     const image = Buffer.from('synthetic epoch image, never execute or flash\n')
+    const imageHash = digest(image), imagePath = join(directory, 'targets/runtime', `${imageHash}.pico2-bench.bin`)
+    await mkdir(join(directory, 'targets/runtime'), { recursive: true })
+    await writeFile(imagePath, image)
     const custom = { schema: 'drone-runtime-image-v1', platform, protocolVersion: 1, releaseSequence, sourceRevision: 'a'.repeat(40), profile: 'neutral-bench' }
     const targets = new Metadata(new Targets({ ...fields, version, targets: { [target]: new TargetFile({ path: target, length: image.length, hashes: { sha256: digest(image) }, unrecognizedFields: { custom: { drone: custom } } }) } }))
     targets.sign(keys.targets.sign)
@@ -32,6 +35,7 @@ export async function epochRepository(directory: string, duplicateSnapshotKey = 
     await writeFile(join(directory, 'metadata/timestamp.json'), JSON.stringify(timestamp.toJSON()))
     await writeFile(join(directory, `metadata/${version}.snapshot.json`), snapshotBytes)
     await writeFile(join(directory, `metadata/${version}.targets.json`), targetBytes)
+    return { image, imageHash, imagePath }
   }
   return { rootPath, rootSha256: digest(anchor), publish }
 }

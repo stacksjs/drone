@@ -4,9 +4,13 @@ import { lstatSync, mkdirSync, mkdtempSync, readdirSync, realpathSync, rmSync, u
 import { tmpdir } from 'node:os'
 import { dirname, join, resolve } from 'node:path'
 import { DownloadHTTPError, Updater } from 'tuf-js'
+import type { TargetFile } from 'tuf-js'
+import { Readable } from 'node:stream'
+import { finishRuntimeCandidate, runtimeCandidateOutput } from './candidate-files'
+import type { RuntimeFirmwareStage } from './staging'
 import { inspectRuntimeTrust } from './enrollment'
 import type { RuntimeTrustSummary } from './enrollment'
-import { directory, metadataLimit, regularFile, repositoryFile, safePath, sha256, syncDirectory, writeExclusive } from './files'
+import { directory, imageLimit, metadataLimit, regularFile, repositoryFile, safePath, sha256, syncDirectory, writeExclusive } from './files'
 import { object, validateMetadata } from './metadata'
 import { admitSignedRuntime, RuntimeManifestRejected } from './manifest'
 
@@ -203,7 +207,7 @@ export interface RuntimeUpdateClock {
 }
 
 export interface RuntimeUpdateProgress {
-  phase: 'input-committed' | 'metadata-committed'
+  phase: 'input-committed' | 'metadata-committed' | 'image-written' | 'candidate-completed'
   ordinal: number
 }
 type ProgressObserver = (event: Readonly<RuntimeUpdateProgress>) => void | Promise<void>
@@ -258,8 +262,17 @@ function commitMetadata(db: Database, binding: Binding, attempt: string, ordinal
   return changed
 }
 
-/** Verify bounded offline metadata and retain its accepted prefix. This does not stage, select or install an image. */
-export async function refreshRuntimeTrustStore(options: StoreReference & { repository: string, clock: RuntimeUpdateClock, onProgress?: ProgressObserver }): Promise<Readonly<RuntimeTrustStoreSummary>> {
+interface RefreshOptions extends StoreReference { repository: string, clock: RuntimeUpdateClock, onProgress?: ProgressObserver }
+interface VerifiedSelection {
+  db: Database
+  binding: Binding
+  trusted: Readonly<RuntimeTrustSummary>
+  source: string
+  info: TargetFile
+  runtime: ReturnType<typeof admitSignedRuntime>
+}
+
+async function refreshAndComplete<T>(options: RefreshOptions, complete: (selection: VerifiedSelection) => Promise<T>): Promise<{ store: Readonly<RuntimeTrustStoreSummary>, value: T }> {
   options = { ...options }
   return withStore(options, async (db, binding, trusted) => {
     if (db.query("SELECT id FROM attempts WHERE phase IN ('pending', 'maintenance')").get()) throw new Error('An unresolved update attempt requires recovery')
@@ -305,11 +318,14 @@ export async function refreshRuntimeTrustStore(options: StoreReference & { repos
       const info = await updater.getTargetInfo(trusted.policy.target)
       if (!info) throw new Error('Selected runtime target is absent')
       const runtime = admitSignedRuntime(info, { ...trusted.policy, minimumReleaseSequence: state(db, binding).release_floor })
+      // The signed release floor survives later image or candidate-output failure.
       db.transaction(() => {
         db.query('UPDATE store_state SET release_floor = max(release_floor, ?) WHERE id = 1').run(runtime.releaseSequence)
-        db.query("UPDATE attempts SET phase = 'verified', accepted_release = ? WHERE id = ?").run(runtime.releaseSequence, attempt)
+        db.query('UPDATE attempts SET accepted_release = ? WHERE id = ?').run(runtime.releaseSequence, attempt)
       })()
-      return summary(db, binding, options.storeSha256)
+      const value = await complete({ db, binding, trusted, source, info, runtime })
+      db.query("UPDATE attempts SET phase = 'verified' WHERE id = ?").run(attempt)
+      return { store: summary(db, binding, options.storeSha256), value }
     }
     catch (error) {
       try { db.query("UPDATE attempts SET phase = 'maintenance' WHERE id = ?").run(attempt) }
@@ -318,6 +334,47 @@ export async function refreshRuntimeTrustStore(options: StoreReference & { repos
     }
     finally { rmSync(cache, { recursive: true, force: true }) }
   })
+}
+
+/** Verify bounded offline metadata and retain its accepted prefix. This never downloads an image. */
+export async function refreshRuntimeTrustStore(options: RefreshOptions): Promise<Readonly<RuntimeTrustStoreSummary>> {
+  return (await refreshAndComplete(options, async () => undefined)).store
+}
+
+export interface PreparedRuntimeFirmware {
+  schema: 'drone-runtime-prepared-image-v1'
+  store: Readonly<RuntimeTrustStoreSummary>
+  candidate: Readonly<RuntimeFirmwareStage>
+  trustStatePersisted: true
+  physicalDeploymentAllowed: false
+}
+
+/** Authenticate an image under current protected metadata. Never installs, selects or confirms firmware. */
+export async function prepareRuntimeFirmwareUpdate(options: RefreshOptions & { output: string }): Promise<Readonly<PreparedRuntimeFirmware>> {
+  options = { ...options }
+  const output = runtimeCandidateOutput(options.output, [options.repository, options.directory, options.enrollmentDirectory])
+  const result = await refreshAndComplete(options, async ({ db, binding, trusted, source, info, runtime }) => {
+    const rows = activeMetadata(db, state(db, binding).generation), root = rows.find(row => row.role === 'root')!
+    const rootBytes = checkedMetadataBytes(root), consistent = object(object(JSON.parse(rootBytes.toString('utf8'))).signed).consistent_snapshot === true
+    const path = consistent ? info.path.replace(/([^/]+)$/, `${info.hashes.sha256}.$1`) : info.path
+    const image = repositoryFile(source, `targets/${path}`, imageLimit)
+    await info.verify(Readable.from(image))
+    const files = new Map<string, Buffer>()
+    for (const row of rows) {
+      if (row.role === 'root') continue
+      files.set(`metadata/${row.role === 'timestamp' || !consistent ? '' : `${row.version}.`}${row.role}.json`, checkedMetadataBytes(row))
+    }
+    files.set(`targets/${path}`, image)
+    const candidate: RuntimeFirmwareStage = { schema: 'drone-runtime-stage-v1', target: trusted.policy.target, platform: trusted.policy.platform, trustedRootSha256: root.sha256, rootVersion: root.version, ...runtime, protocolVersion: 1, signerDeclaredProfile: 'neutral-bench', length: info.length, sha256: info.hashes.sha256!, trustStatePersisted: false, physicalDeploymentAllowed: false }
+    mkdirSync(output, { mode: 0o700 })
+    writeExclusive(join(output, 'trust-root.json'), rootBytes)
+    writeExclusive(join(output, 'image.bin'), image)
+    await options.onProgress?.(Object.freeze({ phase: 'image-written', ordinal: 0 }))
+    await finishRuntimeCandidate(output, info, candidate, files)
+    await options.onProgress?.(Object.freeze({ phase: 'candidate-completed', ordinal: 0 }))
+    return Object.freeze(candidate)
+  })
+  return Object.freeze({ schema: 'drone-runtime-prepared-image-v1', store: result.store, candidate: result.value, trustStatePersisted: true, physicalDeploymentAllowed: false })
 }
 
 function causedBy(error: unknown, marker: Error) {

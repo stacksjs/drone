@@ -267,13 +267,17 @@
       "resources/components/DiagnosticsReplay.stx",
       "docs/diagnostics.md",
       "public/diagnostics/runtime-deadline.ndjson",
-      "tests/unit/diagnostics.test.ts"
+      "tests/unit/diagnostics.test.ts",
+      "resources/functions/drone/updates/",
+      "app/Commands/UpdatesPrepare.ts",
+      "docs/runtime-updates.md",
+      "tests/unit/updates-preparation.test.ts"
     ],
     "remaining": [
       "Live runtime/sensor/estimator/authority/mission/payload correlation and measured clock relations",
       "Physical crash, reset cause, power loss, ENOSPC/EDQUOT and electrical storage fault evidence",
       "Measured board logging deadlines, memory, rotation and long-mission retention",
-      "Signed firmware updates, trust/key lifecycle, anti-rollback and known-good recovery slot",
+      "Complete signed firmware update/rollback coordinator, key/clock lifecycle, protected slots and exact-image boot/session health",
       "Commissioning workflow backed by independent physical interlock, calibration and recovery evidence"
     ]
   },

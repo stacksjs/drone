@@ -27,6 +27,7 @@ import UpdatesStoreInit from '../app/Commands/UpdatesStoreInit'
 import UpdatesStore from '../app/Commands/UpdatesStore'
 import UpdatesRefresh from '../app/Commands/UpdatesRefresh'
 import UpdatesRecover from '../app/Commands/UpdatesRecover'
+import UpdatesPrepare from '../app/Commands/UpdatesPrepare'
 
 import MissionsSimulate from '../app/Commands/MissionsSimulate'
 import MissionsValidate from '../app/Commands/MissionsValidate'
@@ -97,6 +98,7 @@ UpdatesStoreInit(app)
 UpdatesStore(app)
 UpdatesRefresh(app)
 UpdatesRecover(app)
+UpdatesPrepare(app)
 MissionsSimulate(app)
 MissionsValidate(app)
 MissionsReplay(app)

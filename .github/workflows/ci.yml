@@ -40,6 +40,8 @@ jobs:
         run: bun tests/fixtures/updates/qualify-sdk.ts "$RUNNER_TEMP/runtime-sdk-qualification"
       - name: Verify persistent metadata and recovery with a copied standalone CLI
         run: bun tests/fixtures/updates/qualify-store.ts "$RUNNER_TEMP/runtime-store-qualification" "$GITHUB_WORKSPACE/storage/runtime-build/cli/drone"
+      - name: Verify protected signed-image preparation with a copied standalone CLI
+        run: bun tests/fixtures/updates/qualify-preparation.ts "$RUNNER_TEMP/runtime-preparation-qualification" "$GITHUB_WORKSPACE/storage/runtime-build/cli/drone"
       - run: $GITHUB_WORKSPACE/storage/runtime-build/cli/drone runtime:bench --project "$GITHUB_WORKSPACE" --ticks 100 --fault deadline
         working-directory: ${{ runner.temp }}
       - run: $GITHUB_WORKSPACE/storage/runtime-build/cli/drone sensors:replay "$GITHUB_WORKSPACE/tests/fixtures/sensors/bench-v1.json" --at-ms 500

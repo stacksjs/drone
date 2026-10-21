@@ -2,10 +2,10 @@
 
 Issue [#9](https://github.com/stacksjs/drone/issues/9) now has offline signed-image
 staging, independent candidate verification, protected initial trust enrollment
-and a persistent host metadata protocol. These commands prepare and verify host
-state. Integrating that protocol with authenticated image staging, revocation,
-installed images, boot selection and known-good rollback slots remains part of
-the full coordinator. Physical deployment is disabled.
+and a persistent host metadata protocol with protected image preparation. These
+commands prepare and verify host state and actual candidate image bytes. Key
+revocation/repair, installed images, boot selection and known-good rollback slots
+remain part of the full coordinator. Physical deployment is disabled.
 
 ## Explicit trust and policy
 
@@ -136,8 +136,9 @@ compatible target's verified signed declaration. Refresh verifies metadata and
 declared compatibility; it does not download or authenticate the actual image
 bytes. An attempt marked `verified` means this metadata operation completed. It
 does not mean an image is staged, installed, booted or confirmed healthy. Existing
-`updates:stage` and `updates:inspect` remain separate and still report
-`trustStatePersisted: false`; integrating them with this store is unfinished.
+`updates:stage` and `updates:inspect` remain standalone and still report
+`trustStatePersisted: false`. The protected `updates:prepare` path below shares
+that candidate file format and actual-image readback verification.
 
 Timestamp or snapshot authority rotation, authenticated through sequential root
 metadata, creates a new active epoch and invalidates both working-cache entries.
@@ -180,7 +181,68 @@ The v1 format is bounded to 256 attempts, 10,000 metadata advances and a 128 MiB
 state database. Each attempt allows 64 inputs, 32 MiB of metadata and 512 KiB per
 file. Exhaustion fails closed; history is not automatically deleted or compacted.
 Capacity migration, the full storage-fault campaign, authenticated repair/key
-revocation, image/slot integration and session-bound health remain in #42.
+revocation, durable slot coordination and session-bound health remain in #42.
+
+## Protected signed-image preparation
+
+Use the pinned store and independently trusted current clock to authenticate an
+actual image into a new candidate directory:
+
+```sh
+./buddy updates:prepare /path/to/store --enrollment /path/to/trust \
+  --enrollment-sha256 "$ENROLLMENT_SHA256" --store-sha256 "$STORE_SHA256" \
+  --repository /path/to/offline-repository --output /path/to/new-candidate \
+  --trusted-system-clock-source operator-managed-utc-clock
+```
+
+The library function is `prepareRuntimeFirmwareUpdate`. Native Buddy and the
+compiled CLI use the same function. One writer lease covers metadata verification,
+release-floor commit, image verification and candidate output. It uses one SDK
+metadata pass with the protected cache and journal. It does not perform a second
+unjournaled refresh through the standalone stager.
+
+The signed release floor is committed before reading the image. A bad hash,
+missing image or later output failure cannot reopen a release downgrade. The SDK
+checks actual payload length and SHA-256 before writing, then checks the actual
+written `image.bin` again. The shared candidate file writer emits the same
+`stage.json` format as standalone staging only after repository files and image
+readback complete. Its file helpers do not grant firmware-selection authority.
+
+The candidate's `trust-root.json` is the currently authenticated protected root,
+which can differ from the immutable enrollment root after rotation. Its metadata
+archive includes protected active roles, including cached roles that this attempt
+did not need to fetch again. Both consistent-snapshot filename modes are supported.
+For independent standalone inspection, obtain the current root hash and release
+floor from independently pinned store readback, never from a candidate receipt.
+The candidate does not need to replay the entire initial root chain: the protected
+store has already authenticated that chain and retains its history.
+
+The result schema is `drone-runtime-prepared-image-v1`, with `store` status,
+`candidate` declaration, `trustStatePersisted: true` and
+`physicalDeploymentAllowed: false`. The nested standalone candidate declaration
+still has `trustStatePersisted: false`: that portable receipt is not the protected
+store or current authorization. A successful preparation authenticates these
+candidate bytes at this operation's trusted time. It does not install, select,
+boot or confirm them, and does not promise future trust/expiry policy will allow
+selection. Durable candidate ownership, installed/known-good slots and current
+policy revalidation before selection remain coordinator work in #42.
+
+Image or candidate-output failure during an attempt leaves accepted metadata and
+release floors intact and marks the attempt for maintenance. `updates:recover` replays metadata only; it never
+reconstructs image success or confirms an existing candidate. Preserve partial
+outputs and use a new output directory for a fresh preparation after recovery.
+A complete candidate marker can exist when a later callback or process failure
+prevents the operation returning. Marker existence alone is not authorization.
+Repository, enrollment and protocol-store directories cannot contain the candidate
+output or be contained by it. Existing output directories are not overwritten.
+
+Host tests kill actual competing-writer-excluded processes at `image-written`
+and `candidate-completed` progress points. The first follows image-file sync;
+the second follows the shared file writer's final marker and directory syncs.
+After restart, metadata recovery retains release floor 9 and returns only a store
+summary; a fresh preparation uses another new directory. These measured process
+cuts do not establish every write/sync boundary, electrical power-loss behavior
+or hardware anti-rollback.
 
 ## Repository and signed image contract
 
@@ -188,9 +250,11 @@ Use a standard TUF repository with `metadata/` and `targets/` directories,
 including consistent-snapshot names when enabled. Verification uses the pinned
 [`tuf-js` 6.0.0 client](https://github.com/theupdateframework/tuf-js) for root
 rotation, signature thresholds, expiration, inter-role versions/hashes and
-target length/hashes. A private, randomly addressed loopback server supplies
-bounded local files to the client's public HTTP interface. It is stopped after
-verification. No external network fetch or arbitrary URL option is provided.
+target length/hashes. Standalone staging/inspection use a private, randomly
+addressed loopback server supplying bounded local files to the public HTTP
+interface, then stop it. Protected refresh/preparation use the public Fetcher
+interface with bounded local files and the durable input journal. Neither path
+provides an external network fetch or arbitrary URL option.
 The host additionally verifies that root and delegation key IDs equal SHA-256
 of their canonical key objects, using the upstream canonical JSON library.
 This rejects arbitrary key-ID aliases before role verification.

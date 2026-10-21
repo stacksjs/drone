@@ -19,18 +19,18 @@ export function signer(nonCanonical = false) {
 }
 
 /** Generated throwaway keys stay in memory. These bytes are a test payload, not firmware. */
-export async function repository(directory: string, options: { custom?: Record<string, string | number | boolean>, expires?: string, metadataFields?: Partial<Record<'root' | 'rotatedRoot' | 'timestamp' | 'snapshot' | 'targets', { expires?: string, version?: number }>>, rotate?: boolean, badRotation?: boolean, badTargetsSignature?: boolean, nonCanonicalRoot?: boolean, nonCanonicalRotation?: boolean, nonCanonicalDelegation?: boolean } = {}) {
+export async function repository(directory: string, options: { custom?: Record<string, string | number | boolean>, expires?: string, metadataFields?: Partial<Record<'root' | 'rotatedRoot' | 'timestamp' | 'snapshot' | 'targets', { expires?: string, version?: number }>>, rotate?: boolean, consistentSnapshot?: boolean, badRotation?: boolean, badTargetsSignature?: boolean, nonCanonicalRoot?: boolean, nonCanonicalRotation?: boolean, nonCanonicalDelegation?: boolean } = {}) {
   await mkdir(join(directory, 'metadata'), { recursive: true })
   await mkdir(join(directory, 'targets/runtime'), { recursive: true })
   const keys = { root: signer(options.nonCanonicalRoot), targets: signer(), snapshot: signer(), timestamp: signer() }
-  const root = new Root({ ...fields, ...options.metadataFields?.root })
+  const root = new Root({ ...fields, ...options.metadataFields?.root, consistentSnapshot: options.consistentSnapshot ?? true })
   for (const role of ['root', 'targets', 'snapshot', 'timestamp'] as const) root.addKey(keys[role].key, role)
   const rootMetadata = new Metadata(root)
   rootMetadata.sign(keys.root.sign)
   const rootBytes = Buffer.from(JSON.stringify(rootMetadata.toJSON()))
   await writeFile(join(directory, 'trusted-root.json'), rootBytes)
   if (options.rotate) {
-    const nextKey = signer(options.nonCanonicalRotation), next = new Root({ ...fields, version: 2, ...options.metadataFields?.rotatedRoot })
+    const nextKey = signer(options.nonCanonicalRotation), next = new Root({ ...fields, version: 2, ...options.metadataFields?.rotatedRoot, consistentSnapshot: options.consistentSnapshot ?? true })
     next.addKey(nextKey.key, 'root')
     for (const role of ['targets', 'snapshot', 'timestamp'] as const) next.addKey(keys[role].key, role)
     const rotated = new Metadata(next)
@@ -54,8 +54,9 @@ export async function repository(directory: string, options: { custom?: Record<s
   const timestamp = new Metadata(new Timestamp({ ...fields, expires: options.expires ?? fields.expires, ...options.metadataFields?.timestamp, snapshotMeta: new MetaFile({ version: 1, length: snapshotBytes.length, hashes: { sha256: digest(snapshotBytes) } }) }))
   timestamp.sign(keys.timestamp.sign)
   await writeFile(join(directory, 'metadata/timestamp.json'), JSON.stringify(timestamp.toJSON()))
-  await writeFile(join(directory, 'metadata/1.snapshot.json'), snapshotBytes)
-  await writeFile(join(directory, 'metadata/1.targets.json'), targetsBytes)
-  await writeFile(join(directory, 'targets/runtime', `${imageHash}.pico2-bench.bin`), image)
-  return { rootPath: join(directory, 'trusted-root.json'), rootSha256: digest(rootBytes), imageHash, image, custom, imagePath: join(directory, 'targets/runtime', `${imageHash}.pico2-bench.bin`) }
+  await writeFile(join(directory, options.consistentSnapshot === false ? 'metadata/snapshot.json' : 'metadata/1.snapshot.json'), snapshotBytes)
+  await writeFile(join(directory, options.consistentSnapshot === false ? 'metadata/targets.json' : 'metadata/1.targets.json'), targetsBytes)
+  const imagePath = join(directory, 'targets/runtime', options.consistentSnapshot === false ? 'pico2-bench.bin' : `${imageHash}.pico2-bench.bin`)
+  await writeFile(imagePath, image)
+  return { rootPath: join(directory, 'trusted-root.json'), rootSha256: digest(rootBytes), imageHash, image, custom, imagePath }
 }

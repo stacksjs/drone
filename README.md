@@ -262,12 +262,14 @@ verified crash-prefix recovery, provenance and offline replay through CLI and `/
 
 The viewer opens files locally in the browser. The v1 format excludes imagery, location and
 operator tokens. See [diagnostics, durability and remaining acceptance](docs/diagnostics.md).
-The [signed runtime image stage](docs/runtime-updates.md) now verifies offline TUF
+The [signed runtime image workflow](docs/runtime-updates.md) verifies offline TUF
 candidates through `updates:stage` and `updates:inspect`, with explicit root pins,
 compatibility and externally supplied release floors. `updates:enroll` and
-`updates:trust` preserve and independently verify an initial root/policy record.
-Physical logging/commissioning, persistent refresh metadata/release floors, image
-installation and known-good rollback remain pending.
+`updates:trust` preserve the initial root/policy record. The independently pinned
+store retains verified metadata, clock/release floors and historical recovery;
+`updates:prepare` authenticates actual image bytes under that protected state.
+Physical logging/commissioning, key revocation/repair, installed/known-good slots
+and image-bound boot/session health remain pending.
 
 ## Sensor acquisition and replay
 

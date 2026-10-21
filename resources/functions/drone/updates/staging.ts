@@ -1,13 +1,14 @@
 import { randomBytes } from 'node:crypto'
 import { mkdirSync, mkdtempSync, realpathSync, rmSync } from 'node:fs'
-import { dirname, join, relative, resolve, sep } from 'node:path'
+import { join, resolve } from 'node:path'
 import { tmpdir } from 'node:os'
 import { Readable } from 'node:stream'
 import { isDeepStrictEqual } from 'node:util'
 import { Updater } from 'tuf-js'
-import { directory, imageLimit, metadataLimit, regularFile, repositoryFile, safePath, sha256, syncDirectory, syncTree, writeExclusive } from './files'
+import { directory, imageLimit, metadataLimit, regularFile, repositoryFile, safePath, sha256, writeExclusive } from './files'
 import { object, validateMetadata } from './metadata'
 import { admitSignedRuntime } from './manifest'
+import { finishRuntimeCandidate, runtimeCandidateOutput } from './candidate-files'
 import { admitPolicy } from './policy'
 import type { RuntimeFirmwarePolicy } from './policy'
 export type { RuntimeFirmwarePolicy } from './policy'
@@ -85,29 +86,14 @@ async function verifyRepository(repository: string, root: Buffer, work: string, 
 /** Exclusive offline candidate only. This never changes installed firmware, boot slots or trust floors. */
 export async function stageRuntimeFirmware(options: RuntimeFirmwarePolicy & { repository: string, trustedRoot: string, output: string }): Promise<RuntimeFirmwareStage> {
   const policy = admitPolicy(options)
-  const repository = realpathSync(options.repository), output = resolve(options.output)
+  const repository = realpathSync(options.repository), output = runtimeCandidateOutput(options.output, [repository])
   directory(repository)
   const root = regularFile(options.trustedRoot, metadataLimit)
   if (sha256(root) !== policy.trustedRootSha256) throw new Error('Trusted root SHA-256 does not match the independent pin')
-  // Resolve the existing parent before creating anything, so a symlinked parent cannot hide overlap.
-  const destination = join(realpathSync(dirname(output)), output.slice(dirname(output).length + 1))
-  const child = relative(repository, destination), parent = relative(destination, repository)
-  if (!child || (!child.startsWith(`..${sep}`) && child !== '..') || (!parent.startsWith(`..${sep}`) && parent !== '..')) throw new Error('Candidate and source repository must be separate')
   mkdirSync(output, { mode: 0o700 })
   writeExclusive(join(output, 'trust-root.json'), root)
   const { result, fetched, info } = await verifyRepository(repository, root, join(output, '.verification'), policy, join(output, 'image.bin'))
-  // Re-read the actual staged bytes, rather than trusting a successful copy or receipt.
-  await info.verify(Readable.from(regularFile(join(output, 'image.bin'), imageLimit)))
-  for (const [path, bytes] of fetched) {
-    const file = join(output, 'repository', path)
-    mkdirSync(dirname(file), { recursive: true, mode: 0o700 })
-    writeExclusive(file, bytes)
-  }
-  syncTree(output)
-  // A final marker means logical completeness. It cannot attest to power-loss durability after fsync.
-  writeExclusive(join(output, 'stage.json'), Buffer.from(`${JSON.stringify(result, null, 2)}\n`))
-  syncDirectory(output)
-  syncDirectory(dirname(output))
+  await finishRuntimeCandidate(output, info, result, fetched)
   return result
 }
 

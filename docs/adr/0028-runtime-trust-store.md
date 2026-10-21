@@ -47,7 +47,13 @@ process-crash evidence is not measured physical power-loss durability. Same-user
 privileged disk rollback and malicious kernel/filesystem behavior require separate
 hardware protection and are outside this host protocol's claims.
 
-Installed, candidate and known-good slots, authenticated image integration and
-health confirmation bound to an exact image and boot/session identity remain part
-of #42. No receipt or healthy boolean can select firmware. Physical installation,
+Protected preparation now uses this metadata operation to authenticate actual
+image bytes before and after writing the existing signed-candidate format. The
+same file writer serves standalone staging. Candidate inspection requires a root
+pin from authenticated store readback when preparation uses the current rotated
+root. A candidate receipt supplies no current trust or selection authority.
+
+This v1 database journals metadata, not durable candidate ownership or slot
+transitions. Installed, candidate and known-good slots and health confirmation
+bound to an exact image and boot/session identity remain part of #42. No receipt or healthy boolean can select firmware. Physical installation,
 bootloader behavior, secure boot and hardware anti-rollback remain gated by #2/#9.
