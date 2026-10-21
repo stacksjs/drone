@@ -264,8 +264,10 @@ The viewer opens files locally in the browser. The v1 format excludes imagery, l
 operator tokens. See [diagnostics, durability and remaining acceptance](docs/diagnostics.md).
 The [signed runtime image stage](docs/runtime-updates.md) now verifies offline TUF
 candidates through `updates:stage` and `updates:inspect`, with explicit root pins,
-compatibility and externally supplied release floors. Physical logging/commissioning,
-persistent trust state, image installation and known-good rollback remain pending.
+compatibility and externally supplied release floors. `updates:enroll` and
+`updates:trust` preserve and independently verify an initial root/policy record.
+Physical logging/commissioning, persistent refresh metadata/release floors, image
+installation and known-good rollback remain pending.
 
 ## Sensor acquisition and replay
 

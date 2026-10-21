@@ -1,25 +1,19 @@
-import { createHash, randomBytes } from 'node:crypto'
-import { constants, closeSync, fstatSync, fsyncSync, lstatSync, mkdirSync, mkdtempSync, openSync, readSync, readdirSync, realpathSync, rmSync, writeSync } from 'node:fs'
+import { randomBytes } from 'node:crypto'
+import { mkdirSync, mkdtempSync, realpathSync, rmSync } from 'node:fs'
 import { dirname, join, relative, resolve, sep } from 'node:path'
 import { tmpdir } from 'node:os'
 import { Readable } from 'node:stream'
 import { isDeepStrictEqual } from 'node:util'
-import { canonicalize } from '@tufjs/canonical-json'
 import { Updater } from 'tuf-js'
 import type { TargetFile } from 'tuf-js'
+import { directory, imageLimit, metadataLimit, regularFile, repositoryFile, safePath, sha256, syncDirectory, syncTree, writeExclusive } from './files'
+import { object, validateMetadata } from './metadata'
+import { admitPolicy } from './policy'
+import type { RuntimeFirmwarePolicy } from './policy'
+export type { RuntimeFirmwarePolicy } from './policy'
 
-const metadataLimit = 512 * 1024
-const imageLimit = 16 * 1024 * 1024
 const originPrefix = '/offline-'
-const sha256 = (bytes: Uint8Array) => createHash('sha256').update(bytes).digest('hex')
 
-export interface RuntimeFirmwarePolicy {
-  target: string
-  platform: 'pico2-neutral-bench-v1' | 'host-neutral-bench-v1'
-  trustedRootSha256: string
-  /** Explicit externally trusted floor. This module does not persist or advance it. */
-  minimumReleaseSequence: number
-}
 export interface RuntimeFirmwareStage {
   schema: 'drone-runtime-stage-v1'
   target: string
@@ -36,99 +30,6 @@ export interface RuntimeFirmwareStage {
   trustStatePersisted: false
 }
 
-function admitPolicy(input: RuntimeFirmwarePolicy): Readonly<RuntimeFirmwarePolicy> {
-  const policy = { target: input.target, platform: input.platform, trustedRootSha256: input.trustedRootSha256, minimumReleaseSequence: input.minimumReleaseSequence }
-  if (process.platform === 'win32') throw new Error('Firmware staging requires a POSIX filesystem')
-  safePath(policy.target)
-  if (policy.platform !== 'pico2-neutral-bench-v1' && policy.platform !== 'host-neutral-bench-v1') throw new TypeError('Select an implemented bench platform')
-  if (typeof policy.trustedRootSha256 !== 'string' || !/^[a-f0-9]{64}$/.test(policy.trustedRootSha256)) throw new TypeError('Provide the independently trusted root SHA-256')
-  if (!Number.isSafeInteger(policy.minimumReleaseSequence) || policy.minimumReleaseSequence < 1) throw new TypeError('Provide a positive trusted minimum release sequence')
-  return Object.freeze(policy)
-}
-function safePath(path: string) {
-  if (typeof path !== 'string' || path.length > 256 || !path.split('/').every(part => /^[a-z0-9][a-z0-9._-]{0,179}$/i.test(part) && part !== '.' && part !== '..')) throw new TypeError('Unsafe offline repository path')
-}
-function regularFile(path: string, limit: number): Buffer {
-  const before = lstatSync(path)
-  if (!before.isFile() || before.isSymbolicLink() || before.size < 1 || before.size > limit) throw new Error('Expected a nonempty bounded regular file')
-  const fd = openSync(path, constants.O_RDONLY | constants.O_NOFOLLOW | constants.O_NONBLOCK | constants.O_NOCTTY)
-  try {
-    const stat = fstatSync(fd)
-    if (!stat.isFile() || stat.size < 1 || stat.size > limit || stat.dev !== before.dev || stat.ino !== before.ino) throw new Error('Expected the same bounded regular file')
-    const bytes = Buffer.alloc(stat.size + 1)
-    let offset = 0
-    while (offset < bytes.length) {
-      const count = readSync(fd, bytes, offset, bytes.length - offset, null)
-      if (count === 0) break
-      offset += count
-    }
-    if (offset !== stat.size) throw new Error('Source file changed length while reading')
-    return bytes.subarray(0, offset)
-  }
-  finally { closeSync(fd) }
-}
-function directory(path: string) {
-  const stat = lstatSync(path)
-  if (!stat.isDirectory() || stat.isSymbolicLink()) throw new Error('Expected a real directory')
-  if (typeof process.getuid !== 'function' || stat.uid !== process.getuid() || (stat.mode & 0o022) !== 0) throw new Error('Repository and candidate directories must be owned and not writable by other principals')
-}
-function repositoryFile(root: string, path: string, limit: number) {
-  safePath(path)
-  directory(root)
-  const parts = path.split('/')
-  for (let i = 1; i < parts.length; i++) directory(join(root, ...parts.slice(0, i)))
-  return regularFile(join(root, ...parts), limit)
-}
-function writeExclusive(path: string, bytes: Uint8Array) {
-  const fd = openSync(path, constants.O_WRONLY | constants.O_CREAT | constants.O_EXCL | constants.O_NOFOLLOW, 0o600)
-  try {
-    let offset = 0
-    while (offset < bytes.length) {
-      const count = writeSync(fd, bytes, offset, bytes.length - offset)
-      if (count <= 0) throw new Error('No progress writing firmware candidate')
-      offset += count
-    }
-    fsyncSync(fd)
-  }
-  finally { closeSync(fd) }
-}
-function syncDirectory(path: string) {
-  const fd = openSync(path, constants.O_RDONLY | constants.O_DIRECTORY | constants.O_NOFOLLOW)
-  try { fsyncSync(fd) }
-  finally { closeSync(fd) }
-}
-function syncTree(path: string) {
-  directory(path)
-  for (const name of readdirSync(path)) {
-    const child = join(path, name), stat = lstatSync(child)
-    if (stat.isDirectory()) syncTree(child)
-    else {
-      if (!stat.isFile() || stat.isSymbolicLink()) throw new Error('Unexpected candidate entry')
-      const fd = openSync(child, constants.O_RDONLY | constants.O_NOFOLLOW)
-      try { fsyncSync(fd) }
-      finally { closeSync(fd) }
-    }
-  }
-  syncDirectory(path)
-}
-function object(value: unknown): Record<string, unknown> {
-  if (!value || typeof value !== 'object' || Array.isArray(value)) throw new Error('Invalid signed runtime metadata')
-  return value as Record<string, unknown>
-}
-function validateMetadata(bytes: Buffer) {
-  const signed = object(object(JSON.parse(bytes.toString('utf8'))).signed)
-  if (!Number.isSafeInteger(signed.version) || (signed.version as number) < 1) throw new Error('TUF metadata requires a positive safe integer version')
-  // Date accepts invalid calendar dates and produces NaN for malformed input. Validate the
-  // specified UTC calendar representation before the SDK performs its expiry comparison.
-  const expires = signed.expires
-  if (typeof expires !== 'string' || !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$/.test(expires) || !Number.isFinite(Date.parse(expires)) || new Date(expires).toISOString().replace('.000Z', 'Z') !== expires) throw new Error('TUF metadata requires a valid UTC expiration date')
-  const keys = signed._type === 'root' ? object(signed.keys) : signed._type === 'targets' && signed.delegations !== undefined ? object(object(signed.delegations).keys) : undefined
-  // The SDK verifies signatures by key ID but does not recompute the ID. Reject arbitrary
-  // identifier aliases by binding each declared ID to the canonical key object.
-  for (const [id, key] of Object.entries(keys ?? {})) {
-    if (id !== sha256(Buffer.from(canonicalize(object(key))))) throw new Error('TUF key identifier does not match canonical key data')
-  }
-}
 function signedRuntime(info: TargetFile, policy: RuntimeFirmwarePolicy) {
   const data = object(info.custom.drone)
   const keys = ['schema', 'platform', 'protocolVersion', 'releaseSequence', 'sourceRevision', 'profile']

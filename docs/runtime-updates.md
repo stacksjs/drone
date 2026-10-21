@@ -1,17 +1,19 @@
-# Signed runtime image staging
+# Runtime trust and signed image staging
 
 Issue [#9](https://github.com/stacksjs/drone/issues/9) now has offline signed-image
-staging and independent candidate verification. These commands prepare files on
-the host. Persistent trust state, installed images, boot selection and known-good
-rollback slots remain to be implemented. Physical deployment is disabled.
+staging, independent candidate verification and protected initial trust enrollment.
+These commands prepare files on the host. Cross-update metadata/release floors,
+installed images, boot selection and known-good rollback slots remain to be
+implemented. Physical deployment is disabled.
 
 ## Explicit trust and policy
 
 Enroll an initial TUF `root.json` and its SHA-256 through an independent trusted
 channel. Do not calculate a pin from an untrusted bundle and call it trusted.
 The release floor must likewise come from externally trusted release policy.
-Every invocation requires the root pin, exact target, expected bench platform
-and positive minimum release sequence. There are no permissive defaults.
+Every staging or candidate-inspection invocation requires the root pin, exact
+target, expected bench platform and positive minimum release sequence. There are
+no permissive defaults.
 
 ```sh
 ./buddy updates:stage /path/to/offline-repository \
@@ -35,6 +37,50 @@ Repository/candidate directories must belong to the invoking user and must not
 be group/world writable. Their parent paths must also be protected against
 replacement by other users. Same-user privileged filesystem mutation is outside
 the protection model; this is not an adversarial-filesystem sandbox.
+
+## Protected initial trust enrollment
+
+Store the independently authenticated root and explicit policy in a new private
+directory with native Buddy or the compiled CLI:
+
+```sh
+./buddy updates:enroll --trusted-root /path/to/enrolled/root.json \
+  --root-sha256 "$ENROLLED_ROOT_SHA256" \
+  --target runtime/pico2-bench.bin --platform pico2-neutral-bench-v1 \
+  --minimum-release-sequence 7 --output /path/to/new-trust
+
+./buddy updates:trust /path/to/new-trust \
+  --enrollment-sha256 "$INDEPENDENTLY_RETAINED_ENROLLMENT_SHA256"
+```
+
+Retain the returned `enrollmentSha256` through your trusted configuration or
+backup channel. Readback requires that independent expected hash; a hash taken
+from the same untrusted directory does not establish trust. The record binds a
+random enrollment identity, exact root hash/version and copied release policy.
+Readback checks the actual root bytes, schema, policy and root self-signatures.
+
+Enrollment creates `root.json` and a final `enrollment.json` record, using an
+exclusive 0700 directory and 0600 files. The directory and immediate parent must
+be owned and protected from other principals' writes; higher parent paths must
+also be protected against replacement. Existing, partial or corrupt enrollments
+are preserved and rejected. Files/directories are synced, but the record is a
+logical completion marker, not proof of physical power-loss durability. A command
+can fail after creating the record, including if output fails. Preserve those
+files and independently verify the record before relying on them.
+
+The result reports `metadataState: "initial-root-only"`,
+`metadataRefreshPerformed: false`, `firmwareSelectionPerformed: false` and
+`physicalDeploymentAllowed: false`. An authenticated expired initial root may be
+enrolled for later sequential rotation; this does not make an expired final root
+valid for a repository refresh. No refresh or network operation runs here.
+
+Keep this immutable anchor separate from an SDK working cache. The current SDK
+writes cache files in place; a host write-limit probe truncated its cached root.
+Never refresh against the enrollment directory. Staging/inspection still require
+their explicit policy and do not load or advance this enrollment automatically.
+Persistent verified metadata/release floors, key lifecycle, interruption recovery
+and known-good coordination remain in [issue #42](https://github.com/stacksjs/drone/issues/42).
+Do not discard or re-enroll over failed state to reset a security floor.
 
 ## Repository and signed image contract
 
@@ -104,7 +150,8 @@ must supply the trusted release floor every time. TUF expiry uses host wall
 time; trusted clock acquisition and protection against clock/storage rollback
 remain open. Control-loop freshness still uses its separate monotonic clock.
 
-Next, implement persistent trust enrollment/rotation and release floors, an
+Initial enrollment is available above. Next, implement protected trust rotation
+and persistent metadata/release floors, an
 interruption-safe coordinator, installed/known-good slot integrity, explicit
 health confirmation and rollback without lowering security floors. Then add
 the board bootloader/install protocol and measured power-loss, full-medium,
@@ -114,7 +161,8 @@ anti-rollback. See [TUF's workflow and threat model](https://theupdateframework.
 
 Tests use generated throwaway Ed25519 keys and clearly synthetic payload bytes.
 They cover real role signatures/rotation, expiration, compatibility, supplied
-release floors, tampering, bounded inputs, incomplete candidates and native/
-portable CLI behavior. They establish host behavior, not actual firmware
+release floors, tampering, bounded inputs, incomplete candidates, enrollment
+readback, competing enrollment processes, an actual host write-limit failure and
+native/portable CLI behavior. They establish host behavior, not actual firmware
 installation, board boot recovery or commissioning. The diagnostic supervisor's
 update/rollback check remains blocked and `commissioningReady` stays false.

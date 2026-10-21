@@ -21,6 +21,8 @@ import DiagnosticsInspect from '../app/Commands/DiagnosticsInspect'
 import DiagnosticsExport from '../app/Commands/DiagnosticsExport'
 import UpdatesStage from '../app/Commands/UpdatesStage'
 import UpdatesInspect from '../app/Commands/UpdatesInspect'
+import UpdatesEnroll from '../app/Commands/UpdatesEnroll'
+import UpdatesTrust from '../app/Commands/UpdatesTrust'
 
 import MissionsSimulate from '../app/Commands/MissionsSimulate'
 import MissionsValidate from '../app/Commands/MissionsValidate'
@@ -85,6 +87,8 @@ DiagnosticsInspect(app)
 DiagnosticsExport(app)
 UpdatesStage(app)
 UpdatesInspect(app)
+UpdatesEnroll(app)
+UpdatesTrust(app)
 MissionsSimulate(app)
 MissionsValidate(app)
 MissionsReplay(app)
