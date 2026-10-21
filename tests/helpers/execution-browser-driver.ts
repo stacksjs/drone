@@ -2,6 +2,7 @@ import assert from 'node:assert/strict'
 import { mkdir, readFile } from 'node:fs/promises'
 import { basename, join } from 'node:path'
 import { startWorkspaceBrowser } from './workspace-browser'
+import { settleExecutionDiagnostics } from './execution-diagnostics'
 
 // This driver owns only browser transport. Native credentials stay in a private fixture file.
 const root = process.cwd()
@@ -23,8 +24,6 @@ let diagnosticPage: Awaited<ReturnType<typeof browser.page>> | undefined
 let startBaseline: number | null = null
 async function failureDiagnostics() {
   const abort = new AbortController()
-  let timer: ReturnType<typeof setTimeout> | undefined
-  const timeout = new Promise<null>(resolve => { timer = setTimeout(() => resolve(null), 1000) })
   try {
     const snapshot = async () => {
       const response = await fetch(`${data.url}/__fixture/diagnostics`, { headers: { 'x-fixture-control': data.control }, signal: abort.signal })
@@ -46,19 +45,18 @@ async function failureDiagnostics() {
         hasSourceExists: !!document.querySelector('[data-execution-source-exists]'), hasExecutionError: !!document.querySelector('[data-execution-error]')
       };
     })()`) : Promise.resolve(null)
-    const collect = Promise.allSettled([snapshot(), dom]).then(([server, page]) => ({
+    const parts = await settleExecutionDiagnostics(snapshot(), dom)
+    const base = {
       label: 'execution-browser-failure-diagnostics', phase, startBaseline,
-      server: server.status === 'fulfilled' ? server.value : { available: false },
-      dom: page.status === 'fulfilled' ? page.value : null, browserErrorCount: diagnosticPage?.errors.length ?? null,
+      browserErrorCount: diagnosticPage?.errors.length ?? null,
+      executionStartRequests: diagnosticPage ? diagnosticPage.requests.filter(request => request.method === 'POST' && request.url.endsWith('/workspace/execution')).length : null,
       admissionRequests: diagnosticPage ? diagnosticPage.requests.filter(request => request.method === 'POST' && request.url.endsWith('/workspace/execution/admission')).length : null,
-    }))
-    const captured = await Promise.race([collect, timeout])
-    const text = `${JSON.stringify(captured ?? { label: 'execution-browser-failure-diagnostics', available: false })}\n`
-    console.error(Buffer.byteLength(text, 'utf8') <= 8192 ? text.trimEnd() : '{"label":"execution-browser-failure-diagnostics","available":false}')
+    }
+    const text = JSON.stringify({ ...base, ...parts })
+    console.error(Buffer.byteLength(text, 'utf8') <= 8192 ? text : JSON.stringify({ ...base, server: { available: false }, dom: null, byteBudgetExceeded: true }))
   }
-  catch { console.error('{"label":"execution-browser-failure-diagnostics","available":false}') }
+  catch { console.error(JSON.stringify({ label: 'execution-browser-failure-diagnostics', phase, available: false })) }
   finally {
-    clearTimeout(timer)
     abort.abort()
     // The owned socket close rejects pending CDP commands and clears their timers in the existing helper.
     diagnosticPage?.close()
