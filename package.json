@@ -49,7 +49,8 @@
     "@stacksjs/testing": "^0.75.221",
     "@stacksjs/validation": "^0.75.221",
     "stacks": "^0.75.221",
-    "ts-images": "0.2.31"
+    "ts-images": "0.2.31",
+    "tuf-js": "6.0.0"
   },
   "workspaces": [
     "storage/framework",
@@ -66,7 +67,8 @@
   },
   "devDependencies": {
     "@stacksjs/query-builder": "0.75.221",
-    "better-dx": "^0.2.37"
+    "better-dx": "^0.2.37",
+    "@tufjs/models": "5.0.0"
   },
   "author": "Chris Breuer <chris@stacksjs.com>",
   "homepage": "https://github.com/stacksjs/drone",
