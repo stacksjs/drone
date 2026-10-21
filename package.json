@@ -82,5 +82,8 @@
   },
   "overrides": {
     "@stacksjs/bunpress": "0.2.22"
+  },
+  "patchedDependencies": {
+    "tuf-js@6.0.0": "patches/tuf-js@6.0.0.patch"
   }
 }

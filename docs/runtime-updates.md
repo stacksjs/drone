@@ -98,6 +98,35 @@ Metadata versions must be positive safe integers. Expiration dates must be real
 UTC calendar dates in the TUF `YYYY-MM-DDTHH:MM:SSZ` format before the SDK makes
 expiry comparisons; malformed or automatically normalized dates are rejected.
 
+### Maintained SDK persistence seam
+
+This repository applies `patches/tuf-js@6.0.0.patch` through Bun's root
+`patchedDependencies`. It extends the pinned MIT-licensed client; these are
+repository-maintained options, not options supplied by unmodified upstream 6.0.0.
+The patch retains upstream signature, role and target verification.
+
+`onVerifiedMetadata(role, bytes)` receives an owned byte copy after the SDK
+accepts remote metadata. The SDK awaits it before writing that cache file or
+advancing to the next role. A rejected observer aborts refresh, including when
+its exception is an HTTP 404. Cache-preferred refresh also propagates persistence
+errors instead of retrying past the rejected observer. Initial root loading and
+cached metadata do not
+emit new observations. An authenticated intermediate root may be observed
+before a later final-root expiry check rejects the refresh. Discard an updater
+after any refresh failure: its upstream in-memory trust set may already have
+advanced. Reusing that instance is not a recovery or persistence retry protocol.
+
+`referenceTime` optionally supplies a finite, copied fixed start time for future
+recovery replay. It does not establish a trusted clock. Historical replay must
+never authorize firmware use: a coordinator must perform fresh verification at
+a trusted current wall time before using a candidate. Existing staging and
+inspection pass neither extension and continue to use the current wall clock.
+
+The seam alone does not persist a protected prefix or make SDK cache writes
+transactional. Its implementation and tests are a prerequisite for the protected
+store and recovery coordinator in issue #42. They do not complete that issue or
+permit flashing, boot selection or physical deployment.
+
 The selected target must have SHA-256, a nonzero length of at most 16 MiB and
 exactly these fields in its signed `custom.drone` object:
 
