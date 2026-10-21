@@ -6,7 +6,7 @@ import { decodeRuntimeFrame, encodeRuntimeFrame, runtimeCrc32, runtimeFlags } fr
 
 export const runtimeBenchFaults = ['none', 'deadline', 'stale', 'expiry', 'replay', 'version'] as const
 export type RuntimeBenchFault = typeof runtimeBenchFaults[number]
-export async function runRuntimeBench(options: { project?: string, ticks?: number, fault?: RuntimeBenchFault, onBuild?: (artifact: string) => Promise<void>, onRequest?: (line: string, atMs: number) => void | Promise<void>, onStatus?: (status: RuntimeFrame, atMs: number) => void | Promise<void> } = {}) {
+export async function runRuntimeBench(options: { project?: string, ticks?: number, fault?: RuntimeBenchFault, onBuild?: (artifact: string) => Promise<void>, onRequest?: (line: string, atMs: number) => void | Promise<void>, onStatus?: (status: Readonly<RuntimeFrame>, atMs: number) => void | Promise<void> } = {}) {
   const ticks = options.ticks ?? 1000
   const fault = options.fault ?? 'none'
   if (!Number.isSafeInteger(ticks) || ticks < 1 || ticks > 100000 || !runtimeBenchFaults.includes(fault)) throw new RangeError('Use 1..100000 ticks and a supported bench fault')
@@ -16,6 +16,7 @@ export async function runRuntimeBench(options: { project?: string, ticks?: numbe
   const session = createRuntimeSession()
   const started = performance.now()
   let time = 1000
+  let operationFailed = false, operationError: unknown
   async function exchange(line: string) {
     await options.onRequest?.(line, time / 1000)
     const status = await harness.exchange(line)
@@ -62,11 +63,21 @@ export async function runRuntimeBench(options: { project?: string, ticks?: numbe
       || (fault === 'deadline' && !(status.flags & runtimeFlags.deadlineFault))) throw new Error('Native bench failure did not return the required neutral-only, unleased state')
     return {
       evidence: 'host-harness', boardCandidate: 'pico2', protocolVersion: 1, fault,
+      bootId: String(harness.bootId),
       ticks: status.ticks, virtualElapsedUs: time, hostElapsedMs: Math.round((performance.now() - started) * 1000) / 1000,
       stateBytes: status.stateBytes, maxExecutionUs: status.maxExecutionUs, deadlineMisses: status.deadlineMisses,
       neutralOnly: true, leaseActive: false, physicalFlightEnabled: false,
       note: 'Host virtual-clock evidence. GPIO timing, stack high-water and hardware watchdog require a Pico 2 bench measurement.',
     }
   }
-  finally { await harness.close() }
+  catch (error) { operationFailed = true; operationError = error; throw error }
+  finally {
+    let exit
+    try { exit = await harness.close() }
+    catch (error) {
+      if (operationFailed) throw new AggregateError([operationError, error], 'Native bench operation and process cleanup failed')
+      throw error
+    }
+    if (!operationFailed && (exit.exitCode !== 0 || exit.signal !== null)) throw new Error('Native bench process did not exit cleanly')
+  }
 }

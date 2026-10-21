@@ -1,4 +1,7 @@
 import { beforeAll, describe, expect, test } from 'bun:test'
+import { mkdtemp, rm, writeFile } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
 import fixtures from '../fixtures/runtime/frames.json'
 import { commandFrame, decodeRuntimeFrame, encodeRuntimeFrame, runtimeCrc32, type RuntimeFrame } from '../../resources/functions/drone/runtime/protocol'
 import { createRuntimeSession } from '../../resources/functions/drone/runtime/session'
@@ -86,13 +89,60 @@ async function withNative(run: (harness: ReturnType<typeof openRuntimeHarness>) 
 }
 
 describe('actual native kernel process', () => {
+  test('separate supervised boots have fresh owned identities and a clean idempotent process exit', async () => {
+    const first = openRuntimeHarness(artifact), second = openRuntimeHarness(artifact)
+    try {
+      expect(typeof first.bootId).toBe('bigint')
+      expect(first.bootId).not.toBe(0n)
+      expect(second.bootId).not.toBe(first.bootId)
+      expect((await first.exchange('tick 1000')).bootId).toBe(first.bootId)
+      expect((await second.exchange('tick 1000')).bootId).toBe(second.bootId)
+      const exit = await first.close()
+      expect(exit).toEqual({ exitCode: 0, signal: null })
+      expect(await first.close()).toEqual(exit)
+    }
+    finally { await first.close(); await second.close() }
+  })
+  test('native host startup refuses missing, zero, malformed or extra boot identity arguments', async () => {
+    const invalid = [
+      ['--stdio'], ['--stdio', '--boot-id', '0'.repeat(16)],
+      ['--stdio', '--boot-id', 'f'.repeat(15)], ['--stdio', '--boot-id', 'F'.repeat(16)],
+      ['--stdio', '--boot-id', 'z'.repeat(16)], ['--stdio', '--boot-id', '1'.repeat(16), 'extra'],
+    ]
+    for (const args of invalid) {
+      const child = Bun.spawn([artifact, ...args], { stdin: 'ignore', stdout: 'pipe', stderr: 'pipe' })
+      const [exit, stdout, stderr] = await Promise.all([child.exited, new Response(child.stdout).text(), new Response(child.stderr).text()])
+      expect(exit).toBe(2)
+      expect(stdout).toBe('')
+      expect(stderr).toBe('')
+    }
+  })
+  test('a valid-CRC response from a different boot fails the transport and its actual process is reaped', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'drone-wrong-host-boot-')), script = join(root, 'wrong-boot.ts'), launcher = join(root, 'launch')
+    const protocol = join(import.meta.dir, '../../resources/functions/drone/runtime/protocol.ts')
+    await writeFile(script, `#!${process.execPath}\nimport { decodeRuntimeFrame, encodeRuntimeFrame } from ${JSON.stringify(protocol)}\nconst frame = decodeRuntimeFrame(Uint8Array.fromHex(${JSON.stringify(fixtures.frames.status)}))\nframe.bootId = BigInt('0x' + Bun.argv.at(-1)) ^ 1n\nawait Bun.stdin.stream().getReader().read()\nconsole.log(Buffer.from(encodeRuntimeFrame(frame)).toString('hex'))\nawait Bun.sleep(10000)\n`, { mode: 0o700 })
+    // A standalone fixture must not load the application's Bun preloads.
+    const quote = (value: string) => `'${value.replaceAll("'", "'\\''")}'`
+    await writeFile(launcher, `#!/bin/sh\ncd ${quote(root)} || exit 1\nexec ${quote(process.execPath)} ${quote(script)} "$@"\n`, { mode: 0o700 })
+    const harness = openRuntimeHarness(launcher)
+    try {
+      await expect(harness.exchange('tick 1000')).rejects.toThrow('boot identity')
+      await expect(harness.exchange('tick 2000')).rejects.toThrow('failed')
+      const exit = await harness.close()
+      expect(exit.exitCode).not.toBe(0)
+      expect(exit.signal).not.toBeNull()
+      expect(await harness.close()).toEqual(exit)
+    }
+    finally { await harness.close(); await rm(root, { recursive: true, force: true }) }
+  })
   test('reports timestamped samples and cross-language handshake/lease/stop', async () => withNative(async harness => {
     const first = await harness.exchange('tick 1000')
     expect(first).toMatchObject({ ticks: 1, sample: -999, sampleTimeUs: 1000n, flags: 67 })
     const link = createRuntimeSession({ nonce: () => 45n })
     const send = (bytes: Uint8Array) => harness.exchange(`frame ${Buffer.from(bytes).toString('hex')}`)
     const hello = await send(link.hello(1)); link.accept(encodeRuntimeFrame(hello), 1)
-    expect(hello.bootId).toBe(0x1122334455667788n)
+    expect(hello.bootId).toBe(harness.bootId)
+    expect(Object.isFrozen(hello)).toBe(true)
     const lease = await send(link.lease(1)); link.accept(encodeRuntimeFrame(lease), 1)
     expect(lease.leaseUs).toBe(100000)
     expect((await send(link.stop(1))).leaseUs).toBe(0)
@@ -126,6 +176,7 @@ describe('actual native kernel process', () => {
       expect(report).toMatchObject({ evidence: 'host-harness', fault, neutralOnly: true, leaseActive: false, physicalFlightEnabled: false })
       expect(report.stateBytes).toBeLessThanOrEqual(128)
       expect(report.deadlineMisses).toBe(fault === 'deadline' ? 1 : 0)
+      expect(report.bootId).toMatch(/^[1-9][0-9]{0,19}$/)
     }
   }, 20000)
   test('invalid CLI parameters cannot silently execute a default bench run', async () => {
@@ -139,6 +190,8 @@ describe('actual native kernel process', () => {
       await expect(harness.exchange('tick 2000')).rejects.toThrow('concurrent')
       expect((await pending).ticks).toBe(1)
       await expect(harness.exchange('not-a-host-command')).rejects.toThrow('exited')
+      expect(await harness.close()).toEqual({ exitCode: 2, signal: null })
+      await expect(harness.exchange('tick 3000')).rejects.toThrow('failed')
     })
   })
 })

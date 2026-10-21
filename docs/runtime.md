@@ -41,6 +41,12 @@ boundaries, clock rollback, identity/version rejection, reset state and ten thou
 The same fixed-buffer UART state machine used by Pico is also exercised through a host I/O harness
 for fragmentation, resynchronization, corruption, RX/TX budgets and pending transmit buffers.
 
+Each host launch receives a fresh supervisor-owned boot nonce. The report includes its decimal
+`bootId`, and the harness checks that identity on every immutable response. The bench reports
+success only after its actual process exits cleanly. This is host session separation, without
+image attestation or update health confirmation. It does not measure board boot entropy or
+physical timing. See the [host startup contract](runtime-protocol.md#host-hal-test-channel).
+
 Build a standalone CLI for the current platform:
 
 ```sh

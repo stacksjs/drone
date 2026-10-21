@@ -330,6 +330,11 @@ and known-good slot roles, identity-bound runtime health, current-policy selecti
 and rollback, authenticated key maintenance and the full fault campaign remain
 required by #42.
 
+The [host bench](runtime.md) now binds each process to a fresh supervisor-owned boot nonce
+and requires a clean exit. This prerequisite provides no installed image identity, bounded
+health transcript or known-good confirmation. Slot health must still bind the verified image,
+owned boot/session challenge and actual runtime evidence before changing known-good state.
+
 ## Repository and signed image contract
 
 Use a standard TUF repository with `metadata/` and `targets/` directories,

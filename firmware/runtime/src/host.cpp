@@ -10,8 +10,16 @@ static int nibble(char c) {
     return -1;
 }
 int main(int argc, char** argv) {
-    if (argc != 2 || std::strcmp(argv[1], "--stdio") != 0) return 2;
-    drone::Runtime runtime(0x1122334455667788ull);
+    if (argc != 4 || std::strcmp(argv[1], "--stdio") != 0
+        || std::strcmp(argv[2], "--boot-id") != 0 || std::strlen(argv[3]) != 16) return 2;
+    uint64_t boot = 0;
+    for (std::size_t i = 0; i < 16; ++i) {
+        const int value = nibble(argv[3][i]);
+        if (value < 0) return 2;
+        boot = (boot << 4) | uint64_t(value);
+    }
+    if (boot == 0) return 2;
+    drone::Runtime runtime(boot);
     uint64_t now = 0;
     char line[160];
     while (std::fgets(line, sizeof(line), stdin)) {
