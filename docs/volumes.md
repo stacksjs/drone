@@ -40,8 +40,9 @@ base TIN overlays and inferred toe/base fitting remain future work and are rejec
 ## Actual numeric interchange
 
 `volumes:import` requires a source file, its metadata JSON and a measurement JSON containing exactly
-`version`, `id`, `boundary`, `base`, `reference`. Its sidecar SHA256 must match the exact original
-UTF-8 bytes, including line endings. UTF-8 decoding preserves a BOM so the ASCII parser rejects it.
+`version`, `id`, `boundary`, `base`, `reference`. For ASC/PLY, the metadata SHA256 must match the exact
+original UTF-8 bytes, including line endings. UTF-8 decoding preserves a BOM so the ASCII parser
+rejects it. GeoTIFF uses the separate wrapped declaration below and hashes the original binary bytes.
 
 - AAIGrid `.asc`: square, corner-origin cells (`xllcorner`, `yllcorner`, `cellsize`), north-first
   rows, finite decimal heights and optional finite `NODATA_value`. Each cell is an explicitly
@@ -51,15 +52,85 @@ UTF-8 bytes, including line endings. UTF-8 decoding preserves a BOM so the ASCII
   single-valued 2.5D top surface. Point-only, binary, extra semantic properties, closed solids,
   vertical faces, projected overlaps and inconsistent shared heights are rejected. No automatic
   point meshing, gap bridging or convex-hull filling is performed.
+- Numeric GeoTIFF: the restrictive `classic-le-f32-utm-area-v1` profile below produces the same
+  constant-cell geometry, with the original binary digest retained. This is explicit
+  `--format geotiff`; neither file extension nor TIFF magic chooses a format automatically.
 - Typed JSON retains either numerical representation directly. Imports are bounded at 8 MiB for
   ASC/PLY; library JSON parsing allows 16 MiB, while the current CLI regular-file reader allows
   8 MiB. Caps include 32,768 vertices/cells, 16,384 triangles, 64 boundary vertices, eight holes,
   and separate candidate/intersection/contribution budgets. Over-budget work fails explicitly.
 
 Numeric ASC/PLY exports include a matching regenerated sidecar. The original source hash remains
-in the retained request and manifest. LAS/LAZ, GeoTIFF, raw-point meshing, classification and
-photogrammetric reconstruction require separately qualified adapters. File extensions do not
+in the retained request and manifest. LAS/LAZ, broader GeoTIFF profiles, raw-point meshing,
+classification and photogrammetric reconstruction require separately qualified adapters. File extensions do not
 establish CRS, vertical datum, ground classification or accuracy.
+
+## Declared GeoTIFF cell elevations
+
+```sh
+./buddy volumes:import /path/surface.tif --format geotiff --metadata /path/elevation-declaration.json --measurement /path/measurement.json --output /tmp/new-geotiff-volume
+```
+
+For this format, `--metadata` is a JSON elevation declaration with exactly these fields:
+
+| Field | Required value |
+|---|---|
+| `version` | `1` |
+| `profile` | `"classic-le-f32-utm-area-v1"` |
+| `sampleMeaning` | `"cell-elevation-metres-up"` |
+| `interpretation` | `"piecewise-constant-cell-elevation"` |
+| `metadata` | The complete existing `SurfaceMetadata` reference and provenance contract |
+
+The nested metadata retains every explicit field and nullable unknown, including the exact original
+TIFF SHA256 in `provenance.sourceSha256`. Every declaration object has closed keys. The entire
+original JSON string is limited to 32,768 code units and UTF-8 bytes before parsing. Ordinary JSON
+whitespace and key order are accepted; duplicate keys follow native JSON parsing, so only their
+final values are validated. A BOM is preserved and rejected. The binary file is never UTF-8 decoded.
+
+The pure library entrypoint is
+`importGeoTiffSurface(bytes: Uint8Array, declarationJson: string): Promise<GeoTiffCellSurface>`.
+It snapshots the exact visible bytes synchronously before its first await. Buffer and genuine
+Uint8Array subviews are accepted without reading caller properties or iteration hooks. Shared,
+resizable, detached and proxy-backed views are rejected. The result owns its metadata and
+north-first rows. The Node-only `readGeoTiffFile` stays outside the pure drone barrel.
+
+The profile accepts one classic little-endian TIFF IFD and one full-height, uncompressed,
+32-bit IEEE floating-point strip, at most 8 MiB and 32,768 cells. Width, height, strip offsets and
+byte counts have explicit LONG types; sample/orientation/planar/predictor fields must be explicit
+and match the profile. Positive `XResolution` and `YResolution` rationals and `ResolutionUnit`
+1, 2 or 3 are required TIFF bookkeeping; they do not scale the declared terrain coordinates.
+Unknown, duplicate or unsorted tags, overlapping regions and nonzero padding are rejected.
+Even-aligned external payloads may appear in different orders; arbitrary trailers are rejected.
+BigTIFF, big-endian, compression, tiles, multiple strips/IFDs, integer/Float64 samples and imagery
+color products are outside this profile.
+
+GeoKeys must explicitly declare projected WGS84 UTM EPSG:32601..32660 or EPSG:32701..32760 and
+RasterPixelIsArea, matching the sidecar CRS; an optional projected-unit key must mean metres.
+ModelPixelScale is `(S,S,0)` and the sole tiepoint is `(0,0,0,W,N,0)`. Cells have west corner `W`,
+south corner `N - height*S` and north-first rows, without a half-cell shift. The sidecar supplies
+the vertical datum and metre-up sample meaning. There is no vertical transformation, CRS
+conversion, rotation, point-sample reinterpretation or acquisition verification.
+
+Optional GDAL_NODATA is a finite ASCII decimal that must represent an exact Float32 value.
+For example `0.1` is rejected because it rounds, while `0.100000001490116119384765625` is exact.
+Either zero sentinel matches both zero signs. Without that tag every finite cell is measured;
+there is no implicit missing value. NaN, infinity and all-missing surfaces are rejected. Missing
+cells remain null through the unchanged covered-area integration.
+
+The importer reports only `geotiff-surface-input` (TypeError), `geotiff-surface-budget`
+(RangeError), `geotiff-source-sha256-mismatch` or `geotiff-surface-unavailable`.
+The binary file reader reports `geotiff-file-unavailable` for path, flag, open, regular-file,
+size, read or close failure. It requires nonblocking/no-follow flags, rejects a final symlink
+and special file, reads at most 8 MiB plus one growth-detection byte, and closes the descriptor.
+Parent directories remain followed and caller-authorized. Concurrent file writes are not an
+atomic snapshot guarantee.
+
+The existing dataset writer retains the original TIFF digest in `request.json` and the manifest.
+It regenerates `surface.asc` with a separately hashed matching sidecar. This does not archive the
+TIFF, export TIFF or reconstruct its original bytes. Reprocessing the retained request uses the
+same numerical geometry and report. The independent small synthetic fixture checks missing-area
+volumes against a hand calculation and an ASC surface; it does not establish external GDAL/libtiff
+interoperability, field accuracy or survey acquisition. Issue #19 remains open.
 
 ## Auditable integration and coverage
 
