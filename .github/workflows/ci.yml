@@ -221,6 +221,57 @@ jobs:
           cmp expected.stderr invalid.stderr
           if ./drone farming:plan > missing.stdout 2> missing.stderr; then exit 1; fi
           test ! -s missing.stdout
+      - name: Qualify source-bound collection with a copied standalone CLI
+        working-directory: ${{ runner.temp }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          attempt="$(mktemp -d "$RUNNER_TEMP/farming-collect.XXXXXX")"
+          cp "$GITHUB_WORKSPACE/storage/runtime-build/cli/drone" "$attempt/drone"
+          cmp "$GITHUB_WORKSPACE/storage/runtime-build/cli/drone" "$attempt/drone"
+          cp "$GITHUB_WORKSPACE/examples/farming-collection.json" "$attempt/request.json"
+          cd "$attempt"
+          printf '%s\n' '3d11fc38f584b19604039c26618285798bff01e7df241f3f91a70a1e19ec5667  request.json' | sha256sum -c -
+          ./drone farming:collect request.json nominal > result.json 2> result.stderr
+          test ! -s result.stderr
+          bun -e '
+            import { createHash } from "node:crypto";
+            import { readFileSync } from "node:fs";
+            const hash = bytes => createHash("sha256").update(bytes).digest("hex");
+            const read = path => readFileSync(path);
+            const raw = read("result.json");
+            if (raw.length > 16777216 || raw.toString().split("\n").length !== 2) throw new Error("Invalid collection wire");
+            const p = JSON.parse(raw), r = p.record, input = read("request.json");
+            if (p.version !== 1 || p.kind !== "farming-synthetic-collection-delivery" || r.outcome.status !== "completed" || r.outcome.boardNeutral !== true || r.outcome.lastMissionResult.state !== "completed" || r.outcome.lastMissionResult.targetM !== null || r.outcome.captures < 1 || r.layer.cells.length !== 256 || r.layer.parcels.length !== 2 || r.layer.observedAreaM2 <= 0 || r.source.sha256 !== hash(input) || r.source.byteLength !== input.length) throw new Error("Invalid collection result");
+            if (r.synthetic !== true || [r.ownershipVerified,r.geometryVerified,r.physicalFlightEnabled,r.physicalCalibrationVerified,r.physicalAgronomyVerified,r.dispatchPerformed,r.operationalMissionCompleted,r.fullSensorReplayPerformed].some(v => v !== false)) throw new Error("Invalid simulation evidence");
+            const producerBytes = read("nominal/attempt/producer.json"), producer = JSON.parse(producerBytes);
+            if (producer.implementation.method !== "observed-standalone-process-executable" || producer.process.standalone !== true || producer.process.executable.sha256 !== hash(read("drone")) || producer.process.executable.byteLength !== read("drone").length || producer.authenticatedExecution !== false || producer.loadedGraphAttested !== false || producer.observationsUnchanged !== true || producer.observationInterval !== "before-collection-and-after-dataset-readback" || r.producer.sha256 !== hash(producerBytes) || r.producer.byteLength !== producerBytes.length) throw new Error("Invalid producer observation");
+            const markerBytes = read("nominal/attempt/manifest.json"), marker = JSON.parse(markerBytes);
+            if (p.attempt.manifestPath !== "attempt/manifest.json" || p.attempt.manifestByteLength !== markerBytes.length || p.attempt.manifestSha256 !== hash(markerBytes) || marker.files.map(f => f.path).join(",") !== "request.json,producer.json,result.json,dataset-manifest.json") throw new Error("Invalid attempt marker");
+            for (const f of marker.files) { const b = read(`nominal/attempt/${f.path}`); if (b.length !== f.byteLength || hash(b) !== f.sha256) throw new Error("Changed attempt file"); }
+            const datasetBytes = read("nominal/dataset/manifest.json"), dataset = JSON.parse(datasetBytes), recording = read("nominal/dataset/recording.json");
+            if (!read("nominal/attempt/dataset-manifest.json").equals(datasetBytes) || r.dataset.manifestSha256 !== hash(datasetBytes) || r.dataset.manifestByteLength !== datasetBytes.length || r.dataset.recordingSha256 !== hash(recording) || r.dataset.recordingByteLength !== recording.length || JSON.stringify(JSON.parse(read("nominal/attempt/result.json"))) !== JSON.stringify(r) || JSON.stringify(JSON.parse(read("nominal/dataset/layer.json"))) !== JSON.stringify(r.layer)) throw new Error("Changed dataset identity");
+            for (const f of dataset.files) { const b = read(`nominal/dataset/${f.path}`); if (b.length !== f.bytes || hash(b) !== f.sha256) throw new Error("Changed raw dataset file"); }
+            const short = JSON.parse(input); short.simulation.seconds = 8;
+            await Bun.write("short-request.json", JSON.stringify(short));
+          '
+          set +e
+          ./drone farming:collect short-request.json incomplete > incomplete.json 2> incomplete.stderr
+          status=$?
+          set -e
+          test "$status" -eq 2
+          test ! -s incomplete.stderr
+          bun -e 'const p = await Bun.file("incomplete.json").json(), r = p.record; if (r.outcome.status !== "incomplete" || r.outcome.boardNeutral !== true || r.outcome.captures !== 0 || r.outcome.lastMissionResult.state !== "running" || r.outcome.lastMissionResult.targetM === null || r.layer.cells.length !== 256 || r.layer.observedAreaM2 !== 0 || r.layer.meanNdvi !== null || r.operationalMissionCompleted !== false || r.layer.cells.some(c => c.source !== null || c.ndvi !== null || c.reason !== "uncovered")) throw new Error("Invalid noncompleted evidence"); if (!(await Bun.file("incomplete/attempt/manifest.json").exists())) throw new Error("Missing noncompleted attempt")'
+          printf '%s\n' '{"version":1}' > invalid.json
+          set +e
+          ./drone farming:collect invalid.json rejected > invalid.stdout 2> invalid.stderr
+          status=$?
+          set -e
+          test "$status" -eq 1
+          test ! -s invalid.stdout
+          test ! -e rejected
+          printf '%s\n' 'Farming collection preview unavailable: invalid declaration, rejected collection or output failure' > expected.stderr
+          cmp expected.stderr invalid.stderr
       - run: $GITHUB_WORKSPACE/storage/runtime-build/cli/drone agriculture:simulate --visit ci-field --output "$RUNNER_TEMP/agriculture-collected"
         working-directory: ${{ runner.temp }}
       - name: Reprocess the full calibrated field layer through a stdout pipe

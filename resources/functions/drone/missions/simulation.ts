@@ -182,7 +182,7 @@ export function simulateTaskMotionMission(options: { plan: unknown, seconds?: nu
     if (!Number.isInteger(seconds) || seconds < 8 || seconds > 45) throw new TypeError()
     const validated = validateTaskMotionMission(d.plan)
     plan = validated.plan; budget = { worstCaseMs: validated.worstCaseMs, requiredWh: validated.requiredWh }
-    if (plan.origin.latitudeDeg !== 0 || plan.origin.longitudeDeg !== 0 || plan.origin.ellipsoidHeightM !== 100) throw new TypeError()
+    assertMissionSimulationOrigin(plan.origin)
     if (Object.hasOwn(d, 'instrument')) {
       const callbacks = ownData(d.instrument, ['render', 'observe', 'observation'], ['render', 'observe'])
       const render = callbacks.render, observe = callbacks.observe, observation = callbacks.observation
@@ -200,6 +200,11 @@ export function simulateTaskMotionMission(options: { plan: unknown, seconds?: nu
   catch { taskMotionUnavailable() }
 }
 
+/** The raw sensor fixture has one geodetic world, including for preflight callers. */
+export function assertMissionSimulationOrigin(origin: MissionPlan['origin']): void {
+  if (origin.latitudeDeg !== 0 || origin.longitudeDeg !== 0 || origin.ellipsoidHeightM !== 100) throw new TypeError('Physics fixture requires origin 0,0,100 WGS84 ellipsoid')
+}
+
 /** Actual owned raw-sensor/estimator/control pipeline, with a separately ticking modeled board. */
 export function simulateMission(options: { plan?: unknown, scenario?: MissionScenario, seconds?: number, instrument?: MissionSimulationInstrument } = {}): LegacySimulationRun {
   const scenario = options.scenario ?? 'nominal'
@@ -207,7 +212,7 @@ export function simulateMission(options: { plan?: unknown, scenario?: MissionSce
   if (!missionScenarios.includes(scenario) || !Number.isInteger(seconds) || seconds < 8 || seconds > 120) throw new RangeError('Invalid mission scenario or duration (8..120 seconds)')
   const { plan, worstCaseMs, requiredWh } = validateMission(options.plan ?? exampleMission())
   // The sensor fixture has this geodetic world origin. Other plans remain valid for policy replay only.
-  if (plan.origin.latitudeDeg !== 0 || plan.origin.longitudeDeg !== 0 || plan.origin.ellipsoidHeightM !== 100) throw new TypeError('Physics fixture requires origin 0,0,100 WGS84 ellipsoid')
+  assertMissionSimulationOrigin(plan.origin)
   const engine = createMissionEngine(plan)
   const result = runWorld(plan, { worstCaseMs, requiredWh }, seconds, { kind: 'legacy', engine, mission: engine.snapshot(), scenario, recovered: false, options })
   if (result.kind !== 'legacy') throw new TypeError('Invalid mission simulation projection')

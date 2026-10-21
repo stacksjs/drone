@@ -52,6 +52,7 @@ import AgricultureSimulate from '../app/Commands/AgricultureSimulate'
 import AgricultureProcess from '../app/Commands/AgricultureProcess'
 import AgricultureObserve from '../app/Commands/AgricultureObserve'
 import FarmingPlan from '../app/Commands/FarmingPlan'
+import FarmingCollect from '../app/Commands/FarmingCollect'
 import ApplicationPlan from '../app/Commands/ApplicationPlan'
 import ApplicationSimulate from '../app/Commands/ApplicationSimulate'
 import ApplicationProcess from '../app/Commands/ApplicationProcess'
@@ -110,6 +111,7 @@ AgricultureSimulate(app)
 AgricultureProcess(app)
 AgricultureObserve(app)
 FarmingPlan(app)
+FarmingCollect(app)
 ApplicationPlan(app)
 ApplicationSimulate(app)
 ApplicationProcess(app)

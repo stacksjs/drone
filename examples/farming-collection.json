@@ -1,0 +1,456 @@
+{
+  "version": 1,
+  "operation": "agriculture-synthetic-collection",
+  "requestId": "farming-collect-square-nominal-v1",
+  "context": {
+    "farmId": 17,
+    "fieldId": 29,
+    "declarationId": "square-declaration-v1"
+  },
+  "geometry": {
+    "frame": "LOCAL_NED",
+    "horizontalUnit": "m",
+    "heightDatum": "WGS84_ELLIPSOID",
+    "evidence": "operator-declared-metric",
+    "sourceReference": "paper-square-v1"
+  },
+  "config": {
+    "version": 1,
+    "id": "farming-square-v1",
+    "survey": {
+      "version": 1,
+      "id": "farming-square-v1",
+      "origin": {
+        "latitudeDeg": 0,
+        "longitudeDeg": 0,
+        "ellipsoidHeightM": 100
+      },
+      "boundary": [
+        [
+          -0.8,
+          -0.8
+        ],
+        [
+          0.8,
+          -0.8
+        ],
+        [
+          0.8,
+          0.8
+        ],
+        [
+          -0.8,
+          0.8
+        ]
+      ],
+      "holes": [],
+      "altitudeAglM": 1.5,
+      "maxGsdM": 0.1,
+      "overlap": {
+        "front": 0.6,
+        "side": 0.6
+      },
+      "headingDeg": 0,
+      "crosshatch": false,
+      "terrain": {
+        "downAtOriginM": 0,
+        "gradient": [
+          0,
+          0
+        ]
+      },
+      "speedMps": 0.4,
+      "minTriggerIntervalMs": 200,
+      "exposureTimeUs": 1000,
+      "power": {
+        "availableWh": 30,
+        "hoverW": 240,
+        "reservePercent": 30
+      },
+      "calibration": {
+        "version": 1,
+        "id": "synthetic-survey-brown5",
+        "cameraId": "survey-fixture",
+        "modeId": "640x480-to-96x72",
+        "evidence": "synthetic",
+        "intrinsics": {
+          "width": 640,
+          "height": 480,
+          "fx": 400,
+          "fy": 400,
+          "cx": 320,
+          "cy": 240,
+          "distortion": [
+            0.04,
+            0,
+            0,
+            0,
+            0
+          ]
+        },
+        "output": {
+          "width": 96,
+          "height": 72,
+          "crop": [
+            0,
+            0,
+            640,
+            480
+          ]
+        },
+        "extrinsics": {
+          "quaternionWxyz": [
+            0.7071067811865476,
+            0,
+            0,
+            -0.7071067811865476
+          ],
+          "translationM": [
+            0,
+            0,
+            0.04
+          ]
+        },
+        "uncertainty": {
+          "pixelSigmaPx": 0.5,
+          "depthSigmaM": 0.01,
+          "translationSigmaM": 0.005,
+          "rotationSigmaRad": 0.001,
+          "modelSigmaM": 0.01
+        },
+        "timing": {
+          "clockUncertaintyMs": 1,
+          "maxSkewMs": 20,
+          "maxAgeMs": 100
+        }
+      },
+      "heldOut": [
+        {
+          "id": "upper-left",
+          "pixel": [
+            23.76,
+            17.82
+          ],
+          "opticalDepthM": 0.5,
+          "bodyPointM": [
+            -0.15,
+            0.2,
+            0.54
+          ]
+        },
+        {
+          "id": "upper-right",
+          "pixel": [
+            72.24,
+            17.82
+          ],
+          "opticalDepthM": 1,
+          "bodyPointM": [
+            -0.3,
+            -0.4,
+            1.04
+          ]
+        },
+        {
+          "id": "lower-left",
+          "pixel": [
+            23.76,
+            54.18
+          ],
+          "opticalDepthM": 2,
+          "bodyPointM": [
+            0.6,
+            0.8,
+            2.04
+          ]
+        },
+        {
+          "id": "lower-right",
+          "pixel": [
+            72.24,
+            54.18
+          ],
+          "opticalDepthM": 3,
+          "bodyPointM": [
+            0.9,
+            -1.2,
+            3.04
+          ]
+        },
+        {
+          "id": "near-left",
+          "pixel": [
+            35.976,
+            42.012
+          ],
+          "opticalDepthM": 4,
+          "bodyPointM": [
+            0.4,
+            0.8,
+            4.04
+          ]
+        },
+        {
+          "id": "near-right",
+          "pixel": [
+            60.024,
+            29.988
+          ],
+          "opticalDepthM": 5,
+          "bodyPointM": [
+            -0.5,
+            -1,
+            5.04
+          ]
+        }
+      ]
+    },
+    "parcels": [
+      {
+        "id": "south-parcel",
+        "name": "South parcel",
+        "boundsM": [
+          -0.8,
+          -0.8,
+          0,
+          0.8
+        ]
+      },
+      {
+        "id": "north-parcel",
+        "name": "North parcel",
+        "boundsM": [
+          0,
+          -0.8,
+          0.8,
+          0.8
+        ]
+      }
+    ],
+    "radiometry": {
+      "id": "synthetic-red-nir-radiometry",
+      "model": "micasense-v1",
+      "evidence": "synthetic",
+      "bands": [
+        {
+          "name": "red",
+          "wavelengthNm": 668,
+          "bandwidthNm": 10,
+          "width": 96,
+          "height": 72,
+          "bitDepth": 16,
+          "blackLevelDn": 4000,
+          "coefficients": [
+            0.001,
+            0,
+            0
+          ],
+          "vignetteCenterPx": [
+            48,
+            36
+          ],
+          "vignettePolynomial": [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0
+          ]
+        },
+        {
+          "name": "nir",
+          "wavelengthNm": 840,
+          "bandwidthNm": 40,
+          "width": 96,
+          "height": 72,
+          "bitDepth": 16,
+          "blackLevelDn": 4000,
+          "coefficients": [
+            0.001,
+            0,
+            0
+          ],
+          "vignetteCenterPx": [
+            48,
+            36
+          ],
+          "vignettePolynomial": [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0
+          ]
+        }
+      ],
+      "panels": [
+        {
+          "id": "panel-red",
+          "band": "red",
+          "certificateId": "synthetic-red-panel",
+          "capturedAtMs": 0,
+          "exposureTimeUs": 1000,
+          "gain": 1,
+          "reflectance": 0.5,
+          "reflectanceUncertainty": 0.005,
+          "irradianceWm2Nm": 1,
+          "samples": [
+            {
+              "pixel": [
+                44,
+                32
+              ],
+              "dn": 14430
+            },
+            {
+              "pixel": [
+                48,
+                32
+              ],
+              "dn": 14430
+            },
+            {
+              "pixel": [
+                52,
+                32
+              ],
+              "dn": 14430
+            },
+            {
+              "pixel": [
+                44,
+                36
+              ],
+              "dn": 14430
+            },
+            {
+              "pixel": [
+                48,
+                36
+              ],
+              "dn": 14430
+            },
+            {
+              "pixel": [
+                52,
+                36
+              ],
+              "dn": 14430
+            },
+            {
+              "pixel": [
+                44,
+                40
+              ],
+              "dn": 14430
+            },
+            {
+              "pixel": [
+                48,
+                40
+              ],
+              "dn": 14430
+            },
+            {
+              "pixel": [
+                52,
+                40
+              ],
+              "dn": 14430
+            }
+          ]
+        },
+        {
+          "id": "panel-nir",
+          "band": "nir",
+          "certificateId": "synthetic-nir-panel",
+          "capturedAtMs": 0,
+          "exposureTimeUs": 1000,
+          "gain": 1,
+          "reflectance": 0.5,
+          "reflectanceUncertainty": 0.005,
+          "irradianceWm2Nm": 1,
+          "samples": [
+            {
+              "pixel": [
+                44,
+                32
+              ],
+              "dn": 14430
+            },
+            {
+              "pixel": [
+                48,
+                32
+              ],
+              "dn": 14430
+            },
+            {
+              "pixel": [
+                52,
+                32
+              ],
+              "dn": 14430
+            },
+            {
+              "pixel": [
+                44,
+                36
+              ],
+              "dn": 14430
+            },
+            {
+              "pixel": [
+                48,
+                36
+              ],
+              "dn": 14430
+            },
+            {
+              "pixel": [
+                52,
+                36
+              ],
+              "dn": 14430
+            },
+            {
+              "pixel": [
+                44,
+                40
+              ],
+              "dn": 14430
+            },
+            {
+              "pixel": [
+                48,
+                40
+              ],
+              "dn": 14430
+            },
+            {
+              "pixel": [
+                52,
+                40
+              ],
+              "dn": 14430
+            }
+          ]
+        }
+      ],
+      "maxPanelAgeMs": 120000,
+      "maxIrradianceAgeMs": 40,
+      "maxSyncMs": 5,
+      "maxRegistrationErrorPx": 0.25,
+      "relativeRadianceUncertainty": 0.02,
+      "relativeIrradianceUncertainty": 0.01
+    },
+    "gridResolutionM": 0.1
+  },
+  "simulation": {
+    "visitId": "farming-square-visit-nominal-v1",
+    "scenario": "nominal",
+    "seconds": 100
+  }
+}

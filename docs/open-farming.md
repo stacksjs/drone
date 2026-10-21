@@ -130,11 +130,114 @@ The pure boundary exposes fixed errors without caller values or underlying stack
 primitive/length, Unicode/encoded length, JSON/envelope, planner and complete result before
 digest availability/completion.
 
+## Retain a synthetic collection
+
+Collection is a separate operation over the existing owned sensor, estimator, mission,
+authority and camera simulation. It does not turn the planning estimates into measurements.
+Both native Buddy and the standalone CLI require an explicit collection request and a new
+output directory:
+
+```sh
+./buddy farming:collect examples/farming-collection.json /operator/attempts/new-collection
+drone farming:collect /operator/requests/collection.json /operator/attempts/new-collection
+```
+
+The parent directory must already exist and be operator controlled. The command refuses an
+existing final directory, file or symlink. The request cannot choose an executable, provider,
+clock or output path. The example retains the planning example's complete fictional metric
+configuration, with an explicit synthetic visit, nominal scenario and 100-second duration.
+
+The server-side library function is deliberately outside the browser-pure barrel:
+
+```ts
+import { collectFarmingObservation } from './resources/functions/drone/agriculture/farming-collection'
+
+const delivery = await collectFarmingObservation(requestJson, operatorProvisionedDirectory)
+```
+
+Every declaration field remains required. The operation is exactly
+`agriculture-synthetic-collection`, with an additional closed `simulation` record containing
+`visitId`, `scenario` and integer `seconds` from 8 through 120. Supported scenarios are
+`nominal`, `irradiance-loss`, `band-skew`, `saturation`, `camera-loss`, `wrong-ack`,
+`position-loss`, `rc-override` and `abort`. There is no scenario-based success override.
+The visit label uses the same bounded ASCII identifier rule as the request references.
+The full configuration must also pass the owned executable mission's calibration, clock,
+pixel, fence and task limits. A planning-only accepted declaration may not be executable.
+
+The function validates the actual run, serializes and reparses its complete raw recording,
+recomputes the entire calibrated layer and reuses `writeAgricultureDataset`. It reads back
+the exact recording, layer and completion marker before publishing a separate attempt:
+
+```text
+new-collection/
+  dataset/                 Existing raw visible/red-NIR/calibration/layer exporter
+    manifest.json          Raw dataset completion marker
+  attempt/
+    request.json           Exact original UTF8 declaration bytes
+    producer.json          Limited software content observations
+    result.json            Complete source-bound collection record
+    dataset-manifest.json  Exact copy of the raw dataset marker
+    manifest.json          Attempt completion marker, published last
+```
+
+The returned `farming-synthetic-collection-delivery` includes the complete record and the
+attempt marker's relative path, byte count and SHA256. The record binds the original request,
+declared context/geometry, producer document, actual raw recording and dataset marker. It
+retains every layer cell, parcel summary, source pixel, null, mask and conditional uncertainty
+interval. It creates no operational Mission, Detection, TreatmentMap or HerdMove.
+
+Software observations distinguish source and standalone hosts. Source execution observes the
+named 56-file `farming-collection-source-v1` profile plus the actual Bun executable. Standalone
+execution observes the actual compiled executable. These are unsigned file-content identities,
+with `authenticatedExecution: false` and `loadedGraphAttested: false`. Source profiles exclude
+bare packages, builtins, preloads and unrelated host imports; a standalone host can also load
+external code. Neither method proves a complete executed-code graph or authenticates a camera,
+principal, field or unique event. Paths and executable selection come from the owned module
+and host, not request fields.
+
+`observationsUnchanged` compares observations before collection and after dataset read-back.
+Its explicit `observationInterval` excludes later attempt publication and stdout delivery.
+Equality does not prove continuous immutability or absence of transient changes.
+
+Exit 0 requires a completely delivered, persisted synthetic run whose actual status is
+`completed`, with a neutral modeled board and replay-consistent terminal mission snapshot.
+Exit 2 delivers retained neutral `aborted`, `blocked` or `incomplete` evidence. An incomplete
+snapshot keeps its actual ready/running/paused state and target; board revocation is not a
+controlled landing. A short or zero-capture run still retains its full missing-data layer.
+None of these outcomes establishes physical flight, field calibration, agronomic validity,
+ownership, dispatch or operational mission completion.
+
+Handler failures exit 1 and attempt this fixed diagnostic, consuming a secondary error-pipe
+failure:
+
+```text
+Farming collection preview unavailable: invalid declaration, rejected collection or output failure
+```
+
+Accept a delivery only after complete bounded streams through EOF and its actual exit code.
+A broken output pipe can leave a prefix after completed artifacts exist. Partial roots and
+completed artifacts are preserved on failure. A post-link filesystem sync failure can leave
+a visible marker while the operation reports failure; marker existence alone is not returned
+success, stdout delivery, authenticated storage or tested power-loss durability.
+
+Collection keeps the 262,144-unit/byte request ceiling. Its complete compact record plus LF
+is limited to 16,776,192 UTF8 bytes; delivery plus LF to 16,777,216 bytes; producer JSON plus
+LF to 131,072 bytes; the attempt marker to 16,384 bytes. Named source content is bounded to
+256 files and 8 MiB in aggregate; the internally selected executable is hashed in bounded
+chunks up to 256 MiB. Existing 64-capture, 65,536-pixel, raw recording, metadata, grid,
+runtime and exporter ceilings remain unchanged. Repeated validation and encoding allocate
+additional memory; transport limits are not peak-memory or Raspberry Pi performance proof.
+
+Library errors are fixed `farming-collection-input` (TypeError),
+`farming-collection-limit` (RangeError), `farming-collection-rejected` (Error for executable
+configuration rejection) and `farming-collection-unavailable` (Error for host, collection,
+identity or persistence failure). No caller values or native filesystem errors are exposed.
+
 ## Remaining integration work
 
 [Drone issue 37](https://github.com/stacksjs/drone/issues/37) tracks this planning boundary.
-[Issue 38](https://github.com/stacksjs/drone/issues/38) tracks a separate source-bound synthetic
-collection preview using the existing dataset writer and calibrated processing. Neither establishes
+[Issue 38](https://github.com/stacksjs/drone/issues/38) tracks the source-bound synthetic
+collection boundary described above, using the existing dataset writer and calibrated processing. Neither establishes
 physical camera calibration, a field deployment or a validated agronomic model.
 
 [Open Farming issue 3](https://github.com/theopenfarm/openfarm.ing/issues/3) tracks the authenticated
