@@ -5,9 +5,9 @@ import { tmpdir } from 'node:os'
 import { Readable } from 'node:stream'
 import { isDeepStrictEqual } from 'node:util'
 import { Updater } from 'tuf-js'
-import type { TargetFile } from 'tuf-js'
 import { directory, imageLimit, metadataLimit, regularFile, repositoryFile, safePath, sha256, syncDirectory, syncTree, writeExclusive } from './files'
 import { object, validateMetadata } from './metadata'
+import { admitSignedRuntime } from './manifest'
 import { admitPolicy } from './policy'
 import type { RuntimeFirmwarePolicy } from './policy'
 export type { RuntimeFirmwarePolicy } from './policy'
@@ -30,16 +30,6 @@ export interface RuntimeFirmwareStage {
   trustStatePersisted: false
 }
 
-function signedRuntime(info: TargetFile, policy: RuntimeFirmwarePolicy) {
-  const data = object(info.custom.drone)
-  const keys = ['schema', 'platform', 'protocolVersion', 'releaseSequence', 'sourceRevision', 'profile']
-  if (Object.keys(data).length !== keys.length || !keys.every(key => Object.hasOwn(data, key)) || data.schema !== 'drone-runtime-image-v1' || data.profile !== 'neutral-bench') throw new Error('Unsupported signed runtime manifest')
-  if (data.platform !== policy.platform || data.protocolVersion !== 1) throw new Error('Signed runtime platform or protocol does not match policy')
-  if (!Number.isSafeInteger(data.releaseSequence) || (data.releaseSequence as number) < policy.minimumReleaseSequence) throw new Error('Signed release is below the trusted minimum release sequence')
-  if (typeof data.sourceRevision !== 'string' || !/^[a-f0-9]{40}$/.test(data.sourceRevision)) throw new Error('Invalid signed source revision')
-  if (!Number.isSafeInteger(info.length) || info.length < 1 || info.length > imageLimit || !/^[a-f0-9]{64}$/.test(info.hashes.sha256 ?? '')) throw new Error('Runtime image requires a bounded length and SHA-256')
-  return { releaseSequence: data.releaseSequence as number, sourceRevision: data.sourceRevision }
-}
 
 /** Use the SDK's public HTTP interface on a private loopback server. No external fetch is performed. */
 async function verifyRepository(repository: string, root: Buffer, work: string, policy: RuntimeFirmwarePolicy, download?: string) {
@@ -81,7 +71,7 @@ async function verifyRepository(repository: string, root: Buffer, work: string, 
     await updater.refresh()
     const info = await updater.getTargetInfo(policy.target)
     if (!info) throw new Error('Selected firmware target is absent')
-    const runtime = signedRuntime(info, policy)
+    const runtime = admitSignedRuntime(info, policy)
     if (download) await updater.downloadTarget(info, download)
     const latest = object(JSON.parse(regularFile(join(work, 'root.json'), metadataLimit).toString('utf8')))
     const rootVersion = object(latest.signed).version

@@ -9,7 +9,7 @@ export const platform = 'pico2-neutral-bench-v1'
 export const digest = (bytes: Uint8Array) => createHash('sha256').update(bytes).digest('hex')
 const fields = { version: 1, specVersion: '1.0.31', expires: '2035-01-01T00:00:00Z' }
 
-function signer(nonCanonical = false) {
+export function signer(nonCanonical = false) {
   const pair = generateKeyPairSync('ed25519')
   const publicKey = pair.publicKey.export({ format: 'der', type: 'spki' }).subarray(-32).toString('hex')
   const keyObject = { keytype: 'ed25519', scheme: 'ed25519', keyval: { public: publicKey } }

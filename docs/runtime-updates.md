@@ -1,10 +1,11 @@
 # Runtime trust and signed image staging
 
 Issue [#9](https://github.com/stacksjs/drone/issues/9) now has offline signed-image
-staging, independent candidate verification and protected initial trust enrollment.
-These commands prepare files on the host. Cross-update metadata/release floors,
-installed images, boot selection and known-good rollback slots remain to be
-implemented. Physical deployment is disabled.
+staging, independent candidate verification, protected initial trust enrollment
+and a persistent host metadata protocol. These commands prepare and verify host
+state. Integrating that protocol with authenticated image staging, revocation,
+installed images, boot selection and known-good rollback slots remains part of
+the full coordinator. Physical deployment is disabled.
 
 ## Explicit trust and policy
 
@@ -78,9 +79,108 @@ Keep this immutable anchor separate from an SDK working cache. The current SDK
 writes cache files in place; a host write-limit probe truncated its cached root.
 Never refresh against the enrollment directory. Staging/inspection still require
 their explicit policy and do not load or advance this enrollment automatically.
-Persistent verified metadata/release floors, key lifecycle, interruption recovery
-and known-good coordination remain in [issue #42](https://github.com/stacksjs/drone/issues/42).
+The metadata-store functions below retain verified metadata/release floors.
+The complete key lifecycle, storage-fault campaigns, image integration and
+known-good coordinator remain in [issue #42](https://github.com/stacksjs/drone/issues/42).
 Do not discard or re-enroll over failed state to reset a security floor.
+
+## Persistent host metadata protocol
+
+Initialize a separate new private directory and retain its returned `storeSha256`
+independently, alongside the enrollment pin:
+
+```sh
+./buddy updates:store-init --enrollment /path/to/trust \
+  --enrollment-sha256 "$ENROLLMENT_SHA256" --output /path/to/new-store
+
+./buddy updates:store /path/to/new-store --enrollment /path/to/trust \
+  --enrollment-sha256 "$ENROLLMENT_SHA256" --store-sha256 "$STORE_SHA256"
+
+./buddy updates:refresh /path/to/new-store --enrollment /path/to/trust \
+  --enrollment-sha256 "$ENROLLMENT_SHA256" --store-sha256 "$STORE_SHA256" \
+  --repository /path/to/offline-repository \
+  --trusted-system-clock-source operator-managed-utc-clock
+
+./buddy updates:recover /path/to/new-store --enrollment /path/to/trust \
+  --enrollment-sha256 "$ENROLLMENT_SHA256" --store-sha256 "$STORE_SHA256"
+```
+
+Native Buddy and the copied standalone CLI use the same functions under
+`resources/functions/drone/updates/store.ts`. The independent store pin binds an
+immutable identity to the authenticated enrollment. It is not a hash of the
+mutable database or a candidate receipt. Wrong pins, existing initialization
+outputs, missing/corrupt files, foreign schemas, unexpected entries, symlinks,
+extra hard links and unsafe ownership/permissions fail closed. Existing files
+are never recreated as a way to recover a floor. See the
+[protocol decision](adr/0028-runtime-trust-store.md).
+
+`writer.sqlite` holds a transaction across awaited work. `state.sqlite` commits
+each input and accepted metadata prefix independently while that writer is
+excluded. The exact schema, application ID and version are checked before
+configuration that could rewrite a foreign database's format. Both connections
+require DELETE journals, FULL synchronous commits and configuration readback.
+SQLite and directory sync evidence concerns this host, not electrical power loss.
+
+An attempt records its base generation, clock source and fixed start time. Before
+the SDK receives an input, its bounded bytes or missing-file response are committed
+and read back. The awaited SDK observer commits accepted metadata before its
+private cache write. Later verification, compatibility or output failure does not
+discard that prefix. Working caches are separate disposable temporary directories.
+Progress-callback rejection aborts refresh and preserves its original cause. A
+callback's HTTP error cannot stand in for an absent repository file.
+`generation` and `retainedMetadataRecords` describe the append-only metadata history;
+status lists the active roles and the latest attempt.
+
+The global `releaseFloor` starts with enrolled policy and advances from the selected
+compatible target's verified signed declaration. Refresh verifies metadata and
+declared compatibility; it does not download or authenticate the actual image
+bytes. An attempt marked `verified` means this metadata operation completed. It
+does not mean an image is staged, installed, booted or confirmed healthy. Existing
+`updates:stage` and `updates:inspect` remain separate and still report
+`trustStatePersisted: false`; integrating them with this store is unfinished.
+
+Timestamp or snapshot authority rotation, authenticated through sequential root
+metadata, creates a new active epoch and invalidates both working-cache entries.
+Historical epochs remain in the database. A test changes only the snapshot key,
+keeps the timestamp key, accepts metadata counters dropping from 100 to 1 under
+the new authority, and still rejects a release below the global release floor.
+Changing only the root signing key does not reset active role floors.
+
+### Clock and interrupted attempts
+
+The function interface requires a `RuntimeUpdateClock` with a source label and
+`read(): Date`. The adapter must obtain independently trusted current wall time;
+there is no repository-supplied time or default adapter. Read once, copy that
+instant, and reject a decrease from the persisted clock floor. The native command
+uses the system UTC clock only with the explicit source option above. That name
+is an audit label, not an attestation that the system clock is synchronized or
+protected. Configure and verify that trust externally before invoking it. Trusted
+clock acquisition and hardware clock/storage rollback protection remain separate
+requirements. Control-loop freshness keeps its own monotonic clock.
+
+A pending or maintenance attempt blocks another refresh. Recovery reconstructs
+its exact base cache, replays only durable inputs at the recorded historical time,
+and compares every earlier accepted observation with its committed bytes. It can
+finish at an owned pre-delivery end-of-recorded-input marker, or after complete
+verification followed by a known rejection from our explicit manifest policy.
+The latter retains all metadata and the release floor without crediting a rejected
+release. Signature, crypto, input-integrity, persistence and unknown SDK errors do
+not become permission to discard a journal: they remain maintenance conditions.
+No automatic repair for those conditions or corrupt state is supplied yet.
+Preserve the directory for investigation.
+
+Recovery can advance floors from a previously journaled valid input that never
+reached the SDK before interruption. Its `recovered` status never authorizes an
+image; a new trusted-current-time verification is required. Host tests perform
+actual SIGKILL cuts after input and metadata commits, observe SQLITE_BUSY from a
+competing process, restart and retain the timestamp before a fresh refresh. These
+cuts do not cover every write/sync boundary or actual physical power loss.
+
+The v1 format is bounded to 256 attempts, 10,000 metadata advances and a 128 MiB
+state database. Each attempt allows 64 inputs, 32 MiB of metadata and 512 KiB per
+file. Exhaustion fails closed; history is not automatically deleted or compacted.
+Capacity migration, the full storage-fault campaign, authenticated repair/key
+revocation, image/slot integration and session-bound health remain in #42.
 
 ## Repository and signed image contract
 
@@ -138,11 +238,14 @@ phase error alone does not prove that input was invalid, that a prefix is safe
 to discard, or that recovery may continue. Unknown crypto, resource or other
 causes must fail closed pending investigation. Error objects and type names do
 not establish authenticated trust or permit firmware use. The recovery
-coordinator and its full failure classification remain to be implemented.
+coordinator's broader failure classification and authenticated maintenance repair
+remain to be implemented. The metadata protocol above only recognizes its own
+pre-delivery replay marker and completed domain-policy rejection.
 
 The seam alone does not persist a protected prefix or make SDK cache writes
 transactional. Its implementation and tests are a prerequisite for the protected
-store and recovery coordinator in issue #42. They do not complete that issue or
+store and recovery coordinator in issue #42. The bounded metadata protocol above
+uses that seam; neither completes the full coordinator or
 permit flashing, boot selection or physical deployment.
 
 The selected target must have SHA-256, a nonzero length of at most 16 MiB and
@@ -190,16 +293,17 @@ treat marker existence alone as permission to install or boot it.
 
 ## Remaining update and operations acceptance
 
-Each verification starts from the supplied root. `trustStatePersisted: false`
-means this module has no protected cross-invocation metadata or release
-high-water state. It is not a complete anti-rollback implementation. The caller
-must supply the trusted release floor every time. TUF expiry uses host wall
-time; trusted clock acquisition and protection against clock/storage rollback
-remain open. Control-loop freshness still uses its separate monotonic clock.
+The separate image-stage/inspection path still starts from its supplied root.
+Its `trustStatePersisted: false` result means it does not use the metadata store's
+cross-invocation floors. The caller must supply its trusted release floor each
+time. Neither path is a complete anti-rollback coordinator. Trusted clock
+acquisition and protection against privileged clock/storage rollback remain
+open. Control-loop freshness still uses its separate monotonic clock.
 
-Initial enrollment is available above. Next, implement protected trust rotation
-and persistent metadata/release floors, an
-interruption-safe coordinator, installed/known-good slot integrity, explicit
+Initial enrollment and the bounded persistent metadata protocol are available
+above. Complete authenticated maintenance/key revocation, the full storage-fault
+campaign and integration with signed image staging, then installed/known-good
+slot integrity, explicit
 health confirmation and rollback without lowering security floors. Then add
 the board bootloader/install protocol and measured power-loss, full-medium,
 storage-latency and recovery campaigns. Local privileged filesystem tampering
