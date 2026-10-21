@@ -60,6 +60,7 @@ import PublicSafetySimulate from '../app/Commands/PublicSafetySimulate'
 import PublicSafetyReplay from '../app/Commands/PublicSafetyReplay'
 import EnvironmentSimulate from '../app/Commands/EnvironmentSimulate'
 import CinemaSimulate from '../app/Commands/CinemaSimulate'
+import CinemaTranslate from '../app/Commands/CinemaTranslate'
 
 const app = cli('drone')
 RuntimeBuild(app)
@@ -116,6 +117,7 @@ PublicSafetySimulate(app)
 PublicSafetyReplay(app)
 EnvironmentSimulate(app)
 CinemaSimulate(app)
+CinemaTranslate(app)
 app.help()
 app.version('0.1.0')
 try { await app.parse(process.argv) }

@@ -137,6 +137,21 @@ jobs:
             test "$actual" -eq "$expected"
             bun -e 'const [file, scenario, expected] = process.argv.slice(1); const raw = await Bun.file(file).text(); const s = JSON.parse(raw); if (Buffer.byteLength(raw) > 16384 || s.scenario !== scenario || s.status !== (expected === "0" ? "completed" : "halted") || s.physicalFlightEnabled !== false || s.physicalGimbalActuationEnabled !== false || s.identityAuthenticated !== false || s.mission.boardNeutral !== true || expected === "0" && (s.captures.length !== 3 || s.captures.some(c => c.state !== "confirmed" || c.postStepAdmission !== "valid" || c.quality.qualified !== true))) throw new Error("Invalid compiled cinema outcome")' "$RUNNER_TEMP/cinema-$scenario.json" "$scenario" "$expected"
           done
+      - name: Qualify compiled counted Cinema summaries outside the checkout
+        working-directory: ${{ runner.temp }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          binary="$GITHUB_WORKSPACE/storage/runtime-build/cli/drone"
+          for scenario in nominal source-expiry-with-foreign; do
+            expected=0
+            if [ "$scenario" = source-expiry-with-foreign ]; then expected=1; fi
+            actual=0
+            "$binary" cinema:translate --scenario "$scenario" > "$RUNNER_TEMP/cinema-counted-$scenario.json" 2> "$RUNNER_TEMP/cinema-counted-$scenario.stderr" || actual=$?
+            test "$actual" -eq "$expected"
+            test ! -s "$RUNNER_TEMP/cinema-counted-$scenario.stderr"
+            bun -e 'const [file, scenario] = process.argv.slice(1); const raw = await Bun.file(file).text(); const s = JSON.parse(raw); if (Buffer.byteLength(raw) > 16384 || !raw.endsWith("\n") || raw.split("\n").length !== 2 || s.version !== 1 || s.evidence !== "owned-counted-cinema-cli-summary" || s.run.version !== 4 || s.run.scenario !== scenario || s.translation.version !== 3 || s.mission.version !== 4 || s.encoderMethod.method !== "count-difference-v1" || s.run.physicalFlightEnabled !== false || s.run.physicalGimbalActuationEnabled !== false || s.run.identityAuthenticated !== false || s.mission.boardNeutral !== true || s.translation.smoothnessQualified !== false) throw new Error("Invalid compiled counted Cinema summary"); if (scenario === "nominal") { if (s.run.status !== "completed" || s.run.reason !== "qualified" || s.mission.state !== "completed" || s.mission.reason !== "landed" || s.evaluation.qualified !== true || s.translation.metrics.nominalWitness !== "satisfied" || s.translation.metrics.captureForwardDisplacementM < 0.5 || s.translation.metrics.captureForwardSpeedMps.some(v => v <= 0) || s.captures.length !== 3 || s.captures.some(c => c.state !== "confirmed" || c.postStepAdmission !== "valid" || c.quality.qualified !== true)) throw new Error("Invalid compiled counted Cinema nominal"); } else if (s.run.status !== "halted" || s.run.reason !== "gimbal-source-expired" || s.mission.state !== "aborted" || s.mission.reason !== "operator-abort" || s.evaluation.qualified !== false || s.translation.metrics.sourceMotionWitness !== "satisfied" || s.translation.metrics.firstExposureForwardDisplacementM <= 0 || s.translation.metrics.firstExposureForwardSpeedMps <= 0 || s.captures.length !== 1 || s.captures[0].state !== "uncertain" || s.captures[0].reason !== "gimbal-source-expired" || s.captures[0].acknowledgedAtMs !== null || s.captures[0].receivedAtMs !== null) throw new Error("Invalid compiled counted Cinema source expiry")' "$RUNNER_TEMP/cinema-counted-$scenario.json" "$scenario"
+          done
       - run: $GITHUB_WORKSPACE/storage/runtime-build/cli/drone antenna:bench --scenario nominal --seconds 10
         working-directory: ${{ runner.temp }}
       - run: $GITHUB_WORKSPACE/storage/runtime-build/cli/drone air:simulate --scenario nominal --seconds 120

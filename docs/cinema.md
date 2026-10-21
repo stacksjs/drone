@@ -1,6 +1,6 @@
 # Simulated POI camera reframe
 
-This partial [issue #26](https://github.com/stacksjs/drone/issues/26) tracer coordinates an ordinary owned takeoff/hover/land mission, a lagged three-axis gimbal and three modeled still captures of one selected synthetic point of interest. It implements a smooth angular reframe while hovering. Translational dolly/orbit paths, physical cameras/gimbals, lens/exposure control, video timecode and operator handoff/resume remain open.
+This partial [issue #26](https://github.com/stacksjs/drone/issues/26) tracer coordinates an ordinary owned takeoff/hover/land mission, a lagged three-axis gimbal and three modeled still captures of one selected synthetic point of interest. It implements a smooth angular reframe while hovering. Broader dolly/orbit paths, physical cameras/gimbals, lens/exposure control, video timecode and operator handoff/resume remain open.
 
 ```sh
 ./buddy cinema:simulate
@@ -52,7 +52,7 @@ This manager provides no authenticated identity, source transfer/resume, rate co
 
 The native trace is limited to 6,001 rows and 8 MiB. Cinema-specific records/images have a 12 MiB bound; the full JSON run plus LF has a 20 MiB bound and the CLI summary plus LF a 16 KiB bound. Data is neither rounded nor truncated to pass. These representation limits establish no hard CPU or peak-memory bound. Source, compiled-executable and CI qualification are tracked separately.
 
-`physicalFlightEnabled`, `physicalGimbalActuationEnabled` and `identityAuthenticated` remain false. These synthetic stills establish no measured optical calibration, physical shutter/gimbal accuracy, lens/exposure behavior, broadcast/video timing or operational readiness. All original issue #26 acceptance criteria remain unchecked. Smooth translational paths, physical integration, broader interruption/recovery, handoff and synchronized video/lens controls need further implementation and evidence.
+`physicalFlightEnabled`, `physicalGimbalActuationEnabled` and `identityAuthenticated` remain false. These synthetic stills establish no measured optical calibration, physical shutter/gimbal accuracy, lens/exposure behavior, broadcast/video timing or operational readiness. All original issue #26 acceptance criteria remain unchecked. Broader smooth translational paths, physical integration, broader interruption/recovery, handoff and synchronized video/lens controls need further implementation and evidence.
 
 ## Counted encoder prerequisite
 
@@ -107,7 +107,7 @@ outer v4 `CinemaCountedTranslationRun`, audit v3 and actual native v4 mission tr
 source-manager and plant flow. Its closed own-data input accepts `nominal` or
 `source-expiry-with-foreign`; omitted scenario selects nominal. Invalid input throws the fixed
 `cinema-counted-translation-input` TypeError. Unavailable owned results use
-`cinema-unqualified-result`. It adds no CLI command or hardware driver.
+`cinema-unqualified-result`. It adds no hardware driver. The counted command is described below.
 
 The original first nominal acquisition is accepted after a separately reviewed saved-result
 decoder field-order correction. The original failed oracle receipt and full first result remain
@@ -129,7 +129,55 @@ joins verified strictly positive first-image displacement and forward speed.
 
 The bounded public input and ownership tests also passed, with two tests and 37 expectations.
 All 20 fresh complete legacy outputs match their before captures byte for byte, including
-final LF and reversible BigInt paths. Full-suite, compiled-command, browser, exact-head CI
-and main-publication gates remain pending for this candidate. These local results establish
-simulation behavior only. The old failed translating-camera candidate remains failed and
-unchanged.
+final LF and reversible BigInt paths. At that first local checkpoint, full-suite,
+compiled-command, browser, exact-head CI and main-publication gates remained pending.
+Those library-candidate gates subsequently passed, and commit
+`a75c06554ea1eaebc34892dc90c97198d5d3228e` was published to main. Its compiled checks exercised
+existing commands; the new counted command below requires its own qualification. These
+results establish simulation behavior only. The old failed translating-camera candidate
+remains failed and unchanged.
+
+
+## Counted translation command
+
+The native Buddy command and portable CLI entry expose the fixed counted dolly simulation:
+
+```sh
+./buddy cinema:translate
+./buddy cinema:translate --scenario source-expiry-with-foreign
+# After building the runtime CLI:
+/path/to/drone cinema:translate --scenario nominal
+```
+
+Only `nominal` and `source-expiry-with-foreign` are accepted. The command invokes
+`simulateCountedTranslatingCinema` once with that scenario. Its mission, selected writer,
+counted encoder, optical renderer and capture schedule remain the library's fixed profile.
+It accepts no user plan, hardware driver, timing or gain controls, provider or output directory.
+The existing seven `cinema:simulate` hover scenarios retain their interface.
+
+Stdout is one compact JSON summary plus LF, at most 16 KiB including LF. The distinct
+summary v1, `owned-counted-cinema-cli-summary`, identifies the actual library run v4,
+translation audit v3 and native mission v4. It retains the count-difference method, terminal
+mission state, board neutrality, shot and source-manager facts, admission timeline,
+translation metrics and per-capture quality, body position and counted measurement.
+It omits image pixels, full model, trace rows, plant rows, encoder ledgers and the full
+readiness suffix. This summary is not a recording or independent replay verification.
+Vehicle smoothness remains unqualified; the motion evaluation describes the modeled gimbal.
+
+A completed run exits 0. Every returned halted, incomplete or failed run still prints its
+actual summary and exits 1. The intentional source-expiry scenario therefore exits 1 and
+retains `gimbal-source-expired`, the uncertain exposure without ACK, and native
+`operator-abort`. Handler input, unavailable-result and output errors use a fixed bounded
+stderr message and exit 1. Native parser usage errors retain their own handling.
+
+The command's 19 public CLI tests passed locally on pinned Bun 1.4.2, including actual
+public-result mapping, native input handling, delayed consumption and closed stdout.
+Default and explicit source/Buddy summaries match byte for byte. Both scenarios also
+passed through a compiled macOS arm64 executable copied outside the checkout, with
+project, dependency and installed Bun reads denied and a system-only PATH. Its complete
+stdout matches the native entry paths, preserving actual exits 0 and 1. All seven legacy
+cinema summaries and exits remain byte-identical through source, Buddy and that executable.
+This is host-target delivery evidence; full-suite and exact-head CI receipts are tracked
+separately in issue 26. Existing independent library qualification remains separate.
+No physical flight, gimbal actuation, authentication, firmware SITL/HIL, real-time
+performance or issue 26 completion is established by the command.
