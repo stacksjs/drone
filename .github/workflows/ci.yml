@@ -32,6 +32,8 @@ jobs:
       - run: python3 -m unittest discover -s tests/hardware
       - run: ./buddy test
       - run: bun run runtime:cli
+      - name: Verify signed test-image staging through the portable CLI outside the checkout
+        run: bun tests/fixtures/updates/qualify.ts "$RUNNER_TEMP/runtime-update-qualification" "$GITHUB_WORKSPACE/storage/runtime-build/cli/drone"
       - run: $GITHUB_WORKSPACE/storage/runtime-build/cli/drone runtime:bench --project "$GITHUB_WORKSPACE" --ticks 100 --fault deadline
         working-directory: ${{ runner.temp }}
       - run: $GITHUB_WORKSPACE/storage/runtime-build/cli/drone sensors:replay "$GITHUB_WORKSPACE/tests/fixtures/sensors/bench-v1.json" --at-ms 500

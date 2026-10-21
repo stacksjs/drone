@@ -67,6 +67,7 @@ const config: BunPressOptions = {
             { text: 'Owned mission engine', link: '/missions' },
             { text: 'Owned range-backed navigation', link: '/navigation' },
             { text: 'Owned runtime diagnostics, journals and replay', link: '/diagnostics' },
+            { text: 'Signed runtime image staging', link: '/runtime-updates' },
           ],
         },
         {

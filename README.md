@@ -262,7 +262,10 @@ verified crash-prefix recovery, provenance and offline replay through CLI and `/
 
 The viewer opens files locally in the browser. The v1 format excludes imagery, location and
 operator tokens. See [diagnostics, durability and remaining acceptance](docs/diagnostics.md).
-Physical logging/commissioning and signed firmware update/rollback remain pending.
+The [signed runtime image stage](docs/runtime-updates.md) now verifies offline TUF
+candidates through `updates:stage` and `updates:inspect`, with explicit root pins,
+compatibility and externally supplied release floors. Physical logging/commissioning,
+persistent trust state, image installation and known-good rollback remain pending.
 
 ## Sensor acquisition and replay
 

@@ -19,6 +19,8 @@ import DiagnosticsRecord from '../app/Commands/DiagnosticsRecord'
 import DiagnosticsReplay from '../app/Commands/DiagnosticsReplay'
 import DiagnosticsInspect from '../app/Commands/DiagnosticsInspect'
 import DiagnosticsExport from '../app/Commands/DiagnosticsExport'
+import UpdatesStage from '../app/Commands/UpdatesStage'
+import UpdatesInspect from '../app/Commands/UpdatesInspect'
 
 import MissionsSimulate from '../app/Commands/MissionsSimulate'
 import MissionsValidate from '../app/Commands/MissionsValidate'
@@ -81,6 +83,8 @@ DiagnosticsRecord(app)
 DiagnosticsReplay(app)
 DiagnosticsInspect(app)
 DiagnosticsExport(app)
+UpdatesStage(app)
+UpdatesInspect(app)
 MissionsSimulate(app)
 MissionsValidate(app)
 MissionsReplay(app)

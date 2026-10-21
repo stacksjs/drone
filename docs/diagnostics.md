@@ -155,8 +155,11 @@ Physical flash power-loss, full-medium and electrical I/O fault campaigns are st
 - Measure board flash/storage latency, loss/rotation policy, logging deadlines and RAM under load.
   Exercise ENOSPC/EDQUOT, torn sectors, storage removal, host crash, power loss and reset causes on
   the actual Pi/Pico setup. Disabled loads and independent authority remain required.
-- Build signed firmware manifests and trust/key lifecycle, target/version checks, anti-rollback,
-  verified staging, interrupted update recovery and a known-good rollback slot before flashing.
+- [Offline signed image staging](runtime-updates.md) now authenticates TUF roles,
+  declared target compatibility and a caller-supplied release floor. Build persistent
+  trust/key lifecycle and metadata/release high-water state, interrupted update
+  recovery and a known-good rollback slot before flashing. Each staging invocation
+  currently starts from the independently supplied root; it is not full anti-rollback.
 - Implement a commissioning workflow backed by measured wiring, neutral outputs, watchdog,
   estimator calibration, RC override/kill and recovery evidence from #2/#3/#4/#6.
 

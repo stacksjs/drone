@@ -59,7 +59,7 @@ export function diagnoseDiagnostics(journal: DiagnosticJournal) {
     { id: 'runtime-status', state: result.latest && !result.statusStale ? 'pass' : 'fail', detail: result.latest ? (result.statusStale ? 'stale' : 'recorded') : 'missing' },
     { id: 'runtime-health', state: result.health.length || result.replayedStatus || result.wireGaps ? 'fail' : 'pass', detail: result.health.join(', ') || (result.wireGaps ? 'status-gaps' : 'no-observed-fault') },
     { id: 'physical-commissioning', state: 'blocked', detail: 'independent-hardware-evidence-required' },
-    { id: 'signed-update-rollback', state: 'blocked', detail: 'not-implemented' },
+    { id: 'signed-update-rollback', state: 'blocked', detail: 'offline-staging-only; persistent-trust-and-rollback-required' },
   ] as const
   return { version: 1, runId: journal.header.runId, evidence: journal.header.evidence, verifiedHash: journal.verifiedHash, checks, diagnosticFailures: checks.filter(check => check.state === 'fail').length, commissioningReady: false as const, replay: result, physicalFlightEnabled: false as const }
 }
