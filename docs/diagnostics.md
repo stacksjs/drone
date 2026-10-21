@@ -158,7 +158,8 @@ Physical flash power-loss, full-medium and electrical I/O fault campaigns are st
 - [Signed image staging and protected preparation](runtime-updates.md) authenticate
   TUF roles, declared compatibility and actual image bytes. Independently pinned
   enrollment/store records retain metadata and clock/release floors; historical
-  recovery retains floors only. Complete key revocation/repair, installed and
+  recovery retains floors only. Owned candidate reservation/status/retirement retain
+  exact identities and files without granting boot authority. Complete key revocation/repair, installed and
   known-good slot coordination, current-policy rollback and exact-image boot/session
   health before flashing. Standalone staging/inspection still need explicit trust
   and are separate from protected-current-policy selection. Host preparation does

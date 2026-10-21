@@ -28,6 +28,9 @@ import UpdatesStore from '../app/Commands/UpdatesStore'
 import UpdatesRefresh from '../app/Commands/UpdatesRefresh'
 import UpdatesRecover from '../app/Commands/UpdatesRecover'
 import UpdatesPrepare from '../app/Commands/UpdatesPrepare'
+import UpdatesReserve from '../app/Commands/UpdatesReserve'
+import UpdatesCandidates from '../app/Commands/UpdatesCandidates'
+import UpdatesRetire from '../app/Commands/UpdatesRetire'
 
 import MissionsSimulate from '../app/Commands/MissionsSimulate'
 import MissionsValidate from '../app/Commands/MissionsValidate'
@@ -99,6 +102,9 @@ UpdatesStore(app)
 UpdatesRefresh(app)
 UpdatesRecover(app)
 UpdatesPrepare(app)
+UpdatesReserve(app)
+UpdatesCandidates(app)
+UpdatesRetire(app)
 MissionsSimulate(app)
 MissionsValidate(app)
 MissionsReplay(app)

@@ -53,7 +53,20 @@ same file writer serves standalone staging. Candidate inspection requires a root
 pin from authenticated store readback when preparation uses the current rotated
 root. A candidate receipt supplies no current trust or selection authority.
 
-This v1 database journals metadata, not durable candidate ownership or slot
-transitions. Installed, candidate and known-good slots and health confirmation
-bound to an exact image and boot/session identity remain part of #42. No receipt or healthy boolean can select firmware. Physical installation,
+The original format1 database journals metadata. Candidate reservation upgrades
+its exact schema to format2 in a single transaction, preserving all earlier
+records, floors and the independently pinned store identity. The writer database
+stays format1. New code reads both formats; older binaries reject format2 before
+rewriting it. Missing/corrupt or unknown schemas are never reinitialized.
+
+Format2 adds bounded owned candidate records and one active-reservation index.
+A record binds the exact attempt/generation and generated signed description,
+is committed before image IO, and changes to prepared only after authenticated
+bytes and full candidate-file readback. The files use exclusive immutable-ID
+directories inside the private store. Explicit retirement preserves the files
+and history. Metadata-only recovery cannot promote a reserved candidate based on
+its receipt. Recorded-byte status is not current-policy authorization.
+
+Installed and known-good slot roles and health confirmation bound to an exact
+image and boot/session identity remain part of #42. No receipt or healthy boolean can select firmware. Physical installation,
 bootloader behavior, secure boot and hardware anti-rollback remain gated by #2/#9.

@@ -177,7 +177,7 @@ actual SIGKILL cuts after input and metadata commits, observe SQLITE_BUSY from a
 competing process, restart and retain the timestamp before a fresh refresh. These
 cuts do not cover every write/sync boundary or actual physical power loss.
 
-The v1 format is bounded to 256 attempts, 10,000 metadata advances and a 128 MiB
+The metadata format is bounded to 256 attempts, 10,000 metadata advances and a 128 MiB
 state database. Each attempt allows 64 inputs, 32 MiB of metadata and 512 KiB per
 file. Exhaustion fails closed; history is not automatically deleted or compacted.
 Capacity migration, the full storage-fault campaign, authenticated repair/key
@@ -224,8 +224,9 @@ still has `trustStatePersisted: false`: that portable receipt is not the protect
 store or current authorization. A successful preparation authenticates these
 candidate bytes at this operation's trusted time. It does not install, select,
 boot or confirm them, and does not promise future trust/expiry policy will allow
-selection. Durable candidate ownership, installed/known-good slots and current
-policy revalidation before selection remain coordinator work in #42.
+selection. The owned-candidate operation below adds durable reservation records;
+installed/known-good slots and current-policy revalidation before selection remain
+coordinator work in #42.
 
 Image or candidate-output failure during an attempt leaves accepted metadata and
 release floors intact and marks the attempt for maintenance. `updates:recover` replays metadata only; it never
@@ -243,6 +244,91 @@ After restart, metadata recovery retains release floor 9 and returns only a stor
 summary; a fresh preparation uses another new directory. These measured process
 cuts do not establish every write/sync boundary, electrical power-loss behavior
 or hardware anti-rollback.
+
+## Owned candidate reservations and retirement
+
+Use `updates:reserve` when the pinned store should own the candidate, rather than
+writing a standalone output directory. Repository and enrollment directories must
+remain separate from the store and cannot contain it or be contained by it.
+
+```sh
+./buddy updates:reserve /path/to/store --enrollment /path/to/trust \
+  --enrollment-sha256 "$ENROLLMENT_SHA256" --store-sha256 "$STORE_SHA256" \
+  --repository /path/to/offline-repository \
+  --trusted-system-clock-source operator-managed-utc-clock
+
+./buddy updates:candidates /path/to/store --enrollment /path/to/trust \
+  --enrollment-sha256 "$ENROLLMENT_SHA256" --store-sha256 "$STORE_SHA256"
+
+./buddy updates:retire /path/to/store --enrollment /path/to/trust \
+  --enrollment-sha256 "$ENROLLMENT_SHA256" --store-sha256 "$STORE_SHA256" \
+  --candidate "$EXACT_ACTIVE_CANDIDATE_ID"
+```
+
+The library functions are `reserveRuntimeFirmwareCandidate`,
+`inspectRuntimeFirmwareCandidates` and `retireRuntimeFirmwareCandidate`. The
+native Buddy commands and copied standalone commands share them. A writer lease
+covers metadata verification, reservation, image output and completion. Only one
+candidate can remain active; another reservation fails before starting a metadata
+attempt. A fresh trusted clock and the existing protected SDK operation verify
+the signed selection, then commit its release floor before image acquisition.
+
+Reservation upgrades an exact format1 `state.sqlite` to format2 in one SQLite
+transaction, adding `candidates` and a partial unique index for one active
+reservation. It retains every metadata/attempt record, clock/release floor and
+store identity. `writer.sqlite` stays format1, and the independently retained
+`store.json` hash is unchanged. New code still reads format1 stores without
+migrating them during inspection. Older binaries fail closed on format2; a
+retained older executable was tested before and after upgrade, including unchanged
+state and writer database hashes after its rejection. Do not downgrade or reset a
+store to make an older binary operate on it. Unknown schemas remain rejected
+before configuration that could rewrite their format.
+
+Each candidate record binds a random ID, exact metadata attempt/generation and
+the generated signed-stage description/hash. The record is committed as
+`reserved` before image IO. Files are exclusively created under
+`store/candidates/<id>` with the same actual-image verification and archive writer
+as protected preparation. Only complete file, image and archive readback permits
+the `prepared` record commit. A receipt cannot introduce an owned record.
+
+`updates:candidates` returns `drone-runtime-candidates-v1`, `stateFormat`, protected
+`store` status, the active `candidate`, and bounded declaration `history`. History
+includes retired identities and paths; retired file integrity is not inspected.
+There are at most 128 retained candidate records. Exhaustion fails closed rather
+than deleting history or images. Active candidate `integrity` is:
+
+| Value | Meaning |
+| --- | --- |
+| `incomplete` | The record is still reserved, even if a stage marker exists |
+| `recorded-bytes-match` | Prepared image, receipt, root and archive match the owned record and its historical metadata bytes |
+| `mismatch` | Available file content or layout differs from the owned candidate |
+| `unavailable` | Files cannot be completely read or their protected file/directory requirements fail |
+
+This status is a local byte check. It does not establish fresh TUF expiration,
+revocation or current-policy authorization. `currentTrustValidated` and
+`physicalDeploymentAllowed` remain false. No installed, booted or healthy result
+is invented from a prepared record or matching files.
+
+After an interrupted or failed operation, preserve the whole store and its
+candidate files. Resolve the pending/maintenance metadata attempt with
+`updates:recover` first. Recovery never promotes `reserved` to `prepared`, even
+when a completed stage marker exists. A process can also stop after the prepared
+record commit but before attempt completion; the record survives, while metadata
+recovery still supplies no current selection authority. Missing/corrupt files
+remain actionable integrity failures. Explicit retirement requires the exact
+active ID and a resolved metadata attempt. It changes the record to `retired`,
+retains all files/history/floors, and allows a new ID with a new directory. It does
+not erase or repair the earlier artifact.
+
+Host qualification kills actual processes after reservation, image write, stage
+marker completion, prepared-record commit and retirement commit. Each cut observes
+an actual competing process rejected with SQLITE_BUSY, then restarts, checks
+unchanged candidate phase/floors and prepares a distinct fresh ID after explicit
+recovery/retirement. This does not cover every SQLite/filesystem write or sync,
+ENOSPC/EDQUOT/EIO, electrical power loss or actual board boot behavior. Installed
+and known-good slot roles, identity-bound runtime health, current-policy selection
+and rollback, authenticated key maintenance and the full fault campaign remain
+required by #42.
 
 ## Repository and signed image contract
 
@@ -364,10 +450,10 @@ time. Neither path is a complete anti-rollback coordinator. Trusted clock
 acquisition and protection against privileged clock/storage rollback remain
 open. Control-loop freshness still uses its separate monotonic clock.
 
-Initial enrollment, the bounded persistent metadata protocol and protected
-signed-image preparation are available above. Complete authenticated
-maintenance/key revocation and the full storage-fault campaign, then durable
-candidate ownership, installed/known-good slot integrity, explicit health
+Initial enrollment, the bounded persistent metadata protocol, protected
+signed-image preparation and durable candidate ownership are available above.
+Complete authenticated maintenance/key revocation and the full storage-fault
+campaign, then installed/known-good slot integrity, explicit health
 confirmation and rollback without lowering security floors. Then add
 the board bootloader/install protocol and measured power-loss, full-medium,
 storage-latency and recovery campaigns. Local privileged filesystem tampering

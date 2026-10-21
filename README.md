@@ -268,6 +268,8 @@ compatibility and externally supplied release floors. `updates:enroll` and
 `updates:trust` preserve the initial root/policy record. The independently pinned
 store retains verified metadata, clock/release floors and historical recovery;
 `updates:prepare` authenticates actual image bytes under that protected state.
+`updates:reserve`, `updates:candidates` and `updates:retire` add durable candidate
+identity, recorded-byte status and explicit retirement while retaining files/history.
 Physical logging/commissioning, key revocation/repair, installed/known-good slots
 and image-bound boot/session health remain pending.
 

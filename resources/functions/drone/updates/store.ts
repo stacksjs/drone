@@ -25,6 +25,10 @@ const schema = [
   `CREATE TABLE inputs (attempt_id TEXT NOT NULL, ordinal INTEGER NOT NULL CHECK(ordinal BETWEEN 0 AND 63), path TEXT NOT NULL CHECK(length(path) BETWEEN 1 AND 256), status INTEGER NOT NULL CHECK(status IN (200, 404)), bytes BLOB, sha256 TEXT, PRIMARY KEY(attempt_id, ordinal), FOREIGN KEY(attempt_id) REFERENCES attempts(id), CHECK((status = 404 AND bytes IS NULL AND sha256 IS NULL) OR (status = 200 AND bytes IS NOT NULL AND sha256 IS NOT NULL AND length(bytes) BETWEEN 1 AND ${metadataLimit} AND length(sha256) = 64))) STRICT`,
   `CREATE TABLE metadata (generation INTEGER PRIMARY KEY CHECK(generation BETWEEN 0 AND ${maximumGeneration}), attempt_id TEXT, ordinal INTEGER NOT NULL CHECK(ordinal BETWEEN 0 AND 63), role TEXT NOT NULL CHECK(length(role) BETWEEN 1 AND 180), version INTEGER NOT NULL CHECK(version BETWEEN 1 AND 9007199254740991), epoch INTEGER NOT NULL CHECK(epoch BETWEEN 0 AND generation), bytes BLOB NOT NULL CHECK(length(bytes) BETWEEN 1 AND ${metadataLimit}), sha256 TEXT NOT NULL CHECK(length(sha256) = 64), UNIQUE(attempt_id, ordinal), FOREIGN KEY(attempt_id) REFERENCES attempts(id)) STRICT`,
 ]
+const candidateSchema = [
+  'CREATE TABLE candidates (id TEXT PRIMARY KEY CHECK(length(id) = 32), attempt_id TEXT NOT NULL UNIQUE, generation INTEGER NOT NULL, phase TEXT NOT NULL CHECK(phase IN (\'reserved\', \'prepared\', \'retired\')), description BLOB NOT NULL CHECK(length(description) BETWEEN 1 AND 16384), sha256 TEXT NOT NULL CHECK(length(sha256) = 64), FOREIGN KEY(attempt_id) REFERENCES attempts(id), FOREIGN KEY(generation) REFERENCES metadata(generation)) STRICT',
+  "CREATE UNIQUE INDEX candidate_active ON candidates ((1)) WHERE phase IN ('reserved', 'prepared')",
+]
 
 interface TrustReference { enrollmentDirectory: string, enrollmentSha256: string }
 interface StoreReference extends TrustReference { directory: string, storeSha256: string }
@@ -63,7 +67,7 @@ function configure(db: Database) {
     if (!result || Object.values(result)[0] !== expected) throw new Error('Required SQLite update-store configuration unavailable')
   }
 }
-function openDatabase(path: string, expectedSchema: string[]) {
+function openDatabase(path: string, expectedSchema: string[], allowCandidates = false) {
   const before = protectedFile(path, path.endsWith('writer.sqlite') ? 1024 * 1024 : maximumDatabaseBytes)
   const db = new Database(path, { create: false, strict: true })
   try {
@@ -72,19 +76,20 @@ function openDatabase(path: string, expectedSchema: string[]) {
     db.exec('PRAGMA trusted_schema=OFF; PRAGMA foreign_keys=ON; PRAGMA busy_timeout=0;')
     // Authenticate the protocol format before any configuration that could
     // rewrite a foreign database's journal/header format.
-    checkSchema(db, expectedSchema)
+    const version = databaseVersion(db)
+    checkSchema(db, allowCandidates && version === 2 ? [...expectedSchema, ...candidateSchema] : expectedSchema, allowCandidates && version === 2 ? 2 : 1)
     if (Object.values(db.query('PRAGMA journal_mode').get() as Record<string, unknown>)[0] !== 'delete') throw new Error('Unexpected update-store journal format')
     configure(db)
     return db
   }
   catch (error) { db.close(); throw error }
 }
-function checkSchema(db: Database, expected: string[]) {
+function databaseVersion(db: Database) { return db.query<{ user_version: number }, []>('PRAGMA user_version').get()!.user_version }
+function checkSchema(db: Database, expected: string[], version = 1) {
   const definitions = db.query<{ sql: string }, []>("SELECT sql FROM sqlite_schema WHERE sql IS NOT NULL ORDER BY name").all().map(row => row.sql).sort()
   if (JSON.stringify(definitions) !== JSON.stringify([...expected].sort())) throw new Error('Unexpected update-store schema')
   const values = db.query<{ application_id: number }, []>('PRAGMA application_id').get()
-  const version = db.query<{ user_version: number }, []>('PRAGMA user_version').get()
-  if (values?.application_id !== applicationId || version?.user_version !== 1 || Object.values(db.query('PRAGMA quick_check').get() as Record<string, unknown>)[0] !== 'ok' || db.query('PRAGMA foreign_key_check').all().length) throw new Error('Invalid update-store database integrity or version')
+  if (values?.application_id !== applicationId || databaseVersion(db) !== version || Object.values(db.query('PRAGMA quick_check').get() as Record<string, unknown>)[0] !== 'ok' || db.query('PRAGMA foreign_key_check').all().length) throw new Error('Invalid update-store database integrity or version')
 }
 function createDatabase(path: string, statements: string[]) {
   writeExclusive(path, Buffer.alloc(0))
@@ -148,17 +153,22 @@ async function withStore<T>(options: StoreReference, operation: (db: Database, b
   let writer: Database | undefined, db: Database | undefined
   try {
     for (const name of readdirSync(path)) {
-      if (!['store.json', 'writer.sqlite', 'state.sqlite', 'writer.sqlite-journal', 'state.sqlite-journal'].includes(name)) throw new Error('Unexpected update-store entry')
+      if (!['store.json', 'writer.sqlite', 'state.sqlite', 'writer.sqlite-journal', 'state.sqlite-journal', 'candidates'].includes(name)) throw new Error('Unexpected update-store entry')
       if (name.endsWith('-journal')) protectedFile(join(path, name), maximumDatabaseBytes, true)
     }
     writer = openDatabase(join(path, 'writer.sqlite'), [writerSchema])
     writer.exec('BEGIN IMMEDIATE')
     const owner = writer.query<{ store_id: string }, []>('SELECT store_id FROM writer').all()
     if (owner.length !== 1 || owner[0]!.store_id !== binding.storeId) throw new Error('Invalid update-store writer identity')
-    db = openDatabase(join(path, 'state.sqlite'), schema)
+    db = openDatabase(join(path, 'state.sqlite'), schema, true)
+    if (readdirSync(path).includes('candidates')) {
+      if (databaseVersion(db) !== 2) throw new Error('Candidate files require an owned format2 store')
+      protectedDirectory(join(path, 'candidates'))
+    }
     const initial = db.query<MetadataRow, []>('SELECT * FROM metadata WHERE generation = 0').get()
     if (initial?.sha256 !== trusted.policy.trustedRootSha256 || initial.version !== trusted.rootVersion || state(db, binding).release_floor < trusted.policy.minimumReleaseSequence) throw new Error('Update-store anchor or floor mismatch')
     summary(db, binding, options.storeSha256)
+    for (const row of candidateRows(db)) ownedDescription(db, row, trusted)
     return await operation(db, binding, trusted, path)
   }
   finally {
@@ -207,7 +217,7 @@ export interface RuntimeUpdateClock {
 }
 
 export interface RuntimeUpdateProgress {
-  phase: 'input-committed' | 'metadata-committed' | 'image-written' | 'candidate-completed'
+  phase: 'input-committed' | 'metadata-committed' | 'image-written' | 'candidate-completed' | 'candidate-reserved' | 'candidate-recorded' | 'candidate-retired'
   ordinal: number
 }
 type ProgressObserver = (event: Readonly<RuntimeUpdateProgress>) => void | Promise<void>
@@ -270,11 +280,14 @@ interface VerifiedSelection {
   source: string
   info: TargetFile
   runtime: ReturnType<typeof admitSignedRuntime>
+  attempt: string
+  path: string
 }
 
-async function refreshAndComplete<T>(options: RefreshOptions, complete: (selection: VerifiedSelection) => Promise<T>): Promise<{ store: Readonly<RuntimeTrustStoreSummary>, value: T }> {
+async function refreshAndComplete<T>(options: RefreshOptions, complete: (selection: VerifiedSelection) => Promise<T>, before?: (db: Database) => void): Promise<{ store: Readonly<RuntimeTrustStoreSummary>, value: T }> {
   options = { ...options }
-  return withStore(options, async (db, binding, trusted) => {
+  return withStore(options, async (db, binding, trusted, path) => {
+    before?.(db)
     if (db.query("SELECT id FROM attempts WHERE phase IN ('pending', 'maintenance')").get()) throw new Error('An unresolved update attempt requires recovery')
     const current = state(db, binding), now = clockReading(options.clock, current.clock_floor_ms)
     if (db.query<{ count: number }, []>('SELECT count(*) AS count FROM attempts').get()!.count >= 256) throw new Error('Update attempt history limit reached')
@@ -323,7 +336,7 @@ async function refreshAndComplete<T>(options: RefreshOptions, complete: (selecti
         db.query('UPDATE store_state SET release_floor = max(release_floor, ?) WHERE id = 1').run(runtime.releaseSequence)
         db.query('UPDATE attempts SET accepted_release = ? WHERE id = ?').run(runtime.releaseSequence, attempt)
       })()
-      const value = await complete({ db, binding, trusted, source, info, runtime })
+      const value = await complete({ db, binding, trusted, source, info, runtime, attempt, path })
       db.query("UPDATE attempts SET phase = 'verified' WHERE id = ?").run(attempt)
       return { store: summary(db, binding, options.storeSha256), value }
     }
@@ -353,28 +366,186 @@ export interface PreparedRuntimeFirmware {
 export async function prepareRuntimeFirmwareUpdate(options: RefreshOptions & { output: string }): Promise<Readonly<PreparedRuntimeFirmware>> {
   options = { ...options }
   const output = runtimeCandidateOutput(options.output, [options.repository, options.directory, options.enrollmentDirectory])
-  const result = await refreshAndComplete(options, async ({ db, binding, trusted, source, info, runtime }) => {
-    const rows = activeMetadata(db, state(db, binding).generation), root = rows.find(row => row.role === 'root')!
-    const rootBytes = checkedMetadataBytes(root), consistent = object(object(JSON.parse(rootBytes.toString('utf8'))).signed).consistent_snapshot === true
-    const path = consistent ? info.path.replace(/([^/]+)$/, `${info.hashes.sha256}.$1`) : info.path
-    const image = repositoryFile(source, `targets/${path}`, imageLimit)
-    await info.verify(Readable.from(image))
-    const files = new Map<string, Buffer>()
-    for (const row of rows) {
-      if (row.role === 'root') continue
-      files.set(`metadata/${row.role === 'timestamp' || !consistent ? '' : `${row.version}.`}${row.role}.json`, checkedMetadataBytes(row))
-    }
-    files.set(`targets/${path}`, image)
-    const candidate: RuntimeFirmwareStage = { schema: 'drone-runtime-stage-v1', target: trusted.policy.target, platform: trusted.policy.platform, trustedRootSha256: root.sha256, rootVersion: root.version, ...runtime, protocolVersion: 1, signerDeclaredProfile: 'neutral-bench', length: info.length, sha256: info.hashes.sha256!, trustStatePersisted: false, physicalDeploymentAllowed: false }
-    mkdirSync(output, { mode: 0o700 })
-    writeExclusive(join(output, 'trust-root.json'), rootBytes)
-    writeExclusive(join(output, 'image.bin'), image)
-    await options.onProgress?.(Object.freeze({ phase: 'image-written', ordinal: 0 }))
-    await finishRuntimeCandidate(output, info, candidate, files)
-    await options.onProgress?.(Object.freeze({ phase: 'candidate-completed', ordinal: 0 }))
-    return Object.freeze(candidate)
-  })
+  const result = await refreshAndComplete(options, selection => writePreparedCandidate(selection, output, options.onProgress))
   return Object.freeze({ schema: 'drone-runtime-prepared-image-v1', store: result.store, candidate: result.value, trustStatePersisted: true, physicalDeploymentAllowed: false })
+}
+
+function candidateDescription({ db, binding, trusted, info, runtime }: VerifiedSelection): RuntimeFirmwareStage {
+  const root = activeMetadata(db, state(db, binding).generation).find(row => row.role === 'root')!
+  return { schema: 'drone-runtime-stage-v1', target: trusted.policy.target, platform: trusted.policy.platform, trustedRootSha256: root.sha256, rootVersion: root.version, ...runtime, protocolVersion: 1, signerDeclaredProfile: 'neutral-bench', length: info.length, sha256: info.hashes.sha256!, trustStatePersisted: false, physicalDeploymentAllowed: false }
+}
+
+async function writePreparedCandidate(selection: VerifiedSelection, output: string, onProgress?: ProgressObserver) {
+  const { db, binding, source, info } = selection
+  const rows = activeMetadata(db, state(db, binding).generation), root = rows.find(row => row.role === 'root')!
+  const rootBytes = checkedMetadataBytes(root), consistent = object(object(JSON.parse(rootBytes.toString('utf8'))).signed).consistent_snapshot === true
+  const path = consistent ? info.path.replace(/([^/]+)$/, `${info.hashes.sha256}.$1`) : info.path
+  const image = repositoryFile(source, `targets/${path}`, imageLimit)
+  await info.verify(Readable.from(image))
+  const files = new Map<string, Buffer>()
+  for (const row of rows) {
+    if (row.role === 'root') continue
+    files.set(`metadata/${row.role === 'timestamp' || !consistent ? '' : `${row.version}.`}${row.role}.json`, checkedMetadataBytes(row))
+  }
+  files.set(`targets/${path}`, image)
+  const candidate = candidateDescription(selection)
+  mkdirSync(output, { mode: 0o700 })
+  writeExclusive(join(output, 'trust-root.json'), rootBytes)
+  writeExclusive(join(output, 'image.bin'), image)
+  await onProgress?.(Object.freeze({ phase: 'image-written', ordinal: 0 }))
+  await finishRuntimeCandidate(output, info, candidate, files)
+  await onProgress?.(Object.freeze({ phase: 'candidate-completed', ordinal: 0 }))
+  return Object.freeze(candidate)
+}
+
+interface CandidateRow { id: string, attempt_id: string, generation: number, phase: 'reserved' | 'prepared' | 'retired', description: Uint8Array, sha256: string }
+export interface RuntimeFirmwareCandidate {
+  id: string
+  attemptId: string
+  generation: number
+  phase: CandidateRow['phase']
+  directory: string
+  description: Readonly<RuntimeFirmwareStage>
+  integrity: 'incomplete' | 'recorded-bytes-match' | 'mismatch' | 'unavailable'
+  currentTrustValidated: false
+}
+export interface RuntimeFirmwareCandidates {
+  schema: 'drone-runtime-candidates-v1'
+  stateFormat: 1 | 2
+  store: Readonly<RuntimeTrustStoreSummary>
+  retainedCandidates: number
+  /** Owned declarations only. Retired file integrity is not inspected or authenticated for current use. */
+  history: ReadonlyArray<Readonly<Omit<RuntimeFirmwareCandidate, 'integrity' | 'currentTrustValidated'>>>
+  candidate: Readonly<RuntimeFirmwareCandidate> | null
+  physicalDeploymentAllowed: false
+}
+
+function candidateRows(db: Database) {
+  if (databaseVersion(db) === 1) return []
+  const rows = db.query<CandidateRow, []>('SELECT * FROM candidates ORDER BY rowid LIMIT 129').all()
+  if (rows.length > 128) throw new Error('Candidate history budget exceeded')
+  return rows
+}
+function ownedDescription(db: Database, row: CandidateRow, trusted: Readonly<RuntimeTrustSummary>): Readonly<RuntimeFirmwareStage> {
+  const bytes = Buffer.from(row.description)
+  if (!/^[a-f0-9]{32}$/.test(row.id) || sha256(bytes) !== row.sha256) throw new Error('Invalid owned candidate record')
+  const value = object(JSON.parse(bytes.toString('utf8')))
+  const keys = ['schema', 'target', 'platform', 'trustedRootSha256', 'rootVersion', 'releaseSequence', 'protocolVersion', 'sourceRevision', 'signerDeclaredProfile', 'length', 'sha256', 'trustStatePersisted', 'physicalDeploymentAllowed']
+  const root = activeMetadata(db, row.generation).find(item => item.role === 'root')!
+  checkedMetadataBytes(root)
+  const attempt = db.query<Attempt, [string]>('SELECT * FROM attempts WHERE id = ?').get(row.attempt_id)
+  if (Object.keys(value).length !== keys.length || !keys.every(key => Object.hasOwn(value, key)) || value.schema !== 'drone-runtime-stage-v1' || value.target !== trusted.policy.target || value.platform !== trusted.policy.platform || value.trustedRootSha256 !== root.sha256 || value.rootVersion !== root.version || !Number.isSafeInteger(value.releaseSequence) || (value.releaseSequence as number) < trusted.policy.minimumReleaseSequence || value.protocolVersion !== 1 || typeof value.sourceRevision !== 'string' || !/^[a-f0-9]{40}$/.test(value.sourceRevision) || value.signerDeclaredProfile !== 'neutral-bench' || !Number.isSafeInteger(value.length) || (value.length as number) < 1 || (value.length as number) > imageLimit || typeof value.sha256 !== 'string' || !/^[a-f0-9]{64}$/.test(value.sha256) || value.trustStatePersisted !== false || value.physicalDeploymentAllowed !== false || !attempt || attempt.accepted_release !== value.releaseSequence || row.generation < attempt.base_generation) throw new Error('Owned candidate does not match protected selection')
+  return Object.freeze(value as unknown as RuntimeFirmwareStage)
+}
+function candidateIntegrity(db: Database, generation: number, path: string, description: Readonly<RuntimeFirmwareStage>): RuntimeFirmwareCandidate['integrity'] {
+  try {
+    protectedDirectory(path)
+    const rows = activeMetadata(db, generation), root = rows.find(row => row.role === 'root')!
+    const rootBytes = checkedMetadataBytes(root), consistent = object(object(JSON.parse(rootBytes.toString('utf8'))).signed).consistent_snapshot === true
+    const imagePath = consistent ? description.target.replace(/([^/]+)$/, `${description.sha256}.$1`) : description.target
+    const expected = new Map<string, Buffer>([['trust-root.json', rootBytes], ['stage.json', Buffer.from(`${JSON.stringify(description, null, 2)}\n`)]])
+    for (const row of rows) {
+      if (row.role !== 'root') expected.set(`repository/metadata/${row.role === 'timestamp' || !consistent ? '' : `${row.version}.`}${row.role}.json`, checkedMetadataBytes(row))
+    }
+    for (const file of ['image.bin', `repository/targets/${imagePath}`]) {
+      const address = join(path, file)
+      protectedFile(address, imageLimit)
+      const bytes = regularFile(address, imageLimit)
+      if (bytes.length !== description.length || sha256(bytes) !== description.sha256) return 'mismatch'
+      expected.set(file, bytes)
+    }
+    const directories = new Set<string>()
+    for (const name of expected.keys()) {
+      for (let parent = dirname(name); parent !== '.'; parent = dirname(parent)) directories.add(parent)
+    }
+    const visit = (relative: string): boolean => {
+      const base = relative ? join(path, relative) : path
+      protectedDirectory(base)
+      const names = readdirSync(base)
+      if (names.length > 64) return false
+      return names.every(name => {
+        const child = relative ? `${relative}/${name}` : name
+        if (directories.has(child)) return visit(child)
+        const bytes = expected.get(child)
+        if (!bytes) return false
+        protectedFile(join(path, child), child.endsWith('image.bin') || child.startsWith('repository/targets/') ? imageLimit : metadataLimit)
+        return regularFile(join(path, child), Math.max(bytes.length, 1)).equals(bytes)
+      })
+    }
+    if (!visit('')) return 'mismatch'
+    for (const [name, bytes] of expected) {
+      protectedFile(join(path, name), Math.max(bytes.length, 1))
+      if (!regularFile(join(path, name), Math.max(bytes.length, 1)).equals(bytes)) return 'mismatch'
+    }
+    return 'recorded-bytes-match'
+  }
+  catch { return 'unavailable' }
+}
+function candidatesSummary(db: Database, binding: Binding, trusted: Readonly<RuntimeTrustSummary>, path: string, storeSha256: string): Readonly<RuntimeFirmwareCandidates> {
+  const rows = candidateRows(db), active = rows.filter(row => row.phase !== 'retired')
+  if (active.length > 1) throw new Error('Multiple active candidate records')
+  let candidate: Readonly<RuntimeFirmwareCandidate> | null = null
+  const history: Array<Readonly<Omit<RuntimeFirmwareCandidate, 'integrity' | 'currentTrustValidated'>>> = []
+  for (const row of rows) {
+    const description = ownedDescription(db, row, trusted)
+    const directory = join(path, 'candidates', row.id)
+    const recorded = Object.freeze({ id: row.id, attemptId: row.attempt_id, generation: row.generation, phase: row.phase, directory, description })
+    history.push(recorded)
+    if (row === active[0]) {
+      candidate = Object.freeze({ ...recorded, integrity: row.phase === 'reserved' ? 'incomplete' : candidateIntegrity(db, row.generation, directory, description), currentTrustValidated: false })
+    }
+  }
+  return Object.freeze({ schema: 'drone-runtime-candidates-v1', stateFormat: databaseVersion(db) as 1 | 2, store: summary(db, binding, storeSha256), retainedCandidates: rows.length, history: Object.freeze(history), candidate, physicalDeploymentAllowed: false })
+}
+
+/** Inspect owned host candidates. Recorded-byte integrity is not fresh selection or boot authorization. */
+export async function inspectRuntimeFirmwareCandidates(options: StoreReference): Promise<Readonly<RuntimeFirmwareCandidates>> {
+  return withStore(options, (db, binding, trusted, path) => candidatesSummary(db, binding, trusted, path, options.storeSha256))
+}
+
+/** Release only the exact active candidate reservation. Retain its records and bytes; never reset trust floors. */
+export async function retireRuntimeFirmwareCandidate(options: StoreReference & { candidateId: string, onProgress?: ProgressObserver }): Promise<Readonly<RuntimeFirmwareCandidates>> {
+  options = { ...options }
+  if (typeof options.candidateId !== 'string' || !/^[a-f0-9]{32}$/.test(options.candidateId)) throw new Error('Exact active candidate identity required')
+  return withStore(options, async (db, binding, trusted, path) => {
+    const current = candidatesSummary(db, binding, trusted, path, options.storeSha256)
+    if (current.store.attempt?.phase === 'pending' || current.store.attempt?.phase === 'maintenance') throw new Error('Resolve the metadata attempt before candidate retirement')
+    if (!current.candidate || current.candidate.id !== options.candidateId) throw new Error('Exact active candidate identity required')
+    db.query("UPDATE candidates SET phase = 'retired' WHERE id = ? AND phase IN ('reserved', 'prepared')").run(options.candidateId)
+    await options.onProgress?.(Object.freeze({ phase: 'candidate-retired', ordinal: 0 }))
+    return candidatesSummary(db, binding, trusted, path, options.storeSha256)
+  })
+}
+
+/** Reserve one owned candidate and prepare signed bytes. No installed slot or health confirmation is changed. */
+export async function reserveRuntimeFirmwareCandidate(options: RefreshOptions): Promise<Readonly<RuntimeFirmwareCandidates>> {
+  options = { ...options }
+  runtimeCandidateOutput(options.directory, [options.repository, options.enrollmentDirectory])
+  const result = await refreshAndComplete(options, async selection => {
+    const { db, binding, trusted, path, attempt } = selection
+    if (databaseVersion(db) === 1) {
+      db.transaction(() => { for (const sql of candidateSchema) db.exec(sql); db.exec('PRAGMA user_version=2') })()
+      checkSchema(db, [...schema, ...candidateSchema], 2)
+    }
+    const id = randomBytes(16).toString('hex'), description = candidateDescription(selection)
+    const bytes = Buffer.from(`${JSON.stringify(description)}\n`), generation = state(db, binding).generation
+    db.query("INSERT INTO candidates VALUES(?, ?, ?, 'reserved', ?, ?)").run(id, attempt, generation, bytes, sha256(bytes))
+    await options.onProgress?.(Object.freeze({ phase: 'candidate-reserved', ordinal: 0 }))
+    const parent = join(path, 'candidates')
+    if (!readdirSync(path).includes('candidates')) { mkdirSync(parent, { mode: 0o700 }); syncDirectory(path) }
+    protectedDirectory(parent)
+    const output = join(parent, id)
+    await writePreparedCandidate(selection, output, options.onProgress)
+    if (candidateIntegrity(db, generation, output, description) !== 'recorded-bytes-match') throw new Error('Owned candidate file readback failed')
+    db.query("UPDATE candidates SET phase = 'prepared' WHERE id = ? AND phase = 'reserved'").run(id)
+    await options.onProgress?.(Object.freeze({ phase: 'candidate-recorded', ordinal: 0 }))
+    return candidatesSummary(db, binding, trusted, path, options.storeSha256)
+  }, db => {
+    const rows = candidateRows(db)
+    if (rows.some(row => row.phase !== 'retired')) throw new Error('An active candidate requires explicit retirement or slot transition')
+    if (rows.length >= 128) throw new Error('Candidate history budget reached')
+  })
+  return Object.freeze({ ...result.value, store: result.store })
 }
 
 function causedBy(error: unknown, marker: Error) {

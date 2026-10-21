@@ -270,8 +270,13 @@
       "tests/unit/diagnostics.test.ts",
       "resources/functions/drone/updates/",
       "app/Commands/UpdatesPrepare.ts",
+      "app/Commands/UpdatesReserve.ts",
+      "app/Commands/UpdatesCandidates.ts",
+      "app/Commands/UpdatesRetire.ts",
       "docs/runtime-updates.md",
-      "tests/unit/updates-preparation.test.ts"
+      "tests/unit/updates-preparation.test.ts",
+      "tests/unit/updates-candidates.test.ts",
+      "tests/unit/updates-candidates-cli.test.ts"
     ],
     "remaining": [
       "Live runtime/sensor/estimator/authority/mission/payload correlation and measured clock relations",

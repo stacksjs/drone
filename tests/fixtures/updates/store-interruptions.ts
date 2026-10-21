@@ -3,13 +3,13 @@ import { spawnSync } from 'node:child_process'
 import { mkdir, readFile, writeFile } from 'node:fs/promises'
 import { join, resolve } from 'node:path'
 import { enrollRuntimeTrust } from '../../../resources/functions/drone/updates/enrollment'
-import { createRuntimeTrustStore, inspectRuntimeTrustStore, prepareRuntimeFirmwareUpdate, recoverRuntimeTrustStore, refreshRuntimeTrustStore } from '../../../resources/functions/drone/updates/store'
+import { createRuntimeTrustStore, inspectRuntimeFirmwareCandidates, inspectRuntimeTrustStore, prepareRuntimeFirmwareUpdate, recoverRuntimeTrustStore, refreshRuntimeTrustStore, reserveRuntimeFirmwareCandidate, retireRuntimeFirmwareCandidate } from '../../../resources/functions/drone/updates/store'
 import type { RuntimeUpdateProgress } from '../../../resources/functions/drone/updates/store'
 import { platform, repository, target } from './repository'
 
 type Reference = Parameters<typeof inspectRuntimeTrustStore>[0]
-type Cut = 'input-committed' | 'metadata-committed' | 'image-written' | 'candidate-completed'
-interface WorkerInput { reference: Reference, repository: string, cut: Cut, output?: string }
+type Cut = RuntimeUpdateProgress['phase']
+interface WorkerInput { reference: Reference, repository: string, cut: Cut, output?: string, managed?: boolean, candidateId?: string }
 const clock = { source: 'synthetic-independent-clock', read: () => new Date('2030-01-01T00:00:00Z') }
 
 async function worker(mode: string, file: string) {
@@ -29,16 +29,19 @@ async function worker(mode: string, file: string) {
     console.log(JSON.stringify({ ready: true, phase: event.phase, ordinal: event.ordinal }))
     await Bun.stdin.text()
   } }
-  if (input.output) await prepareRuntimeFirmwareUpdate({ ...options, output: input.output })
+  if (input.candidateId) await retireRuntimeFirmwareCandidate({ ...options, candidateId: input.candidateId })
+  else if (input.managed) await reserveRuntimeFirmwareCandidate(options)
+  else if (input.output) await prepareRuntimeFirmwareUpdate({ ...options, output: input.output })
   else await refreshRuntimeTrustStore(options)
   throw new Error('Interruption worker unexpectedly finished')
 }
 
 /** Keep generated signed repositories and actual host process outcomes for inspection. No power-loss claim. */
-async function qualifyInterruptions(directory: string, preparation: boolean) {
+async function qualifyInterruptions(directory: string, operation: 'refresh' | 'prepare' | 'reserve') {
   await mkdir(directory, { mode: 0o700 })
   const results = []
-  const cuts: Cut[] = preparation ? ['image-written', 'candidate-completed'] : ['input-committed', 'metadata-committed']
+  const managed = operation === 'reserve', preparation = operation !== 'refresh'
+  const cuts: Cut[] = managed ? ['candidate-reserved', 'image-written', 'candidate-completed', 'candidate-recorded', 'candidate-retired'] : preparation ? ['image-written', 'candidate-completed'] : ['input-committed', 'metadata-committed']
   for (const cut of cuts) {
     const root = join(directory, cut); await mkdir(root, { mode: 0o700 })
     const source = join(root, 'repo'), fixture = await repository(source, { custom: { releaseSequence: 9 } })
@@ -46,8 +49,10 @@ async function qualifyInterruptions(directory: string, preparation: boolean) {
     const enrolled = enrollRuntimeTrust({ target, platform, trustedRootSha256: fixture.rootSha256, minimumReleaseSequence: 7, trustedRoot: fixture.rootPath, output: enrollmentDirectory })
     const created = await createRuntimeTrustStore({ enrollmentDirectory, enrollmentSha256: enrolled.enrollmentSha256, output: join(root, 'store') })
     const reference = { enrollmentDirectory, enrollmentSha256: enrolled.enrollmentSha256, directory: join(root, 'store'), storeSha256: created.storeSha256 }
-    const file = join(root, 'worker.json'), output = preparation ? join(root, 'candidate') : undefined
-    await writeFile(file, JSON.stringify({ reference, repository: source, cut, output } satisfies WorkerInput), { mode: 0o600 })
+    const prior = cut === 'candidate-retired' ? await reserveRuntimeFirmwareCandidate({ ...reference, repository: source, clock }) : null
+    const file = join(root, 'worker.json')
+    let output = prior?.candidate?.directory ?? (!managed && preparation ? join(root, 'candidate') : undefined)
+    await writeFile(file, JSON.stringify({ reference, repository: source, cut, output: managed ? undefined : output, managed, candidateId: prior?.candidate?.id } satisfies WorkerInput), { mode: 0o600 })
     const child = Bun.spawn([process.execPath, import.meta.path, 'hold', file], { stdin: 'pipe', stdout: 'pipe', stderr: 'pipe' })
     const timer = setTimeout(() => child.kill('SIGKILL'), 15000)
     const reader = child.stdout.getReader(), decoder = new TextDecoder()
@@ -68,25 +73,42 @@ async function qualifyInterruptions(directory: string, preparation: boolean) {
       const exit = await child.exited, signal = child.signalCode
       assert.equal(signal, 'SIGKILL'); assert.notEqual(exit, 0)
       const interrupted = await inspectRuntimeTrustStore(reference)
-      assert.equal(interrupted.attempt?.phase, 'pending')
+      assert.equal(interrupted.attempt?.phase, cut === 'candidate-retired' ? 'verified' : 'pending')
       assert.equal(interrupted.generation, preparation ? 3 : cut === 'input-committed' ? 0 : 1)
       assert.equal(interrupted.releaseFloor, preparation ? 9 : 7)
+      const candidateBefore = managed ? await inspectRuntimeFirmwareCandidates(reference) : null
+      if (managed && cut !== 'candidate-retired') {
+        assert.equal(candidateBefore!.candidate!.phase, cut === 'candidate-recorded' ? 'prepared' : 'reserved')
+        assert.equal(candidateBefore!.candidate!.currentTrustValidated, false)
+        output = candidateBefore!.candidate!.directory
+      }
+      if (cut === 'candidate-retired') assert.equal(candidateBefore!.candidate, null)
       const candidateStagePresent = output ? await Bun.file(join(output, 'stage.json')).exists() : false
       if (output) {
-        assert.deepEqual(await readFile(join(output, 'image.bin')), fixture.image)
-        assert.equal(candidateStagePresent, cut === 'candidate-completed')
+        if (cut !== 'candidate-reserved') assert.deepEqual(await readFile(join(output, 'image.bin')), fixture.image)
+        assert.equal(candidateStagePresent, ['candidate-completed', 'candidate-recorded', 'candidate-retired'].includes(cut))
       }
-      const recovered = await recoverRuntimeTrustStore(reference)
-      assert.equal(recovered.generation, preparation ? 3 : 1); assert.equal(recovered.attempt?.phase, 'recovered')
+      const recovered = cut === 'candidate-retired' ? await inspectRuntimeTrustStore(reference) : await recoverRuntimeTrustStore(reference)
+      assert.equal(recovered.generation, preparation ? 3 : 1); assert.equal(recovered.attempt?.phase, cut === 'candidate-retired' ? 'verified' : 'recovered')
       assert.equal(recovered.releaseFloor, preparation ? 9 : 7)
       assert.equal(Object.hasOwn(recovered, 'candidate'), false)
-      const completed = preparation ? await prepareRuntimeFirmwareUpdate({ ...reference, repository: source, clock, output: join(root, 'fresh-candidate') }) : await refreshRuntimeTrustStore({ ...reference, repository: source, clock })
-      const fresh = completed.schema === 'drone-runtime-prepared-image-v1' ? completed.store : completed
+      if (managed) {
+        assert.deepEqual((await inspectRuntimeFirmwareCandidates(reference)).candidate, candidateBefore!.candidate)
+        if (candidateBefore!.candidate) await retireRuntimeFirmwareCandidate({ ...reference, candidateId: candidateBefore!.candidate.id })
+      }
+      const completed = managed ? await reserveRuntimeFirmwareCandidate({ ...reference, repository: source, clock }) : preparation ? await prepareRuntimeFirmwareUpdate({ ...reference, repository: source, clock, output: join(root, 'fresh-candidate') }) : await refreshRuntimeTrustStore({ ...reference, repository: source, clock })
+      const fresh = completed.schema === 'drone-runtime-prepared-image-v1' || completed.schema === 'drone-runtime-candidates-v1' ? completed.store : completed
+      if (completed.schema === 'drone-runtime-candidates-v1') {
+        assert.equal(completed.retainedCandidates, 2)
+        assert.equal(completed.candidate!.integrity, 'recorded-bytes-match')
+        assert.notEqual(completed.candidate!.id, candidateBefore!.candidate?.id ?? prior!.candidate!.id)
+        if (candidateStagePresent) assert.deepEqual(await readFile(join(output!, 'image.bin')), fixture.image)
+      }
       assert.equal(fresh.generation >= interrupted.generation, true)
       if (!preparation) assert.equal(fresh.generation, 3)
       assert.equal(fresh.releaseFloor, 9)
       assert.equal(fresh.attempt?.phase, 'verified'); assert.equal(fresh.physicalDeploymentAllowed, false)
-      results.push({ cut, ready, killedExit: exit, killedSignal: signal, contenderExit: contender.status, contender: contender.stdout, candidateStagePresent, interrupted, recovered, fresh })
+      results.push({ cut, ready, killedExit: exit, killedSignal: signal, contenderExit: contender.status, contender: contender.stdout, candidateStagePresent, candidateBefore, interrupted, recovered, fresh })
     }
     finally {
       clearTimeout(timer)
@@ -95,18 +117,20 @@ async function qualifyInterruptions(directory: string, preparation: boolean) {
       reader.releaseLock()
       await writeFile(join(root, 'worker.stdout'), stdout)
       await writeFile(join(root, 'worker.stderr'), await new Response(child.stderr).text())
-      await writeFile(join(directory, 'qualification.json'), JSON.stringify({ evidence: 'host-process-interruption-only', operation: preparation ? 'prepare' : 'refresh', results, physicalDeploymentAllowed: false }, null, 2))
+      await writeFile(join(directory, 'qualification.json'), JSON.stringify({ evidence: 'host-process-interruption-only', operation, results, physicalDeploymentAllowed: false }, null, 2))
     }
   }
-  return { evidence: 'host-process-interruption-only', operation: preparation ? 'prepare' : 'refresh', cuts: results.length, physicalDeploymentAllowed: false }
+  return { evidence: 'host-process-interruption-only', operation, cuts: results.length, physicalDeploymentAllowed: false }
 }
 
-export async function qualifyStoreInterruptions(directory: string) { return qualifyInterruptions(directory, false) }
-export async function qualifyPreparationInterruptions(directory: string) { return qualifyInterruptions(directory, true) }
+export async function qualifyStoreInterruptions(directory: string) { return qualifyInterruptions(directory, 'refresh') }
+export async function qualifyPreparationInterruptions(directory: string) { return qualifyInterruptions(directory, 'prepare') }
+export async function qualifyCandidateInterruptions(directory: string) { return qualifyInterruptions(directory, 'reserve') }
 
 if (import.meta.main) {
-  if (process.argv.length === 4 && process.argv[2] === 'prepare') console.log(JSON.stringify(await qualifyPreparationInterruptions(resolve(process.argv[3]!))))
+  if (process.argv.length === 4 && process.argv[2] === 'reserve') console.log(JSON.stringify(await qualifyCandidateInterruptions(resolve(process.argv[3]!))))
+  else if (process.argv.length === 4 && process.argv[2] === 'prepare') console.log(JSON.stringify(await qualifyPreparationInterruptions(resolve(process.argv[3]!))))
   else if (process.argv.length === 4) await worker(process.argv[2]!, process.argv[3]!)
   else if (process.argv.length === 3) console.log(JSON.stringify(await qualifyStoreInterruptions(resolve(process.argv[2]!))))
-  else throw new Error('Use store-interruptions.ts [prepare] NEW_DIRECTORY')
+  else throw new Error('Use store-interruptions.ts [prepare|reserve] NEW_DIRECTORY')
 }
