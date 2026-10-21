@@ -4,6 +4,7 @@ import { dirname, join, relative, resolve, sep } from 'node:path'
 import { tmpdir } from 'node:os'
 import { Readable } from 'node:stream'
 import { isDeepStrictEqual } from 'node:util'
+import { canonicalize } from '@tufjs/canonical-json'
 import { Updater } from 'tuf-js'
 import type { TargetFile } from 'tuf-js'
 
@@ -114,6 +115,15 @@ function object(value: unknown): Record<string, unknown> {
   if (!value || typeof value !== 'object' || Array.isArray(value)) throw new Error('Invalid signed runtime metadata')
   return value as Record<string, unknown>
 }
+function validateMetadataKeyIDs(bytes: Buffer) {
+  const signed = object(object(JSON.parse(bytes.toString('utf8'))).signed)
+  const keys = signed._type === 'root' ? object(signed.keys) : signed._type === 'targets' && signed.delegations !== undefined ? object(object(signed.delegations).keys) : undefined
+  // The SDK verifies signatures by key ID but does not recompute the ID. Reject arbitrary
+  // identifier aliases by binding each declared ID to the canonical key object.
+  for (const [id, key] of Object.entries(keys ?? {})) {
+    if (id !== sha256(Buffer.from(canonicalize(object(key))))) throw new Error('TUF key identifier does not match canonical key data')
+  }
+}
 function signedRuntime(info: TargetFile, policy: RuntimeFirmwarePolicy) {
   const data = object(info.custom.drone)
   const keys = ['schema', 'platform', 'protocolVersion', 'releaseSequence', 'sourceRevision', 'profile']
@@ -127,6 +137,7 @@ function signedRuntime(info: TargetFile, policy: RuntimeFirmwarePolicy) {
 
 /** Use the SDK's public HTTP interface on a private loopback server. No external fetch is performed. */
 async function verifyRepository(repository: string, root: Buffer, work: string, policy: RuntimeFirmwarePolicy, download?: string) {
+  validateMetadataKeyIDs(root)
   const fetched = new Map<string, Buffer>()
   let requests = 0, received = 0
   const prefix = `${originPrefix}${randomBytes(32).toString('hex')}/`
@@ -143,6 +154,7 @@ async function verifyRepository(repository: string, root: Buffer, work: string, 
         let bytes = fetched.get(path)
         if (!bytes) {
           bytes = repositoryFile(repository, path, path.startsWith('metadata/') ? metadataLimit : imageLimit)
+          if (path.startsWith('metadata/')) validateMetadataKeyIDs(bytes)
           received += bytes.length
           if (received > 32 * 1024 * 1024) throw new Error('Repository byte budget exceeded')
           fetched.set(path, bytes)

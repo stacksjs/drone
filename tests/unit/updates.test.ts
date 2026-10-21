@@ -142,6 +142,14 @@ test('repository directories writable by other principals cannot enter verificat
   await incomplete(item.output)
 })
 
+test('root, rotated root and delegation key identifiers must bind canonical key data', async () => {
+  for (const options of [{ nonCanonicalRoot: true }, { rotate: true, nonCanonicalRotation: true }, { nonCanonicalDelegation: true }]) {
+    const item = await setup(options)
+    await expect(stageRuntimeFirmware(item.input)).rejects.toThrow()
+    await incomplete(item.output)
+  }
+})
+
 test('admission owns the trust policy and inspection directory across asynchronous verification', async () => {
   const stage = await setup(), input = { ...stage.input, minimumReleaseSequence: 8 }
   const pendingStage = stageRuntimeFirmware(input)

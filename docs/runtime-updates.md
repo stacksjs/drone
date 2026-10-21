@@ -45,6 +45,9 @@ rotation, signature thresholds, expiration, inter-role versions/hashes and
 target length/hashes. A private, randomly addressed loopback server supplies
 bounded local files to the client's public HTTP interface. It is stopped after
 verification. No external network fetch or arbitrary URL option is provided.
+The host additionally verifies that root and delegation key IDs equal SHA-256
+of their canonical key objects, using the upstream canonical JSON library.
+This rejects arbitrary key-ID aliases before role verification.
 
 The selected target must have SHA-256, a nonzero length of at most 16 MiB and
 exactly these fields in its signed `custom.drone` object:
