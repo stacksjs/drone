@@ -20,5 +20,5 @@ to our own runtime or mission engine.
 
 Keep serial/TCP, command-specific behavior, complete mission/parameter variants, key lifecycle,
 FTP/log/event/time/RTCM services and payload/ROS/CAN gateways as explicit remaining sub-capabilities.
-See [the driver contract and limits](../driver-protocols.md) and
-[retained conformance evidence](../driver-protocol-evidence.json).
+See [the driver contract and limits](https://github.com/stacksjs/drone/blob/main/docs/driver-protocols.md) and
+[retained conformance evidence](https://github.com/stacksjs/drone/blob/main/docs/driver-protocol-evidence.json).

@@ -3,7 +3,7 @@
 The executable audit accounts for the 274 pinned PX4 module/driver and ArduPilot library directories
 and six ArduPilot vehicle programs. Directory assignment is work ownership. It is not feature parity.
 
-The retained matrix is [parity-audit.json](parity-audit.json). It currently contains **79 behavior
+The retained matrix is [parity-audit.json](https://github.com/stacksjs/drone/blob/main/docs/parity-audit.json). It currently contains **79 behavior
 cases**, including **26 bounded support claims** backed by **25 distinct executable test selectors**
 and **53 explicitly unsupported cases**. There are **1,327 unclassified detail dimensions**.
 The audit retains **42 pinned source records**. No upstream firmware SITL, HIL or physical-vehicle
@@ -106,7 +106,7 @@ policies. Their ten source records retain exact file hashes and line/symbol cita
 59 cases and 26 support claims are unchanged. Both directories remain owned by payload issue #8;
 their reviewed dimensions retain explicit deeper work and do not constitute exhaustive review.
 
-The [owned Cinema simulation](cinema.md) implements a separate hover POI angular reframe with
+The [owned Cinema simulation](https://github.com/stacksjs/drone/blob/main/docs/cinema.md) implements a separate hover POI angular reframe with
 modeled joints, encoders and still exposures. It does not implement those firmware modes,
 manager ownership/discovery, normalized AUX/servo outputs, electrical behavior or device health
 policies. Generic command/parameter transport also does not supply gimbal-specific semantics.

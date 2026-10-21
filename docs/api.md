@@ -81,5 +81,5 @@ A lost, stale, unconfirmed or changed lock holds an otherwise valid velocity dec
 retain precedence. The guard supplements an independently supplied position target.
 
 The authenticated `/api/camera/state` and `/api/camera/command` Actions own the shared camera session.
-Read [the camera guide](camera-tracking.md) for the command schema and process/clock contract.
-ArduPilot and PX4 factories are server-only imports from `drone/drivers`; see [drivers](drivers.md).
+Read [the camera guide](https://github.com/stacksjs/drone/blob/main/docs/camera-tracking.md) for the command schema and process/clock contract.
+ArduPilot and PX4 factories are server-only imports from `drone/drivers`; see [drivers](https://github.com/stacksjs/drone/blob/main/docs/drivers.md).

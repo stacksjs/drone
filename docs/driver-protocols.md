@@ -20,7 +20,7 @@ It creates a scripted loopback UDP peer with the selected firmware identity, per
 negotiates a requested 5 Hz message interval, reads/writes an integer, uploads/downloads two waypoints
 and requests resume at item 1. The optional ACK drop verifies a retry with confirmation 1.
 The public signing key is a test vector, never a deployed credential. All sockets/timers close.
-The [retained report](driver-protocol-evidence.json) identifies this as a protocol peer, not actual
+The [retained report](https://github.com/stacksjs/drone/blob/main/docs/driver-protocol-evidence.json) identifies this as a protocol peer, not actual
 ArduPilot/PX4 firmware, SITL flight, HIL or measured vehicle execution.
 
 ## Public driver contract

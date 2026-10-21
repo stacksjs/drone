@@ -7,6 +7,9 @@ we implement our own runtime, estimation, controls and mission engine.
 **Status: experimental, simulation and bench development. Physical flight commands are disabled.**
 The MAVLink command adapters are for local ArduCopter/PX4 quadcopter SITL only. No hardware flight test or full SITL flight has been performed for this release. This is an initial framework, not a finished autonomous aircraft.
 
+Start with the [documentation guide](docs/index.md) for setup, workflow guides, implementation
+status and the dependency roadmap. Buddy serves the documentation at `/docs`.
+
 ## Run it
 
 Requires Bun >= 1.4.2. The owner has a Raspberry Pi 5 with 8 GB RAM.

@@ -1,7 +1,7 @@
 # Synthetic incident execution
 
 The source Stacks application supports owned synthetic execution and deliberate
-source admission. See [ADR26](adr/0026-owner-bound-incident-execution.md) for its
+source admission. See [ADR26](https://github.com/stacksjs/drone/blob/main/docs/adr/0026-owner-bound-incident-execution.md) for its
 authority and deployment contract.
 
 The `/incidents` workspace runs the existing owned public-safety simulator with
@@ -91,7 +91,7 @@ These are finite software admission rules, not hard CPU, memory or scheduling
 bounds. Worker completion does not establish an individual OS thread join.
 
 The initial deployment target is the source Stacks app with a file-based Worker.
-The installed realtime package uses a [pinned native compatibility module](../resources/functions/drone/http/native-realtime/README.md)
+The installed realtime package uses a [pinned native compatibility module](https://github.com/stacksjs/drone/blob/main/resources/functions/drone/http/native-realtime/README.md)
 for enqueue and close observers. Complete authenticated bundled-server, Docker
 and physical Pi deployment need separate qualification.
 

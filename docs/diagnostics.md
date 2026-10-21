@@ -53,7 +53,7 @@ and End controls let you inspect recorded epochs. Seeking backwards creates a ne
 CLI/library replay instances require monotonically advancing time. Clearing the viewer discards
 its parsed journal from application state. Browser and OS file caches remain outside that promise.
 
-The [retained example](../public/diagnostics/runtime-deadline.ndjson) is an actual 20-tick native
+The [retained example](https://github.com/stacksjs/drone/blob/main/public/diagnostics/runtime-deadline.ndjson) is an actual 20-tick native
 host recording: no fault at 20 ms, a deadline miss at 22 ms, 46 verified events, no recorded loss.
 Its random run/session identifiers and platform-specific firmware digest identify that original
 capture. Re-recording the same experiment should reproduce the fault and counters, not identical

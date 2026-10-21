@@ -105,7 +105,7 @@ landing strategy for a real aircraft.
 
 ## Reproducible scenarios
 
-The [retained report](authority-evidence.json) records a 20-second nominal step and eight-second
+The [retained report](https://github.com/stacksjs/drone/blob/main/docs/authority-evidence.json) records a 20-second nominal step and eight-second
 fault runs, with injection at 3000 ms. RC override/kill pulses last 100 ms; their release never
 restores autonomous authority. IMU capture loss lasts 3000..3400 ms; resumed packets do not rearm.
 Other scenarios cover disconnected RC/link, reserve battery, an out-of-fence target, disarm,

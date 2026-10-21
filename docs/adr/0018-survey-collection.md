@@ -17,4 +17,4 @@ Only the synthetic measurement renderer sees plant truth. Accepted exposures ret
 estimated capture poses, calibration and explicit correction/control-point availability. ODM input
 files carry real encoded images and declared optical-center geotags, with a completion manifest.
 Collection reports and mission replay cannot imply reconstruction, measured precision or physical
-survey acceptance. See [mapping contract](../mapping.md) for evidence limits and remaining work.
+survey acceptance. See [mapping contract](https://github.com/stacksjs/drone/blob/main/docs/mapping.md) for evidence limits and remaining work.

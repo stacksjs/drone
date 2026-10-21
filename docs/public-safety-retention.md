@@ -98,12 +98,12 @@ advance the incident version without creating a retention event.
 
 ## Separate purge acceptance
 
-[Managed source datasets](public-safety-managed.md) add explicitly requested private copies and
+[Managed source datasets](https://github.com/stacksjs/drone/blob/main/docs/public-safety-managed.md) add explicitly requested private copies and
 read-only reconciliation. They do not reinterpret enrollment or a hold as purge acceptance.
 
 Retained custody projections keep their original `purgeImplemented: false` and
 `contentDeletionPerformed: false` flags. They describe the existing enrollment contract.
-Use the separate [accepted local purge API](public-safety-purge.md) for deletion progress and receipts.
+Use the separate [accepted local purge API](https://github.com/stacksjs/drone/blob/main/docs/public-safety-purge.md) for deletion progress and receipts.
 Its `local-managed-purge-v1` policy requires a fresh explicit inventory-bound acceptance and
 operator opt-in. No automatic sweep is registered.
 

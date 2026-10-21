@@ -60,7 +60,7 @@ An independently evaluated extract from pinned official MicaSense red/NIR panel 
 per-pixel radiance, per-band reference-panel correction and the ratio of the resulting ROI means.
 The fixture retains raw DN, original coordinates/metadata, upstream image/source SHA-256 hashes,
 MIT notice, expected results and method. See
-[the reference fixture](../tests/fixtures/agriculture/README.md). Those different ROIs observe
+[the reference fixture](https://github.com/stacksjs/drone/blob/main/tests/fixtures/agriculture/README.md). Those different ROIs observe
 reference-panel material; they are not registered crop pixels and cannot prove a vegetation map.
 Separately worked synthetic landmarks and actual owned-runtime images test map projection and
 illumination correction. These distinct checks do not prove physical field accuracy.
@@ -139,4 +139,4 @@ Keep #21 open for measured multispectral hardware/panels/irradiance, synchroniza
 real field/dataset interchange, physical range/heading/pose accuracy, external known crop-map
 comparisons, ground agronomic measurements, real explicitly reviewed livestock records, richer
 parcel models, bench/HIL/vehicle campaigns and any physical operator/privacy requirements. The owned
-software evidence does not complete those acceptance gates. See [ADR 21](adr/0021-agriculture-sensing.md).
+software evidence does not complete those acceptance gates. See [ADR 21](https://github.com/stacksjs/drone/blob/main/docs/adr/0021-agriculture-sensing.md).

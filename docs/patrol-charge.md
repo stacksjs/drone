@@ -5,7 +5,7 @@ The private `createNavigationOccurrenceSession` in
 `contact` is also selected. Profiles are `nominal`, `no-current`, `current-stuck`,
 `stuck-relay`, `feedback-loss`, `feedback-replay` and `mains-loss`. Issue #24 remains open
 for production scheduling, runtime recovery, a full weather system and physical qualification.
-The separate [authenticated review ledger](patrol-review.md) persists owner-only intent and
+The separate [authenticated review ledger](https://github.com/stacksjs/drone/blob/main/docs/patrol-review.md) persists owner-only intent and
 review metadata without granting charge or launch authority. This experiment has no charger hardware transport.
 
 Only the charge-enabled adapter exposes `requestCharge()` and `stopCharge()`. A request is
@@ -96,5 +96,5 @@ orders, finite capacity and exact refusal behavior. Seven full legacy navigation
 remain byte-identical. Physical charging, unattended operation, HIL and endurance evidence
 are outside this modeled checkpoint.
 
-A separate [finite recurrence ledger](patrol-recurrence.md) records due slots and explicit
+A separate [finite recurrence ledger](https://github.com/stacksjs/drone/blob/main/docs/patrol-recurrence.md) records due slots and explicit
 local reviews. Neither due slots nor flight reviews supply charge approval.

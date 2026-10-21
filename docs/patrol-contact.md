@@ -53,10 +53,10 @@ wrong-pad identity, genuine stale feedback at call versus arm, regressed origina
 pending and verified host silence, exact switch edges, and a blocked contact-enabled flight.
 Legacy seven-scenario result bytes remain unchanged. The contact-only experiment keeps an
 unmeasured nominal hover-load proxy without recharge credit. A separate optional
-[partial-charge model](patrol-charge.md) adds explicit permission, instrument verification
-and isolation. The separate [authenticated review ledger](patrol-review.md) persists
+[partial-charge model](https://github.com/stacksjs/drone/blob/main/docs/patrol-charge.md) adds explicit permission, instrument verification
+and isolation. The separate [authenticated review ledger](https://github.com/stacksjs/drone/blob/main/docs/patrol-review.md) persists
 owner-only intent and review metadata without launch or charging authority. Measured
 hardware current, a full weather system, production scheduling, runtime handoff/recovery,
 a patrol workspace and physical docking remain open.
-The [finite patrol command](patrol-cli.md) composes this modeled contact verifier with
+The [finite patrol command](https://github.com/stacksjs/drone/blob/main/docs/patrol-cli.md) composes this modeled contact verifier with
 explicit unsigned decisions; it adds no physical contact evidence.

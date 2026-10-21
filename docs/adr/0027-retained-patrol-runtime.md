@@ -45,7 +45,7 @@ disarm/revoke. Verified history remains separate from continuously checked eligi
 Only accepted arm plus engage retires the prior live window. Host absence freezes host
 verification while source and independent board/body continue. Each contact-enabled
 request additionally reserves the full 5 second window; the 180 second ceiling stays fixed.
-See [the declared model and evidence](../patrol-contact.md). This is simulated contact,
+See [the declared model and evidence](https://github.com/stacksjs/drone/blob/main/docs/patrol-contact.md). This is simulated contact,
 without charge permission, energy credit or physical validation.
 
 An optional closed partial-charge profile now adds explicit one-use charge approval,
@@ -58,14 +58,14 @@ Electrical isolation remains distinct from contact/environment readiness and lat
 recovery. A queued flight blocks charge, and queued or active charge blocks a new flight.
 Normalize unknown input before reading current owned time, availability and reservations.
 Keep prior completed episodes immutable when canceling a later queued approval.
-See [the fixed model, causal order and evidence](../patrol-charge.md).
+See [the fixed model, causal order and evidence](https://github.com/stacksjs/drone/blob/main/docs/patrol-charge.md).
 
 A finite native cron ledger now selects minute-zero and minute-one slots, records
 explicit local reviews and emits a handoff description only on its one consuming call.
 It has no runtime handle or scheduler process. Fixed clocks, missed/busy decisions and
 global faults cannot recreate a prior review. The nominal integration test composes
 two actual retained flights with separate charge approval. See [the bounded recurrence
-contract](../patrol-recurrence.md).
+contract](https://github.com/stacksjs/drone/blob/main/docs/patrol-recurrence.md).
 Production scheduling must never grant actuator authority or silently retry a refused launch.
 Native Stacks commands and application services belong outside the synchronous control
 loop. Durable review/audit, weather interlocks, failed docking and recovery, HIL and

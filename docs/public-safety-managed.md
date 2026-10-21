@@ -12,7 +12,7 @@ creation are separate explicit actions. Neither authorizes deletion. Managed art
 `purgeImplemented: false` and `contentDeletionPerformed: false`; legacy offline exports and
 downloaded copies remain outside the managed registry.
 
-[Accepted local purge](public-safety-purge.md) is a separate policy with explicit inventory
+[Accepted local purge](https://github.com/stacksjs/drone/blob/main/docs/public-safety-purge.md) is a separate policy with explicit inventory
 acceptance, durable progress and a minimized receipt. It freezes these content operations before
 removing registered namespace entries and accepted DB payload. Existing enrollment and dataset
 requests never grant that destructive authority.
@@ -107,7 +107,7 @@ remain outside public/static roots and preserve their qualified identities. Conf
 does not relocate or adopt existing artifacts. Unsupported or uncertain ownership blocks writes.
 
 Drone's installed native version does not contain the prepared export. The explicit
-[source bridge provenance](../resources/functions/artifacts/native-storage/PROVENANCE.md) records
+[source bridge provenance](https://github.com/stacksjs/drone/blob/main/resources/functions/artifacts/native-storage/PROVENANCE.md) records
 the qualified published native source used here. It does not imply a dependency upgrade.
 Deliberate native SQLite connection retirement is tested as a terminal process boundary. The
 captured transaction correctly refuses further file effects, but current Bun/native driver
@@ -119,6 +119,6 @@ connection closure. The library adds no garbage-collection workaround or replace
 Local process-crash and filesystem checks do not establish hardware power-loss durability,
 hostile-host protection, media erasure, uncontrolled-copy removal or purge acceptance.
 
-The [resource qualification](public-safety-managed-budget.md) derives a tighter output
+The [resource qualification](https://github.com/stacksjs/drone/blob/main/docs/public-safety-managed-budget.md) derives a tighter output
 bound for the pinned replay profile and codec. The manifest-inclusive 32 MiB guard
 remains enforced before publication intent.

@@ -3,9 +3,9 @@
 The incident record functions retain verified owned collection sources, explicit operator pixel
 declarations and append-only review history. Native Stacks accounts, tokens, permissions, Gates,
 model-derived migrations and transactions provide the persistence and access checks described in
-[incident access](public-safety-access.md). The collection producer remains unsigned simulation.
+[incident access](https://github.com/stacksjs/drone/blob/main/docs/public-safety-access.md). The collection producer remains unsigned simulation.
 
-[Managed source datasets](public-safety-managed.md) can explicitly publish private derivatives
+[Managed source datasets](https://github.com/stacksjs/drone/blob/main/docs/public-safety-managed.md) can explicitly publish private derivatives
 from one admitted source after custody enrollment, without copying observation or review notes.
 
 ## Register a collection source
@@ -116,10 +116,10 @@ and noncanonical numeric identifiers are refused. Responses and errors remain pr
 uncacheable. These models have no generated REST, search or generic dashboard exposure.
 
 The access deadline controls current reads and writes. It does not erase database pages, exported
-files, backups or uncontrolled copies. [Retention custody](public-safety-retention.md) provides explicit enrollment and hold review,
-without granting deletion authority. [Accepted local purge](public-safety-purge.md) separately
+files, backups or uncontrolled copies. [Retention custody](https://github.com/stacksjs/drone/blob/main/docs/public-safety-retention.md) provides explicit enrollment and hold review,
+without granting deletion authority. [Accepted local purge](https://github.com/stacksjs/drone/blob/main/docs/public-safety-purge.md) separately
 controls active DB payload and registered files; uncontrolled copies remain excluded. The
-[incident handover module](public-safety-handover.md) binds recipient acknowledgement to a
+[incident handover module](https://github.com/stacksjs/drone/blob/main/docs/public-safety-handover.md) binds recipient acknowledgement to a
 selected-source briefing and its original uncertainty. Sector/team assignments, an authorized
 operator workspace and live observations remain in issue #23,
 alongside hardware, jurisdiction/operator, interoperability and field qualification.

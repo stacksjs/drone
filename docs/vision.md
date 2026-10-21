@@ -93,7 +93,7 @@ There is no appearance embedding, biometric identity model or automatic re-ident
 
 ## Evidence and remaining gates
 
-[Recorded scenario metrics](vision-evidence.json) distinguish synthetic calibration from physical
+[Recorded scenario metrics](https://github.com/stacksjs/drone/blob/main/docs/vision-evidence.json) distinguish synthetic calibration from physical
 measurements. Worked distortion/crop/frame examples and held-out 3D points test geometry independently.
 The owned physics fixture renders pixels/depth from its plant separately from localization, which
 uses the estimator's capture pose. It measures target position error and declared three-sigma coverage,
@@ -110,4 +110,4 @@ uncertainty with held-out trajectories. Complete on-Pi acquisition, restart/rese
 authority campaigns. Neither this dataset nor a `declared-bench` import closes those gates.
 
 Issue #17 remains open for those campaigns, physical sensor adapters and broader appearance/privacy
-evaluation if an appearance tracker is introduced. See [ADR 17](adr/0017-calibrated-vision.md).
+evaluation if an appearance tracker is introduced. See [ADR 17](https://github.com/stacksjs/drone/blob/main/docs/adr/0017-calibrated-vision.md).

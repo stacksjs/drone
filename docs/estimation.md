@@ -1,7 +1,7 @@
 # Owned estimator
 
 Issue [#4](https://github.com/stacksjs/drone/issues/4) has a replayable first estimator built on the
-owned [sensor stream](sensors.md). This is a Pi/Bun TypeScript bench implementation, not a board-rate
+owned [sensor stream](https://github.com/stacksjs/drone/blob/main/docs/sensors.md). This is a Pi/Bun TypeScript bench implementation, not a board-rate
 flight estimator. Issue #3 remains open for physical capture, calibration and timing evidence.
 
 ## Native Stacks CLI and library
@@ -59,7 +59,7 @@ There is no compass or other heading observation in the sensor profile. Absolute
 covariance cannot be inferred from gravity or assumed from GNSS course. `absoluteHeading` and
 `navigation` stay false. Relative yaw drifts with residual gyro bias; a 0.02 rad/s bias gives 0.08 rad
 drift over four seconds in the test. Attitude covariance is null. An optional `gravityCorrection: 'initialization-only'` disables post-alignment gravity feedback
-for the explicitly assumed-heading [control physics experiment](controls.md). The default remains
+for the explicitly assumed-heading [control physics experiment](https://github.com/stacksjs/drone/blob/main/docs/controls.md). The default remains
 `norm-gated`. This mode is gyro propagation, not a remedy for physical observability or bias drift.
 No gyro bias learning, coning
 correction, accelerometer dynamic rejection beyond the norm heuristic, Earth-rate or lever-arm
@@ -119,7 +119,7 @@ The published GeographicLib CartConvert ECEF/local example and simple equatorial
 conventions. No physical orientation reference, compass, RTK or vehicle flight is validated.
 
 Regenerate fixtures with `bun tests/fixtures/estimation/generate.ts`; reproduce maximum/RMS errors
-with `bun tests/fixtures/estimation/evaluate.ts`. The [retained report](estimator-evidence.json) is
+with `bun tests/fixtures/estimation/evaluate.ts`. The [retained report](https://github.com/stacksjs/drone/blob/main/docs/estimator-evidence.json) is
 specific to this scripted trajectory. Its small errors are not a claim about sensor/vehicle accuracy.
 Tests additionally inject IMU outage, stale/replayed/time-reversed input, mounting/noise errors,
 GNSS jumps/reacquisition, gyro yaw bias and datum changes, and check covariance positivity.

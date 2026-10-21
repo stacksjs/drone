@@ -9,8 +9,8 @@ Do not buy a second Pi. These are off-the-shelf hardware parts assembled at home
 
 For your own runtime, start with the Pi accessories and AI Camera below, then this separate
 Pico 2 bench kit. The firmware currently produces neutral diagnostic outputs. The
-[runtime guide](runtime.md) defines its wiring and measurements; add the
-[sensor profile](sensors.md) as a later bench stage. No airframe or external autopilot firmware
+[runtime guide](https://github.com/stacksjs/drone/blob/main/docs/runtime.md) defines its wiring and measurements; add the
+[sensor profile](https://github.com/stacksjs/drone/blob/main/docs/sensors.md) as a later bench stage. No airframe or external autopilot firmware
 is needed to begin that work.
 
 Bench prices checked October 20, 2026. These are additional to the airframe table, before tax,
@@ -32,7 +32,7 @@ possible to preserve the aircraft budget.
 
 For the later sensor stage, the implemented profile requires an **ICM-42688-P SPI breakout**,
 **BMP280 at I2C address 0x76**, and **u-blox M10-class UART NAV-PVT**. Match the exact part,
-exposed signals and voltage to the [sensor bench guide](sensors.md). The
+exposed signals and voltage to the [sensor bench guide](https://github.com/stacksjs/drone/blob/main/docs/sensors.md). The
 [Adafruit BMP280, product 2651](https://www.adafruit.com/product/2651) lists at $9.95.
 Use its [pinout guide](https://learn.adafruit.com/adafruit-bmp280-barometric-pressure-plus-temperature-sensor-breakout/pinouts)
 for breakout connections. [Bosch's datasheet, section 5.2](https://www.bosch-sensortec.com/media/boschsensortec/downloads/datasheets/bst-bmp280-ds001.pdf#page=28)
@@ -57,7 +57,7 @@ local quadcopter SITL; physical telemetry is receive-only and physical flight co
 Choose flight-controller firmware independently of the owned mission and camera logic. No firmware
 flash or physical-flight qualification follows from this shopping list.
 
-The separate [owned board runtime](runtime.md) uses a Pico 2 for bench development. Pixhawk 6C flight
+The separate [owned board runtime](https://github.com/stacksjs/drone/blob/main/docs/runtime.md) uses a Pico 2 for bench development. Pixhawk 6C flight
 firmware, physical control and measured aircraft validation remain separate roadmap work. Keep the
 Pi 5 for Stacks mission and camera logic.
 

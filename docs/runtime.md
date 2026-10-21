@@ -12,7 +12,7 @@ sensor-to-neutral-output bench target, with no arming, PWM, flight modes or actu
 - `app/Commands/Runtime*.ts`: native `defineCommand()` commands, automatically discovered by Buddy.
 - `bin/drone.ts`: the same Stacks command definitions in a standalone CLI. No separate argument parser.
 
-The [language and board decision](adr/0002-bench-runtime.md) records the firmware exception.
+The [language and board decision](https://github.com/stacksjs/drone/blob/main/docs/adr/0002-bench-runtime.md) records the firmware exception.
 The Pico 2 is an additional development board, not the existing Pi 5 and not yet an approved
 flight controller. Existing ArduPilot and PX4 drivers continue independently. This bench protocol
 cannot be adapted into flight `Telemetry` from a synthetic scalar; flight integration needs real
@@ -57,7 +57,7 @@ remain available through Buddy. `buddy build:cli` in the installed framework bui
 
 ## Reproduce the Pico 2 firmware build
 
-Inputs are retained in [toolchain-lock.json](../firmware/runtime/toolchain-lock.json): Pico SDK
+Inputs are retained in [toolchain-lock.json](https://github.com/stacksjs/drone/blob/main/firmware/runtime/toolchain-lock.json): Pico SDK
 2.3.1 at `079c6f39023649b154152db30f1d781e884879bc`, picotool's pinned commit and Arm GNU
 14.3.Rel1 (GCC 14.3.1). Toolchain archives for macOS ARM64, Linux x86-64 and Linux ARM64 have
 SHA256 pins. Obtain the matching archive from the retained vendor URL, verify its hash, then
@@ -137,7 +137,7 @@ The watchdog is refreshed only after a healthy completed tick. Deadline/clock fa
 reset and stop watchdog feeding. Invalid frames revoke diagnostic authority but keep sampling neutral.
 
 Boot/session identity, freshness, version mismatch, sequence exhaustion, lease expiry and invalid
-capabilities are described in the [protocol specification](runtime-protocol.md). There is no crypto
+capabilities are described in the [protocol specification](https://github.com/stacksjs/drone/blob/main/docs/runtime-protocol.md). There is no crypto
 authentication: local UART is a trusted bench boundary. Network transport and physical flight authority
 remain separate work. A diagnostic lease never changes GP15 from neutral.
 
@@ -149,9 +149,9 @@ remain separate work. A diagnostic lease never changes GP15 from neutral.
 - Board boot, UART capture, deadline timing, stack high-water and watchdog reset: **not measured**.
   Issue #2 remains open for those acceptance gates. No physical flight capability is claimed.
 
-The [validation record](validation.md) tracks the complete release checks, and the
-[historical runtime build evidence snapshot](runtime-evidence.json) records artifact hashes and static footprint. Add real bench captures,
+The [validation record](https://github.com/stacksjs/drone/blob/main/docs/validation.md) tracks the complete release checks, and the
+[historical runtime build evidence snapshot](https://github.com/stacksjs/drone/blob/main/docs/runtime-evidence.json) records artifact hashes and static footprint. Add real bench captures,
 logic-analyser measurements, exact board revision and stack/watchdog results before closing #2.
 
-The optional [sensor bench profile](sensors.md) adds bounded IMU, barometer and GNSS acquisition.
+The optional [sensor bench profile](https://github.com/stacksjs/drone/blob/main/docs/sensors.md) adds bounded IMU, barometer and GNSS acquisition.
 Its larger footprint must be checked separately from the historical synthetic-only snapshot.

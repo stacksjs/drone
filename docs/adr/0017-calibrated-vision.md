@@ -27,4 +27,4 @@ Synthetic/declared-bench provenance is explicit and never reports physical calib
 The simulator uses qualified sensor prediction for capture pose, independently rendered image/depth,
 explicit operator selection/pairing and the existing navigation/authority/control/watchdog pipeline.
 The live Pi worker stays 2D. Physical calibration, heading, depth association, HIL and vehicle evidence
-remain required as described in the [vision contract](../vision.md).
+remain required as described in the [vision contract](https://github.com/stacksjs/drone/blob/main/docs/vision.md).

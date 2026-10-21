@@ -24,6 +24,8 @@ jobs:
       - run: ./buddy typecheck
       - run: bun run typecheck:runtime
       - run: bun run typecheck:views
+      - run: ./buddy build:docs
+      - run: test -f dist/docs/.bunpress/index.html
       - run: bun run roadmap:check
       - run: bun run parity:check
       - run: python3 -m py_compile resources/functions/drone/camera/imx500_worker.py

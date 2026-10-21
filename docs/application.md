@@ -148,4 +148,4 @@ Engineering background includes [NC State calibration guidance](https://content.
 [UGA spray factors](https://precisionagirrigation.extension.uga.edu/2022/06/spray-considerations-for-effective-pesticide-applications/)
 and [Nebraska drift factors](https://extensionpubs.unl.edu/publication/g1773/2019/html/view).
 These sources motivate separate delivery, distribution and weather evidence; they do not validate
-our synthetic thresholds or establish local authorization. See [ADR 22](adr/0022-prescribed-application.md).
+our synthetic thresholds or establish local authorization. See [ADR 22](https://github.com/stacksjs/drone/blob/main/docs/adr/0022-prescribed-application.md).

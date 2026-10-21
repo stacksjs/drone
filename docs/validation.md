@@ -18,7 +18,7 @@
   Desktop and phone layouts were visually inspected against the existing operator workspace design.
 - Evidence is owned physics simulation. Physical mission execution, hardware payload dispatch,
   whole-runtime durable restart, terrain following and external driver compilation remain open in
-  [#10](https://github.com/stacksjs/drone/issues/10). See [the mission guide](missions.md).
+  [#10](https://github.com/stacksjs/drone/issues/10). See [the mission guide](https://github.com/stacksjs/drone/blob/main/docs/missions.md).
 
 ## External-driver protocol software slice
 
@@ -37,7 +37,7 @@
   faults and lost final-download-ACK recovery with bounded completion records. Fresh responses after
   8-bit packet-sequence wrap remain valid. NaN-shaped uint32 parameter bits retain their integer value.
 - Native Stacks `drivers:bench` executes through Buddy and the compiled standalone binary outside
-  the checkout. Regeneration exactly matches [the retained report](driver-protocol-evidence.json).
+  the checkout. Regeneration exactly matches [the retained report](https://github.com/stacksjs/drone/blob/main/docs/driver-protocol-evidence.json).
   The generated server function registry also loads successfully without duplicate runtime exports.
 - This is scripted protocol-peer conformance, not actual autopilot firmware SITL, flight or HIL.
   [Issue #7](https://github.com/stacksjs/drone/issues/7) remains open for pinned-firmware campaigns,
@@ -61,11 +61,11 @@
   and the modeled board continue; the board expires output at 3040 ms without a final host command.
 - Native Stacks `authority:simulate` runs through Buddy and the compiled standalone CLI outside
   the checkout. The retained authority report is reproducible, and regeneration of the isolated
-  control baseline still matches its previous report. See [authority evidence](authority-evidence.json).
+  control baseline still matches its previous report. See [authority evidence](https://github.com/stacksjs/drone/blob/main/docs/authority-evidence.json).
 - Physical kill/RC/disarm, board supervisor port, measured HIL failures and recovery controllers
   remain open in [#6](https://github.com/stacksjs/drone/issues/6). Zero modeled thrust is not a
   landing controller. Parachute, rally/emergency landing and redundant links are explicitly deferred
-  in [the authority contract](authority.md). Physical outputs remain inhibited.
+  in [the authority contract](https://github.com/stacksjs/drone/blob/main/docs/authority.md). Physical outputs remain inhibited.
 
 ## Simulated multirotor control slice
 
@@ -77,7 +77,7 @@
 - The owned closed loop passes 20-second hover, position-step, wind/torque-disturbance and additional
   sensor-delay scenarios without floor contact. Raw synthetic frames pass through the existing
   sensor pipeline/estimator; the controller receives no plant truth. Physics-step convergence is
-  checked at 2 ms versus 4 ms. See [the reproducible report](controls-evidence.json).
+  checked at 2 ms versus 4 ms. See [the reproducible report](https://github.com/stacksjs/drone/blob/main/docs/controls-evidence.json).
 - The IMU-loss run latches zero commands at 3060 ms, within 80 ms of capture loss, and stays inhibited
   after packets resume. The simulated vehicle falls; this verifies inhibition, not a landing controller.
 - Estimator reset/origin/boot changes, mismatched rate epochs, clock/schedule faults, stale targets
@@ -102,7 +102,7 @@
   independently quantifies maximum/RMS errors; regeneration reproduces fixture files and report.
 - The scripted six-second trajectory reports maximum Euler error norm 0.0061411 rad and maximum
   NED position error 0.0025786 m across 276 checks. These are synthetic-software regression values,
-  not sensor accuracy or flight evidence. See [the retained report](estimator-evidence.json).
+  not sensor accuracy or flight evidence. See [the retained report](https://github.com/stacksjs/drone/blob/main/docs/estimator-evidence.json).
 - Fault tests cover gyro yaw bias, IMU gaps/stationary realignment, invalid source/mount/noise,
   GNSS jumps/outage/reacquisition, altitude datum isolation, pressure reference reset, positive
   covariance blocks and board/consumer-clock resets. Qualified anchor corrections preserve board
@@ -124,7 +124,7 @@
   sensor snapshots match direct replay, and replay continues to age after EOF without stopping motion.
 - Both synthetic and sensor Pico 2 images cross-compiled with the pinned toolchain. The sensor image
   uses 20,440 text bytes, 836 BSS bytes and a 1,112-byte compiler-reported main stack frame. These
-  are static build values, not measured hardware timing or stack high-water. See [build evidence](sensor-evidence.json).
+  are static build values, not measured hardware timing or stack high-water. See [build evidence](https://github.com/stacksjs/drone/blob/main/docs/sensor-evidence.json).
 - Lint, application/runtime/view typechecks, roadmap validation, native CTest and the Bun/Python
   suites passed: 97 Bun tests with 12,451 assertions, two native CTest contracts and five Python tests.
 - Physical sensor capture, mounting/thermal/noise calibration, group-delay measurement and GNSS
@@ -200,7 +200,7 @@ are not applicable. Newly authored visible copy uses no em-dash or separator en-
 - Firmware flashing, sensor calibration, RC link, actuator outputs or physical airworthiness tests.
 - Authenticated paired GNSS transport or calibrated metric visual-position fusion.
 - Board-validated runtime, estimation/controls and the domain workflows listed in the
-  [replacement matrix](roadmap/feature-coverage.md). They remain planned work.
+  [replacement matrix](https://github.com/stacksjs/drone/blob/main/docs/roadmap/feature-coverage.md). They remain planned work.
 
 The scaffold warns that feature-stripped defaults differ from the installed full defaults. Build
 output can warn about inherited unused image assets and an unset deployed sitemap domain. No cloud

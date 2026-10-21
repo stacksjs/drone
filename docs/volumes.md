@@ -186,7 +186,7 @@ executed GDAL/PDAL interoperability campaign. No physical reference survey has b
 
 Issue [#19](https://github.com/stacksjs/drone/issues/19) remains open for measured independent survey
 comparison, larger external datasets, numeric raster/point-cloud adapters, qualified meshing and
-basal surfaces, acquisition calibration and full field acceptance. See [ADR 19](adr/0019-known-surface-volumes.md).
+basal surfaces, acquisition calibration and full field acceptance. See [ADR 19](https://github.com/stacksjs/drone/blob/main/docs/adr/0019-known-surface-volumes.md).
 
 Format and policy references: [GDAL AAIGrid](https://gdal.org/en/stable/drivers/raster/aaigrid.html),
 [indexed PLY](https://www.loc.gov/preservation/digital/formats/fdd/fdd000501.shtml),

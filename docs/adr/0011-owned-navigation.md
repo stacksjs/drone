@@ -20,4 +20,4 @@ acceptance. Abort/revocation zeros modeled thrust and is not a physical landing 
 
 Use native Stacks command discovery for `navigation:simulate` and the existing standalone CLI build.
 Do not add queues, persistence or network endpoints inside the synchronous navigation/control loop.
-Detailed equations, evidence, limitations and remaining issue #11 gates are in [navigation](../navigation.md).
+Detailed equations, evidence, limitations and remaining issue #11 gates are in [navigation](https://github.com/stacksjs/drone/blob/main/docs/navigation.md).

@@ -19,6 +19,6 @@ read-only capability reporting and test infrastructure. Do not use asynchronous 
 as a motor watchdog. Do not connect simulation frames to the neutral-only board runtime or physical
 telemetry adapters. The session ID is a fixture scope, not a network security credential.
 
-See [the state/guard/expiry contract and remaining hardware gates](../authority.md) and
-[the reproducible software report](../authority-evidence.json). No measured HIL, physical flight,
+See [the state/guard/expiry contract and remaining hardware gates](https://github.com/stacksjs/drone/blob/main/docs/authority.md) and
+[the reproducible software report](https://github.com/stacksjs/drone/blob/main/docs/authority-evidence.json). No measured HIL, physical flight,
 kill circuitry, native control port or airborne recovery guarantee follows from these results.

@@ -38,7 +38,7 @@ first. The CLI records one policy decision without starting or restoring a vehic
 
 The first release does not claim physical execution, terrain following, hardware exactly-once
 payload delivery or parity with external autopilot mission systems. The detailed contract,
-evidence and remaining gates are in [the mission guide](../missions.md).
+evidence and remaining gates are in [the mission guide](https://github.com/stacksjs/drone/blob/main/docs/missions.md).
 
 ## Version 2 portable decision artifacts
 

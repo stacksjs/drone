@@ -27,7 +27,7 @@ serialization at 115200 baud; this is not hardware latency evidence.
 
 ## Pico 2 acquisition profile
 
-Keep the [runtime toolchain setup](runtime.md) and disabled-load wiring. Build a separate image:
+Keep the [runtime toolchain setup](https://github.com/stacksjs/drone/blob/main/docs/runtime.md) and disabled-load wiring. Build a separate image:
 
 ```sh
 ./buddy runtime:build --target pico2 --sensors --sdk /path/to/pico-sdk --toolchain /path/to/arm-gnu-toolchain
@@ -168,7 +168,7 @@ serial delays. Tests add skew, delayed/future samples, boot changes, source stal
 calibration/mount faults and dropout. Native register/UBX tests use bus adapters and bounded real
 codecs; they do not establish physical capture or timing.
 
-The [software build snapshot](sensor-evidence.json) records the local sensor-profile hash and static
+The [software build snapshot](https://github.com/stacksjs/drone/blob/main/docs/sensor-evidence.json) records the local sensor-profile hash and static
 footprint. Static stack frames do not establish a measured high-water mark.
 
 To finish #3, retain actual disabled-load captures from all three devices, sensor/mount identities,

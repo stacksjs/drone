@@ -114,4 +114,4 @@ leak, power, thermal, sensor timing, thruster and tether evidence; implement the
 board target and tether protocol; demonstrate operator stop and watchdog expiry;
 and validate recovery behavior in a controlled tank. Open-water hull, dam,
 pipeline and aquaculture inspection remain acceptance work. See
-[ADR 0015](adr/0015-subsea-profile.md) for the software boundary.
+[ADR 0015](https://github.com/stacksjs/drone/blob/main/docs/adr/0015-subsea-profile.md) for the software boundary.
