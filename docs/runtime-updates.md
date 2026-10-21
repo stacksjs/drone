@@ -364,11 +364,11 @@ time. Neither path is a complete anti-rollback coordinator. Trusted clock
 acquisition and protection against privileged clock/storage rollback remain
 open. Control-loop freshness still uses its separate monotonic clock.
 
-Initial enrollment and the bounded persistent metadata protocol are available
-above. Complete authenticated maintenance/key revocation, the full storage-fault
-campaign and integration with signed image staging, then installed/known-good
-slot integrity, explicit
-health confirmation and rollback without lowering security floors. Then add
+Initial enrollment, the bounded persistent metadata protocol and protected
+signed-image preparation are available above. Complete authenticated
+maintenance/key revocation and the full storage-fault campaign, then durable
+candidate ownership, installed/known-good slot integrity, explicit health
+confirmation and rollback without lowering security floors. Then add
 the board bootloader/install protocol and measured power-loss, full-medium,
 storage-latency and recovery campaigns. Local privileged filesystem tampering
 is outside this host module's protection; it is not secure boot or hardware
