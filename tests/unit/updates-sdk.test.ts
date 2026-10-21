@@ -3,6 +3,7 @@ import { copyFile, mkdir, mkdtemp, readFile, readdir, rm, writeFile } from 'node
 import { tmpdir } from 'node:os'
 import { basename, join } from 'node:path'
 import { Updater, type UpdaterOptions } from 'tuf-js'
+import * as Tuf from 'tuf-js'
 import { repository } from '../fixtures/updates/repository'
 
 const roots: string[] = []
@@ -63,12 +64,16 @@ test('a pending observer prevents the cache write and the next metadata request'
 
 for (const failedRole of roles) {
   test(`an observer rejection for ${failedRole} aborts before that cache or a later role advances`, async () => {
-    const item = await setup(), seen: string[] = []
+    const item = await setup(), seen: string[] = [], cause = new Error('protected persistence rejected')
     const updater = new Updater({ ...item.input, async onVerifiedMetadata(role) {
       seen.push(role)
-      if (role === failedRole) throw new Error('protected persistence rejected')
+      if (role === failedRole) throw cause
     } })
-    await expect(updater.refresh()).rejects.toThrow('Failed to persist metadata')
+    const failure = await updater.refresh().then(() => undefined, error => error)
+    const persistence = failedRole === 'snapshot' || failedRole === 'targets' ? failure.cause : failure
+    expect(persistence).toBeInstanceOf(Tuf.PersistError)
+    expect(persistence.message).toBe(`Failed to persist metadata ${failedRole}`)
+    expect(persistence.cause).toBe(cause)
     expect(seen).toEqual(roles.slice(0, roles.indexOf(failedRole) + 1))
     if (failedRole === 'root') expect(JSON.parse(await readFile(join(item.cache, 'root.json'), 'utf8')).signed.version).toBe(1)
     else expect(await Bun.file(join(item.cache, `${failedRole}.json`)).exists()).toBe(false)
@@ -124,7 +129,11 @@ test('fixed-time recovery replay is distinct from current-time authorization', a
   const past = await setup({ expires: '2025-01-01T00:00:00Z' })
   await new Updater({ ...past.input, referenceTime: new Date('2024-01-01T00:00:00Z') }).refresh()
   const current = await setup({ expires: '2025-01-01T00:00:00Z' })
-  await expect(new Updater(current.input).refresh()).rejects.toThrow('expired')
+  const failure = await new Updater(current.input).refresh().then(() => undefined, error => error)
+  expect(failure).toBeInstanceOf(Tuf.MetadataVerificationError)
+  expect(failure.role).toBe('timestamp')
+  expect(failure.cause).toBeInstanceOf(Error)
+  expect(failure.cause.message).toContain('expired')
 })
 
 test('invalid fixed time is rejected before loading even a missing bootstrap root', () => {
@@ -142,7 +151,11 @@ test('a fully cached trusted refresh does not emit observations for cache bytes'
 
 test('an authenticated intermediate root is observed before final-root expiry rejects the refresh', async () => {
   const item = await setup({ rotate: true, metadataFields: { rotatedRoot: { expires: '2020-01-01T00:00:00Z' } } }), seen: string[] = []
-  await expect(new Updater({ ...item.input, onVerifiedMetadata(role) { seen.push(role) } }).refresh()).rejects.toThrow('expired')
+  const failure = await new Updater({ ...item.input, onVerifiedMetadata(role) { seen.push(role) } }).refresh().then(() => undefined, error => error)
+  expect(failure).toBeInstanceOf(Tuf.MetadataVerificationError)
+  expect(failure.role).toBe('timestamp')
+  expect(failure.cause).toBeInstanceOf(Error)
+  expect(failure.cause.message).toContain('expired')
   expect(seen).toEqual(['root'])
   expect(JSON.parse(await readFile(join(item.cache, 'root.json'), 'utf8')).signed.version).toBe(2)
 })
@@ -157,4 +170,92 @@ test('forceCache cannot swallow a rejected remote timestamp observer when its lo
   expect(seen).toEqual(['timestamp'])
   expect(item.requests).toEqual(['/metadata/timestamp.json'])
   expect((await readdir(item.cache)).sort()).toEqual(['root.json'])
+})
+
+
+test('a signed metadata rejection retains its original typed cause through the SDK wrapper', async () => {
+  const item = await setup({ badTargetsSignature: true })
+  const failure = await new Updater(item.input).refresh().then(() => undefined, error => error)
+  expect(failure).toBeInstanceOf(Error)
+  expect(failure.cause).toBeInstanceOf(Error)
+})
+
+
+test('recovery can identify a remote metadata rejection through a public typed cause', async () => {
+  const item = await setup({ badTargetsSignature: true })
+  const failure = await new Updater(item.input).refresh().then(() => undefined, error => error)
+  expect(Tuf.MetadataVerificationError).toBeFunction()
+  expect(failure.cause).toBeInstanceOf(Tuf.MetadataVerificationError)
+  expect(failure.cause.role).toBe('targets')
+})
+
+
+for (const role of roles) {
+  test(`remote ${role} verification failure has a typed role and original cause`, async () => {
+    const options: Parameters<typeof repository>[1] = role === 'root' ? { rotate: true, badRotation: true } : { metadataFields: { [role]: { expires: '2020-01-01T00:00:00Z' } } }
+    const item = await setup(options)
+    const failure = await new Updater(item.input).refresh().then(() => undefined, error => error)
+    const verification = failure instanceof Tuf.MetadataVerificationError ? failure : failure.cause
+    expect(verification).toBeInstanceOf(Tuf.MetadataVerificationError)
+    expect(verification.role).toBe(role)
+    expect(verification.cause).toBeInstanceOf(Error)
+  })
+}
+
+test('observer failure stays a persistence failure and preserves its exact cause', async () => {
+  const item = await setup(), cause = new Error('protected storage failure')
+  const failure = await new Updater({ ...item.input, onVerifiedMetadata() { throw cause } }).refresh().then(() => undefined, error => error)
+  expect(failure).toBeInstanceOf(Tuf.PersistError)
+  expect(failure).not.toBeInstanceOf(Tuf.MetadataVerificationError)
+  expect(failure.cause).toBe(cause)
+  expect(item.requests).toEqual(['/metadata/2.root.json'])
+})
+
+test('an observer-supplied verification error is still classified as failed persistence first', async () => {
+  const item = await setup({ rotate: false }), cause = new Tuf.MetadataVerificationError('timestamp', 'caller error, not an SDK verification verdict')
+  const failure = await new Updater({ ...item.input, forceCache: true, onVerifiedMetadata() { throw cause } }).refresh().then(() => undefined, error => error)
+  expect(failure).toBeInstanceOf(Tuf.PersistError)
+  expect(failure.cause).toBe(cause)
+  expect(item.requests).toEqual(['/metadata/timestamp.json'])
+})
+
+test('the public HTTP failure class matches actual missing-metadata failures', async () => {
+  const item = await setup({ rotate: false }, 'timestamp.json')
+  const failure = await new Updater(item.input).refresh().then(() => undefined, error => error)
+  expect(failure).toBeInstanceOf(Tuf.DownloadHTTPError)
+  expect(failure).toBeInstanceOf(Tuf.DownloadError)
+  expect(failure.statusCode).toBe(404)
+  expect(failure).not.toBeInstanceOf(Tuf.MetadataVerificationError)
+})
+
+test('a Symbol observer rejection remains a persistence failure under forceCache', async () => {
+  const item = await setup({ rotate: false }), seen: string[] = [], cause = Symbol('opaque storage failure')
+  const failure = await new Updater({ ...item.input, forceCache: true, onVerifiedMetadata(role) {
+    seen.push(role)
+    if (role === 'timestamp') throw cause
+  } }).refresh().then(() => undefined, error => error)
+  expect(failure).toBeInstanceOf(Tuf.PersistError)
+  expect(failure.cause).toBe(cause)
+  expect(seen).toEqual(['timestamp'])
+  expect(item.requests).toEqual(['/metadata/timestamp.json'])
+  expect((await readdir(item.cache)).sort()).toEqual(['root.json'])
+})
+
+test('observer failures are never coerced while wrapping any metadata role', async () => {
+  for (const failedRole of roles) {
+    const item = await setup(), seen: string[] = []
+    let coercions = 0
+    const cause = { toString() { coercions++; throw new Error('Cause coercion must not run') } }
+    const failure = await new Updater({ ...item.input, onVerifiedMetadata(role) {
+      seen.push(role)
+      if (role === failedRole) throw cause
+    } }).refresh().then(() => undefined, error => error)
+    const persistence = failedRole === 'snapshot' || failedRole === 'targets' ? failure.cause : failure
+    expect(persistence).toBeInstanceOf(Tuf.PersistError)
+    expect(persistence.cause).toBe(cause)
+    expect(coercions).toBe(0)
+    expect(seen).toEqual(roles.slice(0, roles.indexOf(failedRole) + 1))
+    if (failedRole === 'root') expect(JSON.parse(await readFile(join(item.cache, 'root.json'), 'utf8')).signed.version).toBe(1)
+    else expect(await Bun.file(join(item.cache, `${failedRole}.json`)).exists()).toBe(false)
+  }
 })

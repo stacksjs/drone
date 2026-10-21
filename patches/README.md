@@ -13,12 +13,20 @@ SDK writes each newly verified remote metadata file, plus an owned finite
 time. Persistence failure aborts rather than being interpreted as a missing
 remote root or a cache miss under `forceCache`. Discard failed updater instances;
 their in-memory trust set is not rolled back. It does not make cache writes
-transactional or implement a protected trust store.
+transactional or implement a protected trust store. Public operational error
+exports retain causes and identify remote verification, persistence and download
+phases. Verification errors identify an attempted role, not permission to discard
+state. Classify persistence first, including when an observer throws a
+verification error; unknown causes require maintenance rather than an assumed
+invalid-input verdict.
+Wrapper messages never coerce caught values, so opaque observer rejections keep
+their persistence classification and exact cause under cache-preferred refresh.
 
 Bun applies the patch through root `patchedDependencies` and the lockfile.
 Always prepare with `bun patch tuf-js@6.0.0` before editing an installed package,
 then generate changes with `bun patch --commit tuf-js@6.0.0`. Do not edit shared
-package caches. For upgrades, review the upstream change against every patch
+package caches. Exclude empty generated `.bun-tag-*` entries from the patch;
+they are installer cache markers rather than package source. For upgrades, review the upstream change against every patch
 hunk and rerun the SDK observer cases, update/enrollment regressions, clean
 frozen installation and copied standalone CLI qualification. Never silently
 carry a patch onto another version.

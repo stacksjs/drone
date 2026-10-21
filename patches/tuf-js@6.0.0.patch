@@ -1,6 +1,62 @@
-diff --git a/node_modules/tuf-js/.bun-tag-c3b7c9e27e9980d7 b/.bun-tag-c3b7c9e27e9980d7
-new file mode 100644
-index 0000000000000000000000000000000000000000..e69de29bb2d1d6434b8b29ae775ad8c2e48c5391
+diff --git a/dist/error.d.ts b/dist/error.d.ts
+index 3a42f0441b68f961d6e367efee45b4f4158bbccd..727dd12095b649a8d6203e7eba6d9ebb59be68d6 100644
+--- a/dist/error.d.ts
++++ b/dist/error.d.ts
+@@ -6,6 +6,10 @@ export declare class PersistError extends Error {
+ }
+ export declare class RepositoryError extends Error {
+ }
++export declare class MetadataVerificationError extends Error {
++    readonly role: string;
++    constructor(role: string, message: string, options?: ErrorOptions);
++}
+ export declare class BadVersionError extends RepositoryError {
+ }
+ export declare class EqualVersionError extends BadVersionError {
+diff --git a/dist/error.js b/dist/error.js
+index 3a3c26a068a953998e16e552faf96b6fbe956f90..e4c07310caa36177ce390e6e3d82dd76178432f4 100644
+--- a/dist/error.js
++++ b/dist/error.js
+@@ -17,6 +17,15 @@ exports.PersistError = PersistError;
+ class RepositoryError extends Error {
+ }
+ exports.RepositoryError = RepositoryError;
++// Repository-maintained public distinction for pure remote metadata validation.
++class MetadataVerificationError extends Error {
++    role;
++    constructor(role, message, options) {
++        super(message, options);
++        this.role = role;
++    }
++}
++exports.MetadataVerificationError = MetadataVerificationError;
+ // An error for metadata that contains an invalid version number.
+ class BadVersionError extends RepositoryError {
+ }
+diff --git a/dist/index.d.ts b/dist/index.d.ts
+index 895fdf4b57c27baf4571e8d06bb93de69166f574..aa1e170b7832c2df49cf2628f77d7895a5f0cbf1 100644
+--- a/dist/index.d.ts
++++ b/dist/index.d.ts
+@@ -4,3 +4,4 @@ export { Updater } from './updater';
+ export type { Config } from './config';
+ export type { Fetcher } from './fetcher';
+ export type { UpdaterOptions } from './updater';
++export { DownloadError, DownloadHTTPError, MetadataVerificationError, PersistError } from './error';
+diff --git a/dist/index.js b/dist/index.js
+index 5a83b91f355d88c27615d2bc07310958b18d0142..645728da0d96110d323b0f5e5b2c5f0e839c6fce 100644
+--- a/dist/index.js
++++ b/dist/index.js
+@@ -7,3 +7,10 @@ var fetcher_1 = require("./fetcher");
+ Object.defineProperty(exports, "BaseFetcher", { enumerable: true, get: function () { return fetcher_1.BaseFetcher; } });
+ var updater_1 = require("./updater");
+ Object.defineProperty(exports, "Updater", { enumerable: true, get: function () { return updater_1.Updater; } });
++
++// Repository-maintained operational error exports; use causes rather than message matching.
++var error_1 = require("./error");
++Object.defineProperty(exports, "DownloadError", { enumerable: true, get: function () { return error_1.DownloadError; } });
++Object.defineProperty(exports, "DownloadHTTPError", { enumerable: true, get: function () { return error_1.DownloadHTTPError; } });
++Object.defineProperty(exports, "MetadataVerificationError", { enumerable: true, get: function () { return error_1.MetadataVerificationError; } });
++Object.defineProperty(exports, "PersistError", { enumerable: true, get: function () { return error_1.PersistError; } });
 diff --git a/dist/store.d.ts b/dist/store.d.ts
 index 20f835c29dee82ea3e61c775c83d8a34fad787dc..3b9c2f88cbe9082b45927ccabccb44f1d56d8739 100644
 --- a/dist/store.d.ts
@@ -31,7 +87,7 @@ index 1b1669029a8db00b7cc594ef202984f3d243a0e4..0ef50b3d8b599b7d49392d7d8c5f63d3
          this.loadTrustedRoot(rootData);
      }
 diff --git a/dist/updater.d.ts b/dist/updater.d.ts
-index 883df0fe6a6628ef5d16bdb0de17c0850d7d19ec..5ea5691230b1c59bcec7021c92fb9a13c24c3314 100644
+index 883df0fe6a6628ef5d16bdb0de17c0850d7d19ec..0fe93d96f9a7912c6708bfdcd6f8bcc7330c9e2e 100644
 --- a/dist/updater.d.ts
 +++ b/dist/updater.d.ts
 @@ -9,6 +9,10 @@ export interface UpdaterOptions {
@@ -53,8 +109,15 @@ index 883df0fe6a6628ef5d16bdb0de17c0850d7d19ec..5ea5691230b1c59bcec7021c92fb9a13
      constructor(options: UpdaterOptions);
      refresh(): Promise<void>;
      getTargetInfo(targetPath: string): Promise<TargetFile | undefined>;
+@@ -31,5 +36,6 @@ export declare class Updater {
+     private loadTargets;
+     private preorderDepthFirstWalk;
+     private generateTargetPath;
++    private verifyMetadata;
+     private persistMetadata;
+ }
 diff --git a/dist/updater.js b/dist/updater.js
-index 94a7658155740fee3f3b7b32937905cc7f791e90..d62b74cd9c6907af7cdd80a80b8160a9452f9db8 100644
+index 94a7658155740fee3f3b7b32937905cc7f791e90..ce62cfdc83eeec41479089aa301cbea250d8d116 100644
 --- a/dist/updater.js
 +++ b/dist/updater.js
 @@ -57,6 +57,7 @@ class Updater {
@@ -94,15 +157,27 @@ index 94a7658155740fee3f3b7b32937905cc7f791e90..d62b74cd9c6907af7cdd80a80b8160a9
                  await this.loadRoot();
                  await this.loadTimestamp();
              }
-@@ -175,7 +188,7 @@ class Updater {
+@@ -173,9 +186,9 @@ class Updater {
+                 // Client workflow 5.3.3: download new root metadata file
+                 const bytesData = await this.fetcher.downloadBytes(rootUrl, this.config.rootMaxLength);
                  // Client workflow 5.3.4 - 5.4.7
-                 this.trustedSet.updateRoot(bytesData);
+-                this.trustedSet.updateRoot(bytesData);
++                this.verifyMetadata(models_1.MetadataKind.Root, () => this.trustedSet.updateRoot(bytesData));
                  // Client workflow 5.3.8: persist root metadata file
 -                this.persistMetadata(models_1.MetadataKind.Root, bytesData);
 +                await this.persistMetadata(models_1.MetadataKind.Root, bytesData);
              }
              catch (error) {
                  if (error instanceof error_1.DownloadHTTPError) {
+@@ -210,7 +223,7 @@ class Updater {
+         const bytesData = await this.fetcher.downloadBytes(timestampUrl, this.config.timestampMaxLength);
+         try {
+             // Client workflow 5.4.2 - 5.4.4
+-            this.trustedSet.updateTimestamp(bytesData);
++            this.verifyMetadata(models_1.MetadataKind.Timestamp, () => this.trustedSet.updateTimestamp(bytesData));
+         }
+         catch (error) {
+             // If new timestamp version is same as current, discardd the new one.
 @@ -222,7 +235,7 @@ class Updater {
              throw error;
          }
@@ -112,29 +187,55 @@ index 94a7658155740fee3f3b7b32937905cc7f791e90..d62b74cd9c6907af7cdd80a80b8160a9
      }
      // Load local and remote snapshot metadata.
      // Client workflow 5.5: update snapshot role
-@@ -248,7 +261,7 @@ class Updater {
+@@ -246,12 +259,12 @@ class Updater {
+                 // Client workflow 5.5.1: download snapshot metadata file
+                 const bytesData = await this.fetcher.downloadBytes(snapshotUrl, maxLength);
                  // Client workflow 5.5.2 - 5.5.6
-                 this.trustedSet.updateSnapshot(bytesData);
+-                this.trustedSet.updateSnapshot(bytesData);
++                this.verifyMetadata(models_1.MetadataKind.Snapshot, () => this.trustedSet.updateSnapshot(bytesData));
                  // Client workflow 5.5.7: persist snapshot metadata file
 -                this.persistMetadata(models_1.MetadataKind.Snapshot, bytesData);
 +                await this.persistMetadata(models_1.MetadataKind.Snapshot, bytesData);
              }
              catch (error) {
-                 throw new error_1.RuntimeError(`Unable to load snapshot metadata error ${error}`);
-@@ -284,7 +297,7 @@ class Updater {
+-                throw new error_1.RuntimeError(`Unable to load snapshot metadata error ${error}`);
++                throw new error_1.RuntimeError('Unable to load snapshot metadata', { cause: error });
+             }
+         }
+     }
+@@ -282,12 +295,12 @@ class Updater {
+                 // Client workflow 5.6.1: download targets metadata file
+                 const bytesData = await this.fetcher.downloadBytes(metadataUrl, maxLength);
                  // Client workflow 5.6.2 - 5.6.6
-                 this.trustedSet.updateDelegatedTargets(bytesData, role, parentRole);
+-                this.trustedSet.updateDelegatedTargets(bytesData, role, parentRole);
++                this.verifyMetadata(role, () => this.trustedSet.updateDelegatedTargets(bytesData, role, parentRole));
                  // Client workflow 5.6.7: persist targets metadata file
 -                this.persistMetadata(role, bytesData);
 +                await this.persistMetadata(role, bytesData);
              }
              catch (error) {
-                 throw new error_1.RuntimeError(`Unable to load targets error ${error}`);
-@@ -358,9 +371,13 @@ class Updater {
+-                throw new error_1.RuntimeError(`Unable to load targets error ${error}`);
++                throw new error_1.RuntimeError('Unable to load targets metadata', { cause: error });
+             }
+         }
+         return this.trustedSet.getRole(role);
+@@ -358,15 +371,31 @@ class Updater {
          const filePath = encodeURIComponent(targetInfo.path);
          return path.join(this.targetDir, filePath);
      }
 -    persistMetadata(metaDataName, bytesData) {
++    verifyMetadata(role, operation) {
++        try {
++            return operation();
++        }
++        catch (error) {
++            // Equal timestamp versions retain the existing normal no-new-metadata path.
++            if (error instanceof error_1.EqualVersionError) {
++                throw error;
++            }
++            throw new error_1.MetadataVerificationError(role, `Failed to verify metadata ${encodeURIComponent(role)}`, { cause: error });
++        }
++    }
 +    async persistMetadata(metaDataName, bytesData) {
          const encodedName = encodeURIComponent(metaDataName);
          try {
@@ -145,3 +246,10 @@ index 94a7658155740fee3f3b7b32937905cc7f791e90..d62b74cd9c6907af7cdd80a80b8160a9
              const filePath = path.join(this.dir, `${encodedName}.json`);
              log('WRITE %s', filePath);
              fs.writeFileSync(filePath, bytesData.toString('utf8'));
+         }
+         catch (error) {
+-            throw new error_1.PersistError(`Failed to persist metadata ${encodedName} error: ${error}`);
++            throw new error_1.PersistError(`Failed to persist metadata ${encodedName}`, { cause: error });
+         }
+     }
+ }

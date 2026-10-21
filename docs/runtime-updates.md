@@ -122,6 +122,24 @@ never authorize firmware use: a coordinator must perform fresh verification at
 a trusted current wall time before using a candidate. Existing staging and
 inspection pass neither extension and continue to use the current wall clock.
 
+The maintained public exports `MetadataVerificationError`, `PersistError`,
+`DownloadError` and `DownloadHTTPError` identify operational failure phases.
+Snapshot, targets and persistence wrappers retain the original `Error.cause`.
+A caught value is never coerced to build a wrapper message, including a `Symbol`
+or an object whose string conversion throws. Persistence rejection must still
+abort a cache-preferred refresh in those cases.
+A remote metadata verification error includes the role being admitted and its
+original cause. Equal timestamp versions keep the normal unchanged-metadata
+path. Initial-root and cached-metadata errors retain upstream behavior.
+
+Classify a `PersistError` before examining its cause: an observer can itself
+throw a verification error, which is still failed persistence. A verification
+phase error alone does not prove that input was invalid, that a prefix is safe
+to discard, or that recovery may continue. Unknown crypto, resource or other
+causes must fail closed pending investigation. Error objects and type names do
+not establish authenticated trust or permit firmware use. The recovery
+coordinator and its full failure classification remain to be implemented.
+
 The seam alone does not persist a protected prefix or make SDK cache writes
 transactional. Its implementation and tests are a prerequisite for the protected
 store and recovery coordinator in issue #42. They do not complete that issue or
