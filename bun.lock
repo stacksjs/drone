@@ -22,6 +22,7 @@
         "@stacksjs/stx": "0.2.564",
         "@stacksjs/testing": "^0.75.221",
         "@stacksjs/validation": "^0.75.221",
+        "@tufjs/canonical-json": "2.0.0",
         "stacks": "^0.75.221",
         "ts-images": "0.2.31",
         "tuf-js": "6.0.0",

@@ -50,7 +50,8 @@
     "@stacksjs/validation": "^0.75.221",
     "stacks": "^0.75.221",
     "ts-images": "0.2.31",
-    "tuf-js": "6.0.0"
+    "tuf-js": "6.0.0",
+    "@tufjs/canonical-json": "2.0.0"
   },
   "workspaces": [
     "storage/framework",
