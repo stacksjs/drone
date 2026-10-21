@@ -97,3 +97,39 @@ legacy output compatibility. It adds no translating-camera consumer or CLI comma
 readiness, moving images, full-flight acceptance, physical feedback, host-death protection
 and issue #26 completion require separate evidence. The original failed 1,600 ms translating
 camera result remains failed; no window, threshold, gain or dynamics was changed here.
+
+
+## Counted translating camera simulation
+
+`simulateCountedTranslatingCinema(input: unknown = {})` in `cinema/runtime.ts` has a separate
+outer v4 `CinemaCountedTranslationRun`, audit v3 and actual native v4 mission trace. The fixed
+`straight-poi-dolly-counted-v1` profile uses the counted encoder producer and the same optical,
+source-manager and plant flow. Its closed own-data input accepts `nominal` or
+`source-expiry-with-foreign`; omitted scenario selects nominal. Invalid input throws the fixed
+`cinema-counted-translation-input` TypeError. Unavailable owned results use
+`cinema-unqualified-result`. It adds no CLI command or hardware driver.
+
+The original first nominal acquisition is accepted after a separately reviewed saved-result
+decoder field-order correction. The original failed oracle receipt and full first result remain
+preserved. The corrected saved-only oracle passed all 47,637 expectations, using the same actual
+acquisition. It verified the original 1,600 ms readiness window, 26 samples across 500 ms,
+strict 0.05 rad/s counted rates, native admission, the full 2 m plan, all three actual moving
+images within 2 pixels, positive forward speed, at least 0.5 m capture progress, 8 s close,
+actual return/landing, neutral board, replay, count joins and bounded residual tail. These are
+simulation observations, without physical flight, gimbal actuation, authentication, SITL/HIL,
+real-time performance or production qualification claims.
+
+The first actual source-loss acquisition and saved-only oracle passed with one test and
+23,478 expectations. The selected token issued at 6,560 ms expired at 6,640 ms; the foreign
+packet was rejected at 6,620 ms while the cached token produced the real first image. At
+6,640 ms expiry won before selected renewal and ACK. Run, shot and uncertain capture retain
+`gimbal-source-expired`; the image has no ACK, and the actual native mission ended with
+`operator-abort`, neutral outputs and the 501-row residual gimbal tail. Independent audit
+joins verified strictly positive first-image displacement and forward speed.
+
+The bounded public input and ownership tests also passed, with two tests and 37 expectations.
+All 20 fresh complete legacy outputs match their before captures byte for byte, including
+final LF and reversible BigInt paths. Full-suite, compiled-command, browser, exact-head CI
+and main-publication gates remain pending for this candidate. These local results establish
+simulation behavior only. The old failed translating-camera candidate remains failed and
+unchanged.
