@@ -198,6 +198,27 @@ jobs:
         working-directory: ${{ runner.temp }}
       - run: $GITHUB_WORKSPACE/storage/runtime-build/cli/drone agriculture:plan "$GITHUB_WORKSPACE/examples/agriculture.json"
         working-directory: ${{ runner.temp }}
+      - name: Qualify the explicit farming planning wire with a copied standalone CLI
+        working-directory: ${{ runner.temp }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          attempt="$(mktemp -d "$RUNNER_TEMP/farming-plan.XXXXXX")"
+          cp "$GITHUB_WORKSPACE/storage/runtime-build/cli/drone" "$attempt/drone"
+          cmp "$GITHUB_WORKSPACE/storage/runtime-build/cli/drone" "$attempt/drone"
+          cp "$GITHUB_WORKSPACE/examples/farming-plan.json" "$attempt/request.json"
+          cd "$attempt"
+          printf '%s\n' '3089a663542e7472ff22cc115e606344f431c2e2d7de39f27edabb3a7f5fa5f0  request.json' | sha256sum -c -
+          ./drone farming:plan request.json > result.json 2> result.stderr
+          test ! -s result.stderr
+          bun -e 'const raw = await Bun.file("result.json").text(); if (Buffer.byteLength(raw) > 524288 || raw.split("\n").length !== 2 || !raw.endsWith("\n")) throw new Error("Invalid farming wire"); const p = JSON.parse(raw); const area = p.plan.survey.areaM2; if (p.version !== 1 || p.kind !== "farming-observation-planning-preview" || p.status !== "planned" || p.source.sha256 !== "3089a663542e7472ff22cc115e606344f431c2e2d7de39f27edabb3a7f5fa5f0" || p.source.byteLength !== 4745 || p.plan.survey.lanes.length !== 5 || typeof area !== "number" || !Number.isFinite(area) || Math.abs(area - 2.56) > 64 * Number.EPSILON * 2.56 || [p.ownershipVerified,p.geometryVerified,p.physicalFlightEnabled,p.observationPerformed,p.dispatchPerformed].some(v => v !== false)) throw new Error("Invalid farming preview")'
+          printf '%s\n' '{"version":1}' > invalid.json
+          if ./drone farming:plan invalid.json > invalid.stdout 2> invalid.stderr; then exit 1; fi
+          test ! -s invalid.stdout
+          printf '%s\n' 'Farming planning preview unavailable: invalid declaration, rejected plan or output failure' > expected.stderr
+          cmp expected.stderr invalid.stderr
+          if ./drone farming:plan > missing.stdout 2> missing.stderr; then exit 1; fi
+          test ! -s missing.stdout
       - run: $GITHUB_WORKSPACE/storage/runtime-build/cli/drone agriculture:simulate --visit ci-field --output "$RUNNER_TEMP/agriculture-collected"
         working-directory: ${{ runner.temp }}
       - name: Reprocess the full calibrated field layer through a stdout pipe
