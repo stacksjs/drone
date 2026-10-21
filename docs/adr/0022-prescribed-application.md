@@ -28,4 +28,4 @@ Source replay verifies consistency without authenticating a producer or claiming
 Reuse the shared completed-artifact publication helper and async CLI output already contributed to
 Stacks. Keep filesystem exports outside browser barrels. Physical hardware calibration, distribution,
 isolation, weather/drift, local requirements, board transport and HIL acceptance stay explicit and open.
-The detailed semantics and limits are in [the application guide](https://github.com/stacksjs/drone/blob/main/docs/application.md).
+The detailed semantics and limits are in [the application guide](../application.md).

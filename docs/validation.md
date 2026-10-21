@@ -18,7 +18,7 @@
   Desktop and phone layouts were visually inspected against the existing operator workspace design.
 - Evidence is owned physics simulation. Physical mission execution, hardware payload dispatch,
   whole-runtime durable restart, terrain following and external driver compilation remain open in
-  [#10](https://github.com/stacksjs/drone/issues/10). See [the mission guide](https://github.com/stacksjs/drone/blob/main/docs/missions.md).
+  [#10](https://github.com/stacksjs/drone/issues/10). See [the mission guide](missions.md).
 
 ## External-driver protocol software slice
 
@@ -65,7 +65,7 @@
 - Physical kill/RC/disarm, board supervisor port, measured HIL failures and recovery controllers
   remain open in [#6](https://github.com/stacksjs/drone/issues/6). Zero modeled thrust is not a
   landing controller. Parachute, rally/emergency landing and redundant links are explicitly deferred
-  in [the authority contract](https://github.com/stacksjs/drone/blob/main/docs/authority.md). Physical outputs remain inhibited.
+  in [the authority contract](authority.md). Physical outputs remain inhibited.
 
 ## Simulated multirotor control slice
 
@@ -200,7 +200,7 @@ are not applicable. Newly authored visible copy uses no em-dash or separator en-
 - Firmware flashing, sensor calibration, RC link, actuator outputs or physical airworthiness tests.
 - Authenticated paired GNSS transport or calibrated metric visual-position fusion.
 - Board-validated runtime, estimation/controls and the domain workflows listed in the
-  [replacement matrix](https://github.com/stacksjs/drone/blob/main/docs/roadmap/feature-coverage.md). They remain planned work.
+  [replacement matrix](roadmap/feature-coverage.md). They remain planned work.
 
 The scaffold warns that feature-stripped defaults differ from the installed full defaults. Build
 output can warn about inherited unused image assets and an unset deployed sitemap domain. No cloud

@@ -36,7 +36,7 @@ The plant uses invented mass/inertia, first-order motor lag, linear drag/wind an
 Newton/Euler equations. It has a simple vertical floor constraint, not a landing/contact dynamics
 model. IMU loss latches zero simulated commands; the model can fall. Do not report that as landing.
 
-Keep the previous ideal kinematic simulator and external drivers unchanged. The [control guide](https://github.com/stacksjs/drone/blob/main/docs/controls.md)
+Keep the previous ideal kinematic simulator and external drivers unchanged. The [control guide](../controls.md)
 records scenarios, equations, gains, evidence and the continuation path to measured tuning, native
 bench execution, autotune and other vehicle/control variants. Physical output waits for #6 authority
 validation and the remaining #2/#3/#4 hardware and estimator work.

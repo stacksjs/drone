@@ -19,7 +19,7 @@ This is an engineering roadmap. Software tests do not establish an airworthy air
 8. Validate the implemented Pi AI Camera acquisition, explicit selection and geometric association on the Pi.
    Camera loss requires reselection. Depth, obstacle sensing and metric fusion remain separate milestones.
 
-The owned runtime follows the dependency-linked [roadmap](https://github.com/stacksjs/drone/blob/main/docs/roadmap/README.md). The external drivers
+The owned runtime follows the dependency-linked [roadmap](roadmap/README.md). The external drivers
 support comparison and development while native board controls are implemented and validated.
 
 Until those milestones are complete, the code here should be used for simulation and bench development.

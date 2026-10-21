@@ -106,7 +106,7 @@ policies. Their ten source records retain exact file hashes and line/symbol cita
 59 cases and 26 support claims are unchanged. Both directories remain owned by payload issue #8;
 their reviewed dimensions retain explicit deeper work and do not constitute exhaustive review.
 
-The [owned Cinema simulation](https://github.com/stacksjs/drone/blob/main/docs/cinema.md) implements a separate hover POI angular reframe with
+The [owned Cinema simulation](cinema.md) implements a separate hover POI angular reframe with
 modeled joints, encoders and still exposures. It does not implement those firmware modes,
 manager ownership/discovery, normalized AUX/servo outputs, electrical behavior or device health
 policies. Generic command/parameter transport also does not supply gimbal-specific semantics.

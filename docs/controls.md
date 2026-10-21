@@ -130,7 +130,7 @@ After feedback starts, lost health, changed boot/origin/reset counters, unmatche
 values, stale/future targets and schedule/clock faults latch inhibition. `reset()` or an explicit
 disabled step clears that session; fresh observations must qualify again. Startup can wait for
 qualified estimates. A fault produces immediate zero simulated commands, bypassing normal slew;
-it is not a landing or RC stick controller. The separate [authority harness](https://github.com/stacksjs/drone/blob/main/docs/authority.md) adds explicit lifecycle supervision. The physical firmware remains neutral-only.
+it is not a landing or RC stick controller. The separate [authority harness](authority.md) adds explicit lifecycle supervision. The physical firmware remains neutral-only.
 Every output retains `physicalFlightEnabled: false` and `boardOutputsInhibited: true`.
 
 ## Scenarios, evidence and continuation

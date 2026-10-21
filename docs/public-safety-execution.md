@@ -1,7 +1,7 @@
 # Synthetic incident execution
 
 The source Stacks application supports owned synthetic execution and deliberate
-source admission. See [ADR26](https://github.com/stacksjs/drone/blob/main/docs/adr/0026-owner-bound-incident-execution.md) for its
+source admission. See [ADR26](adr/0026-owner-bound-incident-execution.md) for its
 authority and deployment contract.
 
 The `/incidents` workspace runs the existing owned public-safety simulator with

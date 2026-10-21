@@ -46,7 +46,7 @@ while first mission/contact history, reference, session and boot identities rema
 Actual modeled stored gain is 0.0592 Wh, with conservative verified credit of
 0.05205362 Wh. Cumulative nominal powered load is 4.704 Wh; policy remaining energy is
 15.34805362 Wh. These are synthetic model results, without idle-load or endurance
-measurement. See [contact](https://github.com/stacksjs/drone/blob/main/docs/patrol-contact.md) and [partial charging](https://github.com/stacksjs/drone/blob/main/docs/patrol-charge.md)
+measurement. See [contact](patrol-contact.md) and [partial charging](patrol-charge.md)
 for their fixed models and limits.
 
 The runtime's independent admission still requires its full 84 second route, 5 second
@@ -54,12 +54,12 @@ contact window and 2 second tail. The second start budget fits the unchanged hor
 60000 + 20 + 84000 + 5000 + 2000 = 151020 ms, below 180000 ms. A positive local review
 followed by runtime refusal stays consumed, without a retry or restored approval.
 
-The separate [authenticated review ledger](https://github.com/stacksjs/drone/blob/main/docs/patrol-review.md) persists owner-only intent,
+The separate [authenticated review ledger](patrol-review.md) persists owner-only intent,
 decisions and consumption metadata through native Auth, Gates and SQLite. It does not
 connect those records to this simulation or authorize launch. Issue #24 remains open for
 production scheduling, runtime handoff/recovery, a patrol workspace, weather and physical
 qualification. This finite recurrence model does not qualify unattended docking, charging or field operation.
 
-The [finite patrol command](https://github.com/stacksjs/drone/blob/main/docs/patrol-cli.md) now composes this ledger and retained model
+The [finite patrol command](patrol-cli.md) now composes this ledger and retained model
 with explicit unsigned decision files. Its neutral default never supplies a review or charge
 approval. The command does not register a scheduler or add production launch permission.

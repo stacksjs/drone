@@ -32,17 +32,17 @@ with fresh grounded/stopped observations can admit another flight. Both flights 
 the same body, raw feeds, estimator, controller, supervisor, watchdog, absolute clock
 and nominal energy ledger. Completed per-occurrence results remain frozen and replayable.
 These are unsigned local fixture decisions. Optional `contact: 'nominal'` adds a modeled
-selected-pad contact check after completion. See [the contact model and its limits](https://github.com/stacksjs/drone/blob/main/docs/patrol-contact.md).
+selected-pad contact check after completion. See [the contact model and its limits](patrol-contact.md).
 Optional `charge: 'nominal'` additionally requires explicit charge approval and independently
-observed isolation before another flight. See [the partial-charge model](https://github.com/stacksjs/drone/blob/main/docs/patrol-charge.md).
-A [finite native recurrence ledger](https://github.com/stacksjs/drone/blob/main/docs/patrol-recurrence.md) keeps due slots separate from
-explicit local reviews. A [finite patrol command](https://github.com/stacksjs/drone/blob/main/docs/patrol-cli.md) composes this model with
-explicit unsigned decision files and separate charge opt-in. Optional [recording and replay](https://github.com/stacksjs/drone/blob/main/docs/patrol-recording.md)
+observed isolation before another flight. See [the partial-charge model](patrol-charge.md).
+A [finite native recurrence ledger](patrol-recurrence.md) keeps due slots separate from
+explicit local reviews. A [finite patrol command](patrol-cli.md) composes this model with
+explicit unsigned decision files and separate charge opt-in. Optional [recording and replay](patrol-recording.md)
 retains bounded input and an exact summary for a fresh model comparison. The separate
-[authenticated review ledger](https://github.com/stacksjs/drone/blob/main/docs/patrol-review.md) records owner-only intent, decisions and
+[authenticated review ledger](patrol-review.md) records owner-only intent, decisions and
 consumption through native Stacks Auth, Gates and SQLite without runtime handoff or launch
 authority. Production scheduling, runtime recovery, a patrol workspace and physical docking remain open.
-See [ADR 27](https://github.com/stacksjs/drone/blob/main/docs/adr/0027-retained-patrol-runtime.md).
+See [ADR 27](adr/0027-retained-patrol-runtime.md).
 
 ## Data flow and references
 
@@ -140,11 +140,11 @@ fails closed before a usable packet arrives, without claiming a measured 240 ms 
 Issue #11 remains open for physical range/camera extrinsic and time calibration, real coverage and
 occlusion models, independently measured uncertainty and braking bounds, dynamic obstacle motion,
 full terrain-aware mission semantics, long follow/orbit campaigns, HIL and hardware trials. Nothing
-in this release enables physical flight. See [ADR 11](https://github.com/stacksjs/drone/blob/main/docs/adr/0011-owned-navigation.md).
+in this release enables physical flight. See [ADR 11](adr/0011-owned-navigation.md).
 
 ## Synthetic environmental collection
 
-The [environment sampling prerequisite](https://github.com/stacksjs/drone/blob/main/docs/environment.md) runs a two-height mission through this
+The [environment sampling prerequisite](environment.md) runs a two-height mission through this
 owned runtime, with capture-time estimated geotags and guarded collection-policy revisions. Site
 closure requests native abort; it does not replace the native fence or establish physical wildlife
 exclusion distances. The native mission's terminal state remains visible alongside fault qualification.

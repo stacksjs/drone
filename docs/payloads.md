@@ -35,7 +35,7 @@ This is local export, not durable flight logging or a cloud storage job.
 
 ## First physical adapter: Raspberry Pi 5 and IMX500
 
-Use the Pi AI Camera and Pi 5 camera cable described in [camera setup](https://github.com/stacksjs/drone/blob/main/docs/camera-tracking.md).
+Use the Pi AI Camera and Pi 5 camera cable described in [camera setup](camera-tracking.md).
 Power the Pi down before connecting the CSI ribbon; verify connector orientation against the
 [Raspberry Pi camera documentation](https://www.raspberrypi.com/documentation/accessories/ai-camera.html).
 Use the supported 64-bit Raspberry Pi OS packages and camera discovery steps from that guide.
@@ -157,7 +157,7 @@ A live step first validates observation structure, monotonic integer clock, a ma
 
 Normal `retire` closes without using a goal or consuming an observation, even after an expired historical lease or large gap. A valid nondecreasing close records `session-retired`; an invalid close while waiting/active latches `gimbal-clock-discontinuity` at a null event time. Invalid close while inhibited is unchanged; a later valid close preserves the first fault; retired calls remain inert. Only live `step` enforces lease/gap before goal use. This deliberate-close distinction provides no independent watchdog.
 
-Snapshot JSON plus LF is capped at 8,192 bytes; decisions at 12,288, with finite counters and at most 16 transitions. These are representation bounds. [Managed Cinema](https://github.com/stacksjs/drone/blob/main/docs/cinema.md#owned-selected-gimbal-source) connects the admitted angle to the existing delayed-encoder PD and plant, and exercises source expiry at a real exposure/ACK tie. The public pure tests of manual/neutral commands establish only directive/latch behavior. No physical gimbal bus, source handoff, sticks, authenticated writer or host-death neutralization is implemented; the hardware inventory and original issue criteria remain open.
+Snapshot JSON plus LF is capped at 8,192 bytes; decisions at 12,288, with finite counters and at most 16 transitions. These are representation bounds. [Managed Cinema](cinema.md#owned-selected-gimbal-source) connects the admitted angle to the existing delayed-encoder PD and plant, and exercises source expiry at a real exposure/ACK tie. The public pure tests of manual/neutral commands establish only directive/latch behavior. No physical gimbal bus, source handoff, sticks, authenticated writer or host-death neutralization is implemented; the hardware inventory and original issue criteria remain open.
 
 ## Acceptance still required on hardware
 

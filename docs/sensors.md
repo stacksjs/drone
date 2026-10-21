@@ -27,7 +27,7 @@ serialization at 115200 baud; this is not hardware latency evidence.
 
 ## Pico 2 acquisition profile
 
-Keep the [runtime toolchain setup](https://github.com/stacksjs/drone/blob/main/docs/runtime.md) and disabled-load wiring. Build a separate image:
+Keep the [runtime toolchain setup](runtime.md) and disabled-load wiring. Build a separate image:
 
 ```sh
 ./buddy runtime:build --target pico2 --sensors --sdk /path/to/pico-sdk --toolchain /path/to/arm-gnu-toolchain

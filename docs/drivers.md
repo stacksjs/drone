@@ -27,7 +27,7 @@ The existing generic `guided` field means external-velocity authority, not a PX4
 
 The new `driver.protocol` interface adds capability discovery, COMMAND_ACK/retries, message-rate
 requests, parameter read/write with readback and bounded mission upload/download/resume.
-Read the [protocol contract, native conformance CLI and limits](https://github.com/stacksjs/drone/blob/main/docs/driver-protocols.md).
+Read the [protocol contract, native conformance CLI and limits](driver-protocols.md).
 Only scripted loopback conformance has been executed; real firmware SITL and physical validation
 remain open. Physical receivers cannot transmit through any of these methods.
 

@@ -37,7 +37,7 @@ companion application and simulator, not a native board autopilot.
 - Calibrated selected-point localization with explicit depth/pose association, GNSS pairing,
   conservative fusion and owned sensor-to-control physics. Measured calibration, depth adapters,
   surveyed heading and hardware campaigns remain in [#17](https://github.com/stacksjs/drone/issues/17).
-- An [executable behavior audit](https://github.com/stacksjs/drone/blob/main/docs/parity.md) with source-backed cases, evidence selectors and upstream refresh.
+- An [executable behavior audit](../parity.md) with source-backed cases, evidence selectors and upstream refresh.
   Unclassified dimensions and unsupported cases remain explicit in [#28](https://github.com/stacksjs/drone/issues/28).
 
 - Shared v2 vehicle missions on the raw sensor/estimator/authority runtime, with typed actuator leases,
@@ -57,10 +57,10 @@ companion application and simulator, not a native board autopilot.
 
 Public-safety collection now connects native incident roles, source-bound observations and reviews,
 recipient-confirmed handover and an authorized read/command workspace with
-[live synthetic execution and deliberate source admission](https://github.com/stacksjs/drone/blob/main/docs/public-safety-execution.md).
+[live synthetic execution and deliberate source admission](../public-safety-execution.md).
 Separately accepted local purge remains disabled by default. Sector/team
 responsibility and operational/hardware qualification remain in
-[#23](https://github.com/stacksjs/drone/issues/23). See [workspace semantics](https://github.com/stacksjs/drone/blob/main/docs/public-safety-workspace.md).
+[#23](https://github.com/stacksjs/drone/issues/23). See [workspace semantics](../public-safety-workspace.md).
 
 Crop scouting now collects acknowledged numeric red/NIR and visible frames through the owned
 survey runtime. Panel/irradiance calibration, an independently checked numerical model, field/parcel
@@ -72,7 +72,7 @@ Prescribed inert-water and inert-granule application now runs on the owned groun
 separate implement leases, quantized delivery instruments, exclusions, fault latches and independent
 shutdown probes. Exact finite-kernel dose/coverage/overlap reports and source replay are implemented.
 Physical calibration, distribution, dose/drift, local requirements and HIL remain in
-[#22](https://github.com/stacksjs/drone/issues/22). See [application evidence](https://github.com/stacksjs/drone/blob/main/docs/application.md).
+[#22](https://github.com/stacksjs/drone/issues/22). See [application evidence](../application.md).
 
 Asset-relative bridge inspection now uses the owned mission/control loop, measured modeled range
 registration, visible/synthetic thermal pixels, explicit operator reviews and repeat-visit geometry.
@@ -142,7 +142,7 @@ The inventory pins PX4 `ddcaad6601be20453ec6acd0f08e567af3a7e1bb` and ArduPilot
 not a claim to track every future upstream change. Run `bun run roadmap:check` to catch unmapped
 entries, dangling issue links and dependency cycles in the retained snapshot.
 
-See [the feature matrix](https://github.com/stacksjs/drone/blob/main/docs/roadmap/feature-coverage.md), [driver contract](https://github.com/stacksjs/drone/blob/main/docs/drivers.md), and
-[the architecture decision](https://github.com/stacksjs/drone/blob/main/docs/adr/0001-owned-autonomy.md). External stack feature availability
+See [the feature matrix](feature-coverage.md), [driver contract](../drivers.md), and
+[the architecture decision](../adr/0001-owned-autonomy.md). External stack feature availability
 varies by vehicle, firmware version, hardware and configuration. Their existence in an upstream
 module does not mean this project's adapter exposes it.

@@ -1,6 +1,6 @@
 # Owned public-safety collection
 
-Issue [#23](https://github.com/stacksjs/drone/issues/23) requires coordinated search, fire and disaster observation, incident annotations, operator review, team handover, enforced access/privacy/retention and runtime handling of communications, incident boundaries and resources. The collection and runtime foundation connects to authenticated source, observation, review and managed retention APIs. Separately accepted local purge is disabled by default. Recipient-confirmed incident coordination handover and the [authorized read and command workspace](https://github.com/stacksjs/drone/blob/main/docs/public-safety-workspace.md) connect persisted records to [live synthetic execution and deliberate source admission](https://github.com/stacksjs/drone/blob/main/docs/public-safety-execution.md). Sector/team assignments and operational qualification remain required work.
+Issue [#23](https://github.com/stacksjs/drone/issues/23) requires coordinated search, fire and disaster observation, incident annotations, operator review, team handover, enforced access/privacy/retention and runtime handling of communications, incident boundaries and resources. The collection and runtime foundation connects to authenticated source, observation, review and managed retention APIs. Separately accepted local purge is disabled by default. Recipient-confirmed incident coordination handover and the [authorized read and command workspace](public-safety-workspace.md) connect persisted records to [live synthetic execution and deliberate source admission](public-safety-execution.md). Sector/team assignments and operational qualification remain required work.
 
 The four explicit observation purposes are search and rescue, fire observation, disaster assessment and lawful police observation. There is no identity recognition, automatic person pursuit, detention or enforcement action. Purpose authority and retention are explicit declarations, not established legal authority. All fixtures are synthetic and physical outputs remain inhibited.
 
@@ -43,7 +43,7 @@ Replay re-executes the pinned `owned-public-safety-collection-v1` deterministic 
 
 - Extend native authenticated incident membership/roles to managed exports and future team event paths. Declared offline actor strings are insufficient.
 - Extend explicit enrollment and hold review to managed files, redacted views and removal of controlled evidence copies. Current API access denies expiry and revocation; offline files do not enforce deletion.
-- [Recipient-confirmed incident coordination](https://github.com/stacksjs/drone/blob/main/docs/public-safety-handover.md) binds assignment, source and expiry to atomic acceptance and audit. Sector/team assignments remain later work. Incident responsibility and vehicle control remain separate.
+- [Recipient-confirmed incident coordination](public-safety-handover.md) binds assignment, source and expiry to atomic acceptance and audit. Sector/team assignments remain later work. Incident responsibility and vehicle control remain separate.
 - Qualify shared team collection and partial searched/unsearched support beyond the current single-owner synthetic execution.
 - Measured visible/thermal calibration, timing/heading/georeferencing, communications, legal/jurisdiction/operator qualification, real team operations, external firmware integration and bench/HIL/vehicle campaigns.
 
@@ -51,16 +51,16 @@ All three issue acceptance requirements remain open until their complete softwar
 
 ## Authenticated coordination
 
-The persisted [incident access API](https://github.com/stacksjs/drone/blob/main/docs/public-safety-access.md) uses native Stacks accounts, tokens,
+The persisted [incident access API](public-safety-access.md) uses native Stacks accounts, tokens,
 permissions, Gates and generated models for scoped incident membership, closure and paginated
-audit. The [source and review module](https://github.com/stacksjs/drone/blob/main/docs/public-safety-records.md) retains complete verified collection
+audit. The [source and review module](public-safety-records.md) retains complete verified collection
 sources, explicit supported-pixel observations and append-only reviewer declarations under the same
-native access rules. [Retention custody](https://github.com/stacksjs/drone/blob/main/docs/public-safety-retention.md) adds explicit inventory-bound
+native access rules. [Retention custody](public-safety-retention.md) adds explicit inventory-bound
 enrollment, minimal expired custody status and append-only hold decisions. Collection artifacts keep
 their separate unsigned simulator evidence boundary.
-[Accepted local purge](https://github.com/stacksjs/drone/blob/main/docs/public-safety-purge.md) removes only explicitly accepted active DB payload
+[Accepted local purge](public-safety-purge.md) removes only explicitly accepted active DB payload
 and registered private namespace entries, with a minimized custody receipt. It excludes offline
 copies, historical diagnostics, backups and media residuals. The incident handover tracer
-preserves source-bound uncertainty. The [authorized workspace](https://github.com/stacksjs/drone/blob/main/docs/public-safety-workspace.md)
+preserves source-bound uncertainty. The [authorized workspace](public-safety-workspace.md)
 combines persisted records, human commands and live synthetic execution.
 Sector/team responsibility and full operational qualification remain in issue #23.

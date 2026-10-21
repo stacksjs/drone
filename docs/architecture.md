@@ -71,60 +71,60 @@ It uses the oldest heartbeat/position/battery receipt time for freshness. Physic
 reports position health false and never transmits. SITL assumes the simulator's position estimator
 is healthy; that assumption must never be carried into a physical adapter.
 
-The wire codec is an experimental subset. [Shared acknowledged microservices](https://github.com/stacksjs/drone/blob/main/docs/driver-protocols.md) add bounded command, parameter and waypoint transfers; serial/TCP and complete firmware coverage remain open.
-Both external stacks are optional drivers. The [owned-stack ADR](https://github.com/stacksjs/drone/blob/main/docs/adr/0001-owned-autonomy.md) and
-[feature roadmap](https://github.com/stacksjs/drone/blob/main/docs/roadmap/README.md) define the replacement path. A future physical adapter needs verified estimator status, source identity, sequence/replay handling,
+The wire codec is an experimental subset. [Shared acknowledged microservices](driver-protocols.md) add bounded command, parameter and waypoint transfers; serial/TCP and complete firmware coverage remain open.
+Both external stacks are optional drivers. The [owned-stack ADR](adr/0001-owned-autonomy.md) and
+[feature roadmap](roadmap/README.md) define the replacement path. A future physical adapter needs verified estimator status, source identity, sequence/replay handling,
 authenticated transport, link supervision, flight-controller configuration and hardware validation.
 
 ## Native runtime bench slice
 
 The owned kernel and Pico 2 HAL live in `firmware/runtime/`, with the explicit C++17 exception in
-[ADR 2](https://github.com/stacksjs/drone/blob/main/docs/adr/0002-bench-runtime.md). Stacks owns the [CLI and protocol tools](https://github.com/stacksjs/drone/blob/main/docs/runtime.md) under
+[ADR 2](adr/0002-bench-runtime.md). Stacks owns the [CLI and protocol tools](runtime.md) under
 `resources/functions/drone/runtime/`. The first profile is synthetic-sensor and neutral-output
 only. It has no physical flight command path and does not replace estimation or vehicle controls.
 
 
-The optional [sensor bench profile](https://github.com/stacksjs/drone/blob/main/docs/sensors.md), recorded in [ADR 3](https://github.com/stacksjs/drone/blob/main/docs/adr/0003-sensor-bench.md),
+The optional [sensor bench profile](sensors.md), recorded in [ADR 3](adr/0003-sensor-bench.md),
 adds original SPI/I2C/UART acquisition and a receive-only DS stream. TypeScript applies units,
 calibration, clock uncertainty and independent health checks. The same pipeline runs against
 recordings on the simulator clock. Replay snapshots are diagnostic; estimator fusion is issue #4.
 
-The [owned estimator](https://github.com/stacksjs/drone/blob/main/docs/estimation.md), recorded in [ADR 4](https://github.com/stacksjs/drone/blob/main/docs/adr/0004-owned-estimator.md), consumes
+The [owned estimator](estimation.md), recorded in [ADR 4](adr/0004-owned-estimator.md), consumes
 qualified sensor events on their capture epochs. It exposes tilt/relative-yaw, GNSS local NED and
 separate pressure height with health/reset counters. It is independent of both external autopilots
 and remains separate from control telemetry until heading, fusion and hardware validation exist.
 
-The [owned control physics harness](https://github.com/stacksjs/drone/blob/main/docs/controls.md), recorded in [ADR 5](https://github.com/stacksjs/drone/blob/main/docs/adr/0005-simulated-multirotor-controls.md),
+The [owned control physics harness](controls.md), recorded in [ADR 5](adr/0005-simulated-multirotor-controls.md),
 feeds modeled raw sensor records through the existing sensor pipeline and estimator into bounded
 quad-X control. It declares initial simulation heading alignment and has no physical transport.
 Plant truth is retained only for sensor synthesis and independent response evaluation.
 
-The [owned authority supervisor](https://github.com/stacksjs/drone/blob/main/docs/authority.md), recorded in [ADR 6](https://github.com/stacksjs/drone/blob/main/docs/adr/0006-simulated-authority.md),
+The [owned authority supervisor](authority.md), recorded in [ADR 6](adr/0006-simulated-authority.md),
 adds explicit arm/engage, fault revocation and a separate modeled output watchdog above that same
 control path. A host-loss run stops all host execution while the modeled board clock continues.
 Physical firmware and external adapters remain separate from these simulation-only frames.
 
-[ADR 7](https://github.com/stacksjs/drone/blob/main/docs/adr/0007-driver-transactions.md) records shared external-driver transactions and the strict
+[ADR 7](adr/0007-driver-transactions.md) records shared external-driver transactions and the strict
 separation between scripted UDP conformance, firmware SITL and physical evidence.
 
-[ADR 8](https://github.com/stacksjs/drone/blob/main/docs/adr/0008-camera-payload-adapters.md) adds owned camera acquisition with bounded local IPC,
+[ADR 8](adr/0008-camera-payload-adapters.md) adds owned camera acquisition with bounded local IPC,
 per-command clock synchronization, no automatic shutter retry and capture-epoch pose association.
-Native Stacks [payload commands](https://github.com/stacksjs/drone/blob/main/docs/payloads.md) expose replay and explicit Pi acquisition. Bus
+Native Stacks [payload commands](payloads.md) expose replay and explicit Pi acquisition. Bus
 contracts remain configuration only; payloads cannot bypass the flight authority supervisor.
 
-[ADR 9](https://github.com/stacksjs/drone/blob/main/docs/adr/0009-runtime-diagnostics.md) records bounded runtime-only journals with typed events,
+[ADR 9](adr/0009-runtime-diagnostics.md) records bounded runtime-only journals with typed events,
 provenance digests, loss accounting and crash-prefix recovery. Native Stacks commands and a local
-[stx viewer](https://github.com/stacksjs/drone/blob/main/docs/diagnostics.md) share the pure verifier/replay projection. No replay path has a
+[stx viewer](diagnostics.md) share the pure verifier/replay projection. No replay path has a
 vehicle transport, update/flash capability or runtime authority.
 
-[ADR 10](https://github.com/stacksjs/drone/blob/main/docs/adr/0010-owned-missions.md) adds a versioned [owned mission engine](https://github.com/stacksjs/drone/blob/main/docs/missions.md) over
+[ADR 10](adr/0010-owned-missions.md) adds a versioned [owned mission engine](missions.md) over
 the estimator/control/authority physics pipeline. Validated graphs emit position targets, never
 arm themselves, and recover recorded prefixes into a supervised paused state. Task events and
 local-position traces stay separate from physical payload IO and runtime-only diagnostic journals.
 
 ## Shared owned vehicle execution
 
-The [vehicle runtime](https://github.com/stacksjs/drone/blob/main/docs/vehicles.md) extends owned raw sensor and estimator execution to aerodynamic
+The [vehicle runtime](vehicles.md) extends owned raw sensor and estimator execution to aerodynamic
 fixed-wing, differential ground and planar surface profiles. Explicit v2 missions share graph budgets,
 replay, payload scope and authority lifecycle while each model owns its control and actuator units.
 Fresh sessions isolate state. The common stx workspace inspects recorded estimated routes and

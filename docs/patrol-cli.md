@@ -18,8 +18,8 @@ charging at 47 seconds, then reviews the second flight at 60 seconds. The fixed 
 is 2026-01-01T00:00:00.000Z. These are unsigned synthetic decisions, without authenticated
 operator identity. The nominal model completes flights at 44.120 and 102.120 seconds,
 verifies their own selected-pad contact, and proves modeled charge isolation at 55.400 seconds.
-See the [recurrence](https://github.com/stacksjs/drone/blob/main/docs/patrol-recurrence.md), [contact](https://github.com/stacksjs/drone/blob/main/docs/patrol-contact.md) and
-[partial-charge](https://github.com/stacksjs/drone/blob/main/docs/patrol-charge.md) contracts for their fixed models and limits.
+See the [recurrence](patrol-recurrence.md), [contact](patrol-contact.md) and
+[partial-charge](patrol-charge.md) contracts for their fixed models and limits.
 
 ## Decisions and native options
 
@@ -65,7 +65,7 @@ It includes each decision's fulfillment, its own historical mission/contact evid
 verification and measured modeled isolation, separate true and credited energy, host freshness
 and actual request/acceptance counters. Optional `--output <directory>` publishes the same
 summary with normalized input and a completion manifest before printing it. The directory must
-not already exist. See the [recording and replay contract](https://github.com/stacksjs/drone/blob/main/docs/patrol-recording.md) for bounds,
+not already exist. See the [recording and replay contract](patrol-recording.md) for bounds,
 fresh replay consent and publication failure behavior. The command does not dump traces.
 
 `neutral-preview`, `reviewed-denials` and `completed` exit successfully. Any unfulfilled explicit
@@ -74,7 +74,7 @@ flight must actually complete with its own verified contact; approved charging m
 isolate its own episode. A queued request or final relay-off value alone cannot establish success.
 The retained model continues to the horizon without a fabricated final stop or revoke.
 
-The separate [authenticated review ledger](https://github.com/stacksjs/drone/blob/main/docs/patrol-review.md) persists owner-only intent,
+The separate [authenticated review ledger](patrol-review.md) persists owner-only intent,
 decisions and consumption metadata without invoking this command or handing off to a runtime.
 Issue #24 remains open for a patrol workspace, production scheduling, runtime recovery, broader
 weather behavior and physical qualification. This command adds no physical transport, unattended

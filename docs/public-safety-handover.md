@@ -157,7 +157,7 @@ with the existing accepted purge-v1 audit group. The fixed inventory and
 previously accepted plans are unchanged. No per-offer copy survives in custody or
 purge receipt metadata. Native diagnostic exclusions and explicit field redaction
 also cover the protocol. Existing downloaded, exported, backed-up or diagnostic
-copies remain subject to the exclusions in [local purge](https://github.com/stacksjs/drone/blob/main/docs/public-safety-purge.md).
+copies remain subject to the exclusions in [local purge](public-safety-purge.md).
 
 The library functions live in resources/functions/drone/public-safety/access/
 handover.ts; native Actions and Gates adapt the same interface to HTTP. The

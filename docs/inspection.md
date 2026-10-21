@@ -120,4 +120,4 @@ Issue [#20](https://github.com/stacksjs/drone/issues/20) remains open for regist
 measured range/pose/visible/thermal calibration, qualified camera/payload hardware, environmental
 and dynamic-structure campaigns, human-reviewed real defect evidence, richer assets/occlusions,
 HIL and vehicle acceptance. This workflow is owned physics simulation, not an external firmware
-SITL run or a completed physical infrastructure inspection. See [ADR 20](https://github.com/stacksjs/drone/blob/main/docs/adr/0020-asset-inspection.md).
+SITL run or a completed physical infrastructure inspection. See [ADR 20](adr/0020-asset-inspection.md).

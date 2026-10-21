@@ -76,5 +76,8 @@
   },
   "bugs": {
     "url": "https://github.com/stacksjs/drone/issues"
+  },
+  "overrides": {
+    "@stacksjs/bunpress": "0.2.22"
   }
 }

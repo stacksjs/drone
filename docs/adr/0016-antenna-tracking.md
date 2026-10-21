@@ -29,4 +29,4 @@ evidence. No PWM, GPIO, serial, UDP, payload actuator or physical endpoint is ad
 Physical acceptance still needs a surveyed mount, encoder calibration, independent braking/stop
 authority, travel and cable tests, transport/clock qualification and timestamped measured pointing
 and RF observations. Keep issue #16 open for those gates. Software tests do not satisfy the issue's
-physical bench criterion. See [the implementation and bench contract](https://github.com/stacksjs/drone/blob/main/docs/antenna.md).
+physical bench criterion. See [the implementation and bench contract](../antenna.md).

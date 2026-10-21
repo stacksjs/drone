@@ -3,7 +3,7 @@
 The owned antenna planner computes bounded pan/tilt trajectories for one explicitly selected
 telemetry target. It is simulation-only. There is no physical mount driver, actuator endpoint or
 flight-authority path. Issue #16 remains open for measured mount accuracy and link correlation.
-The decision is recorded in [ADR 16](https://github.com/stacksjs/drone/blob/main/docs/adr/0016-antenna-tracking.md).
+The decision is recorded in [ADR 16](adr/0016-antenna-tracking.md).
 
 Run the native Stacks command:
 

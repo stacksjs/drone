@@ -33,4 +33,4 @@ initial north alignment and local surface pressure are declared assumptions.
 Tether, leak, depth, DVL/pressure quality, emergency, host, IMU, sensor, operator
 and kill losses inhibit outputs. A neutral board cannot guarantee vehicle safety
 around entanglement or overhead structures. Hardware evidence remains a separate
-acceptance gate described in [the profile guide](https://github.com/stacksjs/drone/blob/main/docs/vehicles-subsea.md).
+acceptance gate described in [the profile guide](../vehicles-subsea.md).

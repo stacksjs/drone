@@ -57,7 +57,7 @@ a body-only CSRF token is unavailable because these routes defer body parsing un
 
 Creation installs exactly one coordinator. Membership changes cannot mint another coordinator,
 remove or demote the current one, or perform handover. Use the separate two-phase
-[incident coordination handover](https://github.com/stacksjs/drone/blob/main/docs/public-safety-handover.md).
+[incident coordination handover](public-safety-handover.md).
 An account needs both platform eligibility and active incident membership.
 Client-supplied actor, grantor or principal fields grant nothing and are rejected by mutation schemas.
 
@@ -105,8 +105,8 @@ or uncontrolled copies. A declared hold does not bypass expiry or prove a review
 Content results are checked after actual transaction completion and again after awaited HTTP
 middleware. If expiry withholds a mutation response after COMMIT, its committed change remains;
 the response gate does not roll back that change or recall bytes already released to clients.
-The [retention custody API](https://github.com/stacksjs/drone/blob/main/docs/public-safety-retention.md) adds explicit enrollment and hold review.
-[Accepted local purge](https://github.com/stacksjs/drone/blob/main/docs/public-safety-purge.md) is a separate, default-disabled policy for active
+The [retention custody API](public-safety-retention.md) adds explicit enrollment and hold review.
+[Accepted local purge](public-safety-purge.md) is a separate, default-disabled policy for active
 incident DB payload and registered files. Enrollment alone never authorizes that removal.
 
 ## Generic data boundaries
@@ -131,14 +131,14 @@ cookie CSRF, unread unauthorized bodies and alternate generic model routes. They
 Auth or the ORM, reset the application's database, or establish production identity-provider,
 distributed revocation or vehicle evidence.
 
-The [source, observation and review functions](https://github.com/stacksjs/drone/blob/main/docs/public-safety-records.md) extend this access module
+The [source, observation and review functions](public-safety-records.md) extend this access module
 with immutable verified collection sources, explicit pixel declarations and append-only review.
-The [retention custody functions](https://github.com/stacksjs/drone/blob/main/docs/public-safety-retention.md) add minimal status and explicit hold
+The [retention custody functions](public-safety-retention.md) add minimal status and explicit hold
 review after expiry, without reopening content access or deleting data.
-The [separate purge module](https://github.com/stacksjs/drone/blob/main/docs/public-safety-purge.md) records explicit accepted removal and minimal
-receipts, with declared exclusions. The [handover module](https://github.com/stacksjs/drone/blob/main/docs/public-safety-handover.md) transfers
+The [separate purge module](public-safety-purge.md) records explicit accepted removal and minimal
+receipts, with declared exclusions. The [handover module](public-safety-handover.md) transfers
 incident coordination after explicit recipient acknowledgement. The
-[authorized workspace](https://github.com/stacksjs/drone/blob/main/docs/public-safety-workspace.md) connects these existing reads and commands
+[authorized workspace](public-safety-workspace.md) connects these existing reads and commands
 at `/incidents`. Issue #23 remains open for sector/team assignments and in-progress
 collection, plus jurisdiction, hardware,
 firmware interoperability and operational qualification.

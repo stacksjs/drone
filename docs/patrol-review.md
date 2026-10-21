@@ -2,7 +2,7 @@
 
 The patrol review API records owner-scoped intent, review decisions and one consumption acknowledgment in native Stacks models. It does not start a simulation, launch a vehicle, grant charging authority or hand work to a runtime. Every successful response carries `actorIdentityAuthenticated: true`, `bindingIdentityAuthenticated: false`, `launchAuthorized: false`, `chargeAuthorized: false`, `physicalFlightEnabled: false`, `executionState: "not-requested"` and `handoff: null`.
 
-This API is separate from [finite patrol recording and replay](https://github.com/stacksjs/drone/blob/main/docs/patrol-recording.md). Recording replay checks an unsigned local summary. Authenticated review records a server-authenticated actor and durable history; it does not authenticate the caller's declared vehicle, pad or frame.
+This API is separate from [finite patrol recording and replay](./patrol-recording.md). Recording replay checks an unsigned local summary. Authenticated review records a server-authenticated actor and durable history; it does not authenticate the caller's declared vehicle, pad or frame.
 
 ## Native access and routes
 

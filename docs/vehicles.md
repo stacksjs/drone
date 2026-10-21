@@ -63,8 +63,8 @@ TypeScript controllers. Native board execution, external firmware SITL, HIL and 
 vehicle acceptance remain separate gates. VTOL, helicopter, soaring, blimp and other vehicle
 families remain explicit roadmap work.
 
-Read [air](https://github.com/stacksjs/drone/blob/main/docs/vehicles-air.md), [ground](https://github.com/stacksjs/drone/blob/main/docs/vehicles-ground.md), [surface](https://github.com/stacksjs/drone/blob/main/docs/vehicles-surface.md), [subsea](https://github.com/stacksjs/drone/blob/main/docs/vehicles-subsea.md),
-[mission semantics](https://github.com/stacksjs/drone/blob/main/docs/missions.md) and [the replacement matrix](https://github.com/stacksjs/drone/blob/main/docs/roadmap/feature-coverage.md).
+Read [air](vehicles-air.md), [ground](vehicles-ground.md), [surface](vehicles-surface.md), [subsea](vehicles-subsea.md),
+[mission semantics](missions.md) and [the replacement matrix](roadmap/feature-coverage.md).
 
 ## Subsea inspection records
 

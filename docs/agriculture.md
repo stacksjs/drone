@@ -139,4 +139,4 @@ Keep #21 open for measured multispectral hardware/panels/irradiance, synchroniza
 real field/dataset interchange, physical range/heading/pose accuracy, external known crop-map
 comparisons, ground agronomic measurements, real explicitly reviewed livestock records, richer
 parcel models, bench/HIL/vehicle campaigns and any physical operator/privacy requirements. The owned
-software evidence does not complete those acceptance gates. See [ADR 21](https://github.com/stacksjs/drone/blob/main/docs/adr/0021-agriculture-sensing.md).
+software evidence does not complete those acceptance gates. See [ADR 21](adr/0021-agriculture-sensing.md).

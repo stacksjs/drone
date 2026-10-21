@@ -110,4 +110,4 @@ uncertainty with held-out trajectories. Complete on-Pi acquisition, restart/rese
 authority campaigns. Neither this dataset nor a `declared-bench` import closes those gates.
 
 Issue #17 remains open for those campaigns, physical sensor adapters and broader appearance/privacy
-evaluation if an appearance tracker is introduced. See [ADR 17](https://github.com/stacksjs/drone/blob/main/docs/adr/0017-calibrated-vision.md).
+evaluation if an appearance tracker is introduced. See [ADR 17](adr/0017-calibrated-vision.md).

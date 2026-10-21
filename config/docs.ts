@@ -12,6 +12,7 @@ const config: BunPressOptions = {
   docsDir: './docs',
   basePath: '/docs',
   outDir: './dist/docs',
+  head: [['link', { rel: 'icon', href: '/docs/favicon.svg', type: 'image/svg+xml' }]],
 
   nav: [
     { text: 'Guide', link: '/' },
@@ -22,6 +23,7 @@ const config: BunPressOptions = {
   ],
 
   themeConfig: {
+    editLink: { pattern: 'https://github.com/stacksjs/drone/edit/main/docs/:path' },
     socialLinks: [{ icon: 'github', link: 'https://github.com/stacksjs/drone' }],
   },
 

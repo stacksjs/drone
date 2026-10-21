@@ -13,7 +13,7 @@ Keep propellers removed during bench integration. This release receives physical
    to `.env` and run `./buddy key:generate`. Run `bun run simulate` before connecting a flight controller.
 4. Validate the camera independently with Raspberry Pi's [AI Camera guide](https://www.raspberrypi.com/documentation/accessories/ai-camera.html)
    or [camera software guide](https://www.raspberrypi.com/documentation/computers/camera_software.html).
-   `rpicam-hello --list-cameras` lists detected cameras. The [camera pipeline](https://github.com/stacksjs/drone/blob/main/docs/camera-tracking.md) now consumes IMX500 frames/detections; its on-device validation remains pending.
+   `rpicam-hello --list-cameras` lists detected cameras. The [camera pipeline](camera-tracking.md) now consumes IMX500 frames/detections; its on-device validation remains pending.
 5. Install the supported ArduCopter firmware for Pixhawk 6C using an appropriate ground station.
    Connect the autopilot to the Pi over USB using the exact connector on your board, then identify its
    stable `/dev/serial/by-id/...` device. Grant the service account the OS's serial-device permissions.

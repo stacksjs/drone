@@ -39,6 +39,6 @@ visible. There is no adapter to command or flight `Telemetry`, no arming and no 
 
 Tightly coupled error-state EKF, bias learning, heading observations, barometric datum alignment,
 delay compensation, full-rate IMU propagation, VIO/optical flow/RTK and redundancy require the
-reference campaigns and numerical work in the [estimator guide](https://github.com/stacksjs/drone/blob/main/docs/estimation.md). Porting a
+reference campaigns and numerical work in the [estimator guide](../estimation.md). Porting a
 validated algorithm into the allocation-free board scheduler is separate from this Pi-side replay
 implementation and requires issue #2's measured runtime budgets.

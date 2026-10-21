@@ -4,8 +4,8 @@ Open `/incidents` to connect an existing native personal credential and incident
 key. This read and command tracer combines existing incident, source, observation,
 review and coordination interfaces in one authorized screen. It does not yet
 start a simulator or display a live vehicle feed. See
-[ADR25](https://github.com/stacksjs/drone/blob/main/docs/adr/0025-authorized-incident-workspace.md) for the accepted design and
-[incident access](https://github.com/stacksjs/drone/blob/main/docs/public-safety-access.md) for account provisioning.
+[ADR25](adr/0025-authorized-incident-workspace.md) for the accepted design and
+[incident access](public-safety-access.md) for account provisioning.
 
 ## Identity and current access
 
@@ -91,8 +91,8 @@ cannot be recalled. A fresh SQL decision is not a distributed revocation fence.
 Source selection remains explicit. Observation and review forms use the
 displayed source and current incident version. Handover uses the independent
 offer digest, assignment and briefing cutoff, with explicit acknowledgement of
-the displayed uncertainty. See [record commands](https://github.com/stacksjs/drone/blob/main/docs/public-safety-records.md) and
-[coordination handover](https://github.com/stacksjs/drone/blob/main/docs/public-safety-handover.md) for authoritative schemas.
+the displayed uncertainty. See [record commands](public-safety-records.md) and
+[coordination handover](public-safety-handover.md) for authoritative schemas.
 
 An identity or scope change clears old source selections, cursors,
 acknowledgements, drafts and pending retries. Old asynchronous completions cannot

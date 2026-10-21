@@ -210,7 +210,7 @@ compiler and frame/capability translation are still needed before a shared drive
 Issue #10 remains open for durable correlated whole-runtime checkpoints, payload transaction/ACK
 reconciliation, external driver translation, richer energy/terrain/rally planning and restart/HIL
 failure evidence. Hardware acceptance, real landing detection, obstacle-aware return and physical
-mission control remain separate gates. See [ADR 10](https://github.com/stacksjs/drone/blob/main/docs/adr/0010-owned-missions.md).
+mission control remain separate gates. See [ADR 10](adr/0010-owned-missions.md).
 
 ## Native readiness policy, library v3
 
