@@ -1,4 +1,5 @@
 import { expect, test } from 'bun:test'
+import { randomBytes } from 'node:crypto'
 import { mkdtemp, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -10,10 +11,15 @@ test('local administrators provision existing incident operators without printin
   try {
     const config = join(root, 'bunfig.toml')
     await writeFile(config, 'preload=[]\n')
-    const child = Bun.spawn([process.execPath, `--config=${config}`, '--no-env-file', `${import.meta.dir}/../fixtures/public-safety-access/provision.ts`], { cwd: root, env: { ...process.env, APP_ENV: 'test', NODE_ENV: 'test', DB_CONNECTION: 'sqlite', DB_DATABASE_PATH: join(root, 'access.sqlite') }, stdout: 'pipe', stderr: 'pipe' })
+    // Own a fresh fixture key rather than inheriting a developer or deployment secret.
+    const appKey = `base64:${randomBytes(32).toString('base64')}`
+    const child = Bun.spawn([process.execPath, `--config=${config}`, '--no-env-file', `${import.meta.dir}/../fixtures/public-safety-access/provision.ts`], { cwd: root, env: { ...process.env, APP_KEY: appKey, APP_ENV: 'test', NODE_ENV: 'test', DB_CONNECTION: 'sqlite', DB_DATABASE_PATH: join(root, 'access.sqlite') }, stdout: 'pipe', stderr: 'pipe' })
     const [code, stdout, stderr] = await Promise.all([child.exited, new Response(child.stdout).text(), new Response(child.stderr).text()])
     expect(code, `${stdout}\n${stderr}`).toBe(0)
     expect(stdout).toContain('PASS native Buddy incident provisioning')
+    expect(stdout).not.toContain(appKey)
+    expect(stderr).not.toContain(appKey)
+    expect(await Bun.file(join(root, '.env')).exists()).toBe(false)
   }
   finally { await rm(root, { recursive: true, force: true }) }
 }, 120000)
