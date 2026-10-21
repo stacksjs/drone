@@ -168,3 +168,37 @@ test('admission owns the trust policy and inspection directory across asynchrono
   stable.target = 'other/image.bin'
   expect(await pendingStable).toEqual(accepted)
 }, 60000)
+
+
+test('reject malformed or normalized expiration dates instead of treating them as unexpired', async () => {
+  for (const expires of ['not-a-date', '2035-02-30T00:00:00Z', '2035-01-01', '2035-01-01T00:00:00+01:00']) {
+    const item = await setup({ expires })
+    await expect(stageRuntimeFirmware(item.input)).rejects.toThrow()
+    await incomplete(item.output)
+  }
+})
+
+test('the bootstrap root and every fetched metadata role require valid expiration dates', async () => {
+  for (const role of ['root', 'rotatedRoot', 'snapshot', 'targets'] as const) {
+    const item = await setup({ rotate: role === 'rotatedRoot', metadataFields: { [role]: { expires: 'not-a-date' } } })
+    await expect(stageRuntimeFirmware(item.input)).rejects.toThrow()
+    await incomplete(item.output)
+  }
+})
+
+test('metadata versions must be positive safe integers', async () => {
+  for (const role of ['root', 'timestamp'] as const) {
+    for (const version of [0, -1, 9007199254740992]) {
+      const item = await setup({ metadataFields: { [role]: { version } } })
+      await expect(stageRuntimeFirmware(item.input)).rejects.toThrow()
+      await incomplete(item.output)
+    }
+  }
+})
+
+
+test('a valid UTC leap date remains accepted and independently verifiable', async () => {
+  const item = await setup({ expires: '2036-02-29T12:34:56Z' })
+  const staged = await stageRuntimeFirmware(item.input)
+  expect(await inspectStagedRuntimeFirmware({ ...item.policy, directory: item.output })).toEqual(staged)
+})

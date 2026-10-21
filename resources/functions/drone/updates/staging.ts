@@ -115,8 +115,13 @@ function object(value: unknown): Record<string, unknown> {
   if (!value || typeof value !== 'object' || Array.isArray(value)) throw new Error('Invalid signed runtime metadata')
   return value as Record<string, unknown>
 }
-function validateMetadataKeyIDs(bytes: Buffer) {
+function validateMetadata(bytes: Buffer) {
   const signed = object(object(JSON.parse(bytes.toString('utf8'))).signed)
+  if (!Number.isSafeInteger(signed.version) || (signed.version as number) < 1) throw new Error('TUF metadata requires a positive safe integer version')
+  // Date accepts invalid calendar dates and produces NaN for malformed input. Validate the
+  // specified UTC calendar representation before the SDK performs its expiry comparison.
+  const expires = signed.expires
+  if (typeof expires !== 'string' || !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$/.test(expires) || !Number.isFinite(Date.parse(expires)) || new Date(expires).toISOString().replace('.000Z', 'Z') !== expires) throw new Error('TUF metadata requires a valid UTC expiration date')
   const keys = signed._type === 'root' ? object(signed.keys) : signed._type === 'targets' && signed.delegations !== undefined ? object(object(signed.delegations).keys) : undefined
   // The SDK verifies signatures by key ID but does not recompute the ID. Reject arbitrary
   // identifier aliases by binding each declared ID to the canonical key object.
@@ -137,7 +142,7 @@ function signedRuntime(info: TargetFile, policy: RuntimeFirmwarePolicy) {
 
 /** Use the SDK's public HTTP interface on a private loopback server. No external fetch is performed. */
 async function verifyRepository(repository: string, root: Buffer, work: string, policy: RuntimeFirmwarePolicy, download?: string) {
-  validateMetadataKeyIDs(root)
+  validateMetadata(root)
   const fetched = new Map<string, Buffer>()
   let requests = 0, received = 0
   const prefix = `${originPrefix}${randomBytes(32).toString('hex')}/`
@@ -154,7 +159,7 @@ async function verifyRepository(repository: string, root: Buffer, work: string, 
         let bytes = fetched.get(path)
         if (!bytes) {
           bytes = repositoryFile(repository, path, path.startsWith('metadata/') ? metadataLimit : imageLimit)
-          if (path.startsWith('metadata/')) validateMetadataKeyIDs(bytes)
+          if (path.startsWith('metadata/')) validateMetadata(bytes)
           received += bytes.length
           if (received > 32 * 1024 * 1024) throw new Error('Repository byte budget exceeded')
           fetched.set(path, bytes)

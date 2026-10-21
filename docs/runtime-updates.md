@@ -48,6 +48,9 @@ verification. No external network fetch or arbitrary URL option is provided.
 The host additionally verifies that root and delegation key IDs equal SHA-256
 of their canonical key objects, using the upstream canonical JSON library.
 This rejects arbitrary key-ID aliases before role verification.
+Metadata versions must be positive safe integers. Expiration dates must be real
+UTC calendar dates in the TUF `YYYY-MM-DDTHH:MM:SSZ` format before the SDK makes
+expiry comparisons; malformed or automatically normalized dates are rejected.
 
 The selected target must have SHA-256, a nonzero length of at most 16 MiB and
 exactly these fields in its signed `custom.drone` object:
