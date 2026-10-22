@@ -1,37 +1,37 @@
-import { createSocket } from 'node:dgram'
 import type { AutopilotDriverId } from './profiles'
 import type { MissionWaypoint } from './messages'
 import { createArduPilotDriver, createPx4Driver } from './index'
 import { createMavlinkSigning } from './signing'
-import { decodeDatagram, encodeFrameV2 } from '../mavlink'
+import type { MavlinkFrame } from '../mavlink'
+import { encodeFrameV2 } from '../mavlink'
+import { createDriverBenchPeer } from './bench-peer'
 import { driverProfiles } from './profiles'
 import { messageView, missionAckPayload, missionCountPayload, normalizeWaypoint, parameterBytes, parseWaypoint, waypointPayload } from './messages'
 
 /** Scripted protocol peer, not an ArduPilot/PX4 firmware process or a flight simulator. */
-export async function runDriverProtocolBench(options: { driver: AutopilotDriverId, dropFirstAck?: boolean, signed?: boolean }) {
+export async function runDriverProtocolBench(options: { driver: AutopilotDriverId, transport?: 'udp' | 'tcp', dropFirstAck?: boolean, signed?: boolean }) {
   const { driver } = options
   if (!['ardupilot', 'px4'].includes(driver)) throw new TypeError('Choose ardupilot or px4')
+  const transport = options.transport ?? 'udp'
+  if (transport !== 'udp' && transport !== 'tcp') throw new TypeError('Choose udp or tcp')
   const dropFirstAck = options.dropFirstAck === true, signed = options.signed === true
   const encoding = driver === 'px4' ? 'bytewise' : 'c-cast'
   // Public conformance key. Never use this fixture key on a deployed link.
   const key = Uint8Array.from({ length: 32 }, (_, i) => i)
   const timestamp = () => BigInt(Math.floor((Date.now() - Date.UTC(2015, 0, 1)) * 100))
   const peerSigning = signed ? createMavlinkSigning({ key, linkId: 1, timestamp }) : undefined
-  const peer = createSocket('udp4')
-  let clientPort: number | null = null, sequence = 0, dropped = 0, integer = 42, peerError: Error | null = null
+  let sequence = 0, dropped = 0, integer = 42, peerError: Error | null = null
   let mission: Required<MissionWaypoint>[] = [], staged: Required<MissionWaypoint>[] = [], uploadCount = 0
   const confirmations: number[] = []
   const send = (id: number, payload: Uint8Array) => {
-    if (clientPort !== null) peer.send(encodeFrameV2(id, payload, sequence++ % 256, 1, 1, peerSigning), clientPort, '127.0.0.1')
+    peer.send(encodeFrameV2(id, payload, sequence++ % 256, 1, 1, peerSigning))
   }
   const ack = (command: number, result = 0) => { const p = new Uint8Array(10); new DataView(p.buffer).setUint16(0, command, true); p.set([result, 100], 2); p.set([245, 191], 8); send(77, p) }
   const heartbeat = () => { const p = new Uint8Array(9); p.set([2, driverProfiles[driver].autopilotId, 0, 4, 3], 4); send(0, p) }
   const value = () => { const p = new Uint8Array(25), v = new DataView(p.buffer); p.set(parameterBytes(integer, 6, encoding)); v.setUint16(4, 1, true); p.set(new TextEncoder().encode('BENCH_INT'), 8); p[24] = 6; send(22, p) }
-  peer.on('error', error => { peerError = error })
-  peer.on('message', (bytes, remote) => {
-    if (remote.address !== '127.0.0.1' || remote.port !== clientPort) return
+  function receive(frames: MavlinkFrame[]) {
     try {
-      for (const frame of decodeDatagram(bytes, peerSigning)) {
+      for (const frame of frames) {
         if (frame.systemId !== 245 || frame.componentId !== 191) continue
         const p = frame.payload, v = messageView(frame)
         if (frame.id === 76) {
@@ -82,15 +82,16 @@ export async function runDriverProtocolBench(options: { driver: AutopilotDriverI
       }
     }
     catch (error) { peerError = error instanceof Error ? error : new Error(String(error)) }
-  })
-  await new Promise<void>((resolve, reject) => { peer.once('error', reject); peer.bind(0, '127.0.0.1', () => { peer.off('error', reject); resolve() }) })
+  }
+  const peer = await createDriverBenchPeer(transport, peerSigning, receive, error => { peerError = error })
   const controller = new AbortController(), timeout = setTimeout(() => controller.abort(), 20000)
   let adapter: Awaited<ReturnType<typeof createArduPilotDriver>> | undefined
   let heartbeatTimer: ReturnType<typeof setInterval> | undefined
   try {
     const factory = driver === 'px4' ? createPx4Driver : createArduPilotDriver
-    adapter = await factory({ kind: 'sitl', listenPort: 0, sitlPort: peer.address().port, signing: signed ? { key, linkId: 2, timestamp } : undefined })
-    clientPort = adapter.localPort; heartbeat(); heartbeatTimer = setInterval(heartbeat, 250)
+    const signing = signed ? { key, linkId: 2, timestamp } : undefined
+    adapter = await factory(transport === 'tcp' ? { transport, kind: 'sitl', port: peer.port, signing } : { kind: 'sitl', listenPort: 0, sitlPort: peer.port, signing })
+    peer.start(adapter.localPort); heartbeat(); heartbeatTimer = setInterval(heartbeat, 250)
     const readyDeadline = performance.now() + 5000
     while (!Number.isFinite(adapter.protocol.snapshot().lastHeartbeatAtMs)) { if (performance.now() > readyDeadline || peerError) throw peerError ?? new Error('Fixture discovery heartbeat timeout'); await Bun.sleep(10) }
     const operation = { signal: controller.signal }, protocol = adapter.protocol
@@ -100,7 +101,7 @@ export async function runDriverProtocolBench(options: { driver: AutopilotDriverI
     const uploaded = await protocol.uploadMission(missionItems, operation), downloaded = await protocol.downloadMission(operation), resume = await protocol.resumeMission(1, operation)
     if (peerError) throw peerError
     if (JSON.stringify(downloaded) !== JSON.stringify(missionItems.map(normalizeWaypoint))) throw new Error('Fixture mission readback mismatch')
-    return { evidence: 'scripted-loopback-protocol-peer' as const, driver, signed, physicalFlightEnabled: false as const, firmwareSitlValidated: false as const, hardwareValidated: false as const, capabilities, rate, confirmations, droppedAcks: dropped, parameterBefore, parameterAfter, uploaded, downloaded, resume }
+    return { evidence: 'scripted-loopback-protocol-peer' as const, driver, transport, signed, physicalFlightEnabled: false as const, firmwareSitlValidated: false as const, hardwareValidated: false as const, capabilities, rate, confirmations, droppedAcks: dropped, parameterBefore, parameterAfter, uploaded, downloaded, resume }
   }
-  finally { clearTimeout(timeout); if (heartbeatTimer) clearInterval(heartbeatTimer); adapter?.close(); peer.close() }
+  finally { clearTimeout(timeout); if (heartbeatTimer) clearInterval(heartbeatTimer); adapter?.close(); await peer.close() }
 }

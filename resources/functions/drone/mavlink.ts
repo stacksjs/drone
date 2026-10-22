@@ -91,6 +91,36 @@ export function decodeDatagram(bytes: Uint8Array, signing?: MavlinkSigning): Mav
   return result
 }
 
+/** Bounded byte-stream framing. Partial frames belong to exactly one connection. */
+export function createMavlinkStreamDecoder(signing?: MavlinkSigning) {
+  // MAVLink 2: 10-byte header, 255-byte payload, CRC and 13-byte signature.
+  const pending = new Uint8Array(280)
+  let used = 0
+  function discard(count: number) { pending.copyWithin(0, count, used); used -= count }
+  return {
+    get retainedBytes() { return used },
+    reset() { used = 0 },
+    push(bytes: Uint8Array): MavlinkFrame[] {
+      if (!(bytes instanceof Uint8Array) || bytes.length > 65_536) throw new RangeError('MAVLink stream chunk exceeds 65536 bytes')
+      const frames: MavlinkFrame[] = []
+      for (const byte of bytes) {
+        pending[used++] = byte
+        while (used > 0) {
+          const v2 = pending[0] === 0xFD
+          if (!v2 && pending[0] !== 0xFE) { discard(1); continue }
+          if (used < (v2 ? 3 : 2)) break
+          const length = pending[1]! + (v2 ? 12 + ((pending[2]! & 1) ? 13 : 0) : 8)
+          if (used < length) break
+          const decoded = decodeDatagram(pending.subarray(0, length), signing)
+          if (decoded.length === 1) { frames.push(decoded[0]!); discard(length) }
+          else discard(1) // Resynchronize after corrupt length/CRC, retaining any following frame.
+        }
+      }
+      return frames
+    },
+  }
+}
+
 /** LOCAL_NED velocity-only setpoint. Does not arm, take off, land or change modes. */
 export function encodeVelocity(velocity: Vector3, options: { sequence?: number, targetSystem?: number, targetComponent?: number, bootMs?: number, signing?: MavlinkSigning } = {}): Uint8Array {
   if (![velocity.north, velocity.east, velocity.down].every(v => Number.isFinite(v) && Math.abs(v) <= 20))

@@ -192,11 +192,15 @@
       "app/Commands/DriversBench.ts",
       "docs/driver-protocols.md",
       "docs/driver-protocol-evidence.json",
-      "tests/unit/driver-protocol.test.ts"
+      "tests/unit/driver-protocol.test.ts",
+      "resources/functions/drone/tcp.ts",
+      "resources/functions/drone/drivers/session.ts",
+      "tests/unit/driver-tcp.test.ts",
+      "tests/unit/mavlink-stream.test.ts"
     ],
     "remaining": [
       "Pinned ArduPilot/PX4 firmware SITL round trips, supported commands, mission variants and measured message rates",
-      "Serial/TCP stream transport, reconnect/backpressure and hardware/HIL authority evidence",
+      "Serial transport, automatic reconnect policy, actual firmware TCP failure campaigns and hardware/HIL authority evidence",
       "Signing key lifecycle, persistent replay watermarks and cross-restart campaigns",
       "COMMAND_INT/remote cancellation, full mission/parameter protocols and ownership reconciliation",
       "Explicit FTP/log/event/time/RTCM, payload/gimbal, DDS/ROS 2 and CAN gateway services"
@@ -861,7 +865,7 @@
     "implementationStatus": "behavior-audit-in-progress",
     "implemented": [
       "Pinned directory and six-vehicle-family assignments with per-dimension reviewed/unclassified status",
-      "59 source-backed behavior cases, bounded subset claims and explicit unsupported behaviors",
+      "89 source-backed behavior cases, bounded subset claims and explicit unsupported behaviors",
       "Executable evidence selectors, pinned source hash/license/citation verification, issue link checks and upstream snapshot refresh/diff gates"
     ],
     "evidence": [
@@ -872,7 +876,7 @@
       "docs/parity.md"
     ],
     "remaining": [
-      "Complete 1,347 currently unclassified parameter/mode/protocol/hardware/failure dimensions and deeper review inside sampled dimensions",
+      "Complete 1,317 currently unclassified parameter/mode/protocol/hardware/failure dimensions and deeper review inside sampled dimensions",
       "Expand executable coverage from bounded subsets to behavior-level parity with retained firmware/SITL/HIL/vehicle evidence"
     ]
   },

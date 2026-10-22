@@ -6,6 +6,7 @@
     {
       "evidence": "scripted-loopback-protocol-peer",
       "driver": "ardupilot",
+      "transport": "udp",
       "signed": false,
       "physicalFlightEnabled": false,
       "firmwareSitlValidated": false,
@@ -82,6 +83,161 @@
     {
       "evidence": "scripted-loopback-protocol-peer",
       "driver": "ardupilot",
+      "transport": "udp",
+      "signed": true,
+      "physicalFlightEnabled": false,
+      "firmwareSitlValidated": false,
+      "hardwareValidated": false,
+      "capabilities": {
+        "driver": "ardupilot",
+        "bits": "139268",
+        "uid": "48879",
+        "flightSoftwareVersion": 0,
+        "missionInt": true,
+        "parameterEncoding": "c-cast",
+        "encodingEvidence": "advertised",
+        "physicalCommands": false
+      },
+      "rate": {
+        "command": 511,
+        "result": 0,
+        "progress": null,
+        "executionConfirmed": false
+      },
+      "confirmations": [
+        0,
+        1
+      ],
+      "droppedAcks": 1,
+      "parameterBefore": {
+        "id": "BENCH_INT",
+        "type": 6,
+        "value": 42,
+        "count": 1,
+        "index": 0
+      },
+      "parameterAfter": {
+        "id": "BENCH_INT",
+        "type": 6,
+        "value": 43,
+        "count": 1,
+        "index": 0
+      },
+      "uploaded": {
+        "count": 2,
+        "accepted": true
+      },
+      "downloaded": [
+        {
+          "command": 16,
+          "frame": 6,
+          "latitudeDeg": 0.001,
+          "longitudeDeg": 0.002,
+          "altitudeM": 10,
+          "holdSeconds": 0,
+          "acceptanceRadiusM": 2,
+          "passRadiusM": 0,
+          "yawDeg": null
+        },
+        {
+          "command": 16,
+          "frame": 6,
+          "latitudeDeg": 0.003,
+          "longitudeDeg": 0.004,
+          "altitudeM": 12,
+          "holdSeconds": 0,
+          "acceptanceRadiusM": 2,
+          "passRadiusM": 0,
+          "yawDeg": 90
+        }
+      ],
+      "resume": {
+        "index": 1,
+        "accepted": true,
+        "executionConfirmed": false
+      }
+    },
+    {
+      "evidence": "scripted-loopback-protocol-peer",
+      "driver": "ardupilot",
+      "transport": "tcp",
+      "signed": false,
+      "physicalFlightEnabled": false,
+      "firmwareSitlValidated": false,
+      "hardwareValidated": false,
+      "capabilities": {
+        "driver": "ardupilot",
+        "bits": "139268",
+        "uid": "48879",
+        "flightSoftwareVersion": 0,
+        "missionInt": true,
+        "parameterEncoding": "c-cast",
+        "encodingEvidence": "advertised",
+        "physicalCommands": false
+      },
+      "rate": {
+        "command": 511,
+        "result": 0,
+        "progress": null,
+        "executionConfirmed": false
+      },
+      "confirmations": [
+        0,
+        1
+      ],
+      "droppedAcks": 1,
+      "parameterBefore": {
+        "id": "BENCH_INT",
+        "type": 6,
+        "value": 42,
+        "count": 1,
+        "index": 0
+      },
+      "parameterAfter": {
+        "id": "BENCH_INT",
+        "type": 6,
+        "value": 43,
+        "count": 1,
+        "index": 0
+      },
+      "uploaded": {
+        "count": 2,
+        "accepted": true
+      },
+      "downloaded": [
+        {
+          "command": 16,
+          "frame": 6,
+          "latitudeDeg": 0.001,
+          "longitudeDeg": 0.002,
+          "altitudeM": 10,
+          "holdSeconds": 0,
+          "acceptanceRadiusM": 2,
+          "passRadiusM": 0,
+          "yawDeg": null
+        },
+        {
+          "command": 16,
+          "frame": 6,
+          "latitudeDeg": 0.003,
+          "longitudeDeg": 0.004,
+          "altitudeM": 12,
+          "holdSeconds": 0,
+          "acceptanceRadiusM": 2,
+          "passRadiusM": 0,
+          "yawDeg": 90
+        }
+      ],
+      "resume": {
+        "index": 1,
+        "accepted": true,
+        "executionConfirmed": false
+      }
+    },
+    {
+      "evidence": "scripted-loopback-protocol-peer",
+      "driver": "ardupilot",
+      "transport": "tcp",
       "signed": true,
       "physicalFlightEnabled": false,
       "firmwareSitlValidated": false,
@@ -158,6 +314,7 @@
     {
       "evidence": "scripted-loopback-protocol-peer",
       "driver": "px4",
+      "transport": "udp",
       "signed": false,
       "physicalFlightEnabled": false,
       "firmwareSitlValidated": false,
@@ -234,6 +391,161 @@
     {
       "evidence": "scripted-loopback-protocol-peer",
       "driver": "px4",
+      "transport": "udp",
+      "signed": true,
+      "physicalFlightEnabled": false,
+      "firmwareSitlValidated": false,
+      "hardwareValidated": false,
+      "capabilities": {
+        "driver": "px4",
+        "bits": "8212",
+        "uid": "48879",
+        "flightSoftwareVersion": 0,
+        "missionInt": true,
+        "parameterEncoding": "bytewise",
+        "encodingEvidence": "advertised",
+        "physicalCommands": false
+      },
+      "rate": {
+        "command": 511,
+        "result": 0,
+        "progress": null,
+        "executionConfirmed": false
+      },
+      "confirmations": [
+        0,
+        1
+      ],
+      "droppedAcks": 1,
+      "parameterBefore": {
+        "id": "BENCH_INT",
+        "type": 6,
+        "value": 42,
+        "count": 1,
+        "index": 0
+      },
+      "parameterAfter": {
+        "id": "BENCH_INT",
+        "type": 6,
+        "value": 43,
+        "count": 1,
+        "index": 0
+      },
+      "uploaded": {
+        "count": 2,
+        "accepted": true
+      },
+      "downloaded": [
+        {
+          "command": 16,
+          "frame": 6,
+          "latitudeDeg": 0.001,
+          "longitudeDeg": 0.002,
+          "altitudeM": 10,
+          "holdSeconds": 0,
+          "acceptanceRadiusM": 2,
+          "passRadiusM": 0,
+          "yawDeg": null
+        },
+        {
+          "command": 16,
+          "frame": 6,
+          "latitudeDeg": 0.003,
+          "longitudeDeg": 0.004,
+          "altitudeM": 12,
+          "holdSeconds": 0,
+          "acceptanceRadiusM": 2,
+          "passRadiusM": 0,
+          "yawDeg": 90
+        }
+      ],
+      "resume": {
+        "index": 1,
+        "accepted": true,
+        "executionConfirmed": false
+      }
+    },
+    {
+      "evidence": "scripted-loopback-protocol-peer",
+      "driver": "px4",
+      "transport": "tcp",
+      "signed": false,
+      "physicalFlightEnabled": false,
+      "firmwareSitlValidated": false,
+      "hardwareValidated": false,
+      "capabilities": {
+        "driver": "px4",
+        "bits": "8212",
+        "uid": "48879",
+        "flightSoftwareVersion": 0,
+        "missionInt": true,
+        "parameterEncoding": "bytewise",
+        "encodingEvidence": "advertised",
+        "physicalCommands": false
+      },
+      "rate": {
+        "command": 511,
+        "result": 0,
+        "progress": null,
+        "executionConfirmed": false
+      },
+      "confirmations": [
+        0,
+        1
+      ],
+      "droppedAcks": 1,
+      "parameterBefore": {
+        "id": "BENCH_INT",
+        "type": 6,
+        "value": 42,
+        "count": 1,
+        "index": 0
+      },
+      "parameterAfter": {
+        "id": "BENCH_INT",
+        "type": 6,
+        "value": 43,
+        "count": 1,
+        "index": 0
+      },
+      "uploaded": {
+        "count": 2,
+        "accepted": true
+      },
+      "downloaded": [
+        {
+          "command": 16,
+          "frame": 6,
+          "latitudeDeg": 0.001,
+          "longitudeDeg": 0.002,
+          "altitudeM": 10,
+          "holdSeconds": 0,
+          "acceptanceRadiusM": 2,
+          "passRadiusM": 0,
+          "yawDeg": null
+        },
+        {
+          "command": 16,
+          "frame": 6,
+          "latitudeDeg": 0.003,
+          "longitudeDeg": 0.004,
+          "altitudeM": 12,
+          "holdSeconds": 0,
+          "acceptanceRadiusM": 2,
+          "passRadiusM": 0,
+          "yawDeg": 90
+        }
+      ],
+      "resume": {
+        "index": 1,
+        "accepted": true,
+        "executionConfirmed": false
+      }
+    },
+    {
+      "evidence": "scripted-loopback-protocol-peer",
+      "driver": "px4",
+      "transport": "tcp",
       "signed": true,
       "physicalFlightEnabled": false,
       "firmwareSitlValidated": false,

@@ -71,7 +71,9 @@ It uses the oldest heartbeat/position/battery receipt time for freshness. Physic
 reports position health false and never transmits. SITL assumes the simulator's position estimator
 is healthy; that assumption must never be carried into a physical adapter.
 
-The wire codec is an experimental subset. [Shared acknowledged microservices](driver-protocols.md) add bounded command, parameter and waypoint transfers; serial/TCP and complete firmware coverage remain open.
+The wire codec is an experimental subset. [Shared acknowledged microservices](driver-protocols.md)
+add bounded command, parameter and waypoint transfers over UDP and explicit loopback TCP. Serial,
+actual firmware transport campaigns and complete firmware coverage remain open.
 Both external stacks are optional drivers. The [owned-stack ADR](adr/0001-owned-autonomy.md) and
 [feature roadmap](roadmap/README.md) define the replacement path. A future physical adapter needs verified estimator status, source identity, sequence/replay handling,
 authenticated transport, link supervision, flight-controller configuration and hardware validation.
