@@ -1,13 +1,20 @@
 import { expect, test } from 'bun:test'
-import { mkdtemp, rm, writeFile } from 'node:fs/promises'
+import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
-import { join } from 'node:path'
+import { join, resolve } from 'node:path'
 
 for (const mode of ['completed', 'canceled', 'quarantine']) test(`native execution lifetime ${mode}`, async () => {
-  const root = await mkdtemp(join(tmpdir(), 'drone-incident-access-execution-lifetime-'))
+  const evidence = process.env.EXECUTION_LIFETIME_EVIDENCE
+  if (evidence) await mkdir(resolve(evidence), { recursive: true, mode: 0o700 })
+  const root = await mkdtemp(join(evidence ? resolve(evidence) : tmpdir(), 'drone-incident-access-execution-lifetime-'))
   let child: ReturnType<typeof Bun.spawn> | undefined
   const began = performance.now()
   let deadlineFired = false, cleanupKill = false, completed = false
+  let stdoutWritten = false, stderrWritten = false
+  const retain = async (artifact: 'fixture.stdout' | 'fixture.stderr' | 'lifecycle.json', value: string) => {
+    try { await writeFile(join(root, artifact), value, { mode: 0o600, flag: 'wx' }); return true }
+    catch { console.error('LIFETIME_FIXTURE_EVIDENCE_UNAVAILABLE', JSON.stringify({ mode, artifact })); return false }
+  }
   try {
     const config = join(root, 'bunfig.toml'); await writeFile(config, 'preload=[]\n[install]\nauto="disable"\n')
     const running = child = Bun.spawn([process.execPath, '--no-install', `--config=${config}`, '--no-env-file', `${import.meta.dir}/../fixtures/public-safety-access/execution-lifetime.ts`, mode], { cwd: root, env: { APP_ENV: 'test', APP_DEBUG: 'false', NODE_ENV: 'test', DB_CONNECTION: 'sqlite', DB_DATABASE_PATH: join(root, 'access.sqlite') }, stdin: 'ignore', stdout: 'pipe', stderr: 'pipe' })
@@ -19,10 +26,10 @@ for (const mode of ['completed', 'canceled', 'quarantine']) test(`native executi
     }, 90000)
     try {
       const [code, stdout, stderr] = await Promise.all([running.exited, new Response(running.stdout).text(), new Response(running.stderr).text()])
-      await writeFile(join(root, 'fixture.stdout'), stdout, { mode: 0o600 })
-      await writeFile(join(root, 'fixture.stderr'), stderr, { mode: 0o600 })
       // eslint-disable-next-line no-console
       for (const line of stdout.split('\n')) if (line.startsWith('{"oracle":')) console.log(line)
+      stdoutWritten = await retain('fixture.stdout', stdout)
+      stderrWritten = await retain('fixture.stderr', stderr)
       expect(code, `${stdout}\n${stderr}`).toBe(0)
       expect(stdout).toContain(`PASS native execution lifetime ${mode}`)
       completed = true
@@ -31,10 +38,9 @@ for (const mode of ['completed', 'canceled', 'quarantine']) test(`native executi
   }
   finally {
     if (child?.exitCode === null) { cleanupKill = true; child.kill('SIGKILL'); await child.exited }
-    const lifecycle = { mode, pid: child?.pid ?? null, exitCode: child?.exitCode ?? null, signal: child?.signalCode ?? null, timeoutMs: 90000, deadlineFired, cleanupKill, elapsedMs: performance.now() - began, completed }
+    const lifecycle = { mode, pid: child?.pid ?? null, exitCode: child?.exitCode ?? null, signal: child?.signalCode ?? null, timeoutMs: 90000, deadlineFired, cleanupKill, elapsedMs: performance.now() - began, stdoutWritten, stderrWritten, completed }
     console.log(JSON.stringify({ oracle: 'lifetime-fixture-exit', ...lifecycle }))
-    try { await writeFile(join(root, 'lifecycle.json'), JSON.stringify(lifecycle, null, 2), { mode: 0o600 }) }
-    catch { console.error('LIFETIME_FIXTURE_EVIDENCE_UNAVAILABLE', JSON.stringify({ mode })) }
+    await retain('lifecycle.json', JSON.stringify(lifecycle, null, 2))
     if (completed) await rm(root, { recursive: true, force: true })
     else console.error('LIFETIME_FIXTURE_RETAINED', root)
   }

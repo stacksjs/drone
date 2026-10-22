@@ -58,6 +58,19 @@ jobs:
         env:
           RUNTIME_HOST_FILE_LIMIT_EVIDENCE: ${{ runner.temp }}/runtime-host-file-limit-full-evidence
           RUNTIME_MAINTENANCE_EVIDENCE: ${{ runner.temp }}/runtime-maintenance-full-evidence
+          EXECUTION_LIFETIME_EVIDENCE: ${{ runner.temp }}/execution-lifetime-failures
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: execution-lifetime-failure-evidence
+          if-no-files-found: ignore
+          retention-days: 7
+          path: |
+            ${{ runner.temp }}/execution-lifetime-failures/*/fixture.stdout
+            ${{ runner.temp }}/execution-lifetime-failures/*/fixture.stderr
+            ${{ runner.temp }}/execution-lifetime-failures/*/lifecycle.json
+            ${{ runner.temp }}/execution-lifetime-failures/*/access.sqlite*
+            ${{ runner.temp }}/execution-lifetime-failures/*/bunfig.toml
       - uses: actions/upload-artifact@v4
         if: always()
         with:

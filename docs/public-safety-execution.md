@@ -123,8 +123,13 @@ exit code and signal separately from whether its own watchdog fired or cleanup
 requested a kill. Elapsed time includes process work and output handling, not
 just a native check. Failed cases retain their private temporary directory,
 stdout, stderr and lifecycle receipt when storage permits. A fixed warning
-reports an unavailable receipt if that write fails. Successful cases remove
-their temporary files as before.
+identifies each unavailable evidence file if its write fails; this does not
+replace the captured child diagnostics or its original test verdict. Successful
+cases remove their temporary files as before. CI sets `EXECUTION_LIFETIME_EVIDENCE`
+to an owned runner directory and retains the failed synthetic database, process
+configuration and captured diagnostics for seven days, using explicit file
+patterns that exclude linked dependencies. No account tokens, scope identifiers or recording contents are included
+in the scalar phase and lifecycle observations.
 
 These observations support [the unresolved Mac failure](https://github.com/stacksjs/drone/issues/60);
 they do not establish its cause or repair it. The production authority-check
