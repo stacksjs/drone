@@ -122,7 +122,7 @@ export function createDriverProtocol(options: { driver: AutopilotDriverId, kind:
   const api = {
     tick,
     close: () => close(),
-    transportLost: () => close('transport-lost', 'UDP transport failed'),
+    transportLost: (message = 'Autopilot transport failed') => close('transport-lost', message),
     snapshot() { return { driver, kind, targetSystem: systemId, targetComponent: componentId, lastHeartbeatAtMs: heartbeatAt, capabilities: capabilities ? { ...capabilities } : null, active: pending ? { key: pending.key, attempts: pending.attempts, deadlineMs: pending.deadline, inProgress: pending.inProgress } : null, fault: terminal?.message ?? null, quarantined: [...quarantine], knownMissionCount, physicalCommands: false as const } },
     receive(frame: MavlinkFrame) {
       if (terminal || frame.systemId !== systemId || frame.componentId !== componentId) return

@@ -7,12 +7,13 @@ export default defineCommand({
   description: 'Exercise acknowledged commands, parameters and missions against a scripted local protocol peer',
   options: {
     '--driver <name>': { description: 'ardupilot or px4', default: 'ardupilot' },
+    '--transport <name>': { description: 'udp or tcp loopback peer', default: 'udp' },
     '--drop-first-ack': 'Deliberately drop the first message-rate ACK to exercise retry',
     '--signed': 'Use a public fixture key to test required MAVLink 2 signatures',
   },
   async handle(options) {
     try {
-      const result = await runDriverProtocolBench({ driver: options.driver as AutopilotDriverId, signed: options.signed, dropFirstAck: options.dropFirstAck })
+      const result = await runDriverProtocolBench({ driver: options.driver as AutopilotDriverId, transport: options.transport as 'udp' | 'tcp', signed: options.signed, dropFirstAck: options.dropFirstAck })
       // eslint-disable-next-line
       print(JSON.stringify(result, (key, value) => typeof value === 'bigint' ? String(value) : value, 2))
     }

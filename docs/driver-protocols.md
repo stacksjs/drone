@@ -1,7 +1,7 @@
 # Acknowledged external-driver protocols
 
 Issue [#7](https://github.com/stacksjs/drone/issues/7) adds a shared MAVLink 2 transaction engine
-behind the existing ArduPilot and PX4 UDP factories. It implements discovery, acknowledged commands,
+behind the ArduPilot and PX4 UDP/TCP factories. It implements discovery, acknowledged commands,
 message-rate requests, named parameter reads/writes, bounded waypoint transfers and resume requests.
 Physical telemetry remains receive-only. No HTTP arm, mode or actuator endpoint is introduced.
 
@@ -10,13 +10,14 @@ Physical telemetry remains receive-only. No HTTP arm, mode or actuator endpoint 
 ```sh
 ./buddy drivers:bench --driver ardupilot --drop-first-ack
 ./buddy drivers:bench --driver px4 --signed --drop-first-ack
+./buddy drivers:bench --driver px4 --transport tcp --signed --drop-first-ack
 bun run runtime:cli
 ./storage/runtime-build/cli/drone drivers:bench --driver px4 --signed
 bun tests/fixtures/drivers/evaluate.ts
 ```
 
 `drivers:bench` uses native Stacks `defineCommand()` and is shared by Buddy and the compiled CLI.
-It creates a scripted loopback UDP peer with the selected firmware identity, performs discovery,
+It creates a scripted loopback UDP or TCP peer with the selected firmware identity, performs discovery,
 negotiates a requested 5 Hz message interval, reads/writes an integer, uploads/downloads two waypoints
 and requests resume at item 1. The optional ACK drop verifies a retry with confirmation 1.
 The public signing key is a test vector, never a deployed credential. All sockets/timers close.
@@ -58,6 +59,41 @@ quarantined transaction keys and terminal faults. It does not transmit or refres
 no keys or physical authority. Constructor options are captured; changing `kind` on the caller's
 object cannot promote a physical receiver.
 
+## TCP framing, loss and reconnection
+
+Select TCP explicitly through either public factory:
+
+```ts
+const driver = await createPx4Driver({ transport: 'tcp', kind: 'sitl', port: 5760 })
+```
+
+TCP always connects to literal `127.0.0.1`, with a 2-second connection deadline and a separate
+2-second deadline for the first matching heartbeat. The configured system/component and firmware
+identity must match before TCP telemetry can be admitted. No arbitrary host, serial port, physical
+writer or forwarding service is added. Existing UDP options and default transport remain compatible.
+
+The stream decoder reconstructs v1/v2 packets across fragmented or coalesced reads, with CRC and
+the existing strict signing verifier. Its partial-frame storage is 280 bytes, the signed MAVLink 2
+wire maximum; each decoding call accepts at most 65,536 bytes. TCP reads larger than that are
+processed in bounded chunks. Invalid CRC/length candidates resynchronize rather than refreshing
+telemetry. Unknown dialects and unsupported flags cannot satisfy a transaction. A decoder reset
+clears framing bytes while preserving the supplied verifier's in-session replay watermark.
+
+Outbound bytes awaiting write callbacks are capped at 16 KiB, alongside the runtime's reported
+queue length. A write that reports backpressure is already accepted by the stream and is never
+resent on `drain`. Further writes during pressure terminate the session. No drain or write-callback
+progress for 500 ms also terminates it. These are application buffering bounds, not confirmation
+that a peer received or executed a command. Focused tests exercise the bound against an actual
+paused loopback peer; they do not establish kernel buffer capacity or hardware link timing.
+
+EOF, socket failure, heartbeat expiry and explicit close reject pending work and discard partial
+frames. Reconnection is deliberate: close the old adapter, reconcile any uncertain remote effects,
+then create a new adapter. Nothing automatically reconnects or replays commands. The new session
+requires fresh heartbeat/capability discovery, and PX4 setpoints require fresh explicit priming.
+An already accepted write may still reach the old peer after local failure. Fresh construction
+does not solve stale-ACK ambiguity, exclusive remote plan ownership or persistent signing replay
+state across sessions; those issue #7 gates remain open.
+
 ## Discovery, commands and timing
 
 Discovery sends `MAV_CMD_REQUEST_MESSAGE` (512) for `AUTOPILOT_VERSION` (148). Both an accepted
@@ -85,7 +121,7 @@ of the request, not measured delivery rate. A denied/unsupported ACK is a typed 
 | Ambiguous transaction keys | At most 64; then the session terminates |
 | Download completion record | One final item or empty COUNT, retained up to 10 s for re-ACK |
 
-The UDP adapter polls every 25 ms and emits a client heartbeat at 1 Hz only after explicit SITL
+Both adapters poll every 25 ms and emit a client heartbeat at 1 Hz only after explicit SITL
 capability discovery. The pure engine can also be driven by deterministic `tick()` calls in tests.
 Clock reversal, link expiry, transport failure and close terminate pending work and require a new
 adapter. Node/Bun event-loop timing is not a real-time safety mechanism.
@@ -170,7 +206,8 @@ supply those guarantees, and a sequence wrap must not discard fresh responses. N
 | Full ArduPilot and PX4 firmware SITL round trips | Pending pinned-firmware campaigns, actual supported commands, parameter metadata, mission variants and measured rates |
 | Physical write capability and HIL | Disabled; requires independent authority, link, hardware and vehicle evidence |
 | COMMAND_INT, remote command cancellation and command-specific state checks | Deferred under #7 |
-| Serial and TCP, stream framing/reconnect/backpressure | Deferred under #7; only loopback UDP datagrams implemented |
+| TCP stream framing, bounded output and explicit fresh-session reconnection | Implemented for scripted loopback peers; actual firmware transport campaigns remain open |
+| Serial transport and automatic reconnect policy | Deferred under #7; no serial adapter or transparent transaction replay |
 | Signing key lifecycle and persistent replay state | Deferred under #7/#9 |
 | Complete mission commands, fence/rally, terrain, opaque IDs, partial transfers and mission ownership | Deferred under #7/#10/#11 |
 | Parameter list/EXT, metadata, table change tracking and persistence | Deferred under #7 |
@@ -184,5 +221,7 @@ Sources: [MAVLink command protocol](https://mavlink.io/en/services/command.html)
 [parameter protocol and implementation differences](https://mavlink.io/en/services/parameter.html),
 [common message definitions](https://mavlink.io/en/messages/common.html) and
 [signing specification](https://mavlink.io/en/guide/message_signing.html).
+Stream layout follows [MAVLink packet serialization](https://mavlink.io/en/guide/serialization.html);
+write acceptance and drain semantics follow the [Node socket contract](https://nodejs.org/api/net.html#socketwritebuffer-encoding-callback), exercised on the pinned Bun runtime.
 Protocol logic is original TypeScript. The optional development fixture generator uses pymavlink
 2.4.50 to retain independent wire vectors; no vendor Python package is a runtime dependency.
