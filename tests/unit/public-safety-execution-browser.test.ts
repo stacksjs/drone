@@ -7,6 +7,7 @@ import { spawnWorkspaceFixture } from '../helpers/workspace-process'
 test.skipIf(process.env.EXECUTION_BROWSER_QA !== 'true')('compiled execution panel uses real native routes and a genuine Worker', async () => {
   const directory = await mkdtemp(join(tmpdir(), 'drone-incident-access-'))
   let owned: ReturnType<typeof spawnWorkspaceFixture> | undefined
+  let passed = false
   try {
     const config = join(directory, 'bunfig.toml'); await writeFile(config, 'preload=[]\n')
     owned = spawnWorkspaceFixture([process.execPath, `--config=${config}`, '--no-env-file', `${import.meta.dir}/../fixtures/public-safety-access/execution-browser.ts`], directory, { ...process.env, APP_ENV: 'test', APP_DEBUG: 'false', NODE_ENV: 'test', DB_CONNECTION: 'sqlite', DB_DATABASE_PATH: join(directory, 'access.sqlite'), STX_DIR: join(directory, 'stx') })
@@ -16,10 +17,15 @@ test.skipIf(process.env.EXECUTION_BROWSER_QA !== 'true')('compiled execution pan
       const [code, stdout, stderr] = await Promise.all([child.exited, new Response(child.stdout as ReadableStream).text(), new Response(child.stderr as ReadableStream).text()])
       expect(code, `${stdout}\n${stderr}`).toBe(0)
       expect(stdout).toContain('PASS actual execution browser: native live-before-return')
+      passed = true
     }
     finally { clearTimeout(timeout) }
   }
-  finally { await owned?.stop(); await rm(directory, { recursive: true, force: true }) }
+  finally {
+    await owned?.stop()
+    if (passed) await rm(directory, { recursive: true, force: true })
+    else console.log(JSON.stringify({ evidence: 'retained-private-browser-fixture', directory }))
+  }
 }, 110000)
 
 test('execution browser fixture refuses an unguarded directory before database or application writes', async () => {

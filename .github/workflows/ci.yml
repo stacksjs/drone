@@ -30,6 +30,34 @@ jobs:
       - run: bun run parity:check
       - run: python3 -m py_compile resources/functions/drone/camera/imx500_worker.py
       - run: python3 -m unittest discover -s tests/hardware
+      - name: Qualify cold build setup across the former hook deadline
+        run: bun scripts/qualify-runtime-cold-build.ts "$RUNNER_TEMP/runtime-cold-build"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: runtime-cold-build-evidence
+          if-no-files-found: ignore
+          retention-days: 7
+          path: |
+            ${{ runner.temp }}/runtime-cold-build/receipt.json
+            ${{ runner.temp }}/runtime-cold-build/capture-result.json
+            ${{ runner.temp }}/runtime-cold-build/tool-events.ndjson
+            ${{ runner.temp }}/runtime-cold-build/stdout.log
+            ${{ runner.temp }}/runtime-cold-build/stderr.log
+            ${{ runner.temp }}/runtime-cold-build/project/firmware/runtime/CMakeLists.txt
+      - name: Verify cold-build evidence failure cannot bypass detached tool cleanup
+        run: bun scripts/qualify-runtime-cold-build.ts "$RUNNER_TEMP/runtime-cold-report-failure" --interrupt-before-capture-report
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: runtime-cold-report-failure-evidence
+          if-no-files-found: ignore
+          retention-days: 7
+          path: |
+            ${{ runner.temp }}/runtime-cold-report-failure/receipt.json
+            ${{ runner.temp }}/runtime-cold-report-failure/tool-events.ndjson
+            ${{ runner.temp }}/runtime-cold-report-failure/stdout.log
+            ${{ runner.temp }}/runtime-cold-report-failure/stderr.log
       - name: Verify a kernel-confirmed full input pipe on Linux
         run: bun test tests/unit/runtime.test.ts --test-name-pattern 'kernel-confirmed full input FIFO'
       - name: Verify an actual partial host image write and fresh-process recovery
@@ -425,6 +453,8 @@ jobs:
           path: |
             ${{ runner.temp }}/workspace-browser-evidence/*.png
             ${{ runner.temp }}/workspace-browser-evidence/compiled.html
+            ${{ runner.temp }}/workspace-browser-evidence/browser-launch.json
+            ${{ runner.temp }}/workspace-browser-evidence/chrome-startup-stderr.log
   execution-browser:
     runs-on: ubuntu-latest
     timeout-minutes: 10
@@ -454,6 +484,8 @@ jobs:
           path: |
             ${{ runner.temp }}/execution-browser-evidence/*.png
             ${{ runner.temp }}/execution-browser-evidence/compiled.html
+            ${{ runner.temp }}/execution-browser-evidence/browser-launch.json
+            ${{ runner.temp }}/execution-browser-evidence/chrome-startup-stderr.log
   purge-namespace:
     runs-on: ubuntu-latest
     timeout-minutes: 30

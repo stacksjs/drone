@@ -89,7 +89,7 @@ try {
   console.log(`QA driver33s timer drift ms: ${Date.now() - waitStart - 33000}`)
   const status = await control('status')
   console.log(`QA actual native recipient streams: ${status.recipientStreams}`)
-  assert.equal(await second.evaluate('1'), 1, 'Existing actual browser tab must stay responsive')
+  await second.checkLiveness()
   assert(status.recipientStreams > baseline.recipientStreams, 'Actual native stream must reconnect during the measured lifetime window')
   const starts = status.recipientStreamStarts as number[]
   assert(starts.slice(baseline.recipientStreams).some((start, index) => start >= waitStart && start - starts[baseline.recipientStreams + index - 1]! >= 30000), 'Measured renewal must follow an actual default30s stream lifetime')
