@@ -6,6 +6,12 @@ permissions:
   contents: read
 jobs:
   tcp-passive-research:
+    strategy:
+      fail-fast: false
+      max-parallel: 1
+      matrix:
+        trial: [1, 2, 3, 4]
+    name: TCP passive research trial ${{ matrix.trial }}
     runs-on: ubuntu-24.04
     timeout-minutes: 5
     steps:
