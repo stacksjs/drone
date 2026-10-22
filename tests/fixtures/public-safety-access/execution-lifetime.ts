@@ -3,20 +3,31 @@ import { setupExecutionLifetime } from './execution-lifetime-setup'
 
 const mode = Bun.argv[2]
 assert(mode === 'completed' || mode === 'canceled' || mode === 'quarantine')
-const h = await setupExecutionLifetime(mode)
+const began = performance.now()
+let observations = 0
+async function observe<T>(phase: string, work: () => Promise<T>): Promise<T> {
+  const emit = (outcome: 'began' | 'settled' | 'rejected') => {
+    assert(observations < 128 && phase.length <= 64)
+    console.log(JSON.stringify({ oracle: 'lifetime-phase', mode, ordinal: observations++, phase, outcome, elapsedMs: performance.now() - began }))
+  }
+  emit('began')
+  try { const result = await work(); emit('settled'); return result }
+  catch (error) { emit('rejected'); throw error }
+}
+const h = await observe('setup', () => setupExecutionLifetime(mode))
 let attachment: Awaited<ReturnType<typeof h.core.attachIncidentExecution>> | undefined
 let expiredClose: string | null = null
 try {
-  const run = await h.start()
+  const run = await observe('start', h.start)
   const ack = h.captureFinished(run.slot, mode === 'quarantine')
-  await h.sourceZero()
+  await observe('source-zero', h.sourceZero)
   if (mode === 'completed') {
     let last = 0
-    attachment = await h.f.as(h.f.senderToken, async () => h.core.attachIncidentExecution(h.core.captureExecutionContext(h.key), run.locator, value => {
+    attachment = await observe('attach', () => h.f.as(h.f.senderToken, async () => h.core.attachIncidentExecution(h.core.captureExecutionContext(h.key), run.locator, value => {
       if (!value.latestEvent || value.latestEvent.sequence === last) return
       assert.equal(value.latestEvent.sequence, ++last)
-    }))
-    await attachment.activate()
+    })))
+    await observe('activate', () => attachment!.activate())
     await h.wait(() => run.slot.phase === 'completed', 'The real eight-second producer must complete', 20000)
     assert(ack.event)
     assert.equal(ack.event.data.outcome, 'completed')
@@ -31,7 +42,7 @@ try {
     assert.equal(Atomics.load(run.slot.control, h.executionWords.credit), 0)
     assert.equal(Atomics.load(run.slot.control, h.executionWords.returned), 0)
     const stoppingAt = performance.now()
-    const stopping = await h.core.closeIncidentExecution(h.context, run.locator)
+    const stopping = await observe('close', () => h.core.closeIncidentExecution(h.context, run.locator))
     assert.equal(stopping.phase, 'stopping')
     await h.wait(() => Boolean(ack.event), 'Capture a genuine finished ACK from the canceled actual Worker')
     assert.equal(ack.event!.data.outcome, 'canceled')
@@ -55,16 +66,16 @@ try {
   const expiry = run.slot.metadataDeadline
   const observedAt = Date.now(), observedMonotonic = performance.now()
   assert(expiry > observedAt + 50000, 'The actual unshortened terminal TTL must still be mostly ahead')
-  await h.sourceZero()
+  await observe('source-zero', h.sourceZero)
   console.log(JSON.stringify({ oracle: 'actual-retention-begins', mode, configuredMs: h.limits.retainedMs, remainingMs: expiry - observedAt, producer: run.slot.producer }))
   // Scalar time/slot observation only, not repeated native authority polling.
-  await h.untilWall(expiry - 1000)
+  await observe('wait-before-expiry', () => h.untilWall(expiry - 1000))
   assert.equal(h.executionOwner().slot, run.slot, 'Reservation remains during the actual retained lifetime')
-  const retained = await h.core.readIncidentExecution(h.context, { scope: h.scope })
+  const retained = await observe('retained-read', () => h.core.readIncidentExecution(h.context, { scope: h.scope }))
   assert.equal(retained?.execution, run.view.execution)
   assert.equal(retained.producer, mode === 'quarantine' ? 'unconfirmed' : 'finished')
   assert.equal(run.slot.metadataDeadline, expiry, 'Reads do not renew retention')
-  await h.untilWall(expiry + 100)
+  await observe('wait-after-expiry', () => h.untilWall(expiry + 100))
   if (mode === 'quarantine') {
     assert.equal(h.executionOwner().slot, run.slot, 'Actual TTL cannot free an unconfirmed reservation')
     try { assert.equal((await h.core.closeIncidentExecution(h.context, run.locator)).producer, 'unconfirmed'); expiredClose = 'unconfirmed-view' }
@@ -84,20 +95,20 @@ try {
     await h.wait(() => h.executionOwner().slot === null, 'The real retention timer must dispose the confirmed slot')
     h.assertCleared(run.slot)
     assert.equal(run.slot.worker, null)
-    assert.equal(await h.core.readIncidentExecution(h.context, { scope: h.scope }), null)
+    assert.equal(await observe('expired-read', () => h.core.readIncidentExecution(h.context, { scope: h.scope })), null)
     if (mode === 'completed') {
-      const next = await h.start()
+      const next = await observe('next-start', h.start)
       assert.notEqual(next.view.execution, run.view.execution)
       assert.equal(next.view.phase, 'waiting-for-consumer')
       await h.wait(() => Atomics.load(next.slot.control, h.executionWords.emitted) === 1, 'A new explicit start constructs a new real producer')
-      await h.core.closeIncidentExecution(h.context, next.locator)
+      await observe('next-close', () => h.core.closeIncidentExecution(h.context, next.locator))
       await h.wait(() => next.slot.producer === 'finished', 'New explicit producer cooperatively finishes')
-      await h.core.closeIncidentExecution(h.context, next.locator)
+      await observe('next-release', () => h.core.closeIncidentExecution(h.context, next.locator))
       assert.equal(h.executionOwner().slot, null)
     }
   }
-  await h.sourceZero()
+  await observe('source-zero', h.sourceZero)
   console.log(JSON.stringify({ oracle: 'actual-retention-ended', mode, elapsedSinceObservationMs: performance.now() - observedMonotonic, expiryPassedMs: Date.now() - expiry, slotRetained: h.executionOwner().slot === run.slot, producer: run.slot.producer, sourceCount: 0, expiredClose, lateAckControlled: mode === 'quarantine', actualIndividualThreadJoinQualified: false }))
   console.log(`PASS native execution lifetime ${mode}`)
 }
-finally { attachment?.release(); await h.close() }
+finally { attachment?.release(); await observe('cleanup', h.close) }

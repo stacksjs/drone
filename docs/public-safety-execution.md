@@ -116,3 +116,18 @@ EXECUTION_BROWSER_QA=true BROWSE_BROWSER=/path/to/google-chrome bun test tests/u
 Native controller and HTTP checks separately cover authority replacement,
 elapsed deadlines, stream capacity, cleanup and durable COMMIT with a withheld
 response. The existing workspace browser scenarios remain required regressions.
+
+The native lifetime fixture emits bounded phase observations around setup,
+authority reads, retention waits and cleanup. Its parent records the observed
+exit code and signal separately from whether its own watchdog fired or cleanup
+requested a kill. Elapsed time includes process work and output handling, not
+just a native check. Failed cases retain their private temporary directory,
+stdout, stderr and lifecycle receipt when storage permits. A fixed warning
+reports an unavailable receipt if that write fails. Successful cases remove
+their temporary files as before.
+
+These observations support [the unresolved Mac failure](https://github.com/stacksjs/drone/issues/60);
+they do not establish its cause or repair it. The production authority-check
+limit, actual 60-second retention, 90-second child watchdog and 100-second test
+guard are unchanged. An observed signal or watchdog marker alone does not prove
+an individually joined Worker thread or the cause of an earlier exit.
