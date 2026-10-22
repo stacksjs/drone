@@ -15,7 +15,7 @@ async function observe<T>(phase: string, work: () => Promise<T>): Promise<T> {
   try { const result = await work(); emit('settled'); return result }
   catch (error) { emit('rejected'); throw error }
 }
-const h = await observe('setup', () => setupExecutionLifetime(mode))
+const h = await observe('setup', () => setupExecutionLifetime(mode, observe))
 let attachment: Awaited<ReturnType<typeof h.core.attachIncidentExecution>> | undefined
 let expiredClose: string | null = null
 try {
@@ -29,7 +29,7 @@ try {
       assert.equal(value.latestEvent.sequence, ++last)
     })))
     await observe('activate', () => attachment!.activate())
-    await h.wait(() => run.slot.phase === 'completed', 'The real eight-second producer must complete', 20000)
+    await observe('producer-completed', () => h.wait(() => run.slot.phase === 'completed', 'The real eight-second producer must complete', 20000))
     assert(ack.event)
     assert.equal(ack.event.data.outcome, 'completed')
     assert.equal(ack.event.data.transferred, true)
@@ -39,7 +39,7 @@ try {
     attachment.release()
   }
   else {
-    await h.wait(() => Atomics.load(run.slot.control, h.executionWords.emitted) === 1, 'The real producer must reach its first blocked callback')
+    await observe('producer-first-callback', () => h.wait(() => Atomics.load(run.slot.control, h.executionWords.emitted) === 1, 'The real producer must reach its first blocked callback'))
     assert.equal(Atomics.load(run.slot.control, h.executionWords.credit), 0)
     assert.equal(Atomics.load(run.slot.control, h.executionWords.returned), 0)
     const stoppingAt = performance.now()

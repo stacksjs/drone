@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict'
+import type { FixturePhaseObserver } from './handover-setup'
 import { setupHandoverFixture } from './handover-setup'
 import { examplePublicSafetyConfig } from '../../../resources/functions/drone/public-safety/fixtures'
 
@@ -8,8 +9,8 @@ export interface LifetimeSlot {
   recording: string | null, completion: unknown, latestEvent: unknown,
   candidate: unknown, pendingEvent: unknown, worker: Worker | null,
 }
-export async function setupExecutionLifetime(mode: string) {
-  const f = await setupHandoverFixture()
+export async function setupExecutionLifetime(mode: string, observe?: FixturePhaseObserver) {
+  const f = await setupHandoverFixture(observe)
   const core = await import('../../../resources/functions/drone/public-safety/execution/service')
   const { executionOwner } = await import('../../../resources/functions/drone/public-safety/execution/state')
   const { executionWords } = await import('../../../resources/functions/drone/public-safety/execution/protocol')
