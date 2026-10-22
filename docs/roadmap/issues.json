@@ -19,7 +19,8 @@
       "firmware/runtime/",
       "resources/functions/drone/runtime/",
       "docs/runtime.md",
-      "tests/unit/runtime.test.ts"
+      "tests/unit/runtime.test.ts",
+      "tests/fixtures/runtime/full-input.cpp"
     ],
     "remaining": [
       "Physical Pico 2 boot/flash evidence",
@@ -273,16 +274,26 @@
       "app/Commands/UpdatesReserve.ts",
       "app/Commands/UpdatesCandidates.ts",
       "app/Commands/UpdatesRetire.ts",
+      "app/Commands/UpdatesTrial.ts",
+      "app/Commands/UpdatesSlots.ts",
+      "app/Commands/UpdatesRollback.ts",
+      "app/Commands/UpdatesAbandon.ts",
+      "docs/adr/0029-host-slot-health.md",
       "docs/runtime-updates.md",
       "tests/unit/updates-preparation.test.ts",
       "tests/unit/updates-candidates.test.ts",
-      "tests/unit/updates-candidates-cli.test.ts"
+      "tests/unit/updates-candidates-cli.test.ts",
+      "tests/unit/updates-host-slots.test.ts",
+      "tests/unit/updates-host-policy.test.ts",
+      "tests/unit/updates-host-slots-cli.test.ts",
+      "tests/fixtures/updates/qualify-host-slots.ts",
+      "tests/fixtures/updates/host-slot-interruptions.ts"
     ],
     "remaining": [
       "Live runtime/sensor/estimator/authority/mission/payload correlation and measured clock relations",
       "Physical crash, reset cause, power loss, ENOSPC/EDQUOT and electrical storage fault evidence",
       "Measured board logging deadlines, memory, rotation and long-mission retention",
-      "Complete signed firmware update/rollback coordinator, key/clock lifecycle, protected slots and exact-image boot/session health",
+      "Complete coordinator key/clock maintenance, storage-fault recovery and board image/install/boot health and rollback qualification",
       "Commissioning workflow backed by independent physical interlock, calibration and recovery evidence"
     ]
   },

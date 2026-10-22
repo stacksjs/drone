@@ -2,10 +2,11 @@
 
 Issue [#9](https://github.com/stacksjs/drone/issues/9) now has offline signed-image
 staging, independent candidate verification, protected initial trust enrollment
-and a persistent host metadata protocol with protected image preparation. These
-commands prepare and verify host state and actual candidate image bytes. Key
-revocation/repair, installed images, boot selection and known-good rollback slots
-remain part of the full coordinator. Physical deployment is disabled.
+and a persistent host metadata protocol with protected image preparation. The host
+coordinator also retains image slots and observes owned neutral runtime health for
+confirmation and fresh-policy rollback. Key repair, complete storage-fault coverage
+and board installation/boot recovery remain part of the full coordinator. Physical
+deployment is disabled.
 
 ## Explicit trust and policy
 
@@ -80,8 +81,9 @@ writes cache files in place; a host write-limit probe truncated its cached root.
 Never refresh against the enrollment directory. Staging/inspection still require
 their explicit policy and do not load or advance this enrollment automatically.
 The metadata-store functions below retain verified metadata/release floors.
-The complete key lifecycle, storage-fault campaigns, image integration and
-known-good coordinator remain in [issue #42](https://github.com/stacksjs/drone/issues/42).
+Authenticated key repair, complete storage-fault campaigns and board image/install/boot
+qualification remain in [issue #42](https://github.com/stacksjs/drone/issues/42).
+The host coordinator below adds protected image preparation and observed known-good slots.
 Do not discard or re-enroll over failed state to reset a security floor.
 
 ## Persistent host metadata protocol
@@ -325,15 +327,104 @@ marker completion, prepared-record commit and retirement commit. Each cut observ
 an actual competing process rejected with SQLITE_BUSY, then restarts, checks
 unchanged candidate phase/floors and prepares a distinct fresh ID after explicit
 recovery/retirement. This does not cover every SQLite/filesystem write or sync,
-ENOSPC/EDQUOT/EIO, electrical power loss or actual board boot behavior. Installed
-and known-good slot roles, identity-bound runtime health, current-policy selection
-and rollback, authenticated key maintenance and the full fault campaign remain
-required by #42.
+ENOSPC/EDQUOT/EIO, electrical power loss or actual board boot behavior. The host slot
+operation below adds actual image/session confirmation. Authenticated key repair,
+the full storage-fault campaign and physical board acceptance remain required by #42.
 
-The [host bench](runtime.md) now binds each process to a fresh supervisor-owned boot nonce
-and requires a clean exit. This prerequisite provides no installed image identity, bounded
-health transcript or known-good confirmation. Slot health must still bind the verified image,
-owned boot/session challenge and actual runtime evidence before changing known-good state.
+## Owned host slots and observed health
+
+Host trials support `host-neutral-bench-v1`. Supply a trusted local source checkout
+whose HEAD is the signed `sourceRevision` and whose `firmware/runtime` tree is clean.
+The coordinator builds that source and runs CTest. Candidate bytes must exactly
+match the resulting neutral host executable before it can run. A signed text
+payload or a profile label cannot substitute for this equality check. The checkout,
+compiler and host OS remain trusted inputs.
+
+```sh
+./buddy updates:trial /private/runtime-store \
+  --enrollment /private/runtime-enrollment --enrollment-sha256 "$ENROLLMENT_SHA256" \
+  --store-sha256 "$STORE_SHA256" --candidate "$CANDIDATE_ID" \
+  --repository /private/runtime-repository --project /trusted/drone-source \
+  --trusted-system-clock-source operator-managed-clock
+
+./buddy updates:slots /private/runtime-store \
+  --enrollment /private/runtime-enrollment --enrollment-sha256 "$ENROLLMENT_SHA256" \
+  --store-sha256 "$STORE_SHA256"
+
+./buddy updates:rollback /private/runtime-store \
+  --enrollment /private/runtime-enrollment --enrollment-sha256 "$ENROLLMENT_SHA256" \
+  --store-sha256 "$STORE_SHA256" --repository /private/runtime-repository \
+  --project /trusted/drone-source --trusted-system-clock-source operator-managed-clock
+```
+
+The same native commands are registered in the standalone CLI. Clock-source names
+are audit labels for independently managed clocks, not clock attestations. The
+trusted clock is sampled before selection and again before confirmation. The final
+observation is committed to the retained clock floor before expiration checks, even
+if confirmation is later rejected. `clockCheckedMs` and `confirmedClockMs` distinguish
+an accepted time observation from a completed confirmation. Release floors cannot decrease.
+
+Format3 adds `host_slots`, `host_roles` and `host_inputs` in one transaction over
+the exact authenticated format2 schema. Existing identity, metadata, attempts,
+epochs and release/clock floors remain. Readers inspect format1/2 without upgrading
+them. Host trials upgrade only an owned format2 store. Older binaries reject the
+new format; retain state and use a supported reader instead of downgrading or
+reinitializing it. The writer database remains format1.
+
+Selection records an immutable slot ID before image IO. Each slot retains its own
+private image copy; the observed process executes the byte-identical local build.
+The `installed` host role records the copied image selected for that trial. It
+does not describe board installation. A failed trial can leave this role `failed`
+while the previous `knownGood` role and image remain intact.
+
+The supervisor owns fresh boot/session challenges and records 214 ordered inputs
+for its fixed 100-tick virtual-clock trial. Each input is committed before health
+interpretation. The final stop response must match the owned command, and success
+requires actual clean process exit, allowed stdout completion and empty stderr.
+Executable and copied-image bytes are rechecked before confirmation. A second
+trusted-clock sample must remain valid, and all active metadata must still be
+unexpired after accounting for local elapsed time. The interval after that sample
+has a one-second freshness guard. Confirmation, the known-good role, the completion clock floor and release
+of that candidate reservation commit atomically.
+
+Candidate retirement releases its reservation and retains its files/history.
+Separately confirmed slots retain their own images and transcripts. Thus a new
+candidate can be prepared without overwriting the prior known-good image. Slot
+inspection verifies retained image integrity and the full boot/session-bound
+transcript. Its `currentTrustValidated: false` means historical health does not
+authorize use under current policy. A corrupt or missing retained rollback image
+is actionable even when another archive contains matching bytes.
+
+Rollback performs fresh signed verification under current roots, metadata and
+security floors, then observes another actual host process with new challenges.
+The fixed target must currently authorize those exact bytes. A newer signed target
+or targets-key revocation can make the retained known-good image unavailable for
+rollback. Metadata/release advancement survives that rejection. Missing, corrupt,
+expired or below-floor images cannot silently repair themselves or reuse old health.
+
+After an interrupted trial, run `updates:recover` to resolve metadata first. Inspect
+the retained trial with `updates:slots`. A `selected` or `running` trial then needs
+deliberate abandonment by its exact ID:
+
+```sh
+./buddy updates:abandon /private/runtime-store \
+  --enrollment /private/runtime-enrollment --enrollment-sha256 "$ENROLLMENT_SHA256" \
+  --store-sha256 "$STORE_SHA256" --trial "$TRIAL_ID"
+```
+
+Abandonment retains files, inputs and known-good state. Metadata replay cannot
+promote an unfinished trial. A confirmation transaction that actually completed
+before interruption survives replay, including when its enclosing attempt had
+not yet returned. History is bounded to 128 slots, 256 inputs per trial and the
+existing global database/attempt limits. Exhaustion requires supported maintenance,
+never deletion of trust history or reset of a security floor.
+
+Host tests cut actual processes after selection, image readback, running-state
+commit, mid-session input commit, final trusted-clock commit and health confirmation. Each cut checks a real
+competing writer, restart behavior and fresh rollback. These are process-crash and
+host-file observations. Board boot, electrical power-loss durability, syscall/storage
+fault campaigns, secure boot and hardware anti-rollback require separate evidence.
+See the [host slot decision](adr/0029-host-slot-health.md).
 
 ## Repository and signed image contract
 
@@ -400,8 +491,8 @@ pre-delivery replay marker and completed domain-policy rejection.
 The seam alone does not persist a protected prefix or make SDK cache writes
 transactional. Its implementation and tests are a prerequisite for the protected
 store and recovery coordinator in issue #42. The bounded metadata protocol above
-uses that seam; neither completes the full coordinator or
-permit flashing, boot selection or physical deployment.
+uses that seam. Flashing, physical boot selection and deployment remain disabled
+pending the full coordinator.
 
 The selected target must have SHA-256, a nonzero length of at most 16 MiB and
 exactly these fields in its signed `custom.drone` object:
@@ -422,8 +513,10 @@ paths use bounded ASCII names without traversal, escapes or symlinks. Metadata
 is limited to 512 KiB per file, 16 root rotations, 16 delegations, 64 requests and
 32 MiB of distinct fetched bytes. FIFO, device, symlink and oversized inputs fail.
 The neutral profile is a **signer's declaration**, not an inspection of machine
-code or proof of neutral outputs. This module authenticates bytes and declared
-compatibility; it does not parse UF2/ELF or execute an image.
+code or proof of neutral outputs. Standalone staging and inspection authenticate
+bytes and declared compatibility without parsing UF2/ELF or executing an image.
+The host trial above additionally requires equality with the actual trusted local
+neutral build and observes its process before confirming a known-good host slot.
 
 ## Candidate integrity and interruption
 
@@ -451,24 +544,40 @@ treat marker existence alone as permission to install or boot it.
 The separate image-stage/inspection path still starts from its supplied root.
 Its `trustStatePersisted: false` result means it does not use the metadata store's
 cross-invocation floors. The caller must supply its trusted release floor each
-time. Neither path is a complete anti-rollback coordinator. Trusted clock
-acquisition and protection against privileged clock/storage rollback remain
-open. Control-loop freshness still uses its separate monotonic clock.
+time. The host coordinator enforces its own retained floors. Trusted clock
+acquisition and protection against privileged clock/storage rollback remain open.
+Control-loop freshness still uses its separate monotonic clock.
 
 Initial enrollment, the bounded persistent metadata protocol, protected
-signed-image preparation and durable candidate ownership are available above.
-Complete authenticated maintenance/key revocation and the full storage-fault
-campaign, then installed/known-good slot integrity, explicit health
-confirmation and rollback without lowering security floors. Then add
-the board bootloader/install protocol and measured power-loss, full-medium,
+signed-image preparation, owned candidates and observed host slot health are
+available above. Complete authenticated key maintenance/repair and the full
+revocation/storage-fault campaigns. Add the board image/build attestation,
+bootloader/install protocol and measured power-loss, full-medium,
 storage-latency and recovery campaigns. Local privileged filesystem tampering
 is outside this host module's protection; it is not secure boot or hardware
 anti-rollback. See [TUF's workflow and threat model](https://theupdateframework.github.io/specification/latest/).
 
-Tests use generated throwaway Ed25519 keys and clearly synthetic payload bytes.
-They cover real role signatures/rotation, expiration, compatibility, supplied
+Tests use generated throwaway Ed25519 keys. Staging cases use clearly synthetic
+payload bytes; host trials use actual built neutral kernels and a deliberately
+compiled wrong-session stop variant. Cases cover real role signatures/rotation,
+expiration, compatibility, supplied
 release floors, tampering, bounded inputs, incomplete candidates, enrollment
 readback, competing enrollment processes, an actual host write-limit failure and
 native/portable CLI behavior. They establish host behavior, not actual firmware
 installation, board boot recovery or commissioning. The diagnostic supervisor's
 update/rollback check remains blocked and `commissioningReady` stays false.
+
+The copied host-slot CLI campaign uses actual signed kernel bytes and retains
+17 maintenance operations, an interrupted trial and six additional process-cut
+states. Exact-ID abandonment follows metadata recovery; fresh rollback uses a
+different owned boot/session. A missing retained image is rejected without
+reconstructing it from the candidate archive. An older format-2 binary rejects
+format 3 before changing either database. Separate source-policy cases reject a
+wrong signed revision and dirty firmware before runtime input, retaining the
+accepted release floor through recovery. Process cuts and host filesystem tests
+do not establish electrical power-loss behavior.
+
+An actual CMake output-overflow case also stops before runtime start, retains
+release floor 9 through recovery, then observes a fresh healthy trial after the
+private build fault is removed. Build tools use native bounded process capture
+with the existing 120-second command deadline and 2 MB per-stream limits.

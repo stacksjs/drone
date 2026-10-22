@@ -67,6 +67,7 @@ directories inside the private store. Explicit retirement preserves the files
 and history. Metadata-only recovery cannot promote a reserved candidate based on
 its receipt. Recorded-byte status is not current-policy authorization.
 
-Installed and known-good slot roles and health confirmation bound to an exact
-image and boot/session identity remain part of #42. No receipt or healthy boolean can select firmware. Physical installation,
+The [host slot health decision](0029-host-slot-health.md) extends this protocol to
+format3 with retained host images and actual owned runtime confirmation. No receipt
+or caller-supplied healthy boolean can select firmware. Board installation,
 bootloader behavior, secure boot and hardware anti-rollback remain gated by #2/#9.

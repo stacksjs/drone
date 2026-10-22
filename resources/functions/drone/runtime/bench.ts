@@ -64,6 +64,7 @@ export async function runRuntimeBench(options: { project?: string, ticks?: numbe
     return {
       evidence: 'host-harness', boardCandidate: 'pico2', protocolVersion: 1, fault,
       bootId: String(harness.bootId),
+      sessionId: String(status.sessionId), cleanProcessExit: true,
       ticks: status.ticks, virtualElapsedUs: time, hostElapsedMs: Math.round((performance.now() - started) * 1000) / 1000,
       stateBytes: status.stateBytes, maxExecutionUs: status.maxExecutionUs, deadlineMisses: status.deadlineMisses,
       neutralOnly: true, leaseActive: false, physicalFlightEnabled: false,

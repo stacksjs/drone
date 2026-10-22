@@ -18,8 +18,8 @@ export function signer(nonCanonical = false) {
   return { key, sign: (data: Buffer) => new Signature({ keyID: key.keyID, sig: sign(null, data, pair.privateKey).toString('hex') }) }
 }
 
-/** Generated throwaway keys stay in memory. These bytes are a test payload, not firmware. */
-export async function repository(directory: string, options: { custom?: Record<string, string | number | boolean>, expires?: string, metadataFields?: Partial<Record<'root' | 'rotatedRoot' | 'timestamp' | 'snapshot' | 'targets', { expires?: string, version?: number }>>, rotate?: boolean, consistentSnapshot?: boolean, badRotation?: boolean, badTargetsSignature?: boolean, nonCanonicalRoot?: boolean, nonCanonicalRotation?: boolean, nonCanonicalDelegation?: boolean } = {}) {
+/** Throwaway keys stay in memory. The default text payload must never be executed or flashed. */
+export async function repository(directory: string, options: { image?: Uint8Array, custom?: Record<string, string | number | boolean>, expires?: string, metadataFields?: Partial<Record<'root' | 'rotatedRoot' | 'timestamp' | 'snapshot' | 'targets', { expires?: string, version?: number }>>, rotate?: boolean, consistentSnapshot?: boolean, badRotation?: boolean, badTargetsSignature?: boolean, nonCanonicalRoot?: boolean, nonCanonicalRotation?: boolean, nonCanonicalDelegation?: boolean } = {}) {
   await mkdir(join(directory, 'metadata'), { recursive: true })
   await mkdir(join(directory, 'targets/runtime'), { recursive: true })
   const keys = { root: signer(options.nonCanonicalRoot), targets: signer(), snapshot: signer(), timestamp: signer() }
@@ -38,7 +38,7 @@ export async function repository(directory: string, options: { custom?: Record<s
     rotated.sign(nextKey.sign)
     await writeFile(join(directory, 'metadata/2.root.json'), JSON.stringify(rotated.toJSON()))
   }
-  const image = Buffer.from('test payload only, never execute or flash\n')
+  const image = options.image ? Buffer.from(options.image) : Buffer.from('test payload only, never execute or flash\n')
   const imageHash = digest(image)
   const custom = { schema: 'drone-runtime-image-v1', platform, protocolVersion: 1, releaseSequence: 7, sourceRevision: 'a'.repeat(40), profile: 'neutral-bench', ...options.custom }
   const targets = new Metadata(new Targets({ ...fields, ...options.metadataFields?.targets, targets: { [target]: new TargetFile({ path: target, length: image.length, hashes: { sha256: imageHash }, unrecognizedFields: { custom: { drone: custom } } }) } }))
@@ -58,5 +58,32 @@ export async function repository(directory: string, options: { custom?: Record<s
   await writeFile(join(directory, options.consistentSnapshot === false ? 'metadata/targets.json' : 'metadata/1.targets.json'), targetsBytes)
   const imagePath = join(directory, 'targets/runtime', options.consistentSnapshot === false ? 'pico2-bench.bin' : `${imageHash}.pico2-bench.bin`)
   await writeFile(imagePath, image)
-  return { rootPath: join(directory, 'trusted-root.json'), rootSha256: digest(rootBytes), imageHash, image, custom, imagePath }
+  let publishedTargetsSigner = keys.targets, publishedRootVersion = root.version
+  async function publish(update: { image: Uint8Array, version: number, custom?: Record<string, string | number | boolean>, rotateTargets?: boolean }) {
+    if (update.rotateTargets) {
+      if (options.rotate) throw new Error('Fixture target rotation requires its original root signer')
+      publishedTargetsSigner = signer()
+      const nextRoot = new Root({ ...fields, version: ++publishedRootVersion, consistentSnapshot: options.consistentSnapshot ?? true })
+      for (const role of ['root', 'targets', 'snapshot', 'timestamp'] as const) nextRoot.addKey(role === 'targets' ? publishedTargetsSigner.key : keys[role].key, role)
+      const metadata = new Metadata(nextRoot)
+      metadata.sign(keys.root.sign)
+      await writeFile(join(directory, `metadata/${publishedRootVersion}.root.json`), JSON.stringify(metadata.toJSON()))
+    }
+    const bytes = Buffer.from(update.image), hash = digest(bytes), revision = { ...fields, version: update.version }
+    const nextTargets = new Metadata(new Targets({ ...revision, targets: { [target]: new TargetFile({ path: target, length: bytes.length, hashes: { sha256: hash }, unrecognizedFields: { custom: { drone: { ...custom, ...update.custom } } } }) } }))
+    nextTargets.sign(publishedTargetsSigner.sign)
+    const targetsBytes = Buffer.from(JSON.stringify(nextTargets.toJSON()))
+    const nextSnapshot = new Metadata(new Snapshot({ ...revision, meta: { 'targets.json': new MetaFile({ version: update.version, length: targetsBytes.length, hashes: { sha256: digest(targetsBytes) } }) } }))
+    nextSnapshot.sign(keys.snapshot.sign)
+    const snapshotBytes = Buffer.from(JSON.stringify(nextSnapshot.toJSON()))
+    const nextTimestamp = new Metadata(new Timestamp({ ...revision, snapshotMeta: new MetaFile({ version: update.version, length: snapshotBytes.length, hashes: { sha256: digest(snapshotBytes) } }) }))
+    nextTimestamp.sign(keys.timestamp.sign)
+    const imagePath = join(directory, 'targets/runtime', options.consistentSnapshot === false ? 'pico2-bench.bin' : `${hash}.pico2-bench.bin`)
+    await writeFile(imagePath, bytes)
+    await writeFile(join(directory, options.consistentSnapshot === false ? 'metadata/targets.json' : `metadata/${update.version}.targets.json`), targetsBytes)
+    await writeFile(join(directory, options.consistentSnapshot === false ? 'metadata/snapshot.json' : `metadata/${update.version}.snapshot.json`), snapshotBytes)
+    await writeFile(join(directory, 'metadata/timestamp.json'), JSON.stringify(nextTimestamp.toJSON()))
+    return { image: bytes, imageHash: hash, imagePath }
+  }
+  return { rootPath: join(directory, 'trusted-root.json'), rootSha256: digest(rootBytes), imageHash, image, custom, imagePath, publish }
 }

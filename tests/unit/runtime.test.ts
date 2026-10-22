@@ -9,8 +9,10 @@ import { buildRuntime } from '../../resources/functions/drone/runtime/build'
 import { openRuntimeHarness } from '../../resources/functions/drone/runtime/harness'
 import { runRuntimeBench, runtimeBenchFaults } from '../../resources/functions/drone/runtime/bench'
 import { inspectRuntimeCapture } from '../../resources/functions/drone/runtime/capture'
+import { runBoundedHostProcess } from '../../resources/functions/host/process'
 
 const statusFrame = (overrides: Partial<RuntimeFrame> = {}): RuntimeFrame => ({ ...commandFrame('hello', 1, 12n, 77n), kind: 'status', sampleTimeUs: 1000n, ticks: 1, sample: -999, flags: 67, stateBytes: 88, ...overrides })
+const shellQuote = (value: string) => `'${value.replaceAll("'", "'\\''")}'`
 
 describe('owned runtime wire boundary', () => {
   test('uses independent Python/zlib little-endian fixtures and the standard CRC32 vector', () => {
@@ -87,6 +89,13 @@ async function withNative(run: (harness: ReturnType<typeof openRuntimeHarness>) 
   try { await run(harness) }
   finally { await harness.close() }
 }
+async function withNativeTrailer(trailer: string, run: (harness: ReturnType<typeof openRuntimeHarness>) => Promise<void>) {
+  const root = await mkdtemp(join(tmpdir(), 'drone-host-tail-')), launcher = join(root, 'launch')
+  await writeFile(launcher, `#!/bin/sh\n${shellQuote(artifact)} "$@"\n${trailer}\n`, { mode: 0o700 })
+  const harness = openRuntimeHarness(launcher)
+  try { await run(harness) }
+  finally { await Promise.allSettled([harness.close()]); await rm(root, { recursive: true, force: true }) }
+}
 
 describe('actual native kernel process', () => {
   test('separate supervised boots have fresh owned identities and a clean idempotent process exit', async () => {
@@ -122,8 +131,7 @@ describe('actual native kernel process', () => {
     const protocol = join(import.meta.dir, '../../resources/functions/drone/runtime/protocol.ts')
     await writeFile(script, `#!${process.execPath}\nimport { decodeRuntimeFrame, encodeRuntimeFrame } from ${JSON.stringify(protocol)}\nconst frame = decodeRuntimeFrame(Uint8Array.fromHex(${JSON.stringify(fixtures.frames.status)}))\nframe.bootId = BigInt('0x' + Bun.argv.at(-1)) ^ 1n\nawait Bun.stdin.stream().getReader().read()\nconsole.log(Buffer.from(encodeRuntimeFrame(frame)).toString('hex'))\nawait Bun.sleep(10000)\n`, { mode: 0o700 })
     // A standalone fixture must not load the application's Bun preloads.
-    const quote = (value: string) => `'${value.replaceAll("'", "'\\''")}'`
-    await writeFile(launcher, `#!/bin/sh\ncd ${quote(root)} || exit 1\nexec ${quote(process.execPath)} ${quote(script)} "$@"\n`, { mode: 0o700 })
+    await writeFile(launcher, `#!/bin/sh\ncd ${shellQuote(root)} || exit 1\nexec ${shellQuote(process.execPath)} ${shellQuote(script)} "$@"\n`, { mode: 0o700 })
     const harness = openRuntimeHarness(launcher)
     try {
       await expect(harness.exchange('tick 1000')).rejects.toThrow('boot identity')
@@ -147,6 +155,55 @@ describe('actual native kernel process', () => {
     expect(lease.leaseUs).toBe(100000)
     expect((await send(link.stop(1))).leaseUs).toBe(0)
   }))
+  test('unsolicited stdout after a valid final status cannot count as a clean process close', async () => withNativeTrailer("printf '\\n'", async harness => {
+    expect((await harness.exchange('tick 1000')).bootId).toBe(harness.bootId)
+    await expect(harness.close()).rejects.toThrow('unexpected output')
+  }))
+  test('stderr after a valid final status cannot count as a clean process close', async () => withNativeTrailer("printf 'owned-fixture-warning\\n' >&2", async harness => {
+    expect((await harness.exchange('tick 1000')).bootId).toBe(harness.bootId)
+    await expect(harness.close()).rejects.toThrow('stderr')
+  }))
+  test('an exited parent with inherited pipes cannot hide an incomplete close', async () => withNativeTrailer('sleep 3 &', async harness => {
+    expect((await harness.exchange('tick 1000')).bootId).toBe(harness.bootId)
+    await expect(harness.close()).rejects.toThrow('close deadline')
+  }))
+  test('the response deadline rejects even when an exited parent leaves input and output pipes inherited', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'drone-host-response-')), launcher = join(root, 'launch')
+    await writeFile(launcher, '#!/bin/sh\nexec 3<&0\nsleep 3 <&3 3<&- &\n', { mode: 0o700 })
+    const harness = openRuntimeHarness(launcher)
+    try { await expect(harness.exchange('tick 1000')).rejects.toThrow('response deadline') }
+    finally { await Promise.allSettled([harness.close()]); await rm(root, { recursive: true, force: true }) }
+  })
+  test.skipIf(process.platform !== 'linux')('a kernel-confirmed full input FIFO cannot keep a write alive beyond the response deadline', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'drone-host-full-input-')), executable = join(root, 'full-input')
+    let harness: ReturnType<typeof openRuntimeHarness> | undefined
+    try {
+      const firmware = join(import.meta.dir, '../../firmware/runtime')
+      const compiled = await runBoundedHostProcess(['c++', '-std=c++17', '-I', join(firmware, 'include'), join(import.meta.dir, '../fixtures/runtime/full-input.cpp'), join(firmware, 'src/protocol.cpp'), '-o', executable], { timeoutMs: 10000, stdoutBytes: 65536, stderrBytes: 65536, label: 'Native full-input fixture' })
+      expect(compiled.exitCode).toBe(0)
+      harness = openRuntimeHarness(executable)
+      const first = await harness.exchange('x'.repeat(127)), capacity = first.stateBytes, pid = first.sequence
+      expect(capacity).toBeGreaterThanOrEqual(4096)
+      expect(capacity).toBeLessThanOrEqual(65536)
+      expect(capacity % 128).toBe(0)
+      expect(first.sample).toBe(128)
+      let queued = first.sample
+      for (let count = 1; count < capacity / 128; count++) {
+        const status = await harness.exchange('x'.repeat(127))
+        queued = status.sample
+        expect(queued).toBe((count + 1) * 128)
+      }
+      expect(queued).toBe(capacity)
+      await expect(harness.exchange('x'.repeat(127))).rejects.toThrow('response deadline')
+      await expect(harness.exchange('tick 1000')).rejects.toThrow('failed')
+      const exit = await harness.close()
+      expect(exit.exitCode).not.toBe(0)
+      expect(exit.signal).toBe('SIGKILL')
+      expect(() => process.kill(pid, 0)).toThrow()
+      expect(await harness.close()).toEqual(exit)
+    }
+    finally { if (harness) await harness.close(); await rm(root, { recursive: true, force: true }) }
+  }, 20000)
   test('a newer sequence cannot renew authority from an old board timestamp', async () => withNative(async harness => {
     await harness.exchange('tick 1000')
     const link = createRuntimeSession({ nonce: () => 45n })

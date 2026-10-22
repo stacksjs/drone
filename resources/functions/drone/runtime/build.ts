@@ -1,16 +1,12 @@
 import { resolve, join } from 'node:path'
+import { runBoundedHostProcess } from '../../host/process'
 
 export const picoSdkRevision = '079c6f39023649b154152db30f1d781e884879bc'
 export interface RuntimeBuildOptions { project?: string, target?: 'host' | 'pico2', sdk?: string, toolchain?: string, watchdogTest?: boolean, sensors?: boolean }
 async function run(args: string[], cwd: string, env = process.env) {
-  const child = Bun.spawn(args, { cwd, env, stdin: 'ignore', stdout: 'pipe', stderr: 'pipe' })
-  const timeout = setTimeout(() => child.kill('SIGKILL'), 120000)
-  try {
-    const [output, errors, code] = await Promise.all([new Response(child.stdout).text(), new Response(child.stderr).text(), child.exited])
-    if (code !== 0) throw new Error(`${args[0]} exited ${code}:\n${(output + errors).slice(-8000)}`)
-    return output.trim()
-  }
-  finally { clearTimeout(timeout) }
+  const result = await runBoundedHostProcess(args, { cwd, env, timeoutMs: 120000, stdoutBytes: 2_000_000, stderrBytes: 2_000_000, label: `Runtime build ${args[0]}` })
+  if (result.exitCode !== 0) throw new Error(`${args[0]} exited ${result.exitCode}:\n${(result.stdout + result.stderr).slice(-8000)}`, { cause: result })
+  return result.stdout.trim()
 }
 /** Local tools only; no shell interpolation, SDK download, firmware flashing or device access. */
 export async function buildRuntime(options: RuntimeBuildOptions = {}) {

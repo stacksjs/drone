@@ -19,6 +19,12 @@ export const storeEnrollmentFlags = {
   '--enrollment-sha256 <hex>': 'Independently retained enrollment record SHA-256',
 } as const
 export const storeReferenceFlags = { ...storeEnrollmentFlags, '--store-sha256 <hex>': 'Independently retained update-store identity SHA-256' } as const
+export const hostTrialFlags = {
+  ...storeReferenceFlags,
+  '--repository <path>': 'Bounded offline signed-image repository',
+  '--trusted-system-clock-source <name>': 'Audit label for the independently managed system clock, not an attestation',
+  '--project <path>': 'Explicit trusted clean local firmware source checkout matching the signed revision',
+} as const
 
 export function storeCommandEnrollment(options: { enrollment?: unknown, enrollmentSha256?: unknown }) {
   if (typeof options.enrollment !== 'string' || typeof options.enrollmentSha256 !== 'string') throw new Error('Explicit enrollment and independent enrollment pin required')
@@ -27,6 +33,10 @@ export function storeCommandEnrollment(options: { enrollment?: unknown, enrollme
 export function storeCommandReference(options: { enrollment?: unknown, enrollmentSha256?: unknown, storeSha256?: unknown }, directory: string) {
   if (typeof options.storeSha256 !== 'string') throw new Error('Explicit independent store pin required')
   return { ...storeCommandEnrollment(options), directory, storeSha256: options.storeSha256 }
+}
+export function hostTrialCommandOptions(options: { enrollment?: unknown, enrollmentSha256?: unknown, storeSha256?: unknown, repository?: unknown, trustedSystemClockSource?: unknown, project?: unknown }, directory: string) {
+  if (typeof options.repository !== 'string' || typeof options.trustedSystemClockSource !== 'string' || typeof options.project !== 'string') throw new Error('Explicit repository, independent system-clock source and trusted project required')
+  return { ...storeCommandReference(options, directory), repository: options.repository, project: options.project, clock: { source: options.trustedSystemClockSource, read: () => new Date() } }
 }
 export async function storeCommandFailure() {
   process.exitCode = 1

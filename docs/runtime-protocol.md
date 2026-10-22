@@ -92,6 +92,16 @@ requests, bounds response lines and times out unresponsive processes. Every retu
 match the supervisor's launch nonce. Invalid responses kill the process and permanently fail
 that transport. Returned status frames are immutable. Closing waits for actual process exit and
 returns its exit code and signal; repeated closes retain the same result.
+Successful close also requires stdout completion without extra bytes and empty
+stderr. The one-second close deadline rejects inherited pipes that remain open
+after parent exit, cancels readers and retains cleanup failures. These checks
+support the [owned host slot trial](runtime-updates.md#owned-host-slots-and-observed-health).
+Host stdin uses an owned nonblocking POSIX pipe. The supervisor creates it with
+`mkfifo`, opens and verifies its descriptors, then unlinks its private directory
+before launching the process. Writes handle partial progress and EAGAIN within the
+existing two-second response deadline. Closing the writer drops the owned descriptor
+without waiting for a buffered flush. The deadline also cancels an inherited output
+read; killing an already-exited parent alone cannot finish that read.
 
 The optional [DS sensor stream](sensors.md) shares UART TX as complete 128-byte frames.
 DR remains 64 bytes. Awaited DR replies take priority when the current frame finishes; partial

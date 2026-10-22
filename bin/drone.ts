@@ -31,6 +31,10 @@ import UpdatesPrepare from '../app/Commands/UpdatesPrepare'
 import UpdatesReserve from '../app/Commands/UpdatesReserve'
 import UpdatesCandidates from '../app/Commands/UpdatesCandidates'
 import UpdatesRetire from '../app/Commands/UpdatesRetire'
+import UpdatesTrial from '../app/Commands/UpdatesTrial'
+import UpdatesRollback from '../app/Commands/UpdatesRollback'
+import UpdatesSlots from '../app/Commands/UpdatesSlots'
+import UpdatesAbandon from '../app/Commands/UpdatesAbandon'
 
 import MissionsSimulate from '../app/Commands/MissionsSimulate'
 import MissionsValidate from '../app/Commands/MissionsValidate'
@@ -105,6 +109,10 @@ UpdatesPrepare(app)
 UpdatesReserve(app)
 UpdatesCandidates(app)
 UpdatesRetire(app)
+UpdatesTrial(app)
+UpdatesRollback(app)
+UpdatesSlots(app)
+UpdatesAbandon(app)
 MissionsSimulate(app)
 MissionsValidate(app)
 MissionsReplay(app)

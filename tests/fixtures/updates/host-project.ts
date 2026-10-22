@@ -1,0 +1,34 @@
+import { cp, mkdir, readFile, writeFile } from 'node:fs/promises'
+import { join } from 'node:path'
+
+/** Actual disposable source repo with explicit stop-reply or configure-output faults. */
+export async function createHostSourceProject(root: string, options: { fault?: 'stop-session' | 'configure-output' } = {}) {
+  const project = join(root, 'project')
+  await mkdir(project, { mode: 0o700 })
+  await mkdir(join(project, 'firmware'), { mode: 0o700 })
+  await cp(join(import.meta.dir, '../../../firmware/runtime'), join(project, 'firmware/runtime'), { recursive: true })
+  if (options.fault === 'stop-session') {
+    const path = join(project, 'firmware/runtime/src/host.cpp'), source = await readFile(path, 'utf8')
+    const original = 'drone::encode(runtime.status(now), bytes);'
+    if (!source.includes(original)) throw new Error('Owned host source no longer matches the deliberate stop-session fixture')
+    await writeFile(path, source.replace(original, 'auto status = runtime.status(now); if (std::strncmp(line, "frame 44520103", 14) == 0) ++status.session; drone::encode(status, bytes);'))
+  }
+  if (options.fault === 'configure-output') {
+    const path = join(project, 'firmware/runtime/CMakeLists.txt')
+    await writeFile(path, `${await readFile(path, 'utf8')}\nif(EXISTS "\${CMAKE_BINARY_DIR}/drone-output-overflow-fixture")\n  string(REPEAT "fixture-only-output " 180000 DRONE_OVERFLOW_FIXTURE)\n  message(STATUS "\${DRONE_OVERFLOW_FIXTURE}")\nendif()\n`)
+  }
+  async function git(args: string[]) {
+    const child = Bun.spawn(['git', '-c', 'core.hooksPath=/dev/null', '-c', 'core.fsmonitor=false', '-c', 'commit.gpgsign=false', '-c', 'user.name=Chris Breuer', '-c', 'user.email=chris@stacksjs.com', '-C', project, ...args], { stdin: 'ignore', stdout: 'pipe', stderr: 'pipe' })
+    const timer = setTimeout(() => child.kill('SIGKILL'), 10000)
+    try {
+      const [code, output, errors] = await Promise.all([child.exited, new Response(child.stdout).text(), new Response(child.stderr).text()])
+      if (code) throw new Error('Isolated host fixture Git command failed', { cause: { code, errors } })
+      return output.trim()
+    }
+    finally { clearTimeout(timer) }
+  }
+  await git(['init', '-b', 'codex/host-health-fixture'])
+  await git(['add', 'firmware'])
+  await git(['commit', '-m', 'test: prepare host health fixture'])
+  return { project, sourceRevision: await git(['rev-parse', 'HEAD']) }
+}

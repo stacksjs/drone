@@ -270,8 +270,10 @@ store retains verified metadata, clock/release floors and historical recovery;
 `updates:prepare` authenticates actual image bytes under that protected state.
 `updates:reserve`, `updates:candidates` and `updates:retire` add durable candidate
 identity, recorded-byte status and explicit retirement while retaining files/history.
-Physical logging/commissioning, key revocation/repair, installed/known-good slots
-and image-bound boot/session health remain pending.
+`updates:trial`, `updates:slots`, `updates:rollback` and `updates:abandon` add retained
+host slots, actual image/boot/session health and fresh-policy rollback for the owned
+neutral host build. Physical logging/commissioning, key repair, complete storage-fault
+coverage and board image/install/boot/rollback qualification remain pending.
 
 ## Sensor acquisition and replay
 

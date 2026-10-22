@@ -30,6 +30,8 @@ jobs:
       - run: bun run parity:check
       - run: python3 -m py_compile resources/functions/drone/camera/imx500_worker.py
       - run: python3 -m unittest discover -s tests/hardware
+      - name: Verify a kernel-confirmed full input pipe on Linux
+        run: bun test tests/unit/runtime.test.ts --test-name-pattern 'kernel-confirmed full input FIFO'
       - run: ./buddy test
       - run: bun run runtime:cli
       - name: Verify signed test-image staging through the portable CLI outside the checkout
@@ -44,6 +46,15 @@ jobs:
         run: bun tests/fixtures/updates/qualify-preparation.ts "$RUNNER_TEMP/runtime-preparation-qualification" "$GITHUB_WORKSPACE/storage/runtime-build/cli/drone"
       - name: Verify owned candidate identity and retirement with a copied standalone CLI
         run: bun tests/fixtures/updates/qualify-candidates.ts "$RUNNER_TEMP/runtime-candidates-qualification" "$GITHUB_WORKSPACE/storage/runtime-build/cli/drone"
+      - name: Verify host slots, observed health and interrupted recovery with a copied standalone CLI
+        run: bun tests/fixtures/updates/qualify-host-slots.ts "$RUNNER_TEMP/runtime-host-slots-qualification" "$GITHUB_WORKSPACE/storage/runtime-build/cli/drone" "$GITHUB_WORKSPACE"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: runtime-host-slots-evidence
+          if-no-files-found: ignore
+          retention-days: 7
+          path: ${{ runner.temp }}/runtime-host-slots-qualification
       - run: $GITHUB_WORKSPACE/storage/runtime-build/cli/drone runtime:bench --project "$GITHUB_WORKSPACE" --ticks 100 --fault deadline
         working-directory: ${{ runner.temp }}
       - run: $GITHUB_WORKSPACE/storage/runtime-build/cli/drone sensors:replay "$GITHUB_WORKSPACE/tests/fixtures/sensors/bench-v1.json" --at-ms 500

@@ -20,8 +20,13 @@ sensors, estimation, controls and authority work in the linked roadmap.
 
 ## Run the native host harness
 
-Requires Bun, CMake >= 3.20, a C++17 compiler and CTest on macOS or Linux. There are no fetched SDK
+Requires Bun, CMake >= 3.20, a C++17 compiler, CTest and the POSIX `mkfifo` utility on macOS or Linux. There are no fetched SDK
 inputs for host builds. From the checkout:
+
+Each build/tool command has a 120-second deadline and a 2 MB limit per output
+stream. Native Stacks process capture drains stdout and stderr concurrently and
+cleans up the owned process group on POSIX before reporting failure. This also
+applies to SDK inspection and Pico 2 builds; it does not install firmware.
 
 ```sh
 ./buddy runtime:build
@@ -42,10 +47,12 @@ The same fixed-buffer UART state machine used by Pico is also exercised through 
 for fragmentation, resynchronization, corruption, RX/TX budgets and pending transmit buffers.
 
 Each host launch receives a fresh supervisor-owned boot nonce. The report includes its decimal
-`bootId`, and the harness checks that identity on every immutable response. The bench reports
-success only after its actual process exits cleanly. This is host session separation, without
-image attestation or update health confirmation. It does not measure board boot entropy or
-physical timing. See the [host startup contract](runtime-protocol.md#host-hal-test-channel).
+`bootId` and `sessionId`, and the harness checks boot identity on every immutable response.
+The report's `cleanProcessExit` requires an actual clean process exit. Fault experiments
+can finish with a clean OS exit and retain their diagnostic failure. The update coordinator
+adds [current signed-image checks and a fixed healthy host trial](runtime-updates.md#owned-host-slots-and-observed-health).
+Board boot entropy and physical timing still require measurement. See the
+[host startup contract](runtime-protocol.md#host-hal-test-channel).
 
 Build a standalone CLI for the current platform:
 
