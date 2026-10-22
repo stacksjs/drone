@@ -451,6 +451,8 @@ jobs:
           path: |
             ${{ runner.temp }}/workspace-browser-evidence/*.png
             ${{ runner.temp }}/workspace-browser-evidence/compiled.html
+            ${{ runner.temp }}/workspace-browser-evidence/browser-launch.json
+            ${{ runner.temp }}/workspace-browser-evidence/chrome-startup-stderr.log
   execution-browser:
     runs-on: ubuntu-latest
     timeout-minutes: 10
@@ -480,6 +482,8 @@ jobs:
           path: |
             ${{ runner.temp }}/execution-browser-evidence/*.png
             ${{ runner.temp }}/execution-browser-evidence/compiled.html
+            ${{ runner.temp }}/execution-browser-evidence/browser-launch.json
+            ${{ runner.temp }}/execution-browser-evidence/chrome-startup-stderr.log
   purge-namespace:
     runs-on: ubuntu-latest
     timeout-minutes: 30

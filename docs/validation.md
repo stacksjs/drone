@@ -1,5 +1,25 @@
 # Validation evidence
 
+## Browser qualification diagnostics
+
+Browser fixtures keep their failed private directory after owned process-group
+cleanup. It contains native fixture credentials, database state and the browser
+profile, so CI does not upload that directory. Local retained paths are reported;
+CI runner disposal still ends access to private files that were not exported.
+
+CI exports a closed launch-child observation and at most 64 KiB of startup stderr.
+Public stderr capture stops before any page visit can receive credentials. Later
+browser stderr remains in the private fixture, while exported metadata reports
+that capture was withheld. Refused evidence destinations report unavailable and
+preserve the original browser failure. Launch exit observation, signal and cleanup
+intent are separate fields; they do not prove browser/page/thread liveness or the
+kernel's exact exit time. Post-renewal CDP liveness has its own operation label.
+
+Discovery, transport, stream and outer-test limits remain unchanged. These
+observations support the open investigations in [#44](https://github.com/stacksjs/drone/issues/44)
+and [#64](https://github.com/stacksjs/drone/issues/64); retaining a new attempt does
+not explain an earlier failure whose Chrome evidence was removed.
+
 ## Owned mission simulation slice
 
 - Full release suite: 211 Bun tests, 17,424 assertions, zero failures. Buddy lint, application/runtime/view
