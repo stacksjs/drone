@@ -14,6 +14,22 @@ Keep propellers removed during bench integration. This release receives physical
 4. Validate the camera independently with Raspberry Pi's [AI Camera guide](https://www.raspberrypi.com/documentation/accessories/ai-camera.html)
    or [camera software guide](https://www.raspberrypi.com/documentation/computers/camera_software.html).
    `rpicam-hello --list-cameras` lists detected cameras. The [camera pipeline](camera-tracking.md) now consumes IMX500 frames/detections; its on-device validation remains pending.
+
+## Owned runtime development
+
+Continue with the [owned runtime bench](runtime.md#run-the-native-host-harness),
+using its CMake, C++17 and CTest prerequisites on a development host. The host
+harness exercises the kernel and Pi protocol with synthetic samples and neutral
+outputs. Follow the separate Pico 2 and [sensor bench](sensors.md) guides when
+adding those boards. Pi camera acquisition and physical board measurements still
+need their own on-device validation. ArduPilot and PX4 are optional drivers.
+
+## Optional flight-controller telemetry
+
+Use this path when you want receive-only telemetry from an independent flight
+controller. It is separate from developing the owned runtime and does not enable
+physical flight commands.
+
 5. Install the supported ArduCopter firmware for Pixhawk 6C using an appropriate ground station.
    Connect the autopilot to the Pi over USB using the exact connector on your board, then identify its
    stable `/dev/serial/by-id/...` device. Grant the service account the OS's serial-device permissions.
