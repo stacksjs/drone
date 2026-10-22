@@ -27,6 +27,7 @@ import UpdatesStoreInit from '../app/Commands/UpdatesStoreInit'
 import UpdatesStore from '../app/Commands/UpdatesStore'
 import UpdatesRefresh from '../app/Commands/UpdatesRefresh'
 import UpdatesRecover from '../app/Commands/UpdatesRecover'
+import UpdatesMaintain from '../app/Commands/UpdatesMaintain'
 import UpdatesPrepare from '../app/Commands/UpdatesPrepare'
 import UpdatesReserve from '../app/Commands/UpdatesReserve'
 import UpdatesCandidates from '../app/Commands/UpdatesCandidates'
@@ -105,6 +106,7 @@ UpdatesStoreInit(app)
 UpdatesStore(app)
 UpdatesRefresh(app)
 UpdatesRecover(app)
+UpdatesMaintain(app)
 UpdatesPrepare(app)
 UpdatesReserve(app)
 UpdatesCandidates(app)

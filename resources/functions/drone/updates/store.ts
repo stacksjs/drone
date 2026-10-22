@@ -38,6 +38,9 @@ const slotSchema = [
   'CREATE TABLE host_roles (id INTEGER PRIMARY KEY CHECK(id = 1), installed_id TEXT, good_id TEXT, FOREIGN KEY(installed_id) REFERENCES host_slots(id), FOREIGN KEY(good_id) REFERENCES host_slots(id)) STRICT',
   "CREATE TABLE host_inputs (slot_id TEXT NOT NULL, ordinal INTEGER NOT NULL CHECK(ordinal BETWEEN 0 AND 255), kind TEXT NOT NULL CHECK(kind IN ('tx', 'rx')), bytes BLOB NOT NULL CHECK(length(bytes) BETWEEN 1 AND 160), PRIMARY KEY(slot_id, ordinal), FOREIGN KEY(slot_id) REFERENCES host_slots(id)) STRICT",
 ]
+const maintenanceSchema = [
+  'CREATE TABLE maintenance_handoffs (previous_attempt_id TEXT PRIMARY KEY, next_attempt_id TEXT NOT NULL UNIQUE, generation INTEGER NOT NULL, CHECK(previous_attempt_id != next_attempt_id), FOREIGN KEY(previous_attempt_id) REFERENCES attempts(id), FOREIGN KEY(next_attempt_id) REFERENCES attempts(id), FOREIGN KEY(generation) REFERENCES metadata(generation)) STRICT',
+]
 
 interface TrustReference { enrollmentDirectory: string, enrollmentSha256: string }
 interface StoreReference extends TrustReference { directory: string, storeSha256: string }
@@ -45,6 +48,15 @@ interface Binding { schema: 'drone-runtime-store-v1', storeId: string, enrollmen
 interface State { store_id: string, enrollment_sha256: string, generation: number, release_floor: number, clock_floor_ms: number }
 interface MetadataRow { generation: number, attempt_id: string | null, ordinal: number, role: string, version: number, epoch: number, bytes: Uint8Array, sha256: string }
 interface Attempt { id: string, base_generation: number, started_ms: number, clock_source: string, phase: 'pending' | 'verified' | 'recovered' | 'maintenance', accepted_release: number | null }
+export interface RuntimeUpdateAttemptSummary {
+  id: string
+  phase: Attempt['phase']
+  clockSource: string
+  startedMs: number
+  inputRecords: number
+  inputSha256: string
+  metadataRecords: number
+}
 export interface RuntimeTrustStoreSummary {
   schema: 'drone-runtime-store-status-v1'
   storeId: string
@@ -56,7 +68,8 @@ export interface RuntimeTrustStoreSummary {
   clockFloorMs: number
   retainedMetadataRecords: number
   metadata: ReadonlyArray<Readonly<{ role: string, version: number, sha256: string }>>
-  attempt: Readonly<{ id: string, phase: Attempt['phase'], clockSource: string, startedMs: number }> | null
+  attempt: Readonly<RuntimeUpdateAttemptSummary> | null
+  maintenanceHandoffs: ReadonlyArray<Readonly<{ previousAttempt: Readonly<RuntimeUpdateAttemptSummary>, nextAttemptId: string, generation: number }>>
   physicalDeploymentAllowed: false
 }
 
@@ -86,8 +99,8 @@ function openDatabase(path: string, expectedSchema: string[], allowCandidates = 
     // Authenticate the protocol format before any configuration that could
     // rewrite a foreign database's journal/header format.
     const version = databaseVersion(db)
-    const additions = allowCandidates && version === 3 ? [...candidateSchema, ...slotSchema] : allowCandidates && version === 2 ? candidateSchema : []
-    checkSchema(db, [...expectedSchema, ...additions], allowCandidates && (version === 2 || version === 3) ? version : 1)
+    const additions = allowCandidates && version === 4 ? [...candidateSchema, ...slotSchema, ...maintenanceSchema] : allowCandidates && version === 3 ? [...candidateSchema, ...slotSchema] : allowCandidates && version === 2 ? candidateSchema : []
+    checkSchema(db, [...expectedSchema, ...additions], allowCandidates && [2, 3, 4].includes(version) ? version : 1)
     if (Object.values(db.query('PRAGMA journal_mode').get() as Record<string, unknown>)[0] !== 'delete') throw new Error('Unexpected update-store journal format')
     configure(db)
     return db
@@ -136,6 +149,35 @@ function checkedMetadataBytes(row: MetadataRow) {
   if (!/^[a-z0-9][a-z0-9._-]{0,179}$/i.test(row.role) || sha256(bytes) !== row.sha256 || signed.version !== row.version || signed._type !== kind) throw new Error('Protected metadata integrity mismatch')
   return bytes
 }
+function activeAttempts(db: Database) {
+  const retained = databaseVersion(db) === 4 ? 'AND id NOT IN (SELECT previous_attempt_id FROM maintenance_handoffs)' : ''
+  return db.query<Attempt, []>(`SELECT * FROM attempts WHERE phase IN ('pending', 'maintenance') ${retained} ORDER BY rowid`).all()
+}
+function attemptObservation(db: Database, row: Attempt): Readonly<RuntimeUpdateAttemptSummary> {
+  const inputs = db.query<InputRow, [string]>('SELECT * FROM inputs WHERE attempt_id = ? ORDER BY ordinal').all(row.id)
+  if (inputs.length > 64 || inputs.some((input, index) => input.ordinal !== index || (input.status === 200 ? !input.bytes || sha256(input.bytes) !== input.sha256 : input.bytes !== null || input.sha256 !== null))) throw new Error('Invalid retained update input history')
+  for (const input of inputs) safePath(input.path)
+  const metadata = db.query<MetadataRow, [string]>('SELECT * FROM metadata WHERE attempt_id = ? ORDER BY ordinal').all(row.id)
+  if (metadata.length > 64 || metadata.some((item, index) => item.ordinal !== index)) throw new Error('Invalid retained metadata observation history')
+  for (const item of metadata) checkedMetadataBytes(item)
+  const digest = sha256(Buffer.from(JSON.stringify(inputs.map(input => [input.ordinal, input.path, input.status, input.sha256]))))
+  return Object.freeze({ id: row.id, phase: row.phase, clockSource: row.clock_source, startedMs: row.started_ms, inputRecords: inputs.length, inputSha256: digest, metadataRecords: metadata.length })
+}
+function maintenanceHandoffs(db: Database): RuntimeTrustStoreSummary['maintenanceHandoffs'] {
+  if (databaseVersion(db) !== 4) return Object.freeze([])
+  const attempts = db.query<Attempt & { position: number }, []>('SELECT rowid AS position, * FROM attempts').all()
+  if (attempts.length > 256) throw new Error('Update attempt history budget exceeded')
+  const index = new Map(attempts.map(row => [row.id, row]))
+  const rows = db.query<{ previous_attempt_id: string, next_attempt_id: string, generation: number }, []>('SELECT * FROM maintenance_handoffs ORDER BY rowid').all()
+  if (rows.length > 255) throw new Error('Maintenance handoff history budget exceeded')
+  return Object.freeze(rows.map(row => {
+    const previous = index.get(row.previous_attempt_id), next = index.get(row.next_attempt_id)
+    if (!previous || !next || !['pending', 'maintenance'].includes(previous.phase) || previous.position >= next.position || previous.started_ms > next.started_ms || row.generation !== next.base_generation || row.generation < previous.base_generation) throw new Error('Invalid retained maintenance handoff')
+    const preceding = db.query<{ generation: number }, [number]>('SELECT coalesce(max(m.generation), 0) AS generation FROM metadata m LEFT JOIN attempts a ON a.id = m.attempt_id WHERE m.attempt_id IS NULL OR a.rowid < ?').get(next.position)!
+    if (row.generation !== preceding.generation) throw new Error('Maintenance handoff skipped committed metadata history')
+    return Object.freeze({ previousAttempt: attemptObservation(db, previous), nextAttemptId: next.id, generation: row.generation })
+  }))
+}
 function summary(db: Database, binding: Binding, storeSha256: string): Readonly<RuntimeTrustStoreSummary> {
   const current = state(db, binding), metadata = activeMetadata(db, current.generation)
   const anchor = db.query<MetadataRow, []>('SELECT * FROM metadata WHERE generation = 0').get()
@@ -143,11 +185,13 @@ function summary(db: Database, binding: Binding, storeSha256: string): Readonly<
   for (const row of [anchor, ...metadata]) checkedMetadataBytes(row)
   const counts = db.query<{ attempts: number, metadata: number, inputs: number }, []>('SELECT (SELECT count(*) FROM attempts) AS attempts, (SELECT count(*) FROM metadata) AS metadata, (SELECT count(*) FROM inputs) AS inputs').get()!
   if (counts.attempts > 256 || counts.metadata !== current.generation + 1 || counts.metadata > maximumGeneration + 1 || counts.inputs > 16384) throw new Error('Update-store history budget exceeded or metadata history is incomplete')
-  const clockQuery = databaseVersion(db) === 3 ? 'max(coalesce((SELECT max(started_ms) FROM attempts), 0), coalesce((SELECT max(checked_ms) FROM host_slots), 0))' : 'coalesce((SELECT max(started_ms) FROM attempts), 0)'
+  const handoffs = maintenanceHandoffs(db)
+  const clockQuery = databaseVersion(db) >= 3 ? 'max(coalesce((SELECT max(started_ms) FROM attempts), 0), coalesce((SELECT max(checked_ms) FROM host_slots), 0))' : 'coalesce((SELECT max(started_ms) FROM attempts), 0)'
   const floors = db.query<{ clock: number, release: number, generation: number }, []>(`SELECT ${clockQuery} AS clock, coalesce((SELECT max(accepted_release) FROM attempts), 0) AS release, (SELECT max(generation) FROM metadata) AS generation`).get()!
-  if (current.clock_floor_ms !== floors.clock || current.release_floor < floors.release || current.generation !== floors.generation || db.query<{ count: number }, []>("SELECT count(*) AS count FROM attempts WHERE phase IN ('pending', 'maintenance')").get()!.count > 1) throw new Error('Inconsistent update-store floors or attempts')
   const attempt = db.query<Attempt, []>('SELECT * FROM attempts ORDER BY rowid DESC LIMIT 1').get()
-  return Object.freeze({ schema: 'drone-runtime-store-status-v1', storeId: binding.storeId, storeSha256, enrollmentSha256: binding.enrollmentSha256, generation: current.generation, epoch: metadata.find(row => row.role === 'root')!.epoch, releaseFloor: current.release_floor, clockFloorMs: current.clock_floor_ms, retainedMetadataRecords: counts.metadata, metadata: Object.freeze(metadata.map(row => Object.freeze({ role: row.role, version: row.version, sha256: row.sha256 }))), attempt: attempt ? Object.freeze({ id: attempt.id, phase: attempt.phase, clockSource: attempt.clock_source, startedMs: attempt.started_ms }) : null, physicalDeploymentAllowed: false })
+  const unresolved = activeAttempts(db)
+  if (current.clock_floor_ms !== floors.clock || current.release_floor < floors.release || current.generation !== floors.generation || unresolved.length > 1 || (unresolved.length === 1 && unresolved[0]!.id !== attempt?.id)) throw new Error('Inconsistent update-store floors or attempts')
+  return Object.freeze({ schema: 'drone-runtime-store-status-v1', storeId: binding.storeId, storeSha256, enrollmentSha256: binding.enrollmentSha256, generation: current.generation, epoch: metadata.find(row => row.role === 'root')!.epoch, releaseFloor: current.release_floor, clockFloorMs: current.clock_floor_ms, retainedMetadataRecords: counts.metadata, metadata: Object.freeze(metadata.map(row => Object.freeze({ role: row.role, version: row.version, sha256: row.sha256 }))), attempt: attempt ? attemptObservation(db, attempt) : null, maintenanceHandoffs: handoffs, physicalDeploymentAllowed: false })
 }
 
 async function withStore<T>(options: StoreReference, operation: (db: Database, binding: Binding, trusted: Readonly<RuntimeTrustSummary>, path: string) => T | Promise<T>): Promise<T> {
@@ -181,10 +225,10 @@ async function withStore<T>(options: StoreReference, operation: (db: Database, b
     summary(db, binding, options.storeSha256)
     for (const row of candidateRows(db)) ownedDescription(db, row, trusted)
     if (readdirSync(path).includes('host-slots')) {
-      if (databaseVersion(db) !== 3) throw new Error('Host slot files require an owned format3 store')
+      if (databaseVersion(db) < 3) throw new Error('Host slot files require an owned format3 or later store')
       protectedDirectory(join(path, 'host-slots'))
     }
-    if (databaseVersion(db) === 3) slotsSummary(db, binding, trusted, path, options.storeSha256)
+    if (databaseVersion(db) >= 3) slotsSummary(db, binding, trusted, path, options.storeSha256)
     return await operation(db, binding, trusted, path)
   }
   finally {
@@ -233,7 +277,7 @@ export interface RuntimeUpdateClock {
 }
 
 export interface RuntimeUpdateProgress {
-  phase: 'input-committed' | 'metadata-committed' | 'image-written' | 'candidate-completed' | 'candidate-reserved' | 'candidate-recorded' | 'candidate-retired' | 'slot-selected' | 'slot-image-written' | 'runtime-started' | 'runtime-input-committed' | 'final-clock-committed' | 'runtime-confirmed'
+  phase: 'input-committed' | 'metadata-committed' | 'image-written' | 'candidate-completed' | 'candidate-reserved' | 'candidate-recorded' | 'candidate-retired' | 'slot-selected' | 'slot-image-written' | 'runtime-started' | 'runtime-input-committed' | 'final-clock-committed' | 'runtime-confirmed' | 'maintenance-handoff-committed'
   ordinal: number
 }
 type ProgressObserver = (event: Readonly<RuntimeUpdateProgress>) => void | Promise<void>
@@ -300,11 +344,15 @@ interface VerifiedSelection {
   path: string
 }
 
-async function refreshAndComplete<T>(options: RefreshOptions, complete: (selection: VerifiedSelection) => Promise<T>, before?: (db: Database) => void): Promise<{ store: Readonly<RuntimeTrustStoreSummary>, value: T }> {
+async function refreshAndComplete<T>(options: RefreshOptions, complete: (selection: VerifiedSelection) => Promise<T>, before?: (db: Database) => void, previousAttemptId?: string): Promise<{ store: Readonly<RuntimeTrustStoreSummary>, value: T }> {
   options = { ...options }
   return withStore(options, async (db, binding, trusted, path) => {
     before?.(db)
-    if (db.query("SELECT id FROM attempts WHERE phase IN ('pending', 'maintenance')").get()) throw new Error('An unresolved update attempt requires recovery')
+    const unresolved = activeAttempts(db)
+    if (previousAttemptId) {
+      if (unresolved.length !== 1 || unresolved[0]!.id !== previousAttemptId) throw new Error('Exact unresolved update attempt required for maintenance continuation')
+    }
+    else if (unresolved.length) throw new Error('An unresolved update attempt requires recovery')
     const current = state(db, binding), now = clockReading(options.clock, current.clock_floor_ms)
     if (db.query<{ count: number }, []>('SELECT count(*) AS count FROM attempts').get()!.count >= 256) throw new Error('Update attempt history limit reached')
     const source = realpathSync(options.repository); directory(source)
@@ -312,9 +360,24 @@ async function refreshAndComplete<T>(options: RefreshOptions, complete: (selecti
     let requests = 0, received = 0, observations = 0
     try {
       db.transaction(() => {
+        if (previousAttemptId && databaseVersion(db) !== 4) {
+          const version = databaseVersion(db)
+          if (version < 2) for (const sql of candidateSchema) db.exec(sql)
+          if (version < 3) {
+            for (const sql of slotSchema) db.exec(sql)
+            db.exec('INSERT INTO host_roles VALUES(1, NULL, NULL)')
+          }
+          for (const sql of maintenanceSchema) db.exec(sql)
+          db.exec('PRAGMA user_version=4')
+        }
         db.query("INSERT INTO attempts VALUES(?, ?, ?, ?, 'pending', NULL)").run(attempt, current.generation, now.time.getTime(), now.source)
         db.query('UPDATE store_state SET clock_floor_ms = ? WHERE id = 1').run(now.time.getTime())
+        if (previousAttemptId) db.query('INSERT INTO maintenance_handoffs VALUES(?, ?, ?)').run(previousAttemptId, attempt, current.generation)
       })()
+      if (previousAttemptId) {
+        checkSchema(db, [...schema, ...candidateSchema, ...slotSchema, ...maintenanceSchema], 4)
+        await options.onProgress?.(Object.freeze({ phase: 'maintenance-handoff-committed', ordinal: 0 }))
+      }
       const fetcher = {
         async downloadBytes(url: string, limit: number) {
           const address = new URL(url), path = address.pathname.slice('/metadata/'.length)
@@ -368,6 +431,13 @@ async function refreshAndComplete<T>(options: RefreshOptions, complete: (selecti
 /** Verify bounded offline metadata and retain its accepted prefix. This never downloads an image. */
 export async function refreshRuntimeTrustStore(options: RefreshOptions): Promise<Readonly<RuntimeTrustStoreSummary>> {
   return (await refreshAndComplete(options, async () => undefined)).store
+}
+
+/** Explicitly retain an unresolved attempt and require a fresh fully verified successor. No trust/floor reset. */
+export async function continueRuntimeTrustMaintenance(options: RefreshOptions & { previousAttemptId: string, acknowledgeUnresolvedInputs: true }): Promise<Readonly<RuntimeTrustStoreSummary>> {
+  options = { ...options }
+  if (options.acknowledgeUnresolvedInputs !== true || typeof options.previousAttemptId !== 'string' || !/^[a-f0-9]{32}$/.test(options.previousAttemptId)) throw new Error('Explicit acknowledgement and exact unresolved attempt identity required')
+  return (await refreshAndComplete(options, async () => undefined, undefined, options.previousAttemptId)).store
 }
 
 export interface PreparedRuntimeFirmware {
@@ -427,7 +497,7 @@ export interface RuntimeFirmwareCandidate {
 }
 export interface RuntimeFirmwareCandidates {
   schema: 'drone-runtime-candidates-v1'
-  stateFormat: 1 | 2 | 3
+  stateFormat: 1 | 2 | 3 | 4
   store: Readonly<RuntimeTrustStoreSummary>
   retainedCandidates: number
   /** Owned declarations only. Retired file integrity is not inspected or authenticated for current use. */
@@ -511,7 +581,7 @@ function candidatesSummary(db: Database, binding: Binding, trusted: Readonly<Run
       candidate = Object.freeze({ ...recorded, integrity: row.phase === 'reserved' ? 'incomplete' : candidateIntegrity(db, row.generation, directory, description), currentTrustValidated: false })
     }
   }
-  return Object.freeze({ schema: 'drone-runtime-candidates-v1', stateFormat: databaseVersion(db) as 1 | 2 | 3, store: summary(db, binding, storeSha256), retainedCandidates: rows.length, history: Object.freeze(history), candidate, physicalDeploymentAllowed: false })
+  return Object.freeze({ schema: 'drone-runtime-candidates-v1', stateFormat: databaseVersion(db) as 1 | 2 | 3 | 4, store: summary(db, binding, storeSha256), retainedCandidates: rows.length, history: Object.freeze(history), candidate, physicalDeploymentAllowed: false })
 }
 
 /** Inspect owned host candidates. Recorded-byte integrity is not fresh selection or boot authorization. */
@@ -579,7 +649,7 @@ export interface RuntimeHostSlot {
 }
 export interface RuntimeFirmwareSlots {
   schema: 'drone-runtime-host-slots-v1'
-  stateFormat: 1 | 2 | 3
+  stateFormat: 1 | 2 | 3 | 4
   store: Readonly<RuntimeTrustStoreSummary>
   installed: Readonly<RuntimeHostSlot> | null
   knownGood: Readonly<RuntimeHostSlot> | null
@@ -639,7 +709,7 @@ function slotsSummary(db: Database, binding: Binding, trusted: Readonly<RuntimeT
     slots.set(row.id, Object.freeze({ id: row.id, candidateId: row.candidate_id, phase: row.phase, clockCheckedMs: row.checked_ms, confirmedClockMs: row.completed_ms, description, health: slotHealth(db, row), integrity, currentTrustValidated: false }))
   }
   let installed: Readonly<RuntimeHostSlot> | null = null, knownGood: Readonly<RuntimeHostSlot> | null = null
-  if (databaseVersion(db) === 3) {
+  if (databaseVersion(db) >= 3) {
     const roles = db.query<{ id: number, installed_id: string | null, good_id: string | null }, []>('SELECT * FROM host_roles').all()
     if (roles.length !== 1 || roles[0]!.id !== 1) throw new Error('Invalid host slot roles')
     const role = roles[0]!
@@ -647,7 +717,7 @@ function slotsSummary(db: Database, binding: Binding, trusted: Readonly<RuntimeT
     knownGood = role.good_id ? slots.get(role.good_id) ?? null : null
     if ((role.installed_id && !installed) || (role.good_id && (!knownGood || knownGood.phase !== 'confirmed')) || installed?.phase === 'selected') throw new Error('Invalid installed or known-good host role')
   }
-  return Object.freeze({ schema: 'drone-runtime-host-slots-v1', stateFormat: databaseVersion(db) as 1 | 2 | 3, store: summary(db, binding, storeSha256), installed, knownGood, trial: rows.length ? slots.get(rows.at(-1)!.id)! : null, retainedSlots: rows.length, physicalDeploymentAllowed: false })
+  return Object.freeze({ schema: 'drone-runtime-host-slots-v1', stateFormat: databaseVersion(db) as 1 | 2 | 3 | 4, store: summary(db, binding, storeSha256), installed, knownGood, trial: rows.length ? slots.get(rows.at(-1)!.id)! : null, retainedSlots: rows.length, physicalDeploymentAllowed: false })
 }
 
 /** Historical host role/evidence inspection. This never authorizes use under current trust. */
@@ -778,7 +848,7 @@ async function runHostTrial(options: RefreshOptions & { project: string }, candi
     if (hostRows(db).some(row => row.phase === 'selected' || row.phase === 'running')) throw new Error('Interrupted host trial requires explicit recovery')
     if (hostRows(db).length >= 128) throw new Error('Host slot history budget reached')
     if (!candidateId) {
-      if (databaseVersion(db) !== 3) throw new Error('No retained known-good host image for rollback')
+      if (databaseVersion(db) < 3) throw new Error('No retained known-good host image for rollback')
       const role = db.query<{ good_id: string | null }, []>('SELECT good_id FROM host_roles WHERE id = 1').get()
       const previous = hostRows(db).find(row => row.id === role?.good_id && row.phase === 'confirmed')
       if (!previous) throw new Error('No retained known-good host image for rollback')
@@ -802,7 +872,7 @@ function causedBy(error: unknown, marker: Error) {
 export async function recoverRuntimeTrustStore(options: StoreReference): Promise<Readonly<RuntimeTrustStoreSummary>> {
   options = { ...options }
   return withStore(options, async (db, binding, trusted) => {
-    const pending = db.query<Attempt, []>("SELECT * FROM attempts WHERE phase IN ('pending', 'maintenance')").all()
+    const pending = activeAttempts(db)
     if (pending.length !== 1) throw new Error('Exactly one unresolved attempt is required for recovery')
     const attempt = pending[0]!, current = state(db, binding)
     const inputs = db.query<InputRow, [string]>('SELECT * FROM inputs WHERE attempt_id = ? ORDER BY ordinal').all(attempt.id)

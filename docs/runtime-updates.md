@@ -187,6 +187,54 @@ revocation remain in #42. [Owned host slots](#owned-host-slots-and-observed-heal
 below add durable host roles and observed boot/session health. Physical board
 selection, boot health and recovery still require their separate qualification.
 
+### Explicit maintenance continuation
+
+A corrected repository does not make an earlier rejected input valid. If ordinary
+`updates:recover` cannot finish, explicitly retain that unresolved attempt and
+require a new full signed metadata verification:
+
+```sh
+./buddy updates:maintain /path/to/store \
+  --enrollment /path/to/trust \
+  --enrollment-sha256 "$INDEPENDENTLY_RETAINED_ENROLLMENT_SHA256" \
+  --store-sha256 "$INDEPENDENTLY_RETAINED_STORE_SHA256" \
+  --attempt "$EXACT_UNRESOLVED_ATTEMPT_ID" \
+  --acknowledge-unresolved-inputs \
+  --repository /path/to/corrected-offline-repository \
+  --trusted-system-clock-source operator-managed-utc-clock
+```
+
+The same command is in the standalone CLI. It requires the exact active attempt
+and explicit acknowledgement, and retains the original phase, inputs, accepted
+metadata and security floors. It does not mark the earlier failure recovered or
+invalid. Public store status exposes `maintenanceHandoffs`; each entry includes
+the predecessor's bounded input digest/counts, unchanged outcome, successor ID
+and committed starting generation. The latest `attempt` also exposes its input
+digest/counts and accepted metadata count.
+
+Format 4 adds the handoff and new pending attempt atomically. Existing formats
+1/2/3 migrate without resetting their independent store identity or security
+history. The writer database remains format 1. Older readers reject format 4
+before rewriting either database. A pending or rejected successor blocks normal
+updates. Historical recovery acts on the active successor only; another explicit
+continuation can retain it and start a further successor within the same bounded
+history. No handoff deletes, reclassifies or silently drops earlier evidence.
+
+Fresh verification starts at the latest committed root, role epochs and floors.
+Unverified predecessor input stays retained and is not automatically replayed by
+this operation. New root continuity and every current-policy check still apply.
+The command does not download an image, change slot roles or confirm health.
+An active candidate or interrupted host slot still needs its ordinary explicit
+retirement or exact-slot abandonment before a replacement can proceed.
+Subsequent selection and rollback still require their own current verification
+and observed runtime session. Existing known-good files remain retained.
+
+This supports corrected metadata and authenticated key rotation through existing
+root continuity. It cannot replace a lost root, reduce an erroneous clock floor,
+repair corrupt history or authorize expired/revoked images. Those maintenance and
+physical acceptance gates remain open. See the
+[continuation decision](adr/0032-runtime-maintenance-continuations.md).
+
 ## Protected signed-image preparation
 
 Use the pinned store and independently trusted current clock to authenticate an

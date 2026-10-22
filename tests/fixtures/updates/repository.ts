@@ -59,7 +59,7 @@ export async function repository(directory: string, options: { image?: Uint8Arra
   const imagePath = join(directory, 'targets/runtime', options.consistentSnapshot === false ? 'pico2-bench.bin' : `${imageHash}.pico2-bench.bin`)
   await writeFile(imagePath, image)
   let publishedTargetsSigner = keys.targets, publishedRootVersion = root.version
-  async function publish(update: { image: Uint8Array, version: number, custom?: Record<string, string | number | boolean>, rotateTargets?: boolean }) {
+  async function publish(update: { image: Uint8Array, version: number, custom?: Record<string, string | number | boolean>, rotateTargets?: boolean, badTargetsSignature?: true }) {
     if (update.rotateTargets) {
       if (options.rotate) throw new Error('Fixture target rotation requires its original root signer')
       publishedTargetsSigner = signer()
@@ -71,7 +71,7 @@ export async function repository(directory: string, options: { image?: Uint8Arra
     }
     const bytes = Buffer.from(update.image), hash = digest(bytes), revision = { ...fields, version: update.version }
     const nextTargets = new Metadata(new Targets({ ...revision, targets: { [target]: new TargetFile({ path: target, length: bytes.length, hashes: { sha256: hash }, unrecognizedFields: { custom: { drone: { ...custom, ...update.custom } } } }) } }))
-    nextTargets.sign(publishedTargetsSigner.sign)
+    nextTargets.sign(update.badTargetsSignature ? signer().sign : publishedTargetsSigner.sign)
     const targetsBytes = Buffer.from(JSON.stringify(nextTargets.toJSON()))
     const nextSnapshot = new Metadata(new Snapshot({ ...revision, meta: { 'targets.json': new MetaFile({ version: update.version, length: targetsBytes.length, hashes: { sha256: digest(targetsBytes) } }) } }))
     nextSnapshot.sign(keys.snapshot.sign)

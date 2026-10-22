@@ -43,9 +43,21 @@ jobs:
           if-no-files-found: ignore
           retention-days: 7
           path: ${{ runner.temp }}/runtime-host-file-limit-evidence
+      - name: Verify explicit maintenance handoff interruption and fresh-process recovery
+        env:
+          RUNTIME_MAINTENANCE_EVIDENCE: ${{ runner.temp }}/runtime-maintenance-evidence
+        run: bun test tests/unit/updates-maintenance-cuts.test.ts
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: runtime-maintenance-evidence
+          if-no-files-found: ignore
+          retention-days: 7
+          path: ${{ runner.temp }}/runtime-maintenance-evidence
       - run: ./buddy test
         env:
           RUNTIME_HOST_FILE_LIMIT_EVIDENCE: ${{ runner.temp }}/runtime-host-file-limit-full-evidence
+          RUNTIME_MAINTENANCE_EVIDENCE: ${{ runner.temp }}/runtime-maintenance-full-evidence
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -53,6 +65,13 @@ jobs:
           if-no-files-found: ignore
           retention-days: 7
           path: ${{ runner.temp }}/runtime-host-file-limit-full-evidence
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: runtime-maintenance-full-evidence
+          if-no-files-found: ignore
+          retention-days: 7
+          path: ${{ runner.temp }}/runtime-maintenance-full-evidence
       - run: bun run runtime:cli
       - name: Verify signed test-image staging through the portable CLI outside the checkout
         run: bun tests/fixtures/updates/qualify.ts "$RUNNER_TEMP/runtime-update-qualification" "$GITHUB_WORKSPACE/storage/runtime-build/cli/drone"
@@ -68,6 +87,18 @@ jobs:
         run: bun tests/fixtures/updates/qualify-candidates.ts "$RUNNER_TEMP/runtime-candidates-qualification" "$GITHUB_WORKSPACE/storage/runtime-build/cli/drone"
       - name: Verify host slots, observed health and interrupted recovery with a copied standalone CLI
         run: bun tests/fixtures/updates/qualify-host-slots.ts "$RUNNER_TEMP/runtime-host-slots-qualification" "$GITHUB_WORKSPACE/storage/runtime-build/cli/drone" "$GITHUB_WORKSPACE"
+      - name: Verify explicit maintenance and format-4 runtime health through a copied CLI
+        run: bun tests/fixtures/updates/qualify-maintenance.ts "$RUNNER_TEMP/runtime-maintenance-cli" "$GITHUB_WORKSPACE/storage/runtime-build/cli/drone"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: runtime-maintenance-cli-evidence
+          if-no-files-found: ignore
+          include-hidden-files: true
+          retention-days: 7
+          path: |
+            ${{ runner.temp }}/runtime-maintenance-cli
+            !${{ runner.temp }}/runtime-maintenance-cli/drone
       - uses: actions/upload-artifact@v4
         if: always()
         with:

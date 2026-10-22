@@ -294,7 +294,16 @@
       "docs/adr/0030-host-storage-fault-fixtures.md",
       "tests/fixtures/updates/host-volume-full.ts",
       "tests/integration/runtime-host-storage.test.ts",
-      "docs/adr/0031-full-host-filesystem-fixture.md"
+      "docs/adr/0031-full-host-filesystem-fixture.md",
+      "docs/adr/0032-runtime-maintenance-continuations.md",
+      "app/Commands/UpdatesMaintain.ts",
+      "tests/unit/updates-maintenance.test.ts",
+      "tests/unit/updates-maintenance-cli.test.ts",
+      "tests/unit/updates-maintenance-cuts.test.ts",
+      "tests/unit/updates-maintenance-host.test.ts",
+      "tests/fixtures/updates/maintenance-scenario.ts",
+      "tests/fixtures/updates/maintenance-interruptions.ts",
+      "tests/fixtures/updates/qualify-maintenance.ts"
     ],
     "remaining": [
       "Live runtime/sensor/estimator/authority/mission/payload correlation and measured clock relations",
