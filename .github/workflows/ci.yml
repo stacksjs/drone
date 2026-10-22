@@ -465,7 +465,7 @@ jobs:
       - run: bun install --frozen-lockfile
       - run: cp .env.example .env
       - run: ./buddy key:generate
-      - name: Qualify actual ENOSPC and fresh runtime recovery in a private filesystem
+      - name: Qualify actual zero-byte and partial ENOSPC writes with fresh runtime recovery
         shell: bash
         run: |
           set -euo pipefail

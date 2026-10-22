@@ -645,9 +645,13 @@ EIO, sync and physical power-loss campaigns open.
 
 The opt-in [full-filesystem qualification](adr/0031-full-host-filesystem-fixture.md)
 uses a separate private Linux mount namespace and a new bounded tmpfs for the
-actual store, candidates and slots. It targets real ENOSPC during the image copy
-and SQLite failure-state persistence, then exercises explicit metadata recovery,
+actual store, candidates and slots. Separate cases leave either 1 MiB or zero
+free bytes after actual ENOSPC filling. They require exactly a 1 MiB authenticated
+prefix or an existing empty image file, with no runtime launch or health claim.
+Both target real ENOSPC during the image copy and SQLite failure-state
+persistence, then exercise explicit metadata recovery,
 exact-slot abandonment and a fresh host trial in new processes. Retained file
-archives are copied and hashed before unmount. This additional campaign is in
-qualification; a local skip is not positive ENOSPC evidence. Physical-media,
-EDQUOT, EIO, sync and power-loss acceptance remain separate.
+archives are copied and hashed before unmount. CI executes both cases; a local
+skip is not positive ENOSPC evidence. Failure before any image bytes are written
+does not establish behavior for a write syscall that returns zero without an
+error. Physical-media, EDQUOT, EIO, sync and power-loss acceptance remain separate.
