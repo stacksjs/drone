@@ -21,6 +21,10 @@ before the copy. Require exactly the selected number of retained image bytes,
 including an existing empty image file and its SHA-256 in the zero-byte case. Leave
 the filesystem full until the trial process has exited, including its attempts
 to record failure. Never replace filesystem or SQLite methods with faults.
+The existing public inspector reports an empty image as `unavailable` because
+valid protected images must be nonempty. A nonempty partial image is `mismatch`.
+Neither status grants health or installation authority; the campaign separately
+reads the actual retained file to distinguish empty, partial and missing bytes.
 
 Inspect retained bytes and public status after removing only the owned filler.
 Require the previous known-good image and accepted metadata/security floors to

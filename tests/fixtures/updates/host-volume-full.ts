@@ -182,7 +182,8 @@ export async function qualifyHostFullVolume(directory: string, imageWriteBudgetB
     await writeFile(join(directory, 'failed-slots.json'), JSON.stringify(failed, null, 2))
     assert.deepEqual(failed.knownGood, good.knownGood); assert.deepEqual(failed.installed, good.installed)
     assert.equal(failed.trial!.phase, 'selected'); assert.equal(failed.trial!.health, null)
-    assert.equal(failed.trial!.integrity, 'mismatch'); assert.equal(failed.store.attempt!.phase, 'pending')
+    assert.equal(failed.trial!.integrity, imageWriteBudgetBytes === 0 ? 'unavailable' : 'mismatch')
+    assert.equal(failed.store.attempt!.phase, 'pending')
     assert.equal(failed.store.releaseFloor, 9)
     const version = (role: string) => failed.store.metadata.find(row => row.role === role)!.version
     assert.equal(version('root'), 2); assert.equal(version('targets'), 3)
