@@ -34,3 +34,21 @@ outside the upload allowlist. Every completed trial is retained, including
 failures; cleanup uncertainty stops the campaign. The campaign checks observed
 Chrome binary content before and after the sequence, without claiming continuous
 immutability. Keep the research-only workflow and startup-only mode off main.
+
+
+## Linux passive TCP observations
+
+On the research-only `codex/linux-tcp-pressure-observations` branch, manual CI
+runs the complete TCP driver test file with `DRONE_TCP_PRESSURE_OBSERVATIONS=1`.
+Only the two passive fault waits retain up to 320 scalar public snapshots and
+emit their trajectories once, including on the original timeout. The 1500 ms
+observation window, 500 ms transport budgets, original fault predicates, actual
+Python OS peer and all other test controls remain unchanged. Default test runs
+retain the original wait path. There are no added writes, retries or per-sample
+logs, and no production transport changes.
+
+A passing focused campaign is a control, not resolution of the failed full
+Linux suite. A queue clearing before 500 ms must be distinguished from a
+continuous stall or a late callback. Preserve every original red result. This
+workflow replacement and the earlier startup-only research controls must never
+merge into main or substitute for product qualification. See issue #73.

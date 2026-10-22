@@ -1,13 +1,13 @@
 # Research branch only. Never merge this workflow replacement into main.
-name: Real workspace startup research (not product qualification)
+name: Linux passive TCP observations (not product qualification)
 on:
   workflow_dispatch:
 permissions:
   contents: read
 jobs:
-  workspace-startup-research:
+  tcp-passive-research:
     runs-on: ubuntu-24.04
-    timeout-minutes: 25
+    timeout-minutes: 5
     steps:
       - uses: actions/checkout@v4
       - uses: oven-sh/setup-bun@v2
@@ -17,29 +17,8 @@ jobs:
       - run: cp .env.example .env
       - run: ./buddy key:generate
       - run: ./buddy lint
-      - run: bun run tsc --noEmit -p tests/tsconfig.browser-startup-probe.json
-      - name: Run 12 real workspace startup controls before page interaction
-        working-directory: ${{ runner.temp }}
-        shell: bash
+      - run: bun run typecheck:runtime
+      - name: Preserve original TCP tests and bounded passive queue observations
         env:
-          PROBE_SOURCE_HEAD: ${{ github.sha }}
-        run: |
-          set -euo pipefail
-          export BROWSE_BROWSER="$(command -v google-chrome)"
-          test -x "$BROWSE_BROWSER"
-          printf '%s\n' '# Empty config for native capability research' > "$RUNNER_TEMP/native-probe-bunfig.toml"
-          bun --no-install --config="$RUNNER_TEMP/native-probe-bunfig.toml" --no-env-file "$GITHUB_WORKSPACE/scripts/debug/workspace-startup-campaign.ts" "$RUNNER_TEMP/workspace-startup-research"
-      - uses: actions/upload-artifact@v4
-        if: always()
-        with:
-          name: workspace-startup-research-only
-          if-no-files-found: warn
-          retention-days: 7
-          path: |
-            ${{ runner.temp }}/workspace-startup-research/manifest.json
-            ${{ runner.temp }}/workspace-startup-research/trial-*/started.json
-            ${{ runner.temp }}/workspace-startup-research/trial-*/result.json
-            ${{ runner.temp }}/workspace-startup-research/trial-*/browser-startup-process.json
-            ${{ runner.temp }}/workspace-startup-research/trial-*/browser-launch.json
-            ${{ runner.temp }}/workspace-startup-research/trial-*/chrome-startup-stderr.log
-            ${{ runner.temp }}/workspace-startup-research/trial-*/compiled.html
+          DRONE_TCP_PRESSURE_OBSERVATIONS: '1'
+        run: bun test ./tests/unit/driver-tcp.test.ts

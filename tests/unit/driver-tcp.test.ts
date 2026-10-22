@@ -13,6 +13,25 @@ async function until(condition: () => boolean) {
   const deadline = performance.now() + 1500
   while (!condition()) { if (performance.now() > deadline) throw new Error('TCP peer observation timed out'); await Bun.sleep(5) }
 }
+// Research observation only: retain the original wait budget and fault predicate.
+async function waitForPassiveFault(driver: TcpAdapter, remote: Awaited<ReturnType<typeof createPressurePeer>>, campaign: string) {
+  if (Bun.env.DRONE_TCP_PRESSURE_OBSERVATIONS !== '1') {
+    await until(() => driver.protocol.snapshot().fault !== null)
+    return
+  }
+  const startedAtMs = performance.now()
+  const samples: Array<{ elapsedMs: number, transport: ReturnType<TcpAdapter['transportSnapshot']>, fault: string | null, receivedBytes: number }> = []
+  let attempts = 0
+  try {
+    await until(() => {
+      const fault = driver.protocol.snapshot().fault
+      attempts++
+      if (samples.length < 320) samples.push({ elapsedMs: performance.now() - startedAtMs, transport: driver.transportSnapshot(), fault, receivedBytes: remote.receivedBytes() })
+      return fault !== null
+    })
+  }
+  finally { console.log(JSON.stringify({ campaign: `${campaign}-passive-observations`, startedAtMs, elapsedMs: performance.now() - startedAtMs, attempts, sampleCap: 320, capped: attempts > samples.length, samples })) }
+}
 async function peer() {
   const sockets: Socket[] = [], received: Buffer[] = [], receivedByConnection: Buffer[][] = []
   const server = createServer(socket => { sockets.push(socket); const own: Buffer[] = []; receivedByConnection.push(own); socket.on('data', data => { const bytes = typeof data === 'string' ? Buffer.from(data) : data; received.push(bytes); own.push(bytes) }); socket.on('error', () => {}) })
@@ -271,7 +290,7 @@ test('native TCP backpressure expires the drain deadline without an additional w
     expect(blocked.state).toBe('connected')
     expect(blocked.pendingCallbackBytes).toBeLessThanOrEqual(16384)
     expect(remote.receivedBytes()).toBe(0)
-    await until(() => driver!.protocol.snapshot().fault !== null)
+    await waitForPassiveFault(driver, remote, 'native-tcp-drain')
     expect(driver.protocol.snapshot().fault).toContain('TCP output drain deadline expired')
     expect(performance.now() - blocked.blockedSinceMs!).toBeGreaterThanOrEqual(500)
     expect(driver.read()).toBeUndefined()
@@ -358,7 +377,7 @@ test('native TCP writes below the watermark expire when their callbacks make no 
     expect(pending.pendingCallbackBytes).toBeGreaterThan(0)
     expect(pending.runtimeWritableBytes).toBeLessThan(4096)
     expect(remote.receivedBytes()).toBe(0)
-    await until(() => driver!.protocol.snapshot().fault !== null)
+    await waitForPassiveFault(driver, remote, 'native-tcp-write-progress')
     expect(driver.protocol.snapshot().fault).toContain('TCP write progress deadline expired')
     expect(performance.now() - pending.lastWriteProgressAtMs!).toBeGreaterThanOrEqual(500)
     expect(driver.read()).toBeUndefined()
