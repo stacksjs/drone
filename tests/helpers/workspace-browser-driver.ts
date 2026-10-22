@@ -2,17 +2,15 @@ import assert from 'node:assert/strict'
 import { mkdir, readFile, writeFile } from 'node:fs/promises'
 import { basename, join } from 'node:path'
 import { startWorkspaceBrowser } from './workspace-browser'
+import type { BrowserControlAction } from './browser-operation'
+import { requestWorkspaceControl } from './workspace-control'
 
 // Controller is isolated from native Auth/SQLite and reads owner-only fixture credentials.
 const root = process.cwd()
 assert(basename(root).startsWith('drone-incident-access-'))
 const data = JSON.parse(await readFile(join(root, 'credentials.json'), 'utf8')) as { url: string, key: string, sourceDigest: string, senderToken: string, recipientToken: string, recipientId: number, control: string, capture: { id: string, width: number }, pixel: number }
 assert(/^http:\/\/127\.0\.0\.1:\d+$/.test(data.url))
-const control = async (action: string): Promise<any> => {
-  const response = await fetch(`${data.url}/__fixture/${action}`, { method: 'GET', headers: { 'x-fixture-control': data.control }, signal: AbortSignal.timeout(5000) })
-  assert(response.ok, `Private fixture control must succeed: ${action}, ${response.status}`)
-  return response.json()
-}
+const control = async (action: BrowserControlAction): Promise<any> => requestWorkspaceControl(data, action)
 const browser = await startWorkspaceBrowser(root)
 const evidence = process.env.WORKSPACE_BROWSER_EVIDENCE ?? join(root, 'evidence')
 await mkdir(evidence, { recursive: true })

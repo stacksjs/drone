@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict'
 import { mkdir, readFile } from 'node:fs/promises'
 import { join } from 'node:path'
+import { observeBrowserOperation } from './browser-operation'
 
 /** Dependency-free CDP, with a fresh profile. Credentials never enter command arguments. */
 async function openSocket(url: string): Promise<WebSocket> {
@@ -26,22 +27,24 @@ export async function startWorkspaceBrowser(root: string) {
     if (port) break
     await Bun.sleep(50)
   }
-  if (!port) { if (child.exitCode === null) child.kill(); await Promise.race([child.exited, Bun.sleep(2000)]); throw new Error('Fresh browser must start') }
+  if (!port) { closing = true; if (child.exitCode === null) child.kill(); await Promise.race([child.exited, Bun.sleep(2000)]); throw new Error('Fresh browser must start') }
   // Keep a browser-level session, as well as page sessions, for the owned lifecycle.
   let browserSocket: WebSocket
   try {
-    const version = await (await fetch(`http://127.0.0.1:${port}/json/version`, { signal: AbortSignal.timeout(5000) })).json() as { webSocketDebuggerUrl: string }
-    browserSocket = await openSocket(version.webSocketDebuggerUrl)
+    const response = await observeBrowserOperation('version-fetch', () => fetch(`http://127.0.0.1:${port}/json/version`, { signal: AbortSignal.timeout(5000) }))
+    const version = await observeBrowserOperation('version-json', () => response.json()) as { webSocketDebuggerUrl: string }
+    browserSocket = await observeBrowserOperation('browser-socket', () => openSocket(version.webSocketDebuggerUrl))
   }
-  catch (error) { if (child.exitCode === null) child.kill(); await Promise.race([child.exited, Bun.sleep(2000)]); throw error }
+  catch (error) { closing = true; if (child.exitCode === null) child.kill(); await Promise.race([child.exited, Bun.sleep(2000)]); throw error }
   let browserSequence = 0
   browserSocket.onmessage = () => {}
   const keepAlive = setInterval(() => { if (browserSocket.readyState === WebSocket.OPEN) browserSocket.send(JSON.stringify({ id: ++browserSequence, method: 'Browser.getVersion' })) }, 5000)
   const pages: Array<{ close: () => void }> = []
   return {
     async page(url: string, javascript = true) {
-      const target = await (await fetch(`http://127.0.0.1:${port}/json/new?about:blank`, { method: 'PUT', signal: AbortSignal.timeout(5000) })).json() as { webSocketDebuggerUrl: string }
-      const socket = await openSocket(target.webSocketDebuggerUrl)
+      const response = await observeBrowserOperation('target-fetch', () => fetch(`http://127.0.0.1:${port}/json/new?about:blank`, { method: 'PUT', signal: AbortSignal.timeout(5000) }))
+      const target = await observeBrowserOperation('target-json', () => response.json()) as { webSocketDebuggerUrl: string }
+      const socket = await observeBrowserOperation('page-socket', () => openSocket(target.webSocketDebuggerUrl))
       let sequence = 0, phase = 'initial page'
       const waiting = new Map<number, { resolve: (value: any) => void, reject: (error: Error) => void }>()
       const errors: string[] = []
