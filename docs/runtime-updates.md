@@ -581,3 +581,14 @@ An actual CMake output-overflow case also stops before runtime start, retains
 release floor 9 through recovery, then observes a fresh healthy trial after the
 private build fault is removed. Build tools use native bounded process capture
 with the existing 120-second command deadline and 2 MB per-stream limits.
+
+The [host storage fixture](adr/0030-host-storage-fault-fixtures.md) also runs an
+actual signed large host image under a read-back 1 MiB POSIX file-size limit.
+The slot copy retains exactly 1 MiB of the authenticated prefix before `EFBIG`,
+with no trial runtime launch or health confirmation. New root/target metadata and
+release floor 9 survive, and the prior known-good image remains intact. Recovery
+and the later unrestricted trial run in separate fresh Bun processes. Only the
+new slot can become known-good through actual fresh runtime health; the failed
+partial file stays retained. CI keeps the synthetic campaign artifacts for seven
+days. This file-size-limit evidence leaves zero-return writes, full-medium/quota,
+EIO, sync and physical power-loss campaigns open.

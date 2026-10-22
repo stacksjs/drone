@@ -287,7 +287,11 @@
       "tests/unit/updates-host-policy.test.ts",
       "tests/unit/updates-host-slots-cli.test.ts",
       "tests/fixtures/updates/qualify-host-slots.ts",
-      "tests/fixtures/updates/host-slot-interruptions.ts"
+      "tests/fixtures/updates/host-slot-interruptions.ts",
+      "tests/fixtures/updates/host-write-limit.ts",
+      "tests/fixtures/updates/file-write-limit.cpp",
+      "tests/unit/updates-host-writes.test.ts",
+      "docs/adr/0030-host-storage-fault-fixtures.md"
     ],
     "remaining": [
       "Live runtime/sensor/estimator/authority/mission/payload correlation and measured clock relations",

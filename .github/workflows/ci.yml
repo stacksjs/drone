@@ -32,7 +32,27 @@ jobs:
       - run: python3 -m unittest discover -s tests/hardware
       - name: Verify a kernel-confirmed full input pipe on Linux
         run: bun test tests/unit/runtime.test.ts --test-name-pattern 'kernel-confirmed full input FIFO'
+      - name: Verify an actual partial host image write and fresh-process recovery
+        env:
+          RUNTIME_HOST_FILE_LIMIT_EVIDENCE: ${{ runner.temp }}/runtime-host-file-limit-evidence
+        run: bun test tests/unit/updates-host-writes.test.ts
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: runtime-host-file-limit-evidence
+          if-no-files-found: ignore
+          retention-days: 7
+          path: ${{ runner.temp }}/runtime-host-file-limit-evidence
       - run: ./buddy test
+        env:
+          RUNTIME_HOST_FILE_LIMIT_EVIDENCE: ${{ runner.temp }}/runtime-host-file-limit-full-evidence
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: runtime-host-file-limit-full-evidence
+          if-no-files-found: ignore
+          retention-days: 7
+          path: ${{ runner.temp }}/runtime-host-file-limit-full-evidence
       - run: bun run runtime:cli
       - name: Verify signed test-image staging through the portable CLI outside the checkout
         run: bun tests/fixtures/updates/qualify.ts "$RUNNER_TEMP/runtime-update-qualification" "$GITHUB_WORKSPACE/storage/runtime-build/cli/drone"
