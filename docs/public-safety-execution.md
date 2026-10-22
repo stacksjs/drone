@@ -120,7 +120,8 @@ response. The existing workspace browser scenarios remain required regressions.
 The native lifetime fixture emits bounded phase observations around setup,
 authority reads, retention waits and cleanup. Its parent records the observed
 exit code and signal separately from whether its own watchdog fired or cleanup
-requested a kill. Elapsed time includes process work and output handling, not
+requested a kill. The settled `exited` status is distinct from the raw
+`exitCode` property, which can remain null after a signal. Elapsed time includes process work and output handling, not
 just a native check. Failed cases retain their private temporary directory,
 stdout, stderr and lifecycle receipt when storage permits. A fixed warning
 identifies each unavailable evidence file if its write fails; this does not
