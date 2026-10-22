@@ -47,8 +47,9 @@ profile remains neutral-only. The owned [sensor pipeline](sensors.md),
 [navigation](navigation.md) have separate simulation and hardware acceptance gates.
 
 [Diagnostics and replay](diagnostics.md) retain explicit loss and provenance.
-[Runtime trust and image staging](runtime-updates.md) preserves initial trust and authenticates offline candidates;
-persistent trust, boot selection and rollback remain required before installation.
+[Runtime trust and image staging](runtime-updates.md) preserves enrolled trust,
+journals verified metadata and prepares owned image candidates. Physical board
+installation, persistent boot selection and recovery require separate qualification.
 The [library API](api.md) describes behavior extensions. The
 [shared vehicle contract](vehicles.md) covers quadcopter, fixed-wing, ground,
 surface and subsea profiles. [Optional external drivers](drivers.md) have
