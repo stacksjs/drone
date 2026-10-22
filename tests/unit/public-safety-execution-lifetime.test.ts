@@ -25,6 +25,7 @@ for (const mode of ['completed', 'canceled', 'quarantine']) test(`native executi
       console.error('LIFETIME_FIXTURE_DEADLINE', JSON.stringify({ mode, pid: running.pid, timeoutMs: 90000, elapsedMs: performance.now() - began, requestedSignal: 'SIGKILL' }))
     }, 90000)
     try {
+      console.log(JSON.stringify({ oracle: 'lifetime-fixture-start', mode, pid: running.pid, timeoutMs: 90000 }))
       const [code, stdout, stderr] = await Promise.all([running.exited, new Response(running.stdout).text(), new Response(running.stderr).text()])
       // eslint-disable-next-line no-console
       for (const line of stdout.split('\n')) if (line.startsWith('{"oracle":')) console.log(line)
