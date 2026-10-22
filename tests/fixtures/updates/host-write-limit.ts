@@ -8,25 +8,10 @@ import { createRuntimeTrustStore, inspectRuntimeFirmwareSlots, recoverRuntimeTru
 import { runBoundedHostProcess } from '../../../resources/functions/host/process'
 import { createHostSourceProject } from './host-project'
 import { digest, repository, target } from './repository'
+import { storageErrorCodes } from './storage-errors'
 
 const fileLimitBytes = 1048576
 const clock = { source: 'independent-resource-fixture-clock', read: () => new Date('2030-01-01T00:00:00Z') }
-
-function errorCodes(error: unknown) {
-  const pending = [error], seen = new Set<unknown>(), codes: string[] = []
-  while (pending.length && seen.size < 32) {
-    const item = pending.shift()
-    if (!item || typeof item !== 'object' || seen.has(item)) continue
-    seen.add(item)
-    const code = Object.getOwnPropertyDescriptor(item, 'code')?.value
-    if ((typeof code === 'string' || typeof code === 'number') && String(code).length <= 64) codes.push(String(code))
-    const cause = Object.getOwnPropertyDescriptor(item, 'cause')?.value
-    if (cause !== undefined) pending.push(cause)
-    const errors = Object.getOwnPropertyDescriptor(item, 'errors')?.value
-    if (Array.isArray(errors)) pending.push(...errors.slice(0, 32))
-  }
-  return codes
-}
 
 async function fixtureInput(inputPath: string) {
   assert.equal(basename(inputPath), 'worker-input.json')
@@ -51,7 +36,7 @@ async function limitedTrial(inputPath: string) {
       assert.ok(phases.length < 512); phases.push(event.phase)
     } })
   }
-  catch (error) { caught = true; codes = errorCodes(error) }
+  catch (error) { caught = true; codes = storageErrorCodes(error) }
   assert.equal(caught, true, 'The actual kernel file limit must reject the trial')
   return { errorCodes: codes, phases }
 }

@@ -33,6 +33,7 @@
     "../resources/functions/drone/updates/**/*.ts",
     "./unit/updates*.test.ts",
     "./fixtures/updates/**/*.ts",
+    "./integration/runtime-host-storage.test.ts",
     "./unit/diagnostics.test.ts",
     "./fixtures/diagnostics/**/*.ts",
     "../resources/functions/drone/missions/**/*.ts",

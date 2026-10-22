@@ -592,3 +592,12 @@ new slot can become known-good through actual fresh runtime health; the failed
 partial file stays retained. CI keeps the synthetic campaign artifacts for seven
 days. This file-size-limit evidence leaves zero-return writes, full-medium/quota,
 EIO, sync and physical power-loss campaigns open.
+
+The opt-in [full-filesystem qualification](adr/0031-full-host-filesystem-fixture.md)
+uses a separate private Linux mount namespace and a new bounded tmpfs for the
+actual store, candidates and slots. It targets real ENOSPC during the image copy
+and SQLite failure-state persistence, then exercises explicit metadata recovery,
+exact-slot abandonment and a fresh host trial in new processes. Retained file
+archives are copied and hashed before unmount. This additional campaign is in
+qualification; a local skip is not positive ENOSPC evidence. Physical-media,
+EDQUOT, EIO, sync and power-loss acceptance remain separate.

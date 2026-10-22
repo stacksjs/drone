@@ -291,7 +291,10 @@
       "tests/fixtures/updates/host-write-limit.ts",
       "tests/fixtures/updates/file-write-limit.cpp",
       "tests/unit/updates-host-writes.test.ts",
-      "docs/adr/0030-host-storage-fault-fixtures.md"
+      "docs/adr/0030-host-storage-fault-fixtures.md",
+      "tests/fixtures/updates/host-volume-full.ts",
+      "tests/integration/runtime-host-storage.test.ts",
+      "docs/adr/0031-full-host-filesystem-fixture.md"
     ],
     "remaining": [
       "Live runtime/sensor/estimator/authority/mission/payload correlation and measured clock relations",
