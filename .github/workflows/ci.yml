@@ -24,7 +24,5 @@ jobs:
       - run: ./buddy key:generate
       - run: ./buddy lint
       - run: bun run typecheck:runtime
-      - name: Preserve original TCP tests and bounded passive queue observations
-        env:
-          DRONE_TCP_PRESSURE_OBSERVATIONS: '1'
+      - name: Qualify corrected TCP pressure phases
         run: bun test ./tests/unit/driver-tcp.test.ts

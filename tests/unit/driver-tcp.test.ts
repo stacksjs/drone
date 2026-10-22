@@ -13,25 +13,6 @@ async function until(condition: () => boolean) {
   const deadline = performance.now() + 1500
   while (!condition()) { if (performance.now() > deadline) throw new Error('TCP peer observation timed out'); await Bun.sleep(5) }
 }
-// Research observation only: retain the original wait budget and fault predicate.
-async function waitForPassiveFault(driver: TcpAdapter, remote: Awaited<ReturnType<typeof createPressurePeer>>, campaign: string) {
-  if (Bun.env.DRONE_TCP_PRESSURE_OBSERVATIONS !== '1') {
-    await until(() => driver.protocol.snapshot().fault !== null)
-    return
-  }
-  const startedAtMs = performance.now()
-  const samples: Array<{ elapsedMs: number, transport: ReturnType<TcpAdapter['transportSnapshot']>, fault: string | null, receivedBytes: number }> = []
-  let attempts = 0
-  try {
-    await until(() => {
-      const fault = driver.protocol.snapshot().fault
-      attempts++
-      if (samples.length < 320) samples.push({ elapsedMs: performance.now() - startedAtMs, transport: driver.transportSnapshot(), fault, receivedBytes: remote.receivedBytes() })
-      return fault !== null
-    })
-  }
-  finally { console.log(JSON.stringify({ campaign: `${campaign}-passive-observations`, startedAtMs, elapsedMs: performance.now() - startedAtMs, attempts, sampleCap: 320, capped: attempts > samples.length, samples })) }
-}
 async function peer() {
   const sockets: Socket[] = [], received: Buffer[] = [], receivedByConnection: Buffer[][] = []
   const server = createServer(socket => { sockets.push(socket); const own: Buffer[] = []; receivedByConnection.push(own); socket.on('data', data => { const bytes = typeof data === 'string' ? Buffer.from(data) : data; received.push(bytes); own.push(bytes) }); socket.on('error', () => {}) })
@@ -266,16 +247,58 @@ test('a native connect callback after the absolute setup deadline cannot establi
   finally { driver?.close(); server.stop(true) }
 }, 6000)
 
-async function fillNativeBackpressure(driver: TcpAdapter) {
-  const fillDeadline = performance.now() + 10000
+async function fillNativeBackpressure(driver: TcpAdapter, sendBudget = 550000, fillDeadline = performance.now() + 10000) {
   let attempted = 0
-  while (!driver.transportSnapshot().backpressured && !driver.protocol.snapshot().fault && attempted < 550000 && performance.now() < fillDeadline) {
-    for (let index = 0; index < 128 && attempted < 550000 && !driver.transportSnapshot().backpressured && !driver.protocol.snapshot().fault; index++) {
+  while (!driver.transportSnapshot().backpressured && !driver.protocol.snapshot().fault && attempted < sendBudget && performance.now() < fillDeadline) {
+    for (let index = 0; index < 128 && attempted < sendBudget && !driver.transportSnapshot().backpressured && !driver.protocol.snapshot().fault; index++) {
       driver.send({ kind: 'hold', reason: 'native drain deadline' }); attempted++
     }
     await Bun.sleep(0)
   }
   return { attempted, blocked: driver.transportSnapshot() }
+}
+
+// A native pressure phase may make legitimate progress before its deadline.
+// Continue establishment only after observing that transition within its budget.
+async function observeNativeOutputExpiry(driver: TcpAdapter, mode: 'drain' | 'progress') {
+  const fillDeadline = performance.now() + 10000
+  let attempted = 0, phases = 0
+  const history: Array<{ before: ReturnType<TcpAdapter['transportSnapshot']>, after: ReturnType<TcpAdapter['transportSnapshot']>, elapsedMs: number, fault: string | null }> = []
+  try {
+    while (performance.now() < fillDeadline && attempted < 550000) {
+      let before = driver.transportSnapshot()
+      if (mode === 'drain') {
+        const phase = await fillNativeBackpressure(driver, 550000 - attempted, fillDeadline)
+        attempted += phase.attempted; before = phase.blocked
+      }
+      else if (before.pendingCallbackBytes === 0 && !before.backpressured) {
+        const phase = await fillNativePendingWrites(driver, 550000 - attempted, fillDeadline)
+        attempted += phase.attempted; before = phase.pending
+      }
+      const epoch = mode === 'drain' ? before.blockedSinceMs : before.lastWriteProgressAtMs
+      const ready = mode === 'drain' ? before.backpressured : !before.backpressured && before.pendingCallbackBytes > 0
+      if (!ready || before.state !== 'connected' || epoch === null) throw new Error(`Native TCP ${mode} pressure was not established within its byte/time budget`)
+      const started = performance.now()
+      try {
+        // No writes while waiting. A continuous stall keeps the original 1500 ms
+        // immediate-failure guard; a valid transition starts a new pressure phase.
+        await until(() => {
+          if (driver.protocol.snapshot().fault !== null) return true
+          const after = driver.transportSnapshot()
+          return mode === 'drain' ? !after.backpressured : after.pendingCallbackBytes === 0 || after.lastWriteProgressAtMs !== before.lastWriteProgressAtMs
+        })
+      }
+      finally {
+        phases++
+        if (history.length === 16) history.shift()
+        history.push({ before, after: driver.transportSnapshot(), elapsedMs: performance.now() - started, fault: driver.protocol.snapshot().fault })
+      }
+      if (driver.protocol.snapshot().fault !== null) return { attempted, pressure: before }
+      if (performance.now() - epoch >= 500) throw new Error(`Native TCP ${mode} transition was late or timing-ambiguous; pressure establishment cannot continue`)
+    }
+    throw new Error(`Native TCP sustained ${mode} pressure was not established within its byte/time budget`)
+  }
+  finally { console.log(JSON.stringify({ campaign: `native-tcp-${mode}-phases`, attempted, phases, retainedPhaseLimit: 16, history })) }
 }
 
 test('native TCP backpressure expires the drain deadline without an additional write', async () => {
@@ -284,13 +307,12 @@ test('native TCP backpressure expires the drain deadline without an additional w
   try {
     driver = await createArduPilotDriver({ transport: 'tcp', kind: 'sitl', port: remote.port })
     await until(() => driver!.read()?.batteryPercent === 90)
-    const { attempted, blocked } = await fillNativeBackpressure(driver)
+    const { attempted, pressure: blocked } = await observeNativeOutputExpiry(driver, 'drain')
     console.log(JSON.stringify({ campaign: 'native-tcp-drain', attempted, blocked, receivedBytes: remote.receivedBytes(), fault: driver.protocol.snapshot().fault }))
     expect(blocked.backpressured).toBe(true)
     expect(blocked.state).toBe('connected')
     expect(blocked.pendingCallbackBytes).toBeLessThanOrEqual(16384)
     expect(remote.receivedBytes()).toBe(0)
-    await waitForPassiveFault(driver, remote, 'native-tcp-drain')
     expect(driver.protocol.snapshot().fault).toContain('TCP output drain deadline expired')
     expect(performance.now() - blocked.blockedSinceMs!).toBeGreaterThanOrEqual(500)
     expect(driver.read()).toBeUndefined()
@@ -347,11 +369,10 @@ test('a native drain within budget settles accepted bytes once and transport sna
   finally { driver?.close(); await remote.close() }
 }, 15000)
 
-async function fillNativePendingWrites(driver: TcpAdapter) {
-  const fillDeadline = performance.now() + 10000
+async function fillNativePendingWrites(driver: TcpAdapter, sendBudget = 550000, fillDeadline = performance.now() + 10000) {
   let attempted = 0, observedPending = false
-  while (!observedPending && !driver.protocol.snapshot().fault && attempted < 550000 && performance.now() < fillDeadline) {
-    for (let index = 0; index < 16 && attempted < 550000 && !driver.transportSnapshot().backpressured; index++) {
+  while (!observedPending && !driver.protocol.snapshot().fault && attempted < sendBudget && performance.now() < fillDeadline) {
+    for (let index = 0; index < 16 && attempted < sendBudget && !driver.transportSnapshot().backpressured; index++) {
       driver.send({ kind: 'hold', reason: 'native callback progress deadline' }); attempted++
     }
     await Bun.sleep(0)
@@ -369,15 +390,13 @@ test('native TCP writes below the watermark expire when their callbacks make no 
   try {
     driver = await createArduPilotDriver({ transport: 'tcp', kind: 'sitl', port: remote.port })
     await until(() => driver!.read()?.batteryPercent === 90)
-    const { attempted, pending, observedPending } = await fillNativePendingWrites(driver)
-    console.log(JSON.stringify({ campaign: 'native-tcp-write-progress', attempted, pending, observedPending, receivedBytes: remote.receivedBytes(), fault: driver.protocol.snapshot().fault }))
-    expect(observedPending).toBe(true)
+    const { attempted, pressure: pending } = await observeNativeOutputExpiry(driver, 'progress')
+    console.log(JSON.stringify({ campaign: 'native-tcp-write-progress', attempted, pending, receivedBytes: remote.receivedBytes(), fault: driver.protocol.snapshot().fault }))
     expect(pending.state).toBe('connected')
     expect(pending.backpressured).toBe(false)
     expect(pending.pendingCallbackBytes).toBeGreaterThan(0)
     expect(pending.runtimeWritableBytes).toBeLessThan(4096)
     expect(remote.receivedBytes()).toBe(0)
-    await waitForPassiveFault(driver, remote, 'native-tcp-write-progress')
     expect(driver.protocol.snapshot().fault).toContain('TCP write progress deadline expired')
     expect(performance.now() - pending.lastWriteProgressAtMs!).toBeGreaterThanOrEqual(500)
     expect(driver.read()).toBeUndefined()

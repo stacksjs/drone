@@ -36,19 +36,25 @@ Chrome binary content before and after the sequence, without claiming continuous
 immutability. Keep the research-only workflow and startup-only mode off main.
 
 
-## Linux passive TCP observations
+## Linux passive TCP pressure qualification
 
-On the research-only `codex/linux-tcp-pressure-observations` branch, manual CI
-runs the complete TCP driver test file with `DRONE_TCP_PRESSURE_OBSERVATIONS=1`.
-Only the two passive fault waits retain up to 320 scalar public snapshots and
-emit their trajectories once, including on the original timeout. The 1500 ms
-observation window, 500 ms transport budgets, original fault predicates, actual
-Python OS peer and all other test controls remain unchanged. Default test runs
-retain the original wait path. There are no added writes, retries or per-sample
-logs, and no production transport changes.
+The research-only `codex/linux-tcp-pressure-observations` branch runs a fixed
+four-trial sequential Linux matrix. Fail-fast is disabled and every result is
+retained. The original observation source `6e95464` reproduced the drain failure
+in all four trials and the below-watermark failure in two. Their queues made
+legitimate progress before 500 ms; no peer application reads were necessary.
 
-A passing focused campaign is a control, not resolution of the failed full
-Linux suite. A queue clearing before 500 ms must be distinguished from a
-continuous stall or a late callback. Preserve every original red result. This
-workflow replacement and the earlier startup-only research controls must never
-merge into main or substitute for product qualification. See issue #73.
+The corrected campaign copies the exact proposed product TCP test file. Its
+bounded producer resumes only after an observed healthy transition within the
+500 ms phase budget. Every passive wait sends nothing, keeps the original
+1500 ms immediate-failure guard, and rejects late or timing-ambiguous transitions.
+Setup remains bounded by 10 seconds and 550000 frames; only the last 16 phase
+snapshots are retained. Actual mutations of each transport expiry branch fail
+the corresponding test. Production transport code and deadlines are unchanged.
+
+The complete TCP test file includes late-callback, in-budget recovery and exact
+accepted-byte controls using the real OS peer. A focused result does not replace
+full product qualification. This manual workflow and the earlier startup-only
+research controls must never merge into main. Preserve the original failures
+and inspect the original downloaded log archive when a formatted CLI view
+truncates long lines. See issue #73.
