@@ -865,7 +865,7 @@
     "implementationStatus": "behavior-audit-in-progress",
     "implemented": [
       "Pinned directory and six-vehicle-family assignments with per-dimension reviewed/unclassified status",
-      "59 source-backed behavior cases, bounded subset claims and explicit unsupported behaviors",
+      "89 source-backed behavior cases, bounded subset claims and explicit unsupported behaviors",
       "Executable evidence selectors, pinned source hash/license/citation verification, issue link checks and upstream snapshot refresh/diff gates"
     ],
     "evidence": [
@@ -876,7 +876,7 @@
       "docs/parity.md"
     ],
     "remaining": [
-      "Complete 1,347 currently unclassified parameter/mode/protocol/hardware/failure dimensions and deeper review inside sampled dimensions",
+      "Complete 1,317 currently unclassified parameter/mode/protocol/hardware/failure dimensions and deeper review inside sampled dimensions",
       "Expand executable coverage from bounded subsets to behavior-level parity with retained firmware/SITL/HIL/vehicle evidence"
     ]
   },

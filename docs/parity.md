@@ -3,10 +3,10 @@
 The executable audit accounts for the 274 pinned PX4 module/driver and ArduPilot library directories
 and six ArduPilot vehicle programs. Directory assignment is work ownership. It is not feature parity.
 
-The retained matrix is [parity-audit.json](https://github.com/stacksjs/drone/blob/main/docs/parity-audit.json). It currently contains **79 behavior
+The retained matrix is [parity-audit.json](https://github.com/stacksjs/drone/blob/main/docs/parity-audit.json). It currently contains **89 behavior
 cases**, including **26 bounded support claims** backed by **25 distinct executable test selectors**
-and **53 explicitly unsupported cases**. There are **1,327 unclassified detail dimensions**.
-The audit retains **42 pinned source records**. No upstream firmware SITL, HIL or physical-vehicle
+and **63 explicitly unsupported cases**. There are **1,317 unclassified detail dimensions**.
+The audit retains **46 pinned source records**. No upstream firmware SITL, HIL or physical-vehicle
 validation is claimed by this audit.
 
 Every assignment classifies parameters, modes, protocols, hardware and failures separately. A
@@ -123,6 +123,21 @@ intervals and its fuse applies to the timer callback, not the separate GPIO path
 not prove hardware enablement. Board wiring, electrical/timing calibration, PPS/RTC mapping and
 queue/restart behavior remain deeper work. The owned IMX500 first-row metadata, scoped capture
 ACK/pose association and modeled shutter remain separate capabilities, with no new parity claim.
+
+Ten further unsupported cases sample pinned ArduPilot Linux and SITL HAL UART behavior. They cover
+baud and buffer budgets, TCP server and CSV replay modes, raw-byte packetisation and simulated-device
+dispatch, parity and CTS/AUTO flow control, deferred open/short-write continuation, and hidden byte-loss
+injection. Four new source records retain 35 exact line/symbol anchors. The prior 79 cases, 42 sources,
+26 bounded claims and 25 selectors remain unchanged. Both HAL directories remain owned by runtime
+issue #2 and retain deeper review work in all five sampled dimensions.
+
+The companion TCP client is distinct from those HAL backends. Its 4 KiB stream watermark and 16 KiB
+outstanding-write cap do not implement configurable UART rings, hardware parity, electrical RTS/CTS,
+raw serial replay or automatic queued-byte continuation. Upstream's SITL loss injector can omit at
+most one byte per write while counting it as transmitted; this is distinct from dropping an entire
+ACK or independently sampling every byte. The reviewed source establishes dispatch to simulated
+serial devices, not full review of each generated sensor dialect. No new executable support or
+upstream firmware execution is claimed by these ten cases.
 
 Unreviewed parameters, full firmware mode sets, serial/CAN/electrical variants, redundant estimators,
 real output paths, simulator campaigns and hardware evidence remain visible gaps owned by their

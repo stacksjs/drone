@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "reviewedAt": "2026-10-20",
+  "reviewedAt": "2026-10-22",
   "assignments": [
     {
       "entry": "px4:src/modules/airship_att_control",
@@ -2372,15 +2372,15 @@
     {
       "entry": "ardupilot:libraries/AP_HAL_Linux",
       "issueKey": "runtime",
-      "unclassified": [
+      "unclassified": [],
+      "reviewed": [
         "parameters",
         "modes",
         "protocols",
         "hardware",
         "failures"
       ],
-      "reviewed": [],
-      "remaining": "Additional parameters, modes, protocol variants, hardware branches and failure paths require source review and independent evidence. Reviewed dimensions contain sampled behavior cases, not exhaustive equivalence."
+      "remaining": "Sampled UART baud/buffer, device-mode, byte-protocol, hardware-flow and failure cases are reviewed gaps, not exhaustive HAL equivalence. Device subclasses, scheduling, console/stdio, parity/stop bits, port ownership, flush/receive-time bounds, reconnect, platform variants and every remaining library subsystem require deeper review and executable evidence."
     },
     {
       "entry": "ardupilot:libraries/AP_HAL_QURT",
@@ -2398,15 +2398,15 @@
     {
       "entry": "ardupilot:libraries/AP_HAL_SITL",
       "issueKey": "runtime",
-      "unclassified": [
+      "unclassified": [],
+      "reviewed": [
         "parameters",
         "modes",
         "protocols",
         "hardware",
         "failures"
       ],
-      "reviewed": [],
-      "remaining": "Additional parameters, modes, protocol variants, hardware branches and failure paths require source review and independent evidence. Reviewed dimensions contain sampled behavior cases, not exhaustive equivalence."
+      "remaining": "Sampled UART baud/buffer, device-mode, byte-protocol, hardware-flow and failure cases are reviewed gaps, not exhaustive HAL equivalence. Device subclasses, scheduling, console/stdio, parity/stop bits, port ownership, flush/receive-time bounds, reconnect, platform variants and every remaining library subsystem require deeper review and executable evidence."
     },
     {
       "entry": "ardupilot:libraries/AP_Hott_Telem",
@@ -4307,6 +4307,54 @@
       "url": "https://github.com/PX4/PX4-Autopilot/blob/ddcaad6601be20453ec6acd0f08e567af3a7e1bb/src/drivers/camera_capture/camera_capture_params.yaml",
       "license": "BSD-3-Clause",
       "licenseSource": "https://github.com/PX4/PX4-Autopilot/blob/ddcaad6601be20453ec6acd0f08e567af3a7e1bb/LICENSE"
+    },
+    {
+      "id": "ardupilot:libraries/AP_HAL_Linux/UARTDriver.cpp",
+      "upstream": "ardupilot",
+      "path": "libraries/AP_HAL_Linux/UARTDriver.cpp",
+      "revision": "afeb9c4941543d97f3e04fecf257b8f598f49a6a",
+      "blobSha": "f253eb8a0881069d281f51e607fed449b764acae",
+      "sha256": "c2c98f36c32d5425860e665fe3fb44586f3c2e7fd9eccfbdc52b0ef78bb84bbe",
+      "lines": 452,
+      "url": "https://github.com/ArduPilot/ardupilot/blob/afeb9c4941543d97f3e04fecf257b8f598f49a6a/libraries/AP_HAL_Linux/UARTDriver.cpp",
+      "license": "GPL-3.0-or-later",
+      "licenseSource": "https://github.com/ArduPilot/ardupilot/blob/afeb9c4941543d97f3e04fecf257b8f598f49a6a/COPYING.txt"
+    },
+    {
+      "id": "ardupilot:libraries/AP_HAL_Linux/UARTDriver.h",
+      "upstream": "ardupilot",
+      "path": "libraries/AP_HAL_Linux/UARTDriver.h",
+      "revision": "afeb9c4941543d97f3e04fecf257b8f598f49a6a",
+      "blobSha": "02a1afba7b88e923ce8fa5e4d6c08f85ad42b714",
+      "sha256": "f2ac2f2b9966d016621971fcf401820dd49e40f459f40e2a7a55323e6746a6de",
+      "lines": 105,
+      "url": "https://github.com/ArduPilot/ardupilot/blob/afeb9c4941543d97f3e04fecf257b8f598f49a6a/libraries/AP_HAL_Linux/UARTDriver.h",
+      "license": "GPL-3.0-or-later",
+      "licenseSource": "https://github.com/ArduPilot/ardupilot/blob/afeb9c4941543d97f3e04fecf257b8f598f49a6a/COPYING.txt"
+    },
+    {
+      "id": "ardupilot:libraries/AP_HAL_SITL/UARTDriver.cpp",
+      "upstream": "ardupilot",
+      "path": "libraries/AP_HAL_SITL/UARTDriver.cpp",
+      "revision": "afeb9c4941543d97f3e04fecf257b8f598f49a6a",
+      "blobSha": "25dd3c45de9f84425e1f6d999f2273a6057032e3",
+      "sha256": "5a435adbb2c03526aa8746ed53ddf6494edb90f1646d2b0458aa9e832f0577ec",
+      "lines": 1382,
+      "url": "https://github.com/ArduPilot/ardupilot/blob/afeb9c4941543d97f3e04fecf257b8f598f49a6a/libraries/AP_HAL_SITL/UARTDriver.cpp",
+      "license": "GPL-3.0-or-later",
+      "licenseSource": "https://github.com/ArduPilot/ardupilot/blob/afeb9c4941543d97f3e04fecf257b8f598f49a6a/COPYING.txt"
+    },
+    {
+      "id": "ardupilot:libraries/AP_HAL_SITL/UARTDriver.h",
+      "upstream": "ardupilot",
+      "path": "libraries/AP_HAL_SITL/UARTDriver.h",
+      "revision": "afeb9c4941543d97f3e04fecf257b8f598f49a6a",
+      "blobSha": "222e63cae9833c1a40cd841b650f4e8ac58804dc",
+      "sha256": "1ce5a1a8cb8fd86ffb5ebb6e593854915c0768872a61d2581d4d385d40c5bb29",
+      "lines": 184,
+      "url": "https://github.com/ArduPilot/ardupilot/blob/afeb9c4941543d97f3e04fecf257b8f598f49a6a/libraries/AP_HAL_SITL/UARTDriver.h",
+      "license": "GPL-3.0-or-later",
+      "licenseSource": "https://github.com/ArduPilot/ardupilot/blob/afeb9c4941543d97f3e04fecf257b8f598f49a6a/COPYING.txt"
     }
   ],
   "cases": [
@@ -6336,6 +6384,331 @@
       "limitations": [
         "The counter decreases on acceptable intervals, so this is not described as 101 consecutive events. This is the input-capture callback path, not a demonstrated guard on the separate GPIO interrupt routine. Owned capture timeouts/lost-ACK models do not establish this interrupt-rate fuse.",
         "No upstream firmware execution, SITL, HIL, physical exposure feedback or executable parity evidence is retained for this gap."
+      ]
+    },
+    {
+      "id": "linux-uart-baud-buffer-configuration",
+      "entry": "ardupilot:libraries/AP_HAL_Linux",
+      "dimension": "parameters",
+      "behavior": "Linux HAL baud changes and UART RX/TX ring allocation with 8192-byte RX and 32000-byte TX minimums are not exposed by the owned companion-driver options.",
+      "support": "unsupported",
+      "sources": [
+        {
+          "source": "ardupilot:libraries/AP_HAL_Linux/UARTDriver.cpp",
+          "line": 82,
+          "symbol": "_baudrate != b"
+        },
+        {
+          "source": "ardupilot:libraries/AP_HAL_Linux/UARTDriver.cpp",
+          "line": 105,
+          "symbol": "rxS < 8192"
+        },
+        {
+          "source": "ardupilot:libraries/AP_HAL_Linux/UARTDriver.cpp",
+          "line": 108,
+          "symbol": "txS < 32000"
+        }
+      ],
+      "evidence": [],
+      "limitations": [
+        "Our fixed pending-write capacity does not provide configurable HAL RX/TX rings, baud changes or their clear-buffer semantics.",
+        "The companion UDP/TCP adapter and scripted peer are not implementations of the upstream HAL UART backend or its raw-byte device contract.",
+        "This is a sampled source-backed gap, not exhaustive review of this dimension. No upstream firmware SITL, hardware, HIL or vehicle execution is claimed."
+      ]
+    },
+    {
+      "id": "linux-uart-device-path-server-mode",
+      "entry": "ardupilot:libraries/AP_HAL_Linux",
+      "dimension": "modes",
+      "behavior": "Linux HAL TCP-server wait mode and serial device-path selection are not provided by the companion TCP-client factory.",
+      "support": "unsupported",
+      "sources": [
+        {
+          "source": "ardupilot:libraries/AP_HAL_Linux/UARTDriver.cpp",
+          "line": 129,
+          "symbol": "_parseDevicePath"
+        },
+        {
+          "source": "ardupilot:libraries/AP_HAL_Linux/UARTDriver.cpp",
+          "line": 195,
+          "symbol": "bool wait"
+        },
+        {
+          "source": "ardupilot:libraries/AP_HAL_Linux/UARTDriver.cpp",
+          "line": 196,
+          "symbol": "TCPServerDevice"
+        }
+      ],
+      "evidence": [],
+      "limitations": [
+        "The bench owns a local server as a test peer; that does not expose a vehicle HAL TCP-listener/wait mode. Invalid-path console fallback is not adopted as an owned safety policy.",
+        "The companion UDP/TCP adapter and scripted peer are not implementations of the upstream HAL UART backend or its raw-byte device contract.",
+        "This is a sampled source-backed gap, not exhaustive review of this dimension. No upstream firmware SITL, hardware, HIL or vehicle execution is claimed."
+      ]
+    },
+    {
+      "id": "linux-uart-queued-mavlink-packetisation",
+      "entry": "ardupilot:libraries/AP_HAL_Linux",
+      "dimension": "protocols",
+      "behavior": "MAVLink packetisation of an arbitrary Linux HAL UART write ring into UDP datagrams is not implemented by the companion packet adapter.",
+      "support": "unsupported",
+      "sources": [
+        {
+          "source": "ardupilot:libraries/AP_HAL_Linux/UARTDriver.cpp",
+          "line": 183,
+          "symbol": "_packetise = true"
+        },
+        {
+          "source": "ardupilot:libraries/AP_HAL_Linux/UARTDriver.cpp",
+          "line": 341,
+          "symbol": "mavlink_packetise"
+        },
+        {
+          "source": "ardupilot:libraries/AP_HAL_Linux/UARTDriver.cpp",
+          "line": 351,
+          "symbol": "_writebuf.peekbytes"
+        }
+      ],
+      "evidence": [],
+      "limitations": [
+        "Encoding one bounded MAVLink frame per companion datagram is narrower than packetising and advancing a HAL byte ring with compile-conditional GCS support.",
+        "The companion UDP/TCP adapter and scripted peer are not implementations of the upstream HAL UART backend or its raw-byte device contract.",
+        "This is a sampled source-backed gap, not exhaustive review of this dimension. No upstream firmware SITL, hardware, HIL or vehicle execution is claimed."
+      ]
+    },
+    {
+      "id": "linux-uart-physical-parity-flow-control",
+      "entry": "ardupilot:libraries/AP_HAL_Linux",
+      "dimension": "hardware",
+      "behavior": "Configurable Linux HAL character-device UART parity and hardware flow-control APIs are not exposed by the owned packet-driver factories.",
+      "support": "unsupported",
+      "sources": [
+        {
+          "source": "ardupilot:libraries/AP_HAL_Linux/UARTDriver.cpp",
+          "line": 133,
+          "symbol": "S_ISCHR"
+        },
+        {
+          "source": "ardupilot:libraries/AP_HAL_Linux/UARTDriver.cpp",
+          "line": 417,
+          "symbol": "configure_parity"
+        },
+        {
+          "source": "ardupilot:libraries/AP_HAL_Linux/UARTDriver.h",
+          "line": 37,
+          "symbol": "set_flow_control"
+        }
+      ],
+      "evidence": [],
+      "limitations": [
+        "No tty wiring, RTS/CTS electrical behavior, kernel termios configuration or hardware parity evidence is established by loopback TCP tests.",
+        "The companion UDP/TCP adapter and scripted peer are not implementations of the upstream HAL UART backend or its raw-byte device contract.",
+        "This is a sampled source-backed gap, not exhaustive review of this dimension. No upstream firmware SITL, hardware, HIL or vehicle execution is claimed."
+      ]
+    },
+    {
+      "id": "linux-uart-deferred-open-byte-continuation",
+      "entry": "ardupilot:libraries/AP_HAL_Linux",
+      "dimension": "failures",
+      "behavior": "Linux HAL deferred device open and scheduled continuation of queued raw UART bytes after zero or short writes are not implemented as a companion-driver lifecycle.",
+      "support": "unsupported",
+      "sources": [
+        {
+          "source": "ardupilot:libraries/AP_HAL_Linux/UARTDriver.cpp",
+          "line": 309,
+          "symbol": "if (!_connected)"
+        },
+        {
+          "source": "ardupilot:libraries/AP_HAL_Linux/UARTDriver.cpp",
+          "line": 310,
+          "symbol": "_device->open"
+        },
+        {
+          "source": "ardupilot:libraries/AP_HAL_Linux/UARTDriver.cpp",
+          "line": 363,
+          "symbol": "_writebuf.advance"
+        },
+        {
+          "source": "ardupilot:libraries/AP_HAL_Linux/UARTDriver.cpp",
+          "line": 366,
+          "symbol": "ret != vec[i].len"
+        }
+      ],
+      "evidence": [],
+      "limitations": [
+        "The owned TCP adapter fails the session on loss or output pressure and requires deliberate reconciliation before a fresh connection. That is not upstream HAL queued-byte continuation and must not silently replay commands.",
+        "The companion UDP/TCP adapter and scripted peer are not implementations of the upstream HAL UART backend or its raw-byte device contract.",
+        "This is a sampled source-backed gap, not exhaustive review of this dimension. No upstream firmware SITL, hardware, HIL or vehicle execution is claimed."
+      ]
+    },
+    {
+      "id": "sitl-uart-configured-baud-budget",
+      "entry": "ardupilot:libraries/AP_HAL_SITL",
+      "dimension": "parameters",
+      "behavior": "SITL telemetry baud-limit enablement with independent byte budgets for UART reads and writes is not provided by the companion protocol bench.",
+      "support": "unsupported",
+      "sources": [
+        {
+          "source": "ardupilot:libraries/AP_HAL_SITL/UARTDriver.cpp",
+          "line": 1043,
+          "symbol": "telem_baudlimit_enable"
+        },
+        {
+          "source": "ardupilot:libraries/AP_HAL_SITL/UARTDriver.cpp",
+          "line": 1046,
+          "symbol": "baud_limits.write.max_bytes"
+        },
+        {
+          "source": "ardupilot:libraries/AP_HAL_SITL/UARTDriver.cpp",
+          "line": 1149,
+          "symbol": "baud_limits.read.max_bytes"
+        }
+      ],
+      "evidence": [],
+      "limitations": [
+        "A 25 ms protocol poll and requested MAVLink message interval are not UART baud emulation, serial throughput identification or delivery-rate evidence.",
+        "The companion UDP/TCP adapter and scripted peer are not implementations of the upstream HAL UART backend or its raw-byte device contract.",
+        "This is a sampled source-backed gap, not exhaustive review of this dimension. No upstream firmware SITL, hardware, HIL or vehicle execution is claimed."
+      ]
+    },
+    {
+      "id": "sitl-uart-timestamped-csv-mode",
+      "entry": "ardupilot:libraries/AP_HAL_SITL",
+      "dimension": "modes",
+      "behavior": "The SITL logic_async_csv raw serial-byte replay mode with capture-time scheduling is not implemented by owned sensor or diagnostic replay.",
+      "support": "unsupported",
+      "sources": [
+        {
+          "source": "ardupilot:libraries/AP_HAL_SITL/UARTDriver.cpp",
+          "line": 198,
+          "symbol": "logic_async_csv"
+        },
+        {
+          "source": "ardupilot:libraries/AP_HAL_SITL/UARTDriver.cpp",
+          "line": 935,
+          "symbol": "read_from_async_csv"
+        },
+        {
+          "source": "ardupilot:libraries/AP_HAL_SITL/UARTDriver.cpp",
+          "line": 951,
+          "symbol": "data_timestamp_us > emit_timestamp_us"
+        }
+      ],
+      "evidence": [],
+      "limitations": [
+        "Existing owned structured sensor/journal replays do not consume this UART CSV format, its startup delay or its malformed-record behavior.",
+        "The companion UDP/TCP adapter and scripted peer are not implementations of the upstream HAL UART backend or its raw-byte device contract.",
+        "This is a sampled source-backed gap, not exhaustive review of this dimension. No upstream firmware SITL, hardware, HIL or vehicle execution is claimed."
+      ]
+    },
+    {
+      "id": "sitl-uart-simulated-serial-device-dispatch",
+      "entry": "ardupilot:libraries/AP_HAL_SITL",
+      "dimension": "protocols",
+      "behavior": "SITL UART dispatch to GPS1/GPS2, ADSB and selected simulated serial devices is not implemented by the companion MAVLink transport.",
+      "support": "unsupported",
+      "sources": [
+        {
+          "source": "ardupilot:libraries/AP_HAL_SITL/UARTDriver.cpp",
+          "line": 87,
+          "symbol": "create_serial_sim"
+        },
+        {
+          "source": "ardupilot:libraries/AP_HAL_SITL/UARTDriver.cpp",
+          "line": 121,
+          "symbol": "create_serial_sim"
+        },
+        {
+          "source": "ardupilot:libraries/AP_HAL_SITL/UARTDriver.cpp",
+          "line": 152,
+          "symbol": "create_serial_sim"
+        }
+      ],
+      "evidence": [],
+      "limitations": [
+        "The cited lines establish device dispatch, not a reviewed inventory of each generated GPS or sensor wire dialect. Those simulator implementations require deeper review.",
+        "The companion UDP/TCP adapter and scripted peer are not implementations of the upstream HAL UART backend or its raw-byte device contract.",
+        "This is a sampled source-backed gap, not exhaustive review of this dimension. No upstream firmware SITL, hardware, HIL or vehicle execution is claimed."
+      ]
+    },
+    {
+      "id": "sitl-uart-cts-auto-flow-control",
+      "entry": "ardupilot:libraries/AP_HAL_SITL",
+      "dimension": "hardware",
+      "behavior": "SITL real-UART CTS checking and AUTO hardware-flow-control detection/fallback are not exposed by the companion TCP adapter.",
+      "support": "unsupported",
+      "sources": [
+        {
+          "source": "ardupilot:libraries/AP_HAL_SITL/UARTDriver.cpp",
+          "line": 262,
+          "symbol": "CRTSCTS"
+        },
+        {
+          "source": "ardupilot:libraries/AP_HAL_SITL/UARTDriver.cpp",
+          "line": 1085,
+          "symbol": "TIOCMGET"
+        },
+        {
+          "source": "ardupilot:libraries/AP_HAL_SITL/UARTDriver.cpp",
+          "line": 1086,
+          "symbol": "TIOCM_CTS"
+        },
+        {
+          "source": "ardupilot:libraries/AP_HAL_SITL/UARTDriver.cpp",
+          "line": 1108,
+          "symbol": "500U"
+        },
+        {
+          "source": "ardupilot:libraries/AP_HAL_SITL/UARTDriver.cpp",
+          "line": 1111,
+          "symbol": "FLOW_CONTROL_DISABLE"
+        }
+      ],
+      "evidence": [],
+      "limitations": [
+        "Software socket pressure is distinct from serial RTS/CTS electrical state. Upstream AUTO can disable flow control after its 500 ms detection condition; our TCP pressure deadline does not reproduce this policy.",
+        "The companion UDP/TCP adapter and scripted peer are not implementations of the upstream HAL UART backend or its raw-byte device contract.",
+        "This is a sampled source-backed gap, not exhaustive review of this dimension. No upstream firmware SITL, hardware, HIL or vehicle execution is claimed."
+      ]
+    },
+    {
+      "id": "sitl-uart-hidden-byte-loss-injection",
+      "entry": "ardupilot:libraries/AP_HAL_SITL",
+      "dimension": "failures",
+      "behavior": "SITL UART can omit at most one byte per write under its configured loss test while counting that byte as transmitted; the companion bench has no equivalent raw-byte loss injector.",
+      "support": "unsupported",
+      "sources": [
+        {
+          "source": "ardupilot:libraries/AP_HAL_SITL/UARTDriver.cpp",
+          "line": 335,
+          "symbol": "lost_byte = 0"
+        },
+        {
+          "source": "ardupilot:libraries/AP_HAL_SITL/UARTDriver.cpp",
+          "line": 340,
+          "symbol": "uart_byte_loss_pct"
+        },
+        {
+          "source": "ardupilot:libraries/AP_HAL_SITL/UARTDriver.cpp",
+          "line": 341,
+          "symbol": "lost_byte = 1"
+        },
+        {
+          "source": "ardupilot:libraries/AP_HAL_SITL/UARTDriver.cpp",
+          "line": 347,
+          "symbol": "_tx_stats_bytes += lost_byte"
+        },
+        {
+          "source": "ardupilot:libraries/AP_HAL_SITL/UARTDriver.cpp",
+          "line": 349,
+          "symbol": "size - lost_byte"
+        }
+      ],
+      "evidence": [],
+      "limitations": [
+        "Dropping one whole COMMAND_ACK and corrupting framing fixtures do not reproduce the upstream per-write loss probability, raw-byte removal or transmitted-byte accounting. This source does not establish independent loss sampling for every byte.",
+        "The companion UDP/TCP adapter and scripted peer are not implementations of the upstream HAL UART backend or its raw-byte device contract.",
+        "This is a sampled source-backed gap, not exhaustive review of this dimension. No upstream firmware SITL, hardware, HIL or vehicle execution is claimed."
       ]
     }
   ]
