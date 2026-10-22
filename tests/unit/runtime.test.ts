@@ -1,4 +1,4 @@
-import { beforeAll, describe, expect, test } from 'bun:test'
+import { describe, expect, test } from 'bun:test'
 import { mkdtemp, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -82,8 +82,8 @@ describe('Pi bench session authority', () => {
   })
 })
 
-let artifact: string
-beforeAll(async () => { artifact = (await buildRuntime()).artifact }, 20000)
+// Build setup uses the build API's bounded command lifecycle, before test timers start.
+const { artifact } = await buildRuntime()
 async function withNative(run: (harness: ReturnType<typeof openRuntimeHarness>) => Promise<void>) {
   const harness = openRuntimeHarness(artifact)
   try { await run(harness) }

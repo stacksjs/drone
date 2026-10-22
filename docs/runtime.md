@@ -28,6 +28,35 @@ stream. Native Stacks process capture drains stdout and stderr concurrently and
 cleans up the owned process group on POSIX before reporting failure. This also
 applies to SDK inspection and Pico 2 builds; it does not install firmware.
 
+Native runtime and sensor tests await build initialization before their test timers
+start. An unrelated setup hook must not interrupt the build API's owned command
+cleanup. Runtime response and test deadlines are unchanged. Build failures identify
+the configure, compile, contracts or SDK inspection stage.
+
+CI also compiles a fresh disposable source copy whose real CMake configure takes
+at least 21 seconds, crossing the former 20-second setup hook. It then runs the
+original Linux full-input FIFO case, retains real tool exit observations and checks
+that no owned tool groups remain. Run the same qualification locally with a new
+evidence directory:
+
+```sh
+bun scripts/qualify-runtime-cold-build.ts /absolute/path/to/new-cold-build-evidence
+```
+
+On macOS the qualification uses the native boot/clean-exit case; the kernel FIFO
+case is Linux-only. The qualification retains its owned source and logs, including
+failures. It does not access a board or measure flight timing.
+
+The qualification supervisor derives its aggregate budget from the three separate
+120-second build commands, their settlement allowance, the selected test's existing
+deadline and startup allowance. It captures at most 2 MB per stream concurrently,
+retains failed output and checks both parent and recorded tool process groups.
+This test-only aggregate budget does not extend the build API or runtime deadlines.
+CI separately interrupts the actual test parent while CMake is active and makes
+the early capture receipt path a directory. That expected reporting refusal must
+still retain its error and settle the recorded detached tool group. Run it with
+`--interrupt-before-capture-report` after a new evidence directory argument.
+
 ```sh
 ./buddy runtime:build
 ./buddy runtime:bench --ticks 1000

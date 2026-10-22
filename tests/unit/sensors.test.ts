@@ -1,4 +1,4 @@
-import { beforeAll, describe, expect, test } from 'bun:test'
+import { describe, expect, test } from 'bun:test'
 import { command } from '@stacksjs/testing'
 import { join } from 'node:path'
 import fixture from '../fixtures/sensors/bench-v1.json'
@@ -199,8 +199,8 @@ describe('sensor clocks and independent health', () => {
   })
 })
 
-let nativeDirectory: string
-beforeAll(async () => { nativeDirectory = (await buildRuntime()).directory }, 20000)
+// A cold native build must settle before the sensor test's own timing begins.
+const { directory: nativeDirectory } = await buildRuntime()
 describe('native capture and simulator replay', () => {
   test('the native C++ codec preserves independently encoded records byte-for-byte', async () => {
     const wire = Buffer.concat(['imu', 'barometer', 'gnss'].map(kind => Buffer.from(bytes(kind as SensorKind))))
