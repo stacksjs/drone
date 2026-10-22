@@ -71,6 +71,8 @@ TCP always connects to literal `127.0.0.1`, with a 2-second connection deadline 
 2-second deadline for the first matching heartbeat. The configured system/component and firmware
 identity must match before TCP telemetry can be admitted. No arbitrary host, serial port, physical
 writer or forwarding service is added. Existing UDP options and default transport remain compatible.
+Connect and initial-heartbeat admission check their absolute deadlines in the receiving callbacks,
+so a delayed timer cannot admit a late connection or first heartbeat after an event-loop pause.
 
 The stream decoder reconstructs v1/v2 packets across fragmented or coalesced reads, with CRC and
 the existing strict signing verifier. Its partial-frame storage is 280 bytes, the signed MAVLink 2
@@ -79,12 +81,22 @@ processed in bounded chunks. Invalid CRC/length candidates resynchronize rather 
 telemetry. Unknown dialects and unsupported flags cannot satisfy a transaction. A decoder reset
 clears framing bytes while preserving the supplied verifier's in-session replay watermark.
 
-Outbound bytes awaiting write callbacks are capped at 16 KiB, alongside the runtime's reported
+The per-connection stream watermark is 4 KiB so native pressure is observed below the separate
+application cap. Outbound bytes awaiting write callbacks are capped at 16 KiB, alongside the runtime's reported
 queue length. A write that reports backpressure is already accepted by the stream and is never
 resent on `drain`. Further writes during pressure terminate the session. No drain or write-callback
 progress for 500 ms also terminates it. These are application buffering bounds, not confirmation
 that a peer received or executed a command. Focused tests exercise the bound against an actual
 paused loopback peer; they do not establish kernel buffer capacity or hardware link timing.
+Native loopback campaigns distinguish the drain timeout from callback progress below the watermark,
+and verify recovery within budget without resending accepted bytes.
+Drain and write callbacks check expiry before crediting progress, so a delayed event loop cannot
+reset an already expired output budget. These host observations do not establish real-time scheduling.
+
+An explicitly typed TCP factory result also provides `transportSnapshot()`. Its detached, read-only
+record reports connection state, backpressure, pending callback bytes, runtime writable bytes and
+active progress/block timestamps in the local `performance.now()` clock domain. These local queue
+observations do not establish remote receipt or execution and cannot change transport authority.
 
 EOF, socket failure, heartbeat expiry and explicit close reject pending work and discard partial
 frames. Reconnection is deliberate: close the old adapter, reconcile any uncertain remote effects,

@@ -1,4 +1,5 @@
 import type { Socket } from 'node:net'
+import type { TcpAdapter } from '../../resources/functions/drone/drivers'
 import { createServer } from 'node:net'
 import { expect, test } from 'bun:test'
 import { createArduPilotDriver, createPx4Driver } from '../../resources/functions/drone/drivers'
@@ -6,6 +7,7 @@ import { createMavlinkStreamDecoder, encodeFrame, encodeFrameV2 } from '../../re
 import { runDriverProtocolBench } from '../../resources/functions/drone/drivers/bench'
 import vectors from '../fixtures/drivers/wire.json'
 import telemetryVectors from '../fixtures/mavlink.json'
+import { createPressurePeer } from '../fixtures/drivers/pressure'
 
 async function until(condition: () => boolean) {
   const deadline = performance.now() + 1500
@@ -219,3 +221,187 @@ test('wrong firmware identity cannot establish a TCP session and silent startup 
   }
   finally { driver.close(); await remote.close() }
 })
+
+// Public factory deadline seam: actual loopback setup plus a real event-loop pause.
+// This catches late callback admission, not network SYN loss or physical timing.
+test('a native connect callback after the absolute setup deadline cannot establish a TCP adapter', async () => {
+  const sockets = new Set<Bun.Socket<undefined>>()
+  const server = Bun.listen({ hostname: '127.0.0.1', port: 0, socket: {
+    open(socket) { sockets.add(socket) },
+    data() {},
+    close(socket) { sockets.delete(socket) },
+  } })
+  let driver: Awaited<ReturnType<typeof createArduPilotDriver>> | undefined
+  try {
+    const pending = createArduPilotDriver({ transport: 'tcp', kind: 'sitl', port: server.port })
+      .then(adapter => { driver = adapter; return undefined }, (error: unknown) => error)
+    const started = performance.now()
+    Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 2200)
+    expect(performance.now() - started).toBeGreaterThanOrEqual(2000)
+    const error = await pending
+    expect(error).toBeInstanceOf(Error)
+    if (!(error instanceof Error)) throw new Error('An expired native connect established an adapter')
+    expect(error.message).toContain('TCP connection deadline expired')
+    await until(() => sockets.size === 0)
+  }
+  finally { driver?.close(); server.stop(true) }
+}, 6000)
+
+async function fillNativeBackpressure(driver: TcpAdapter) {
+  const fillDeadline = performance.now() + 10000
+  let attempted = 0
+  while (!driver.transportSnapshot().backpressured && !driver.protocol.snapshot().fault && attempted < 550000 && performance.now() < fillDeadline) {
+    for (let index = 0; index < 128 && attempted < 550000 && !driver.transportSnapshot().backpressured && !driver.protocol.snapshot().fault; index++) {
+      driver.send({ kind: 'hold', reason: 'native drain deadline' }); attempted++
+    }
+    await Bun.sleep(0)
+  }
+  return { attempted, blocked: driver.transportSnapshot() }
+}
+
+test('native TCP backpressure expires the drain deadline without an additional write', async () => {
+  const remote = await createPressurePeer(telemetry(3))
+  let driver: TcpAdapter | undefined
+  try {
+    driver = await createArduPilotDriver({ transport: 'tcp', kind: 'sitl', port: remote.port })
+    await until(() => driver!.read()?.batteryPercent === 90)
+    const { attempted, blocked } = await fillNativeBackpressure(driver)
+    console.log(JSON.stringify({ campaign: 'native-tcp-drain', attempted, blocked, receivedBytes: remote.receivedBytes(), fault: driver.protocol.snapshot().fault }))
+    expect(blocked.backpressured).toBe(true)
+    expect(blocked.state).toBe('connected')
+    expect(blocked.pendingCallbackBytes).toBeLessThanOrEqual(16384)
+    expect(remote.receivedBytes()).toBe(0)
+    await until(() => driver!.protocol.snapshot().fault !== null)
+    expect(driver.protocol.snapshot().fault).toContain('TCP output drain deadline expired')
+    expect(performance.now() - blocked.blockedSinceMs!).toBeGreaterThanOrEqual(500)
+    expect(driver.read()).toBeUndefined()
+    expect(driver.transportSnapshot().state).toBe('failed')
+  }
+  finally { driver?.close(); await remote.close() }
+}, 15000)
+
+test('late native drain callbacks cannot erase an expired output deadline', async () => {
+  const remote = await createPressurePeer(telemetry(3))
+  let driver: TcpAdapter | undefined
+  try {
+    driver = await createArduPilotDriver({ transport: 'tcp', kind: 'sitl', port: remote.port })
+    await until(() => driver!.read()?.batteryPercent === 90)
+    const { attempted, blocked } = await fillNativeBackpressure(driver)
+    expect(blocked.backpressured).toBe(true)
+    expect(blocked.state).toBe('connected')
+    remote.resume()
+    expect(driver.transportSnapshot().backpressured).toBe(true)
+    Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 550)
+    await Bun.sleep(25)
+    console.log(JSON.stringify({ campaign: 'late-native-tcp-drain', attempted, blocked, after: driver.transportSnapshot(), fault: driver.protocol.snapshot().fault }))
+    expect(driver.protocol.snapshot().fault).toContain('TCP output drain deadline expired')
+    expect(driver.read()).toBeUndefined()
+  }
+  finally { driver?.close(); await remote.close() }
+}, 15000)
+
+test('a native drain within budget settles accepted bytes once and transport snapshots cannot change the connection', async () => {
+  const remote = await createPressurePeer(telemetry(3))
+  let driver: TcpAdapter | undefined
+  try {
+    driver = await createArduPilotDriver({ transport: 'tcp', kind: 'sitl', port: remote.port })
+    await until(() => driver!.read()?.batteryPercent === 90)
+    const { attempted, blocked } = await fillNativeBackpressure(driver)
+    expect(blocked.backpressured).toBe(true)
+    expect(blocked.pendingCallbackBytes).toBeGreaterThan(0)
+    const detached = driver.transportSnapshot()
+    Object.assign(detached, { state: 'closed', backpressured: false, pendingCallbackBytes: 0 })
+    expect(driver.transportSnapshot().state).toBe('connected')
+    expect(driver.transportSnapshot().backpressured).toBe(true)
+    remote.resume()
+    // Unsigned SET_POSITION_TARGET_LOCAL_NED is 53 payload bytes plus the 8-byte v1 envelope.
+    await until(() => remote.receivedBytes() === attempted * 61 && driver!.transportSnapshot().pendingCallbackBytes === 0)
+    expect(driver.transportSnapshot().backpressured).toBe(false)
+    expect(driver.protocol.snapshot().fault).toBeNull()
+    expect(blocked.backpressured).toBe(true)
+    driver.send({ kind: 'hold', reason: 'fresh write after observed native drain' })
+    await until(() => remote.receivedBytes() === (attempted + 1) * 61)
+    expect(driver.protocol.snapshot().fault).toBeNull()
+    driver.close()
+    expect(driver.transportSnapshot().state).toBe('closed')
+  }
+  finally { driver?.close(); await remote.close() }
+}, 15000)
+
+async function fillNativePendingWrites(driver: TcpAdapter) {
+  const fillDeadline = performance.now() + 10000
+  let attempted = 0, observedPending = false
+  while (!observedPending && !driver.protocol.snapshot().fault && attempted < 550000 && performance.now() < fillDeadline) {
+    for (let index = 0; index < 16 && attempted < 550000 && !driver.transportSnapshot().backpressured; index++) {
+      driver.send({ kind: 'hold', reason: 'native callback progress deadline' }); attempted++
+    }
+    await Bun.sleep(0)
+    if (driver.transportSnapshot().pendingCallbackBytes > 0 && !driver.transportSnapshot().backpressured) {
+      await Bun.sleep(25)
+      observedPending = driver.transportSnapshot().pendingCallbackBytes > 0 && !driver.transportSnapshot().backpressured
+    }
+  }
+  return { attempted, pending: driver.transportSnapshot(), observedPending }
+}
+
+test('native TCP writes below the watermark expire when their callbacks make no progress', async () => {
+  const remote = await createPressurePeer(telemetry(3))
+  let driver: TcpAdapter | undefined
+  try {
+    driver = await createArduPilotDriver({ transport: 'tcp', kind: 'sitl', port: remote.port })
+    await until(() => driver!.read()?.batteryPercent === 90)
+    const { attempted, pending, observedPending } = await fillNativePendingWrites(driver)
+    console.log(JSON.stringify({ campaign: 'native-tcp-write-progress', attempted, pending, observedPending, receivedBytes: remote.receivedBytes(), fault: driver.protocol.snapshot().fault }))
+    expect(observedPending).toBe(true)
+    expect(pending.state).toBe('connected')
+    expect(pending.backpressured).toBe(false)
+    expect(pending.pendingCallbackBytes).toBeGreaterThan(0)
+    expect(pending.runtimeWritableBytes).toBeLessThan(4096)
+    expect(remote.receivedBytes()).toBe(0)
+    await until(() => driver!.protocol.snapshot().fault !== null)
+    expect(driver.protocol.snapshot().fault).toContain('TCP write progress deadline expired')
+    expect(performance.now() - pending.lastWriteProgressAtMs!).toBeGreaterThanOrEqual(500)
+    expect(driver.read()).toBeUndefined()
+    expect(driver.transportSnapshot().state).toBe('failed')
+  }
+  finally { driver?.close(); await remote.close() }
+}, 15000)
+
+test('late native write callbacks cannot erase an expired below-watermark progress deadline', async () => {
+  const remote = await createPressurePeer(telemetry(3))
+  let driver: TcpAdapter | undefined
+  try {
+    driver = await createArduPilotDriver({ transport: 'tcp', kind: 'sitl', port: remote.port })
+    await until(() => driver!.read()?.batteryPercent === 90)
+    const { attempted, pending, observedPending } = await fillNativePendingWrites(driver)
+    expect(observedPending).toBe(true)
+    expect(pending.backpressured).toBe(false)
+    remote.resume()
+    expect(driver.transportSnapshot().pendingCallbackBytes).toBeGreaterThan(0)
+    Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 550)
+    await Bun.sleep(25)
+    console.log(JSON.stringify({ campaign: 'late-native-tcp-progress', attempted, pending, after: driver.transportSnapshot(), fault: driver.protocol.snapshot().fault }))
+    expect(driver.protocol.snapshot().fault).toContain('TCP write progress deadline expired')
+    expect(driver.read()).toBeUndefined()
+  }
+  finally { driver?.close(); await remote.close() }
+}, 15000)
+
+test('a queued initial heartbeat cannot establish telemetry after its absolute matching deadline', async () => {
+  let remote: Bun.Socket<undefined> | undefined
+  const server = Bun.listen({ hostname: '127.0.0.1', port: 0, socket: {
+    open(socket) { remote = socket },
+    data() {},
+  } })
+  let driver: Awaited<ReturnType<typeof createArduPilotDriver>> | undefined
+  try {
+    driver = await createArduPilotDriver({ transport: 'tcp', kind: 'sitl', port: server.port })
+    await until(() => remote !== undefined)
+    remote!.write(telemetry(3))
+    Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 2200)
+    await Bun.sleep(25)
+    expect(driver.protocol.snapshot().fault).toContain('matching heartbeat deadline expired')
+    expect(driver.read()).toBeUndefined()
+  }
+  finally { driver?.close(); server.stop(true) }
+}, 6000)
