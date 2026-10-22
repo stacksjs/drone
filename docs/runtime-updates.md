@@ -182,8 +182,10 @@ cuts do not cover every write/sync boundary or actual physical power loss.
 The metadata format is bounded to 256 attempts, 10,000 metadata advances and a 128 MiB
 state database. Each attempt allows 64 inputs, 32 MiB of metadata and 512 KiB per
 file. Exhaustion fails closed; history is not automatically deleted or compacted.
-Capacity migration, the full storage-fault campaign, authenticated repair/key
-revocation, durable slot coordination and session-bound health remain in #42.
+Capacity migration, the full storage-fault campaign and authenticated repair/key
+revocation remain in #42. [Owned host slots](#owned-host-slots-and-observed-health)
+below add durable host roles and observed boot/session health. Physical board
+selection, boot health and recovery still require their separate qualification.
 
 ## Protected signed-image preparation
 

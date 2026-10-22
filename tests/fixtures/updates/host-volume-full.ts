@@ -168,8 +168,9 @@ export async function qualifyHostFullVolume(directory: string) {
     assert.ok(rejection.errorCodes.includes('ENOSPC') && rejection.errorCodes.includes('SQLITE_FULL'))
     assert.ok(Array.isArray(rejection.phases) && rejection.phases.includes('slot-selected'))
     assert.ok(!rejection.phases.includes('slot-image-written') && !rejection.phases.includes('runtime-started') && !rejection.phases.includes('runtime-input-committed'))
-    assert.equal(checkedVolume(volume).freeBytes, 0)
-    await writeFile(join(directory, 'full-volume.json'), JSON.stringify(checkedVolume(volume), null, 2))
+    const fullVolume = checkedVolume(volume)
+    assert.equal(fullVolume.freeBytes, 0)
+    await writeFile(join(directory, 'full-filesystem.json'), JSON.stringify(fullVolume, null, 2))
     await archiveVolume(volume, join(directory, 'full-volume'))
     await unlink(join(volume, 'filler.bin'))
     const failed = await inspectRuntimeFirmwareSlots(reference)
@@ -207,7 +208,7 @@ export async function qualifyHostFullVolume(directory: string) {
     assert.notEqual(fresh.knownGood!.health!.sessionId, good.knownGood!.health!.sessionId)
     assert.deepEqual(await readFile(partialPath), partial); assert.deepEqual(await readFile(previousImage), image)
     assert.deepEqual(await readFile(join(reference.directory, 'host-slots', fresh.knownGood!.id, 'image.bin')), image)
-    const result = { evidence: 'host-actual-enospc-v1', filesystemType: 'tmpfs', filesystemBytes: mounted.capacityBytes, freeBytesAfterFailure: 0, sourceRevision, authorizedImageBytes: image.length, authorizedImageSha256: signed.imageHash, partialImageBytes: partial.length, partialImageSha256: digest(partial), errorCodes: rejection.errorCodes, interruptedPhase: failed.trial!.phase, interruptedAttempt: failed.store.attempt!.phase, acceptedRootVersion: version('root'), acceptedTargetsVersion: version('targets'), releaseFloor: fresh.store.releaseFloor, abandonedPhase: abandoned.trial!.phase, previousSlotId: good.knownGood!.id, failedSlotId: failed.trial!.id, confirmedSlotId: fresh.knownGood!.id, previousBootId: good.knownGood!.health!.bootId, freshBootId: fresh.knownGood!.health!.bootId, physicalDeploymentAllowed: fresh.physicalDeploymentAllowed }
+    const result = { evidence: 'host-actual-enospc-v1', filesystemType: 'tmpfs', filesystemBytes: mounted.capacityBytes, freeBytesAfterFailure: fullVolume.freeBytes, sourceRevision, authorizedImageBytes: image.length, authorizedImageSha256: signed.imageHash, partialImageBytes: partial.length, partialImageSha256: digest(partial), errorCodes: rejection.errorCodes, interruptedPhase: failed.trial!.phase, interruptedAttempt: failed.store.attempt!.phase, acceptedRootVersion: version('root'), acceptedTargetsVersion: version('targets'), releaseFloor: fresh.store.releaseFloor, abandonedPhase: abandoned.trial!.phase, previousSlotId: good.knownGood!.id, failedSlotId: failed.trial!.id, confirmedSlotId: fresh.knownGood!.id, previousBootId: good.knownGood!.health!.bootId, freshBootId: fresh.knownGood!.health!.bootId, physicalDeploymentAllowed: fresh.physicalDeploymentAllowed }
     await writeFile(join(directory, 'qualification.json'), JSON.stringify(result, null, 2))
     return result
   }
