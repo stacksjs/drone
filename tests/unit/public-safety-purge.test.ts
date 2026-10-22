@@ -71,6 +71,7 @@ test('accepted purge removes more than one hundred review leaves and audits in b
     try { [code, stdout, stderr] = await Promise.all([running.exited, new Response(running.stdout).text(), new Response(running.stderr).text()]) }
     finally { clearTimeout(timer) }
     expect(code, `${stdout}\n${stderr}`).toBe(0); expect(stdout).toContain('PASS actual137review FK leaves')
+    expect(stdout).toContain('PASS controlled setup crosses real60000ms expiry before its last review and refuses exact-expiry review before genuinely due purge')
   }
   finally { if (child && child.exitCode === null) { child.kill('SIGKILL'); await child.exited }; await rm(root, { recursive: true, force: true }) }
 }, 180000)

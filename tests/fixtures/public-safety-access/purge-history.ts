@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict'
+import { setSystemTime } from 'bun:test'
 import { randomUUID } from 'node:crypto'
-import { actor, as, seed, database, records, managed } from './managed-context'
+import { actor, as, seed, database, records, managed, status } from './managed-context'
 const purge = await import('../../../resources/functions/drone/public-safety/purge/service')
 const { purgeAbilities, purgePolicy, purgeCoverage, purgeExclusions } = await import('../../../resources/functions/drone/public-safety/purge/types')
 const { publicSafetyPurgeGate } = await import('../../../resources/functions/drone/public-safety/purge/policy')
@@ -11,17 +12,52 @@ const coordinator = await actor('purge-history-coordinator')
 try {
   process.env.PUBLIC_SAFETY_PURGE_ENABLED = 'true'
   await as(coordinator.token.plainTextToken, async () => {
-    const key = 'purge-history', fixture = await seed(key, 60000)
-    const capture = fixture.run.survey.captures[0]!, support = fixture.run.captures[0]!.support.findIndex(value => value === 1)
-    const observation = await records.appendPublicSafetyObservation(key, { expectedVersion: 3, sourceDigest: fixture.source.digest, captureId: capture.id, modality: 'visible', pixel: { x: support % capture.width, y: Math.floor(support / capture.width) }, note: 'private-history-observation-fragment', uncertaintyNote: 'private-history-uncertainty-fragment' })
-    let version = 4, previousReviewId: number | null = null
-    for (let count = 0; count < 137; count++) {
-      const appended = await records.appendPublicSafetyReview(key, observation.observation.id, { expectedVersion: version, sourceDigest: fixture.source.digest, previousReviewId, disposition: 'unresolved', note: `private-history-review-fragment-${count}` })
-      version = appended.incident.version; previousReviewId = appended.review.id
-    }
-    await managed.createPublicSafetyManagedDataset(key, { ...fixture.body, expectedVersion: version })
+    const key = 'purge-history'
+    // Controlled preparation removes an unrelated host-throughput precondition.
+    // The installed Stacks testing root registers afterEach, so this standalone
+    // child uses its underlying Bun clock API. Real timers remain unchanged.
+    const fixture = await (async () => {
+      const preparationAt = Date.now()
+      const realNow = () => {
+        setSystemTime()
+        try { return Date.now() }
+        finally { setSystemTime(preparationAt) }
+      }
+      setSystemTime(preparationAt)
+      try {
+        const prepared = await seed(key, 60000)
+        const capture = prepared.run.survey.captures[0]!, support = prepared.run.captures[0]!.support.findIndex(value => value === 1)
+        const observation = await records.appendPublicSafetyObservation(key, { expectedVersion: 3, sourceDigest: prepared.source.digest, captureId: capture.id, modality: 'visible', pixel: { x: support % capture.width, y: Math.floor(support / capture.width) }, note: 'private-history-observation-fragment', uncertaintyNote: 'private-history-uncertainty-fragment' })
+        let version = 4, previousReviewId: number | null = null
+        for (let count = 0; count < 137; count++) {
+          if (count === 136) {
+            // Exercise the reproduced precondition even on a fast host. This
+            // spends the existing expiry wait before the last setup write.
+            const expires = Date.parse(prepared.config.retention.expiresAt)
+            const remaining = expires - realNow() + 20
+            if (remaining > 0) await Bun.sleep(remaining)
+            assert(realNow() >= expires, 'The final controlled setup review must cross real retention expiry')
+          }
+          const appended = await records.appendPublicSafetyReview(key, observation.observation.id, { expectedVersion: version, sourceDigest: prepared.source.digest, previousReviewId, disposition: 'unresolved', note: `private-history-review-fragment-${count}` })
+          version = appended.incident.version; previousReviewId = appended.review.id
+        }
+        await managed.createPublicSafetyManagedDataset(key, { ...prepared.body, expectedVersion: version })
+        const beforeReviews = await database.db.primary.selectFrom('public_safety_reviews').select('id').execute()
+        const beforeAudits = await database.db.primary.selectFrom('public_safety_audits').select('id').execute()
+        const incident = (await database.db.primary.selectFrom('public_safety_incidents').select('version').where('incident_key', '=', key).executeTakeFirst())!
+        assert.equal(beforeReviews.length, 137)
+        setSystemTime(Date.parse(prepared.config.retention.expiresAt))
+        await assert.rejects(() => records.appendPublicSafetyReview(key, observation.observation.id, { expectedVersion: incident.version, sourceDigest: prepared.source.digest, previousReviewId, disposition: 'unresolved', note: 'refused-at-exact-retention-boundary' }), status(404))
+        assert.deepEqual(await database.db.primary.selectFrom('public_safety_reviews').select('id').execute(), beforeReviews)
+        assert.deepEqual(await database.db.primary.selectFrom('public_safety_audits').select('id').execute(), beforeAudits)
+        return prepared
+      }
+      finally { setSystemTime() }
+    })()
     const wait = Date.parse(fixture.config.retention.expiresAt) - Date.now() + 20
     if (wait > 0) await new Promise(resolve => setTimeout(resolve, wait))
+    assert(Date.now() > Date.parse(fixture.config.retention.expiresAt), 'Purge acceptance must use genuinely elapsed wall time after restoring the clock')
+    console.log('PASS controlled setup crosses real60000ms expiry before its last review and refuses exact-expiry review before genuinely due purge')
     const preview = await purge.previewPublicSafetyPurge(key)
     assert.equal(preview.counts.reviews, 137); assert(preview.counts.audits > 100)
     const accepted = await purge.acceptPublicSafetyPurge(key, { expectedVersion: preview.incidentVersion, expectedRetentionVersion: preview.retentionVersion, policyVersion: purgePolicy, coverage: purgeCoverage, inventoryDigest: preview.inventoryDigest, exclusions: purgeExclusions, receiptRetentionDays: 2, requestId: randomUUID() })
