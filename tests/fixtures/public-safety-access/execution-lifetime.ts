@@ -4,6 +4,7 @@ import { setupExecutionLifetime } from './execution-lifetime-setup'
 const mode = Bun.argv[2]
 assert(mode === 'completed' || mode === 'canceled' || mode === 'quarantine')
 const began = performance.now()
+console.log(JSON.stringify({ oracle: 'lifetime-fixture-runtime', mode, bunVersion: Bun.version, executable: process.execPath, platform: process.platform, arch: process.arch }))
 let observations = 0
 async function observe<T>(phase: string, work: () => Promise<T>): Promise<T> {
   const emit = (outcome: 'began' | 'settled' | 'rejected') => {

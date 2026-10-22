@@ -118,7 +118,8 @@ elapsed deadlines, stream capacity, cleanup and durable COMMIT with a withheld
 response. The existing workspace browser scenarios remain required regressions.
 
 The native lifetime fixture emits bounded phase observations around setup,
-authority reads, retention waits and cleanup. Its parent records the observed
+authority reads, retention waits and cleanup. Parent-start and child-runtime
+records identify their Bun versions and executable paths independently. Its parent records the observed
 exit code and signal separately from whether its own watchdog fired or cleanup
 requested a kill. The settled `exited` status is distinct from the raw
 `exitCode` property, which can remain null after a signal. Elapsed time includes process work and output handling, not
