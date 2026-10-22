@@ -1,5 +1,8 @@
 import { expect, test } from 'bun:test'
 import { Buffer } from 'node:buffer'
+import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
 import process from 'node:process'
 import { captureColdBuild, coldBuildCaptureBytes, coldBuildQualificationTimeout } from '../helpers/runtime-cold-build-supervisor'
 
@@ -60,3 +63,29 @@ test('qualification derives its aggregate budget without changing the individual
   expect(coldBuildQualificationTimeout(120000, 20000)).toBe(405000)
   expect(() => coldBuildQualificationTimeout(120001, 5000)).toThrow('command budget')
 })
+
+test.skipIf(process.platform === 'win32')('external cancellation settles an actual subject and inherited descendant before the deadline', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'drone-qualification-cancel-'))
+  const controller = new AbortController()
+  const marker = join(root, 'ready.json'), config = join(root, 'bunfig.toml')
+  await writeFile(config, 'preload=[]\n')
+  const source = `import { writeFileSync } from 'node:fs'; const child = Bun.spawn([process.execPath, '--config=${config}', '--no-env-file', '-e', 'setInterval(() => {}, 1000)'], { stdout: 'inherit', stderr: 'inherit' }); writeFileSync(${JSON.stringify(marker)}, JSON.stringify({ pid: process.pid, child: child.pid })); setInterval(() => {}, 1000)`
+  const captureOptions = { cwd: root, env: process.env, timeoutMs: 4000, signal: controller.signal }
+  const pending = captureColdBuild([process.execPath, `--config=${config}`, '--no-env-file', '-e', source], captureOptions)
+  try {
+    const deadline = performance.now() + 2000
+    while (!await Bun.file(marker).exists()) { if (performance.now() > deadline) throw new Error('Actual cancellation subject did not start'); await Bun.sleep(5) }
+    const observed = JSON.parse(await readFile(marker, 'utf8')) as { pid: number, child: number }
+    process.kill(observed.pid, 0); process.kill(observed.child, 0)
+    controller.abort()
+    const result = await pending
+    expect(result.pid).toBe(observed.pid)
+    expect(result.deadlineReached).toBe(false)
+    expect(result.stopRequested).toBe(true)
+    expect(String(result.failure)).toContain('aborted')
+    expect(result.rootGroupRemaining).toBe(false)
+    expect(groupExists(result.pid)).toBe(false)
+    expect(() => process.kill(observed.child, 0)).toThrow()
+  }
+  finally { controller.abort(); await pending; await rm(root, { recursive: true }) }
+}, 15000)

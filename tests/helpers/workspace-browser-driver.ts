@@ -12,6 +12,11 @@ const data = JSON.parse(await readFile(join(root, 'credentials.json'), 'utf8')) 
 assert(/^http:\/\/127\.0\.0\.1:\d+$/.test(data.url))
 const control = async (action: BrowserControlAction): Promise<any> => requestWorkspaceControl(data, action)
 const browser = await startWorkspaceBrowser(root)
+if (process.env.WORKSPACE_BROWSER_STARTUP_ONLY === 'true') {
+  await browser.close()
+  console.log('PASS actual workspace startup-only control')
+}
+else {
 const evidence = process.env.WORKSPACE_BROWSER_EVIDENCE ?? join(root, 'evidence')
 await mkdir(evidence, { recursive: true })
 const watchdog = setTimeout(() => { console.error('QA isolated browser watchdog expired'); void browser.close().finally(() => process.exit(1)) }, 85000)
@@ -122,3 +127,4 @@ try {
 }
 catch (error) { console.error('QA browser failure:', error instanceof Error ? error.message : 'unknown'); throw error }
 finally { clearTimeout(watchdog); await browser.close() }
+}

@@ -1,4 +1,4 @@
 {
   "extends": "../tsconfig.json",
-  "include": ["../scripts/debug/browser-startup-probe.ts"]
+  "include": ["../scripts/debug/browser-startup-probe.ts", "../scripts/debug/workspace-startup-campaign.ts", "../tests/helpers/workspace-browser-driver.ts"]
 }

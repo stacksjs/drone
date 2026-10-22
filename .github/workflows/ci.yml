@@ -1,13 +1,13 @@
 # Research branch only. Never merge this workflow replacement into main.
-name: Native Chrome startup capability probe (not product qualification)
+name: Real workspace startup research (not product qualification)
 on:
   workflow_dispatch:
 permissions:
   contents: read
 jobs:
-  native-startup-probe:
+  workspace-startup-research:
     runs-on: ubuntu-24.04
-    timeout-minutes: 12
+    timeout-minutes: 25
     steps:
       - uses: actions/checkout@v4
       - uses: oven-sh/setup-bun@v2
@@ -18,7 +18,7 @@ jobs:
       - run: ./buddy key:generate
       - run: ./buddy lint
       - run: bun run tsc --noEmit -p tests/tsconfig.browser-startup-probe.json
-      - name: Run 24 native startup trials without application imports
+      - name: Run 12 real workspace startup controls before page interaction
         working-directory: ${{ runner.temp }}
         shell: bash
         env:
@@ -28,14 +28,18 @@ jobs:
           export BROWSE_BROWSER="$(command -v google-chrome)"
           test -x "$BROWSE_BROWSER"
           printf '%s\n' '# Empty config for native capability research' > "$RUNNER_TEMP/native-probe-bunfig.toml"
-          bun --no-install --config="$RUNNER_TEMP/native-probe-bunfig.toml" --no-env-file "$GITHUB_WORKSPACE/scripts/debug/browser-startup-probe.ts" "$RUNNER_TEMP/browser-startup-probe" "$RUNNER_TEMP/browser-startup-profiles"
+          bun --no-install --config="$RUNNER_TEMP/native-probe-bunfig.toml" --no-env-file "$GITHUB_WORKSPACE/scripts/debug/workspace-startup-campaign.ts" "$RUNNER_TEMP/workspace-startup-research"
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: native-startup-capability-only
+          name: workspace-startup-research-only
           if-no-files-found: warn
           retention-days: 7
           path: |
-            ${{ runner.temp }}/browser-startup-probe/manifest.json
-            ${{ runner.temp }}/browser-startup-probe/trial-*.json
-            ${{ runner.temp }}/browser-startup-probe/trial-*.startup-stderr.log
+            ${{ runner.temp }}/workspace-startup-research/manifest.json
+            ${{ runner.temp }}/workspace-startup-research/trial-*/started.json
+            ${{ runner.temp }}/workspace-startup-research/trial-*/result.json
+            ${{ runner.temp }}/workspace-startup-research/trial-*/browser-startup-process.json
+            ${{ runner.temp }}/workspace-startup-research/trial-*/browser-launch.json
+            ${{ runner.temp }}/workspace-startup-research/trial-*/chrome-startup-stderr.log
+            ${{ runner.temp }}/workspace-startup-research/trial-*/compiled.html

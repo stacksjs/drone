@@ -28,10 +28,11 @@ export function coldBuildQualificationTimeout(commandTimeoutMs: number, selected
   return 3 * (commandTimeoutMs + coldBuildSettlementMs) + selectedTestTimeoutMs + 10000
 }
 
-export async function captureColdBuild(command: string[], options: { cwd: string, env: NodeJS.ProcessEnv, timeoutMs: number }): Promise<ColdBuildCapture> {
+export async function captureColdBuild(command: string[], options: { cwd: string, env: NodeJS.ProcessEnv, timeoutMs: number, signal?: AbortSignal }): Promise<ColdBuildCapture> {
   if (process.platform === 'win32') throw new Error('Cold build capture requires POSIX process groups')
   if (!Number.isSafeInteger(options.timeoutMs) || options.timeoutMs < 1 || options.timeoutMs > 405000)
     throw new Error('Invalid aggregate cold-build budget')
+  if (options.signal?.aborted) throw new Error('Aggregate qualification aborted before startup')
   const child = Bun.spawn(command, { cwd: options.cwd, env: options.env, stdin: 'ignore', stdout: 'pipe', stderr: 'pipe', detached: true })
   const readers = [child.stdout.getReader(), child.stderr.getReader()]
   const chunks: Uint8Array[][] = [[], []], sizes = [0, 0]
@@ -86,6 +87,9 @@ export async function captureColdBuild(command: string[], options: { cwd: string
   }
   const timer = setTimeout(() => { deadlineReached = true; stop(new Error('Aggregate cold build qualification timed out')) }, options.timeoutMs)
   const outputs = [consume(0), consume(1)]
+  const abort = () => stop(new Error('Aggregate qualification aborted'))
+  options.signal?.addEventListener('abort', abort, { once: true })
+  if (options.signal?.aborted) abort()
   let exitCode: number
   try {
     exitCode = await child.exited
@@ -95,6 +99,7 @@ export async function captureColdBuild(command: string[], options: { cwd: string
     await Promise.all(outputs)
   }
   finally {
+    options.signal?.removeEventListener('abort', abort)
     clearTimeout(timer)
     clearTimeout(pipeTimer)
     rootCleanupRequired = groupExists()

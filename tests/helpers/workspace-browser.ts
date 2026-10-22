@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict'
-import { mkdir, readFile } from 'node:fs/promises'
+import { mkdir, readFile, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { observeBrowserOperation } from './browser-operation'
 import { browserFileErrorCode, retainBrowserLaunchEvidence } from './browser-launch-evidence'
@@ -37,6 +37,18 @@ export async function startWorkspaceBrowser(root: string) {
     port = await readFile(join(profile, 'DevToolsActivePort'), 'utf8').then(value => { portProbe.successfulReads++; portProbe.lastReadError = null; return value.split('\n')[0]! }).catch(error => { portProbe.failedReads++; portProbe.lastReadError = browserFileErrorCode(error); return '' })
     if (port) { portProbe.discovered = true; break }
     await Bun.sleep(50)
+  }
+  if (process.env.BROWSER_STARTUP_PROCESS_OBSERVATIONS === 'true') {
+    const discoveryElapsedMs = performance.now() - began
+    try {
+      const { linuxBrowserObservation } = await import('../../scripts/debug/linux-browser-state')
+      const observation = { phase: port ? 'discovered' : 'unavailable', discoveryElapsedMs, portProbe: { ...portProbe }, process: await linuxBrowserObservation(child.pid, profile) }
+      const bytes = `${JSON.stringify(observation, null, 2)}\n`
+      await writeFile(join(root, 'browser-startup-process.json'), bytes, { mode: 0o600 })
+      const directory = process.env.WORKSPACE_BROWSER_EVIDENCE ?? process.env.EXECUTION_BROWSER_EVIDENCE
+      if (directory) { await mkdir(directory, { recursive: true }); await writeFile(join(directory, 'browser-startup-process.json'), bytes, { mode: 0o600 }) }
+    }
+    catch (error) { console.log(JSON.stringify({ evidence: 'startup-process-observation-unavailable', code: browserFileErrorCode(error) })) }
   }
   if (!port) { closing = true; launch.cleanupRequested = true; if (child.exitCode === null) child.kill(); await Promise.race([child.exited, Bun.sleep(2000)]); await retain('startup-unavailable'); throw new Error('Fresh browser must start') }
   // Keep a browser-level session, as well as page sessions, for the owned lifecycle.
