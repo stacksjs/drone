@@ -76,7 +76,7 @@ const config: BunPressOptions = {
           items: [
             { text: 'Owned vehicle runtime', link: '/vehicles' },
             { text: 'Owned fixed-wing profile', link: '/vehicles-air' },
-            { text: 'VTOL hover development', link: '/vehicles-vtol' },
+            { text: 'VTOL development', link: '/vehicles-vtol' },
             { text: 'Owned ground vehicle profile', link: '/vehicles-ground' },
             { text: 'Owned surface vessel profile', link: '/vehicles-surface' },
             { text: 'Owned subsea inspection profile', link: '/vehicles-subsea' },

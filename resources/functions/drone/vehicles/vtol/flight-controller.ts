@@ -13,6 +13,7 @@ import { vtolModel } from './plant'
 
 const clamp = (n: number, low: number, high: number) => Math.max(low, Math.min(high, n))
 const wrap = (n: number) => Math.atan2(Math.sin(n), Math.cos(n))
+const pauseLoiterRadiusM = 60
 
 /** Original fictional pressure/force-aware lift-and-cruise control, undergoing owned-model qualification. */
 export function createVtolFlightController(): VehicleController {
@@ -20,6 +21,7 @@ export function createVtolFlightController(): VehicleController {
   const ratePid = [0, 1, 2].map(i => createBoundedPid({ kp: i === 2 ? 0.96 : 1.6, ki: i === 2 ? 0.48 : 0.8, kd: 0.02, integralLimit: 1, outputLimit: i === 2 ? 2 : 6, derivativeTauS: 0.03, trackingGain: 4 }))
   const velocityPid = [0, 1, 2].map(() => createBoundedPid({ kp: 1.6, ki: 0.25, kd: 0, integralLimit: 1.5, outputLimit: 3, derivativeTauS: 0.03, trackingGain: 1 }))
   let hasWingControl = false, backSlow = false
+  let loiterCenter: SensorVector | null = null
   let lastNow: number | null = null, identity: string | null = null, fault = ''
   let phase: VehicleVtolTransitionObservation['phase'] = 'hover', request: VehicleVtolTransitionCommand | null = null, signature = '', confirmedEvent = ''
   let stableSource: number | null = null, stableDecision: number | null = null
@@ -77,12 +79,24 @@ export function createVtolFlightController(): VehicleController {
       const [roll, pitch, yaw] = quaternionEuler(q!), values = measurement!.values
       const speed = values.airspeedMps as number, alpha = values.alphaRad as number, beta = values.betaRad as number
       const landing = phase === 'hover' && c.mission.state === 'running' && c.mission.taskKind === 'land'
-      if (measurement!.values.onSurface && !landing || speed > 22 || Math.abs(roll) > 0.6 || Math.abs(pitch) > 0.5 || speed > 8 && (Math.abs(alpha) > 0.32 || Math.abs(beta) > 0.4) || phase !== 'hover' && Math.abs(position![2] - request!.positionM[2]) > 2) return neutral(c, 'vtol-transition-envelope')
-      if (landing && measurement!.values.onSurface) return output(c, [0, 0, 0, 0, 0, 0, 0, 0], 'vertical-contact')
+      const pausedContact = phase === 'hover' && c.mission.state === 'paused' && values.onSurface === true && values.stopped === true
+      if (measurement!.values.onSurface && !landing && !pausedContact || speed > 22 || Math.abs(roll) > 0.6 || Math.abs(pitch) > 0.5 || speed > 8 && (Math.abs(alpha) > 0.32 || Math.abs(beta) > 0.4) || phase !== 'hover' && Math.abs(position![2] - request!.positionM[2]) > 2) return neutral(c, 'vtol-transition-envelope')
+      if (landing && measurement!.values.onSurface || pausedContact) return output(c, [0, 0, 0, 0, 0, 0, 0, 0], pausedContact ? 'ground-paused' : 'vertical-contact')
       const rotary = phase === 'back-transition' || phase === 'hover'
-      const heading = phase === 'front-transition' || rotary ? request!.headingRad : Math.atan2(target![1] - position![1], target![0] - position![0])
-      const course = Math.hypot(velocity![0], velocity![1]) > 3 ? Math.atan2(velocity![1], velocity![0]) : yaw
-      let bankTarget = clamp(wrap(heading - course) * 0.8, -0.3, 0.3)
+      let heading = phase === 'front-transition' || rotary ? request!.headingRad : Math.atan2(target![1] - position![1], target![0] - position![0])
+      const groundSpeed = Math.hypot(velocity![0], velocity![1])
+      const course = groundSpeed > 3 ? Math.atan2(velocity![1], velocity![0]) : yaw
+      const pausedCruise = phase === 'cruise' && c.mission.state === 'paused'
+      if (!pausedCruise) loiterCenter = null
+      else {
+        loiterCenter ??= [position![0] - pauseLoiterRadiusM * Math.sin(course), position![1] + pauseLoiterRadiusM * Math.cos(course), target![2]]
+        if (Math.hypot(loiterCenter[0], loiterCenter[1]) + pauseLoiterRadiusM > 400) return neutral(c, 'vtol-pause-loiter-outside-envelope')
+        const radial = Math.atan2(position![1] - loiterCenter[1], position![0] - loiterCenter[0])
+        const distance = Math.hypot(position![0] - loiterCenter[0], position![1] - loiterCenter[1])
+        heading = radial + Math.PI / 2 + Math.atan2(distance - pauseLoiterRadiusM, 40)
+      }
+      const loiterBank = pausedCruise ? Math.atan2(groundSpeed ** 2, vtolModel.gravityMps2 * pauseLoiterRadiusM) : 0
+      let bankTarget = clamp(loiterBank + wrap(heading - course) * 0.8, -0.3, 0.3)
       let downAcceleration = clamp((target![2] - position![2]) * 1.2 - velocity![2] * 1.5, -3, 3)
       const capturedRelative: SensorVector = [speed * Math.cos(alpha) * Math.cos(beta), speed * Math.sin(beta), speed * Math.sin(alpha) * Math.cos(beta)]
       // Delayed BODY_FRD airflow belongs to its qualified capture pose. Hold that measured NED

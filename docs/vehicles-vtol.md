@@ -1,4 +1,4 @@
-# VTOL hover development
+# VTOL development
 
 The owned lift-and-cruise model can execute a **hover-only** mission through the shared raw sensor,
 estimator, mission, authority and independent output-lease runtime. It takes off vertically, reaches
@@ -106,11 +106,54 @@ reference and clock faults latch. Real modeled sensor loss, RC override, kill an
 cover front transition, cruise, back transition and post-back landing through the independent output
 lease. Neutral outputs during an airborne failure do not demonstrate a safe recovery or landing.
 
+## Operator actions in modeled sessions
+
+The shared runtime accepts a captured schedule of `pause`, `resume`, `recover` and `abort` actions.
+For example, from a TypeScript file in the project root:
+
+```ts
+import { runVehicleSimulation } from './resources/functions/drone/vehicles/runtime'
+import { createVtolTransitionProfile } from './resources/functions/drone/vehicles/vtol/transition-profile'
+
+const report = runVehicleSimulation(createVtolTransitionProfile(), {
+  seconds: 160,
+  missionActions: [
+    { atMs: 20000, action: 'pause' },
+    { atMs: 40000, action: 'resume' },
+  ],
+})
+```
+
+Each schedule record contains only `atMs` and `action`. Up to 32 events must have unique,
+strictly increasing 20 ms epochs after the automatic start at 600 ms and within the requested
+simulation duration. Validation and capture happen before session resources are created. Events
+are consumed once by the existing mission policy and retained in its replayable trace. An omitted
+or empty schedule preserves prior recordings and report fields.
+
+A qualified hover pause holds the captured estimated position. Wing-borne cruise uses a captured
+clockwise 60 m holding circle, with coordinated bank and radial course feedback. The complete circle
+must fit inside the declared 400 m horizontal envelope. Straight and banked-entry model campaigns
+hold the same 8 m radial-error bound after six seconds, maintain wing support and height, then resume
+the route and land. Post-back airborne pause also arrests descent around the captured position.
+Qualified stopped ground contact stays neutral during pause, with source and envelope checks applied
+before that return. Sensor loss, RC takeover, kill and host loss retain authority withdrawal.
+
+`recover` pauses the already running session until explicit `resume`. Fresh-process restoration after
+host loss or a changed estimator reference remains a separate gate. Pending initial-hover, front or
+back mode work retains uncertain-outcome refusal for pause/recover. Those refusals release modeled
+outputs; a controlled airborne recovery and observed landing still require an explicit route.
+`abort` terminates the modeled mission and releases outputs as well.
+
+Task execution time stops during pause. Global endurance and the declared energy charge continue,
+so a later scheduled resume can be preempted by reserve, endurance, health or authority refusal.
+Operator actions never extend the original planning allowance or rearm revoked authority. The
+transition library and these actions remain separate from the hover-only CLI and common workspace.
+
 ## Remaining implementation
 
 [Issue #12](https://github.com/stacksjs/drone/issues/12) remains open. The experimental nominal
-controller does not establish complete VTOL support. Phase pause/recovery, explicit bounded
-transition abort and landing, the complete hybrid power/reserve model, native transition CLI and
+controller does not establish complete VTOL support. Controlled front/back recovery and fresh-process
+restoration, explicit bounded transition abort and landing, the complete hybrid power/reserve model, native transition CLI and
 the common mission workspace still require implementation and qualification. Wind campaigns and
 broader mission/envelope coverage remain necessary. Full TECS/soaring, tiltrotor/tailsitter mechanisms,
 helicopters and other airframe families remain separate work. Native board control, measured airframe

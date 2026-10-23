@@ -56,8 +56,10 @@ surface and subsea profiles. [Optional external drivers](drivers.md) have
 [acknowledged protocol services](driver-protocols.md); scripted peers are distinct
 from [firmware SITL](sitl.md) and physical testing.
 
-The separate [VTOL hover development command](vehicles-vtol.md) exercises vertical takeoff,
-hover and landing. Front/cruise/back transitions and the common VTOL mission workspace remain open.
+The separate [VTOL development guide](vehicles-vtol.md) covers the hover-only command and an
+experimental TypeScript library profile for modeled front transition, cruise, back transition and
+vertical landing, with stable-phase pause and resume. Controlled transition recovery and abort
+landing, complete hybrid energy qualification and the common VTOL mission workspace remain open.
 
 ## Explore a workflow
 
