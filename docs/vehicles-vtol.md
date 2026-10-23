@@ -36,20 +36,40 @@ and a 120 N/s slew limit. An independent 14 N pusher and the owned trainer's aer
 share the rigid body. Rotor allocation preserves collective thrust first, then roll/pitch demand,
 then yaw. No coefficient is measured from a purchased airframe.
 
-The VTOL wing uses the fictional `folded-incidence-v2` extension. Its forward pre-stall curve
-matches the trainer. In reversed chordwise flow, incidence is folded and the coefficient changes
-sign, with a cosine fade toward broadside. This removes the force/moment jump at the raw angle's
-positive/negative pi boundary and restores the local vertical response in the tested head/tail flow.
-Raw airflow angles remain available to the capture and envelope guards. The fixed-wing profile keeps
-its original trainer model. Neither curve represents measured reverse-flow or post-stall data.
+The VTOL wing uses the fictional `projected-incidence-v3` extension. At zero sideslip its forward
+pre-stall response exactly matches the trainer. Reversed chordwise incidence is folded, changes
+coefficient sign and fades toward broadside. Longitudinal lift, drag and static pitch use the fraction
+of dynamic pressure in the chord/vertical airflow plane. This removes the force/moment singularity
+where that plane's velocity goes to zero while spanwise flow stays finite. Total pressure and raw
+airflow angles remain available to capture and envelope guards. The separately declared lateral,
+surface and rate responses retain total pressure. The default fixed-wing trainer is unchanged.
+These are fictional coefficients, without measured post-stall, spanwise or reverse-flight data.
+Full-route CLI reports identify this curve with `aerodynamicsModel: 'projected-incidence-v3'`.
+
+The prior `folded-incidence-v2` removed the reverse-flow angle-wrap jump at zero spanwise velocity,
+but retained a 0.9555 N force jump between `[+1e-8, 2, 0]` and `[-1e-8, 2, 0]` m/s. Approaching the
+same lateral-flow axis from positive/negative vertical velocity produced a 4.0768 N vertical-force
+jump. The v3 checks cover these approach directions, finite zero-flow response and non-positive
+unpowered airflow work. They establish bounded mathematical properties, not a calibrated airframe.
+A predeclared 16-case runtime campaign introduces 2 m/s head, tail, east and west wind at observed
+front, cruise, back and landing phase entries. All complete their declared heading plans through
+source-qualified hover, contact and replay within the original budgets. Wind onset is applied on
+the next actual integration step; the CLI/workspace wind selectors still use the fixed 1000 ms onset.
+
+Hover control aligns the thrust direction separately from its heading correction. A large, saturated
+yaw error therefore cannot rotate the requested position correction into another axis. Opposite
+thrust directions have no unique shortest tilt axis; that unsupported condition inhibits and latches
+neutral output. Existing body-rate bounds, PID gains, source guards and allocation priorities remain.
 
 Back-transition braking compares the linear pre-stall estimate with 41 pitch candidates in the
 existing -0.08 to 0.3 rad range. It evaluates the declared nonlinear wing/rotor force balance against
 qualified captured airflow and estimated ground motion. Candidates must admit 0 to 48 N of lift-rotor
 thrust while supporting the requested vertical force; high-speed candidate incidence remains within
 0.3 rad. The finite transition deadline, source guards, capture dwell and independent authority still
-apply. Replacing a correlated back request preserves rotary capture once reached, so recovery cannot
-restart forward-flight braking during a reverse position return.
+apply. Before low-speed rotary capture, the nose and candidate force search follow qualified measured
+airflow. The requested final hover heading remains the capture condition after braking. Replacing a
+correlated back request preserves rotary capture once reached, so recovery cannot restart forward-flight
+braking during a reverse position return.
 
 ### Bounded wind cases
 
@@ -92,8 +112,9 @@ profile.faults = (_scenario, atMs) => ({ windMps: atMs >= 1000 ? [2, 0, 0] : [0,
 const result = runVehicleSimulation(profile, { seconds: 160 })
 ```
 
-The original fixed north-facing east/west crosswind plans still reach the back-transition
-envelope guard without confirmed hover or landing. During the east case's reverse return at 38,000 ms,
+The fixed north-facing east/west crosswind plans still reach the back-transition envelope guard
+without confirmed hover or landing. The retained v2 east-case diagnosis, before the v3 flow projection,
+records a reverse return at 38,000 ms where
 the modeled aerodynamic yaw moment is approximately -0.729 Nm while the fully allocated opposing
 rotor yaw moment is only +0.416 Nm, with the rudder at its +0.4 rad bound. The qualified airflow capture
 is 60 ms old, attitude 20 ms and position 100 ms, within the unchanged source guards. This is an
@@ -105,15 +126,15 @@ can oppose at most +0.470 Nm. This worked example does not establish a full stea
 envelope, but changing gains cannot supply the missing torque in that condition. Neutral outputs
 at the original airborne failure do not establish a safe landing.
 
-The two wind-facing plans change only the declared back-hover heading and plan identity. They use
-the existing `vtol-mode.headingRad` mission contract and unchanged controller, model, reserve and
-finite budgets. The front heading remains north. These plans complete the source-qualified modeled hover
+The two wind-facing plans differ from their fixed-heading counterparts only in the declared
+back-hover heading and plan identity. They use the existing `vtol-mode.headingRad` mission contract
+and the same shared controller, model, reserve and finite budgets. The front heading remains north. These plans complete the source-qualified modeled hover
 confirmation and contact route in the declared wind. Their extra `backHeadingRad` declaration and
 `backHeadingMatched` check bind qualification to the actual recorded plan; a completed route under
-a different heading remains unmatched. No automatic heading substitution or retry is performed.
+a different heading remains unmatched. The plan retains its declared final heading, and there are no automatic retries.
 The original `*-limit-2mps` cases keep their prior plans and blocked outcomes.
 
-Wider wind directions, onset phases, a general feasibility planner and full-angle model qualification
+Wider wind directions, onset phases, a general feasibility planner and measured full-angle model qualification
 remain in [#87](https://github.com/stacksjs/drone/issues/87). No arbitrary-wind, measured-airframe or
 physical flight acceptance is claimed.
 

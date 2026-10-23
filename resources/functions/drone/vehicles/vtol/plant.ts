@@ -9,9 +9,9 @@ import { numericPacket } from './packets'
 import { vtolElectricalLoad, vtolElectricalMaximumW, vtolElectricalModel, vtolElectricalSupply } from './power'
 
 /** Fictional lift-and-cruise model. No measured hardware coefficients or flight qualification. */
-export const vtolModel = Object.freeze({ aerodynamicsModel: 'folded-incidence-v2' as const, massKg: 2.5, surfaceFrictionCoefficient: 0.5, gravityMps2: 9.80665, maxRotorThrustN: 12, rotorTimeConstantS: 0.06, rotorSlewNPerS: 120, rotorArmProjectionM: 0.4, reactionTorqueM: 0.02, inertiaKgM2: Object.freeze([0.3, 0.4, 0.6] as const), maxPusherThrustN: airModel.maxThrustN, pusherTimeConstantS: 0.08, pusherSlewNPerS: 60, wing: airModel })
+export const vtolModel = Object.freeze({ aerodynamicsModel: 'projected-incidence-v3' as const, massKg: 2.5, surfaceFrictionCoefficient: 0.5, gravityMps2: 9.80665, maxRotorThrustN: 12, rotorTimeConstantS: 0.06, rotorSlewNPerS: 120, rotorArmProjectionM: 0.4, reactionTorqueM: 0.02, inertiaKgM2: Object.freeze([0.3, 0.4, 0.6] as const), maxPusherThrustN: airModel.maxThrustN, pusherTimeConstantS: 0.08, pusherSlewNPerS: 60, wing: airModel })
 
-/** Fictional continuous reverse-flow extension, not measured post-stall or reverse-flight data. */
+/** Fictional projected-flow extension, not measured post-stall, spanwise or reverse-flight data. */
 export function vtolAerodynamics(relativeBodyMps: SensorVector, rateRadS: SensorVector, actuators: number[]) {
   return airAerodynamics(relativeBodyMps, rateRadS, actuators, true)
 }

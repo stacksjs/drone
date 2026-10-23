@@ -19,6 +19,11 @@ export function airAerodynamics(relativeBodyMps: SensorVector, rateRadS: SensorV
   const [u, v, w] = relativeBodyMps
   const speedMps = Math.hypot(u, v, w), alphaRad = Math.atan2(w, u), betaRad = Math.atan2(v, Math.hypot(u, w))
   const dynamicPressurePa = 0.5 * airModel.densityKgM3 * speedMps ** 2
+  // The VTOL extension applies longitudinal lift, drag and static pitch only
+  // to the incident chord/vertical flow plane. Total pressure remains measured
+  // and supplies the separately declared lateral, surface and rate response.
+  const planeFraction = foldReverseFlow && v !== 0 ? Math.hypot(u, w) / speedMps : 1
+  const longitudinalPressurePa = dynamicPressurePa * planeFraction ** 2
   // Explicit VTOL extension: fold the incidence and project stalled flow along
   // the chord. Preserve the forward pre-stall curve; fade to zero at broadside
   // and reverse the coefficient sign for flow over the trailing edge.
@@ -29,13 +34,13 @@ export function airAerodynamics(relativeBodyMps: SensorVector, rateRadS: SensorV
   // Bounded post-stall loss, retaining drag. No claim of dynamic stall or spin modeling.
   const liftCoefficient = chordDirection * clamp(linearLift, -1.1, 1.4) * Math.max(0.15, 1 - Math.max(0, Math.abs(coefficientAlphaRad) - airModel.stallAlphaRad) * 2.5)
   const dragCoefficient = 0.04 + 0.06 * liftCoefficient ** 2 + 0.8 * Math.sin(alphaRad) ** 2 + 0.2 * Math.sin(betaRad) ** 2
-  const lift = dynamicPressurePa * airModel.areaM2 * liftCoefficient, drag = dynamicPressurePa * airModel.areaM2 * dragCoefficient
+  const lift = longitudinalPressurePa * airModel.areaM2 * liftCoefficient, drag = longitudinalPressurePa * airModel.areaM2 * dragCoefficient
   const ca = Math.cos(alphaRad), sa = Math.sin(alphaRad)
   const forceN: SensorVector = [actuators[0]! * airModel.maxThrustN - drag * ca + lift * sa, -dynamicPressurePa * airModel.areaM2 * 0.6 * betaRad, -drag * sa - lift * ca]
   const rateScale = Math.max(1, speedMps)
   const torqueNm: SensorVector = [
     dynamicPressurePa * airModel.areaM2 * airModel.spanM * (0.12 * actuators[1]! - 0.3 * rateRadS[0] * airModel.spanM / (2 * rateScale)),
-    dynamicPressurePa * airModel.areaM2 * airModel.chordM * (0.8 * actuators[2]! - 0.15 * coefficientAlphaRad * chordDirection - 2 * rateRadS[1] * airModel.chordM / (2 * rateScale)),
+    dynamicPressurePa * airModel.areaM2 * airModel.chordM * (0.8 * actuators[2]! - 0.15 * coefficientAlphaRad * chordDirection * planeFraction ** 2 - 2 * rateRadS[1] * airModel.chordM / (2 * rateScale)),
     dynamicPressurePa * airModel.areaM2 * airModel.spanM * (0.08 * actuators[3]! + 0.12 * betaRad - 0.25 * rateRadS[2] * airModel.spanM / (2 * rateScale)),
   ]
   return { forceN, torqueNm, speedMps, alphaRad, betaRad, liftCoefficient, dragCoefficient, dynamicPressurePa, stalled: Math.abs(alphaRad) > airModel.stallAlphaRad }

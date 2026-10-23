@@ -138,6 +138,9 @@ export function createVtolFlightController(): VehicleController {
       if (rotary) {
         backSlow ||= speed < 3
         if (!backSlow && phase === 'back-transition') {
+          // A requested hover heading is the final capture condition. While
+          // wing braking, keep the nose and force search in measured airflow.
+          heading = Math.atan2(airNed[1], airNed[0])
           // The linear pre-stall estimate seeds a bounded search of the actual fictional
           // wing/rotor force balance, including stalled drag. Keep the original pitch limits.
           const optimalAlpha = Math.max(0, (requiredUpN / Math.max(1, pressureArea) - 0.25) / (2 * 4.8))

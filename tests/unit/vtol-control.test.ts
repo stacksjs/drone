@@ -64,3 +64,31 @@ test('the VTOL body follows a hover position step using raw IMU and GNSS rather 
   expect(estimate.health.localPosition).toBe(true)
   expect(estimate.health.absoluteHeading).toBe(false)
 })
+
+// The public lift output exposes desired body rates. A yaw goal must not rotate
+// the independent thrust-direction correction when yaw authority is exhausted.
+test('hover tilt correction stays independent of a large yaw heading error', () => {
+  const outputs = [0, Math.PI / 2].map(yawRad => {
+    const input = hoverInput()
+    input.estimate.attitude!.quaternionWxyz = [Math.SQRT1_2, 0, 0, Math.SQRT1_2]
+    input.estimate.attitude!.eulerRad = [0, 0, Math.PI / 2]
+    input.target = { ...input.target, positionM: [2, 1, -10], yawRad }
+    return createVtolHoverController({ headingAlignment: 'initial-simulation-north' }).step(input)
+  })
+  expect(outputs.every(output => !output.inhibited)).toBe(true)
+  expect(outputs[0]!.desiredRatesRadS![0]).toBeCloseTo(outputs[1]!.desiredRatesRadS![0]!, 10)
+  expect(outputs[0]!.desiredRatesRadS![1]).toBeCloseTo(outputs[1]!.desiredRatesRadS![1]!, 10)
+  expect(outputs[0]!.desiredRatesRadS![2]).not.toBe(outputs[1]!.desiredRatesRadS![2])
+})
+
+test('an antipodal thrust direction is inhibited and latched rather than using an undefined tilt axis', () => {
+  const controller = createVtolHoverController({ headingAlignment: 'initial-simulation-north' })
+  const input = hoverInput()
+  input.estimate.attitude!.quaternionWxyz = [0, 1, 0, 0]
+  input.estimate.attitude!.eulerRad = [Math.PI, 0, 0]
+  const result = controller.step(input)
+  expect(result.inhibited).toBe(true)
+  expect(result.reason).toBe('antipodal-thrust-direction')
+  expect(result.motorsN).toEqual([0, 0, 0, 0])
+  expect(controller.step(hoverInput(1020)).inhibited).toBe(true)
+})

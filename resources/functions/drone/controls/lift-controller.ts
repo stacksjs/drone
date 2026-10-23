@@ -1,7 +1,8 @@
 import type { EstimatorSnapshot } from '../estimation/estimator'
 import type { SensorVector } from '../sensors/types'
 import type { Motors, Wrench } from './model'
-import { multiplyQuaternion, quaternionFromTilt } from '../estimation/frames'
+import { multiplyQuaternion, normalizeQuaternion, quaternionFromTilt } from '../estimation/frames'
+import { rotateBodyToNed } from './physics'
 import { createBoundedPid } from './pid'
 import { clampControl, validVector } from './model'
 export interface SimulatedControlInput {
@@ -66,9 +67,18 @@ export function createSimulatedLiftController(options: { headingAlignment: 'init
       const yaw = target.yawRad, ax = Math.cos(yaw) * acceleration[0] + Math.sin(yaw) * acceleration[1], ay = -Math.sin(yaw) * acceleration[0] + Math.cos(yaw) * acceleration[1]
       const vertical = model.gravityMps2 - acceleration[2]
       const desired = multiplyQuaternion([Math.cos(yaw / 2), 0, 0, Math.sin(yaw / 2)], quaternionFromTilt(Math.atan2(ay, Math.hypot(ax, vertical)), Math.atan2(-ax, vertical)))
-      const q = attitude.quaternionWxyz
-      const error = multiplyQuaternion([q[0], -q[1], -q[2], -q[3]], desired)
-      const rates = error.slice(1).map((n, i) => clampControl(8 * n * (error[0] < 0 ? -1 : 1), i === 2 ? 1.5 : 3)) as SensorVector
+      const q = normalizeQuaternion(attitude.quaternionWxyz)
+      // First align the thrust direction without twisting about it. An
+      // unattainable yaw goal must not rotate the position correction.
+      const from = rotateBodyToNed(q, [0, 0, 1]), to = rotateBodyToNed(desired, [0, 0, 1])
+      const dot = Math.max(-1, Math.min(1, from.reduce((sum, n, i) => sum + n * to[i]!, 0)))
+      if (1 + dot <= 1e-8) return inhibit('antipodal-thrust-direction')
+      const alignment = normalizeQuaternion([1 + dot, from[1] * to[2] - from[2] * to[1], from[2] * to[0] - from[0] * to[2], from[0] * to[1] - from[1] * to[0]])
+      const reduced = normalizeQuaternion(multiplyQuaternion(alignment, q))
+      const tiltError = multiplyQuaternion([q[0], -q[1], -q[2], -q[3]], reduced)
+      const yawError = multiplyQuaternion([reduced[0], -reduced[1], -reduced[2], -reduced[3]], desired)
+      const correction = [tiltError[1] * (tiltError[0] < 0 ? -1 : 1), tiltError[2] * (tiltError[0] < 0 ? -1 : 1), yawError[3] * (yawError[0] < 0 ? -1 : 1)]
+      const rates = correction.map((n, i) => clampControl(8 * n, i === 2 ? 1.5 : 3)) as SensorVector
       const torque = rates.map((n, i) => ratePid[i]!.step(n - input.angularRateRadS[i]!, input.angularRateRadS[i]!, dt)) as SensorVector
       const desiredWrench = { thrustN: model.massKg * Math.hypot(...[acceleration[0], acceleration[1], vertical]), torqueNm: torque }
       const allocation = allocate(desiredWrench, previous, dt)

@@ -28,6 +28,7 @@ test('native VTOL full-route command reports qualified initial hover, cruise, ba
   const report = JSON.parse(result.stdout)
   expect(report.status).toBe('completed')
   expect(report.scope).toBe('development-lift-and-cruise')
+  expect(report.aerodynamicsModel).toBe('projected-incidence-v3')
   expect(report.demonstrationMatched).toBe(true)
   expect(report.transitionEvidence.map((row: { taskId: string, phase: string }) => [row.taskId, row.phase])).toEqual([
     ['initial-hover', 'hover'], ['front', 'cruise'], ['back', 'hover'],

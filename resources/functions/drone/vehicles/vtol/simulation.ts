@@ -1,4 +1,5 @@
 import { createVtolTransitionProfile } from './transition-profile'
+import { vtolModel } from './plant'
 import { runVehicleSimulation } from '../runtime'
 import type { VehicleMissionAction } from '../types'
 import type { SensorVector } from '../../sensors/types'
@@ -170,7 +171,7 @@ export function createVtolSimulationCase(scenario = 'nominal', options: VtolSimu
     const backHeadingMatched = backHeadingRad === null || backTask?.kind === 'vtol-mode' && backTask.mode === 'hover' && backTask.headingRad === backHeadingRad
     const windOutcomeMatched = !!wind && (wind.expectedOutcome === 'completed-route' ? completedRoute : result.status === 'blocked' && result.fault === 'vtol-transition-envelope' && result.mission.taskId === 'back' && result.mission.state === 'blocked' && result.mission.targetM === null && result.mission.transition === null && confirmed(['initial-hover', 'front']) && observedFlight && !landingContact && boardNeutral)
     const demonstrationMatched = wind ? worldMatched && windOutcomeMatched && backHeadingMatched : scenario === 'nominal' ? completedRoute : actions ? operatorMatched : faultObserved && observedFlight && !landingContact && result.mission.state !== 'completed' && boardNeutral
-    const summary = { ...report, scope: 'development-lift-and-cruise' as const, transitionEvidence, completeTransitions, observedFlight, landingContact, boardNeutral, demonstrationMatched, recordedMissionRows: trace.rows.length, evaluatedPathRows: path.length,
+    const summary = { ...report, scope: 'development-lift-and-cruise' as const, aerodynamicsModel: vtolModel.aerodynamicsModel, transitionEvidence, completeTransitions, observedFlight, landingContact, boardNeutral, demonstrationMatched, recordedMissionRows: trace.rows.length, evaluatedPathRows: path.length,
       ...(phase ? { scenarioEvidence: { phase: phase.phase, injectedAtMs: phase.atMs, taskId: before?.mission.taskId ?? null, faultObserved, sources: capturedSources } } : {}),
       ...(wind ? { windEvidence: { ...structuredClone(wind), ...exposure, worldMatched, outcomeMatched: windOutcomeMatched, ...(backHeadingRad === null ? {} : { backHeadingMatched }) } } : {}),
       ...(actions ? { operatorEvidence: { actions: actualActions, tasksBeforeActions, phaseMatched: operatorPhaseMatched, observedPaused, matched: operatorMatched, ...(operator?.recovery ? { recoveryCorrelated } : {}), ...(operator?.openCircuit ? { pusherOpenCircuitObserved } : {}), ...(operator?.outcome === 'hold-expiry' ? { globalEnduranceExpired, landingStarted } : {}) } } : {}) }
