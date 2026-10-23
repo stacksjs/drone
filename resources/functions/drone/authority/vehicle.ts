@@ -12,7 +12,7 @@ export function validateVehicleActuators(input: VehicleActuator[]): VehicleActua
 export function validVehicleActuatorValues(input: unknown, declaration: VehicleActuator[]): input is number[] {
   return Array.isArray(input) && input.length === declaration.length && input.every((n, i) => typeof n === 'number' && Number.isFinite(n) && n >= declaration[i]!.min && n <= declaration[i]!.max)
 }
-function vehicleKind(kind: VehicleKind) { if (!['fixed-wing', 'ground', 'surface', 'subsea'].includes(kind)) throw new TypeError('Unsupported simulated vehicle') }
+function vehicleKind(kind: VehicleKind) { if (!['fixed-wing', 'vtol', 'ground', 'surface', 'subsea'].includes(kind)) throw new TypeError('Unsupported simulated vehicle') }
 /** Profile-specific actuator adapter over the same arming, lease and failover lifecycle as quad-X. */
 export function createVehicleAuthoritySupervisor(options: { bootId: bigint, sessionId: bigint, vehicle: VehicleKind, actuators: VehicleActuator[], fence: { radiusM: number, minDownM: number, maxDownM: number } }) {
   vehicleKind(options.vehicle)

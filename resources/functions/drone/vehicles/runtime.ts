@@ -1,5 +1,5 @@
 import type { EstimatorSnapshot } from '../estimation/estimator'
-import type { SensorVector } from '../sensors/types'
+import type { ImuMeasurement, SensorVector } from '../sensors/types'
 import type { VehicleControlOutput, VehicleControllerContext, VehicleMeasurement, VehicleMeasurementPose, VehicleProfile } from './types'
 import { createPhysicsSensorFeed } from '../controls/sensors'
 import { createEstimator } from '../estimation/estimator'
@@ -56,7 +56,8 @@ export function runVehicleSimulation(profileInput: VehicleProfile, options: { sc
       estimate = navigation ? navigation.update(baseEstimate, measurement, nowMs) : baseEstimate
       if (nowMs % 20 !== 0) continue
       const reference = vehicleReference(estimate)
-      const capturePose = predictVehicleMeasurementPose(estimate, sensors.sensors.find(s => s.kind === 'imu')?.observation, nowMs)
+      const imuObservation = sensors.sensors.find(s => s.kind === 'imu')?.observation
+      const capturePose = predictVehicleMeasurementPose(estimate, imuObservation, nowMs)
       if ((capturePose || profileInput.vehicle === 'subsea') && !faults.dropVehicleSensor) {
         if (queue.length >= 8) throw new RangeError('Vehicle sensor queue exhausted')
         const packet = structuredClone(session.renderMeasurement(truth, nowMs, reference))
@@ -83,7 +84,9 @@ export function runVehicleSimulation(profileInput: VehicleProfile, options: { sc
       }
       supervisor.update(observation)
       if (nowMs === 600) { send('arm'); send('engage', [0, 0, 0]) }
-      const context: VehicleControllerContext = { nowMs, enabled: supervisor.snapshot().state === 'autonomous', estimate, measurement, measurementPose, mission }
+      const context: VehicleControllerContext = { nowMs, enabled: supervisor.snapshot().state === 'autonomous', estimate, measurement, measurementPose, mission,
+        ...(profileInput.vehicle === 'vtol' ? { controlRate: capturePose ? { evidence: 'modeled-qualified-imu' as const, reference: capturePose.reference, capturedAtMs: capturePose.gyroCapturedAtMs, angularRateRadS: [...(imuObservation!.value as ImuMeasurement).angularRateRadS] as SensorVector } : null } : {}),
+      }
       payload?.observe?.(structuredClone(context))
       const ack = payload?.poll(nowMs) ?? null
       const missionObservation = { ...observeMission({ estimate, authority: supervisor.snapshot().state, batteryPercent, onGround: qualified?.values.onSurface === true }, profileInput.vehicle === 'subsea' ? 'LOCAL_WATER_SURFACE' : 'WGS84_ELLIPSOID'), payloadAck: ack }

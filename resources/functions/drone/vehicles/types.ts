@@ -3,7 +3,7 @@ import type { GeodeticOrigin, Quaternion } from '../estimation/frames'
 import type { SensorVector } from '../sensors/types'
 import type { MissionAction, MissionObservation, MissionState } from '../missions/engine'
 
-export type VehicleKind = 'fixed-wing' | 'ground' | 'surface' | 'subsea'
+export type VehicleKind = 'fixed-wing' | 'vtol' | 'ground' | 'surface' | 'subsea'
 export interface VehicleActuator { name: string, unit: 'normalized' | 'newton' | 'radian' | 'metres-per-second', min: number, max: number, neutral: number }
 export interface VehiclePlantState {
   positionM: SensorVector
@@ -80,7 +80,9 @@ export interface VehicleControlOutput {
   boardOutputsInhibited: true
 }
 export interface VehicleMeasurementPose { capturedAtMs: number, reference: string, positionM: SensorVector, quaternionWxyz: Quaternion, positionCapturedAtMs: number, positionPredictedToMs: number, attitudeCapturedAtMs: number, attitudePredictedToMs: number, gyroCapturedAtMs: number, attitudePrediction: 'qualified-gyro-hold' }
-export interface VehicleControllerContext { nowMs: number, enabled: boolean, estimate: EstimatorSnapshot, measurement: VehicleMeasurement | null, measurementPose?: VehicleMeasurementPose | null, mission: VehicleMissionSnapshot }
+/** Current calibrated gyro from the same qualified raw IMU capture as estimator attitude. */
+export interface VehicleControlRate { evidence: 'modeled-qualified-imu', reference: string, capturedAtMs: number, angularRateRadS: SensorVector }
+export interface VehicleControllerContext { nowMs: number, enabled: boolean, estimate: EstimatorSnapshot, measurement: VehicleMeasurement | null, measurementPose?: VehicleMeasurementPose | null, controlRate?: VehicleControlRate | null, mission: VehicleMissionSnapshot }
 export interface VehicleController { step(context: VehicleControllerContext): VehicleControlOutput }
 export interface VehicleFaults {
   windMps?: SensorVector

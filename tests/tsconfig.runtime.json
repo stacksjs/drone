@@ -74,6 +74,7 @@
     "./unit/air.test.ts",
     "./unit/vtol.test.ts",
     "./unit/vtol-control.test.ts",
+    "./unit/vtol-runtime.test.ts",
     "./unit/ground.test.ts",
     "./unit/surface.test.ts",
     "./unit/mission-workspace.test.ts",

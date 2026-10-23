@@ -15,7 +15,7 @@ export function vehicleMissionContains(plan: VehicleMissionPlan, p: unknown) {
 export function vehicleTaskTarget(plan: VehicleMissionPlan, task: VehicleMissionTask) { return task.kind === 'return' ? [...plan.rallyM] : 'positionM' in task ? [...task.positionM] : null }
 export function validateVehicleMission(input: unknown): { plan: VehicleMissionPlan, worstCaseMs: number, requiredWh: number } {
   const invalid = (): never => { throw new TypeError('Invalid vehicle mission or unsupported profile') }
-  if (!object(input) || !keys(input, ['version', 'vehicle', 'id', 'frame', 'altitude', 'terrain', 'origin', 'fence', 'rallyM', 'power', 'start', 'tasks']) || input.version !== 2 || !['fixed-wing', 'ground', 'surface', 'subsea'].includes(input.vehicle as string) || !id(input.id) || input.frame !== 'LOCAL_NED' || input.altitude !== 'ORIGIN_RELATIVE_DOWN' || input.terrain !== 'DECLARED_MODEL_SURFACE' || !id(input.start)) invalid()
+  if (!object(input) || !keys(input, ['version', 'vehicle', 'id', 'frame', 'altitude', 'terrain', 'origin', 'fence', 'rallyM', 'power', 'start', 'tasks']) || input.version !== 2 || !['fixed-wing', 'vtol', 'ground', 'surface', 'subsea'].includes(input.vehicle as string) || !id(input.id) || input.frame !== 'LOCAL_NED' || input.altitude !== 'ORIGIN_RELATIVE_DOWN' || input.terrain !== 'DECLARED_MODEL_SURFACE' || !id(input.start)) invalid()
   const p = input as unknown as VehicleMissionPlan
   if (!object(p.origin) || !keys(p.origin, ['latitudeDeg', 'longitudeDeg', 'ellipsoidHeightM']) || !number(p.origin.latitudeDeg, -90, 90) || !number(p.origin.longitudeDeg, -180, 180) || !number(p.origin.ellipsoidHeightM, -500, 10000)
     || !object(p.fence) || !keys(p.fence, ['radiusM', 'minDownM', 'maxDownM']) || !number(p.fence.radiusM, 1, 5000) || !number(p.fence.minDownM, -1000, 0) || !number(p.fence.maxDownM, 0, 10) || p.fence.minDownM >= p.fence.maxDownM || !vehicleMissionContains(p, p.rallyM)
@@ -33,7 +33,7 @@ export function validateVehicleMission(input: unknown): { plan: VehicleMissionPl
     }
     else if (t.kind === 'payload') {
       fields.push('operation', 'containerId', 'timeoutMs', 'next')
-      const supported = p.vehicle === 'fixed-wing' ? ['camera-still'] : p.vehicle === 'ground' ? ['camera-still', 'material-drop', 'mower-enable', 'mower-disable'] : p.vehicle === 'surface' ? ['camera-still', 'water-sample'] : ['camera-still', 'inspection-capture']
+      const supported = p.vehicle === 'fixed-wing' || p.vehicle === 'vtol' ? ['camera-still'] : p.vehicle === 'ground' ? ['camera-still', 'material-drop', 'mower-enable', 'mower-disable'] : p.vehicle === 'surface' ? ['camera-still', 'water-sample'] : ['camera-still', 'inspection-capture']
       if (!supported.includes(t.operation) || (t.containerId !== null && !id(t.containerId)) || (t.operation === 'water-sample' && !id(t.containerId)) || !number(t.timeoutMs, 100, 10000) || !id(t.next)) invalid()
       durationMs = t.timeoutMs; edges = [t.next]
     }
@@ -41,8 +41,8 @@ export function validateVehicleMission(input: unknown): { plan: VehicleMissionPl
       fields = [...fields, 'acceptanceM', 'maxArrivalSpeedMps', 'settleMs', 'timeoutMs', 'next']
       if (t.kind !== 'return') { fields.push('positionM'); if (!vehicleMissionContains(p, (t as { positionM?: unknown }).positionM)) invalid() }
       if (!('acceptanceM' in t) || !number(t.acceptanceM, 0.05, 150) || !number(t.maxArrivalSpeedMps, 0.05, 50) || !number(t.settleMs, 0, 10000) || !number(t.timeoutMs, 1000, 60000) || t.settleMs >= t.timeoutMs) invalid()
-      if ((t.kind === 'takeoff' || t.kind === 'land') && p.vehicle !== 'fixed-wing') invalid()
-      if (t.kind === 'stop' && (p.vehicle === 'fixed-wing' || t.maxArrivalSpeedMps > 0.5)) invalid()
+      if ((t.kind === 'takeoff' || t.kind === 'land') && p.vehicle !== 'fixed-wing' && p.vehicle !== 'vtol') invalid()
+      if (t.kind === 'stop' && (p.vehicle === 'fixed-wing' || p.vehicle === 'vtol' || t.maxArrivalSpeedMps > 0.5)) invalid()
       if (t.kind === 'land' && t.maxArrivalSpeedMps > 2) invalid()
       const terminal = t.kind === 'land' || t.kind === 'stop'
       if (!terminal && !id(t.next)) invalid()
