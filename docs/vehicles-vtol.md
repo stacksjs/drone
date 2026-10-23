@@ -3,7 +3,8 @@
 The owned lift-and-cruise model can execute a **hover-only** mission through the shared raw sensor,
 estimator, mission, authority and independent output-lease runtime. It takes off vertically, reaches
 a nearby hover waypoint and lands against fresh modeled contact evidence. Wing transitions and
-cruise control are not implemented. This development profile is separate from the selectable
+cruise control are not implemented in this hover profile. A separate experimental library controller
+is described below. This development profile is separate from the selectable
 profiles in the `/missions` workspace.
 
 ```sh
@@ -64,14 +65,56 @@ neutral until observation is qualified. Unobserved headings expire, and this hov
 cruise requests as aborted. This is a library prerequisite, not front/back transition control or a
 new CLI scenario. Existing hover-only recordings keep their prior shapes.
 
+## Experimental lift-and-cruise library controller
+
+`createVtolTransitionProfile()` in `resources/functions/drone/vehicles/vtol/transition-profile.ts`
+is a separate development experiment on the same owned runtime. Its nominal mission observes initial
+hover, takes off vertically to 15 m, requests a front transition, flies a cruise leg, requests back
+transition, returns to the back request's capture point, observes settled hover, and lands vertically.
+A turning leg also has an actual completed model campaign. This profile is not registered as a CLI
+scenario or selectable workspace profile.
+
+The controller receives measured relative airspeed, differential pressure, airflow angles and modeled
+rotor/pusher response, together with the qualified raw gyro and estimated navigation. Delayed airflow
+angles are transformed through their matching capture-time attitude. The measured NED airflow vector
+is held to the decision and then expressed in the current gyro-predicted body attitude. This is a
+bounded synthetic observation approximation, not identified wind estimation or physical air-data
+calibration. Banked navigation follows the route while coordinated yaw follows the measured air
+course. Surface torque and residual rotor torque are allocated together; measured wing lift reduces
+collective rather than adding full rotor weight support on top of the wing.
+
+Front confirmation requires sustained measured 12 to 14 m/s relative airflow, bounded angles,
+height/rate and less than 1 N of measured and commanded lift-rotor support. Both decision time and
+oldest-source coverage must qualify for 500 ms, including the attitude and gyro epochs used to
+transform delayed airflow. Ground speed or a timer alone cannot confirm cruise.
+A failed modeled pusher and an artificial co-moving-air fixture retain failed transition outcomes.
+
+Back transition turns the pusher off and decelerates under the declared aerodynamic model before
+returning to the original capture point at a horizontal target speed bounded to 3 m/s. The nominal
+model needs about 38 seconds for deceleration, return and hover qualification. Observed hover also
+requires wrapped heading error within 0.1 rad for the complete 500 ms dwell. Hover/back requests
+therefore have a finite 45-second ceiling; front requests retain 15 seconds. The original 15-second
+back budget still fails without retry or a claimed landing. This is a virtual task allowance,
+not a wall-clock test timeout. The complete declared mission budget is 131,520 ms, or 43.84 Wh at its
+1200 W ceiling, with 100 Wh capacity and 30% reserve. These remain declared planning values, without
+a complete hybrid electrical-power law or measured battery identification.
+
+The experiment keeps the 2 m transition-height deviation, 0.6 rad roll, 0.5 rad pitch and 22 m/s
+speed guards. Its own target range is bounded to 400 m. The quadcopter and hover development kernel's
+existing 3 m/s horizontal target and 100 m target-radius guards are unchanged. Source, capture-pose,
+reference and clock faults latch. Real modeled sensor loss, RC override, kill and host-loss campaigns
+cover front transition, cruise, back transition and post-back landing through the independent output
+lease. Neutral outputs during an airborne failure do not demonstrate a safe recovery or landing.
+
 ## Remaining implementation
 
-[Issue #12](https://github.com/stacksjs/drone/issues/12) remains open for full correlated front/back
-transition control and observed outcomes, airspeed and attitude
-qualification, bounded transition abort/recovery, complete hybrid power/reserve accounting and
-the common mission workspace. Full TECS/soaring, tiltrotor/tailsitter mechanisms, helicopters and
-other airframe families remain separate work. Native board control, measured airframe identification,
-HIL and physical flight require their own evidence.
+[Issue #12](https://github.com/stacksjs/drone/issues/12) remains open. The experimental nominal
+controller does not establish complete VTOL support. Phase pause/recovery, explicit bounded
+transition abort and landing, the complete hybrid power/reserve model, native transition CLI and
+the common mission workspace still require implementation and qualification. Wind campaigns and
+broader mission/envelope coverage remain necessary. Full TECS/soaring, tiltrotor/tailsitter mechanisms,
+helicopters and other airframe families remain separate work. Native board control, measured airframe
+identification, HIL and physical flight require their own evidence.
 
 Read the [shared vehicle contract](vehicles.md), [fixed-wing model](vehicles-air.md) and
 [authority contract](authority.md).

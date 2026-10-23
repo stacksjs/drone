@@ -28,7 +28,7 @@ export function validateVehicleMission(input: unknown): { plan: VehicleMissionPl
     else if (t.kind === 'abort') { /* Terminal release, never an emergency landing. */ }
     else if (t.kind === 'vtol-mode') {
       fields.push('mode', 'headingRad', 'timeoutMs', 'next')
-      if (p.vehicle !== 'vtol' || !['hover', 'cruise'].includes(t.mode) || !number(t.headingRad, -Math.PI, Math.PI) || !Number.isSafeInteger(t.timeoutMs) || !number(t.timeoutMs, 100, 15000) || !id(t.next)) invalid()
+      if (p.vehicle !== 'vtol' || !['hover', 'cruise'].includes(t.mode) || !number(t.headingRad, -Math.PI, Math.PI) || !Number.isSafeInteger(t.timeoutMs) || !number(t.timeoutMs, 100, t.mode === 'hover' ? 45000 : 15000) || !id(t.next)) invalid()
       durationMs = t.timeoutMs; edges = [t.next]
     }
     else if (t.kind === 'branch') {
