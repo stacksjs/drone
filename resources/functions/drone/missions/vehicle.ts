@@ -14,7 +14,7 @@ export function vehicleMissionContains(plan: VehicleMissionPlan, p: unknown) {
 }
 export function vehicleTaskTarget(plan: VehicleMissionPlan, task: VehicleMissionTask) { return task.kind === 'return' ? [...plan.rallyM] : 'positionM' in task ? [...task.positionM] : null }
 export function validateVehicleMission(input: unknown): { plan: VehicleMissionPlan, worstCaseMs: number, requiredWh: number } {
-  const invalid = (): never => { throw new TypeError('Invalid vehicle mission or unsupported profile') }
+  function invalid(): never { throw new TypeError('Invalid vehicle mission or unsupported profile') }
   if (!object(input) || !keys(input, ['version', 'vehicle', 'id', 'frame', 'altitude', 'terrain', 'origin', 'fence', 'rallyM', 'power', 'start', 'tasks']) || input.version !== 2 || !['fixed-wing', 'vtol', 'ground', 'surface', 'subsea'].includes(input.vehicle as string) || !id(input.id) || input.frame !== 'LOCAL_NED' || input.altitude !== 'ORIGIN_RELATIVE_DOWN' || input.terrain !== 'DECLARED_MODEL_SURFACE' || !id(input.start)) invalid()
   const p = input as unknown as VehicleMissionPlan
   if (!object(p.origin) || !keys(p.origin, ['latitudeDeg', 'longitudeDeg', 'ellipsoidHeightM']) || !number(p.origin.latitudeDeg, -90, 90) || !number(p.origin.longitudeDeg, -180, 180) || !number(p.origin.ellipsoidHeightM, -500, 10000)
@@ -27,9 +27,10 @@ export function validateVehicleMission(input: unknown): { plan: VehicleMissionPl
     if (t.kind === 'start') { fields.push('next'); if (t.id !== p.start || !id(t.next)) invalid(); edges = [t.next] }
     else if (t.kind === 'abort') { /* Terminal release, never an emergency landing. */ }
     else if (t.kind === 'vtol-mode') {
-      fields.push('mode', 'headingRad', 'timeoutMs', 'next')
+      fields.push('mode', 'headingRad', 'timeoutMs', 'next', 'onFailure')
       if (p.vehicle !== 'vtol' || !['hover', 'cruise'].includes(t.mode) || !number(t.headingRad, -Math.PI, Math.PI) || !Number.isSafeInteger(t.timeoutMs) || !number(t.timeoutMs, 100, t.mode === 'hover' ? 45000 : 15000) || !id(t.next)) invalid()
-      durationMs = t.timeoutMs; edges = [t.next]
+      if (t.onFailure !== undefined && !id(t.onFailure)) invalid()
+      durationMs = t.timeoutMs; edges = t.onFailure === undefined ? [t.next] : [t.next, t.onFailure]
     }
     else if (t.kind === 'branch') {
       fields.push('batteryAtLeast', 'then', 'otherwise')
@@ -57,6 +58,15 @@ export function validateVehicleMission(input: unknown): { plan: VehicleMissionPl
     else invalid()
     if (!keys(t, fields)) invalid()
     nodes.push({ id: t.id, durationMs, edges })
+  }
+  for (const task of p.tasks) {
+    if (task.kind !== 'vtol-mode' || task.onFailure === undefined) continue
+    const hover = p.tasks.find(candidate => candidate.id === task.onFailure)
+    if (!hover || hover.kind !== 'vtol-mode' || hover.mode !== 'hover' || hover.onFailure !== undefined) invalid()
+    const land = p.tasks.find(candidate => candidate.id === hover.next)
+    if (!land || land.kind !== 'land' || land.next !== undefined || land.positionM[2] !== 0) invalid()
+    // Failure routes are one-way, finite hover -> contact paths, never normal success or retries.
+    if (p.tasks.some(candidate => 'next' in candidate && candidate.next === hover.id || candidate.kind === 'branch' && [candidate.then, candidate.otherwise].includes(hover.id))) invalid()
   }
   if (p.tasks.find(t => t.id === p.start)?.kind !== 'start') invalid()
   const worstCaseMs = missionGraphBudget(nodes, p.start, vehicleMissionLimits.maximumMs)
@@ -87,9 +97,10 @@ export function createVehicleMissionEngine(input: unknown) {
   let lastNow: number | null = null, startedAt: number | null = null, reference: string | null = null, taskElapsedMs = 0, settledMs = 0
   let targetM: VehicleMissionSnapshot['targetM'] = null, holdM: VehicleMissionSnapshot['targetM'] = null, pending: VehiclePayloadCommand | null = null
   let transition: VehicleVtolTransitionCommand | null = null
+  let recovery: VehicleMissionSnapshot['recovery']
   let transitionObservation: { capturedAtMs: number, measurementCapturedAtMs: number, signature: string } | null = null
   const rows: VehicleMissionTrace['rows'] = []
-  function snapshot(): VehicleMissionSnapshot { return { version: 2, vehicle: plan.vehicle, evidence: 'owned-vehicle-mission-simulation', physicalFlightEnabled: false, state, taskId, taskKind: tasks.get(taskId)!.kind, targetM: targetM ? [...targetM] : null, payload: pending ? structuredClone(pending) : null, reason, elapsedMs: startedAt === null || lastNow === null ? 0 : lastNow - startedAt, ...(hasTransitions ? { transition: transition ? structuredClone(transition) : null } : {}) } }
+  function snapshot(): VehicleMissionSnapshot { return { version: 2, vehicle: plan.vehicle, evidence: 'owned-vehicle-mission-simulation', physicalFlightEnabled: false, state, taskId, taskKind: tasks.get(taskId)!.kind, targetM: targetM ? [...targetM] : null, payload: pending ? structuredClone(pending) : null, reason, elapsedMs: startedAt === null || lastNow === null ? 0 : lastNow - startedAt, ...(hasTransitions ? { transition: transition ? structuredClone(transition) : null } : {}), ...(recovery ? { recovery: { ...recovery } } : {}) } }
   function block(why: string) { state = 'blocked'; reason = why; targetM = null; pending = null; transition = null; transitionObservation = null }
   function advance(next: string) {
     taskId = next; taskElapsedMs = 0; settledMs = 0; pending = null; transition = null; transitionObservation = null; reason = 'task-entered'
@@ -97,6 +108,30 @@ export function createVehicleMissionEngine(input: unknown) {
     const goal = vehicleTaskTarget(plan, task)
     if (goal) targetM = goal as VehicleMissionSnapshot['targetM']
     if (task.kind === 'abort') { state = 'aborted'; targetM = null; reason = 'mission-abort-task' }
+  }
+  function readTransitionObservation(o: VehicleMissionObservation) {
+    const observed = o.transition
+    if (!observed) return null
+    const command = transition!
+    const phases = command.mode === 'hover' ? ['hover', 'back-transition'] : ['front-transition', 'cruise']
+    if (observed.eventId !== command.eventId || observed.taskId !== command.taskId || observed.mode !== command.mode || observed.reference !== command.reference
+      || observed.capturedAtMs < command.issuedAtMs || observed.capturedAtMs >= command.expiresAtMs || observed.capturedAtMs > o.nowMs || o.nowMs - observed.capturedAtMs > 120
+      || observed.measurementCapturedAtMs < command.issuedAtMs || o.nowMs - observed.measurementCapturedAtMs > 120
+      || observed.outcome === 'confirmed' && observed.phase !== command.mode || observed.outcome === 'progress' && !phases.includes(observed.phase)) { block('vtol-transition-outcome-uncertain'); return null }
+    const signature = JSON.stringify(Object.entries(observed).sort(([a], [b]) => a < b ? -1 : a > b ? 1 : 0))
+    if (transitionObservation && (observed.capturedAtMs < transitionObservation.capturedAtMs || observed.measurementCapturedAtMs < transitionObservation.measurementCapturedAtMs || observed.capturedAtMs === transitionObservation.capturedAtMs && signature !== transitionObservation.signature)) { block('vtol-transition-observation-replayed'); return null }
+    transitionObservation = { capturedAtMs: observed.capturedAtMs, measurementCapturedAtMs: observed.measurementCapturedAtMs, signature }
+    return observed
+  }
+  function beginRecovery(task: Extract<VehicleMissionTask, { kind: 'vtol-mode' }>, o: VehicleMissionObservation, cause: NonNullable<VehicleMissionSnapshot['recovery']>['cause']) {
+    if (!task.onFailure || recovery) return false
+    const failedEventId = transition?.eventId ?? null, hover = tasks.get(task.onFailure)!
+    if (hover.kind !== 'vtol-mode') return false
+    advance(hover.id)
+    recovery = { failedEventId, failedTaskId: task.id, hoverTaskId: hover.id, triggeredAtMs: o.nowMs, cause, ...(cause === 'operator-abort' ? { abortRequestedAtMs: o.nowMs } : {}) }
+    transition = { eventId: `${plan.id}:${reference}:${hover.id}`, taskId: hover.id, mode: 'hover', headingRad: hover.headingRad, issuedAtMs: o.nowMs, expiresAtMs: o.nowMs + hover.timeoutMs, positionM: [...o.positionM], reference: reference!, ...(failedEventId ? { supersedesEventId: failedEventId } : {}) }
+    targetM = [...transition.positionM]; reason = 'vtol-transition-recovery-requested'
+    return true
   }
   return {
     snapshot,
@@ -120,7 +155,16 @@ export function createVehicleMissionEngine(input: unknown) {
         else if (o.payloadAck !== null && pending === null) block('unsolicited-payload-ack')
         else if (o.transition && transition === null) block('unsolicited-vtol-transition')
       }
-      if (action === 'abort' && (active(state) || state === 'ready')) { state = 'aborted'; reason = 'operator-abort'; targetM = null; pending = null; transition = null; transitionObservation = null }
+      const currentTask = tasks.get(taskId)!
+      if (action === 'abort' && (active(state) || state === 'ready')) {
+        const task = currentTask
+        if (recovery && active(state)) { recovery.abortRequestedAtMs ??= o.nowMs; state = 'running'; reason = 'vtol-recovery-abort-requested' }
+        else if (state === 'running' && task.kind === 'vtol-mode' && task.onFailure) {
+          if (transition) readTransitionObservation(o)
+          if (active(state)) beginRecovery(task, o, 'operator-abort')
+        }
+        else { state = 'aborted'; reason = 'operator-abort'; targetM = null; pending = null; transition = null; transitionObservation = null }
+      }
       else if (action === 'start' && state === 'ready') {
         const needed = plan.power.reservePercent + 100 * plan.power.maxW * worstCaseMs / 3600000 / plan.power.availableWh
         if (!o.healthy || o.authority !== 'autonomous' || !o.onGround || Math.hypot(...o.velocityMps) > 0.1 || !vehicleMissionContains(plan, o.positionM) || o.batteryPercent < needed || o.payloadAck !== null || o.transition) block('mission-start-interlocks')
@@ -128,15 +172,29 @@ export function createVehicleMissionEngine(input: unknown) {
       }
       else if ((action === 'pause' && state === 'running') || (action === 'recover' && active(state))) {
         if (pending) block('payload-recovery-uncertain')
-        else if (transition) block('vtol-transition-recovery-uncertain')
+        else if (transition || currentTask.kind === 'vtol-mode' && currentTask.onFailure) {
+          const task = currentTask
+          if (recovery && recovery.hoverTaskId === task.id) reason = 'vtol-recovery-already-in-progress'
+          else if (task.kind === 'vtol-mode' && task.onFailure) {
+            if (transition) readTransitionObservation(o)
+            if (active(state) && !beginRecovery(task, o, action === 'pause' ? 'operator-pause' : 'operator-recover')) block('vtol-transition-recovery-uncertain')
+          }
+          else block('vtol-transition-recovery-uncertain')
+        }
         else { state = 'paused'; holdM = [...o.positionM]; settledMs = 0; reason = action === 'recover' ? 'checkpoint-recovered-awaiting-resume' : 'operator-pause' }
       }
       else if (action === 'resume' && state === 'paused') { state = 'running'; settledMs = 0; reason = 'operator-resume' }
       if (state === 'paused') targetM = holdM ? [...holdM] : null
-      if (state === 'running') {
+      if (state === 'running' && recovery?.triggeredAtMs !== o.nowMs) {
         const t = tasks.get(taskId)!, executionDt = previousState === 'ready' || previousState === 'paused' ? 0 : dt
         taskElapsedMs += executionDt
-        if ('timeoutMs' in t && taskElapsedMs >= t.timeoutMs) block(t.kind === 'payload' ? 'payload-outcome-uncertain' : t.kind === 'vtol-mode' ? 'vtol-transition-outcome-uncertain' : 'task-timeout')
+        if ('timeoutMs' in t && taskElapsedMs >= t.timeoutMs) {
+          if (t.kind === 'vtol-mode' && transition && t.onFailure) {
+            readTransitionObservation(o)
+            if (active(state) && !beginRecovery(t, o, 'timeout')) block('vtol-transition-outcome-uncertain')
+          }
+          else block(t.kind === 'payload' ? 'payload-outcome-uncertain' : t.kind === 'vtol-mode' ? 'vtol-transition-outcome-uncertain' : 'task-timeout')
+        }
         else if (t.kind === 'abort') { state = 'aborted'; reason = 'mission-abort-task'; targetM = null }
         else if (t.kind === 'start') advance(t.next)
         else if (t.kind === 'branch') { advance(o.batteryPercent >= t.batteryAtLeast ? t.then : t.otherwise); reason = 'battery-branch' }
@@ -146,24 +204,15 @@ export function createVehicleMissionEngine(input: unknown) {
             reason = 'vtol-transition-requested'
           }
           targetM = [...transition.positionM]
-          const observed = o.transition
+          const observed = readTransitionObservation(o)
           if (observed) {
-            const phases = transition.mode === 'hover' ? ['hover', 'back-transition'] : ['front-transition', 'cruise']
-            if (observed.eventId !== transition.eventId || observed.taskId !== transition.taskId || observed.mode !== transition.mode || observed.reference !== transition.reference
-              || observed.capturedAtMs < transition.issuedAtMs || observed.capturedAtMs >= transition.expiresAtMs || observed.capturedAtMs > o.nowMs || o.nowMs - observed.capturedAtMs > 120
-              || observed.measurementCapturedAtMs < transition.issuedAtMs || o.nowMs - observed.measurementCapturedAtMs > 120
-              || observed.outcome === 'confirmed' && observed.phase !== transition.mode || observed.outcome === 'progress' && !phases.includes(observed.phase)) block('vtol-transition-outcome-uncertain')
-            else {
-              // Wire object order is not evidence identity; all accepted fields are scalar and closed above.
-              const signature = JSON.stringify(Object.entries(observed).sort(([a], [b]) => a < b ? -1 : a > b ? 1 : 0))
-              if (transitionObservation && (observed.capturedAtMs < transitionObservation.capturedAtMs || observed.measurementCapturedAtMs < transitionObservation.measurementCapturedAtMs || observed.capturedAtMs === transitionObservation.capturedAtMs && signature !== transitionObservation.signature)) block('vtol-transition-observation-replayed')
-              else {
-                transitionObservation = { capturedAtMs: observed.capturedAtMs, measurementCapturedAtMs: observed.measurementCapturedAtMs, signature }
-                if (observed.outcome === 'aborted') block('vtol-transition-aborted')
-                else if (observed.outcome === 'confirmed') { advance(t.next); reason = 'vtol-transition-confirmed' }
-                else reason = 'vtol-transition-progress'
-              }
+            if (observed.outcome === 'aborted') { if (!beginRecovery(t, o, 'controller-aborted')) block('vtol-transition-aborted') }
+            else if (observed.outcome === 'confirmed') {
+              const holdAfterRecovery = recovery?.hoverTaskId === t.id && ['operator-pause', 'operator-recover'].includes(recovery.cause) && recovery.abortRequestedAtMs === undefined
+              advance(t.next); reason = 'vtol-transition-confirmed'
+              if (holdAfterRecovery) { state = 'paused'; holdM = [...o.positionM]; targetM = [...holdM]; reason = 'vtol-recovery-hover-awaiting-resume' }
             }
+            else reason = 'vtol-transition-progress'
           }
         }
         else if (t.kind === 'payload') {
@@ -182,7 +231,10 @@ export function createVehicleMissionEngine(input: unknown) {
           if (reached && settledMs >= t.settleMs) {
             holdM = [...goal] as VehicleMissionSnapshot['targetM']
             if (t.next) advance(t.next)
-            else { state = 'completed'; reason = t.kind === 'land' ? 'landed' : 'stopped'; targetM = null }
+            else {
+              const abortLanded = t.kind === 'land' && recovery?.abortRequestedAtMs !== undefined
+              state = abortLanded ? 'aborted' : 'completed'; reason = t.kind === 'land' ? abortLanded ? 'vtol-abort-landed' : recovery ? 'vtol-recovery-landed' : 'landed' : 'stopped'; targetM = null
+            }
           }
         }
       }

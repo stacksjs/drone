@@ -79,8 +79,8 @@ outputs remain inhibited. Read the [shared contract](docs/vehicles.md), [air mod
 `./buddy vtol:hover` separately exercises [VTOL development](docs/vehicles-vtol.md):
 vertical takeoff, a nearby hover waypoint and contact-gated landing. The TypeScript library also
 includes a bounded modeled front/cruise/back experiment with stable-phase pause and resume. The
-command stays hover-only. Controlled transition recovery and abort landing, complete hybrid energy
-qualification and a selectable VTOL mission workspace remain open.
+command stays hover-only. Plans can explicitly declare bounded hover-and-land transition recovery.
+Complete recovery/abort envelopes, hybrid energy qualification and a selectable VTOL mission workspace remain open.
 
 ## Simulated carried load
 

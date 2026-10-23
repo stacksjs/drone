@@ -32,11 +32,11 @@ export interface VehiclePayloadCommand { eventId: string, taskId: string, operat
 export interface VehiclePayloadAck { eventId: string, taskId: string, operation: VehiclePayloadOperation, containerId: string | null, capturedAtMs: number, reference: string, positionM: SensorVector, outcome: 'confirmed' | 'rejected' | 'uncertain', metadata?: Record<string, number | string | boolean> }
 export interface VehiclePayloadPort { observe?(context: VehicleControllerContext): void, request(command: VehiclePayloadCommand): void, poll(nowMs: number): VehiclePayloadAck | null, close(): void }
 export type VehicleVtolMode = 'hover' | 'cruise'
-export interface VehicleVtolTransitionCommand { eventId: string, taskId: string, mode: VehicleVtolMode, headingRad: number, issuedAtMs: number, expiresAtMs: number, positionM: SensorVector, reference: string }
+export interface VehicleVtolTransitionCommand { eventId: string, taskId: string, mode: VehicleVtolMode, headingRad: number, issuedAtMs: number, expiresAtMs: number, positionM: SensorVector, reference: string, supersedesEventId?: string }
 export interface VehicleVtolTransitionObservation { evidence: 'modeled-vtol-controller-observation', eventId: string, taskId: string, mode: VehicleVtolMode, reference: string, capturedAtMs: number, measurementCapturedAtMs: number, phase: 'hover' | 'front-transition' | 'cruise' | 'back-transition', outcome: 'progress' | 'confirmed' | 'aborted', reason: string }
 export type VehicleMissionTask =
   | { id: string, kind: 'start', next: string }
-  | { id: string, kind: 'vtol-mode', mode: VehicleVtolMode, headingRad: number, timeoutMs: number, next: string }
+  | { id: string, kind: 'vtol-mode', mode: VehicleVtolMode, headingRad: number, timeoutMs: number, next: string, onFailure?: string }
   | { id: string, kind: 'takeoff' | 'waypoint' | 'land' | 'stop', positionM: SensorVector, acceptanceM: number, maxArrivalSpeedMps: number, settleMs: number, timeoutMs: number, next?: string }
   | { id: string, kind: 'return', acceptanceM: number, maxArrivalSpeedMps: number, settleMs: number, timeoutMs: number, next: string }
   | { id: string, kind: 'loiter', positionM: SensorVector, acceptanceM: number, maxArrivalSpeedMps: number, settleMs: number, timeoutMs: number, next: string }
@@ -71,6 +71,8 @@ export interface VehicleMissionSnapshot {
   payload: VehiclePayloadCommand | null
   /** Present only for plans with explicit VTOL mode tasks; legacy recording shapes stay unchanged. */
   transition?: VehicleVtolTransitionCommand | null
+  /** Present after entering an explicitly planned transition-failure hover/landing route. */
+  recovery?: { failedEventId: string | null, failedTaskId: string, hoverTaskId: string, triggeredAtMs: number, cause: 'timeout' | 'controller-aborted' | 'operator-abort' | 'operator-pause' | 'operator-recover', abortRequestedAtMs?: number }
   reason: string
   elapsedMs: number
 }

@@ -58,8 +58,9 @@ from [firmware SITL](sitl.md) and physical testing.
 
 The separate [VTOL development guide](vehicles-vtol.md) covers the hover-only command and an
 experimental TypeScript library profile for modeled front transition, cruise, back transition and
-vertical landing, with stable-phase pause and resume. Controlled transition recovery and abort
-landing, complete hybrid energy qualification and the common VTOL mission workspace remain open.
+vertical landing, with stable-phase pause/resume and explicitly declared hover-and-land recovery
+routes. Complete recovery/abort envelopes, hybrid energy qualification and the common VTOL mission
+workspace remain open.
 
 ## Explore a workflow
 

@@ -22,9 +22,11 @@ export function createVtolFlightController(): VehicleController {
   const velocityPid = [0, 1, 2].map(() => createBoundedPid({ kp: 1.6, ki: 0.25, kd: 0, integralLimit: 1.5, outputLimit: 3, derivativeTauS: 0.03, trackingGain: 1 }))
   let hasWingControl = false, backSlow = false
   let loiterCenter: SensorVector | null = null
+  let landingTask = '', approachDownM: number | null = null
   let lastNow: number | null = null, identity: string | null = null, fault = ''
   let phase: VehicleVtolTransitionObservation['phase'] = 'hover', request: VehicleVtolTransitionCommand | null = null, signature = '', confirmedEvent = ''
   let stableSource: number | null = null, stableDecision: number | null = null
+  let lastMissionTask: string | null = null, recoveryBinding: { eventId: string, signature: string } | null = null
   function output(c: VehicleControllerContext, actuators: number[], reason: string, inhibited = false): VehicleControlOutput { return { kind: 'simulated-vehicle-control', vehicle: 'vtol', atMs: c.nowMs, actuators: [...actuators], reason, inhibited, physicalFlightEnabled: false, boardOutputsInhibited: true } }
   function neutral(c: VehicleControllerContext, reason: string) { fault ||= reason; return output(c, [0, 0, 0, 0, 0, 0, 0, 0], fault, true) }
   return {
@@ -57,6 +59,8 @@ export function createVtolFlightController(): VehicleController {
         if ((v.airspeedMps as number) < 0 || (v.airspeedMps as number) > 60 || (v.differentialPressurePa as number) < 0 || Math.abs(Math.sqrt(2 * (v.differentialPressurePa as number) / airModel.densityKgM3) - (v.airspeedMps as number)) > 0.02 || Math.abs(v.alphaRad as number) > Math.PI || Math.abs(v.betaRad as number) > Math.PI || (v.rotorThrustN as number) < 0 || (v.rotorThrustN as number) > 48 || (v.pusherThrustN as number) < 0 || (v.pusherThrustN as number) > 14) throw new TypeError('Invalid VTOL air measurement')
       }
       catch { return neutral(c, 'vtol-flight-observation-unqualified') }
+      const priorTask = lastMissionTask
+      lastMissionTask = c.mission.taskId
       const incoming = c.mission.transition
       if (incoming) {
         let anchor: number[]
@@ -65,20 +69,39 @@ export function createVtolFlightController(): VehicleController {
         if (c.mission.taskKind !== 'vtol-mode' || incoming.taskId !== c.mission.taskId || typeof incoming.eventId !== 'string' || !incoming.eventId || incoming.eventId.length > 256 || incoming.reference !== measurement!.reference || !['hover', 'cruise'].includes(incoming.mode) || !Number.isFinite(incoming.headingRad) || Math.abs(incoming.headingRad) > Math.PI || anchor.some((n, i) => n !== target[i]) || !Number.isSafeInteger(incoming.issuedAtMs) || incoming.issuedAtMs < 0 || !Number.isSafeInteger(incoming.expiresAtMs) || incoming.issuedAtMs > c.nowMs || incoming.expiresAtMs <= c.nowMs || incoming.expiresAtMs <= incoming.issuedAtMs || incoming.expiresAtMs - incoming.issuedAtMs > (incoming.mode === 'hover' ? 45000 : 15000)) return neutral(c, 'vtol-flight-request-unqualified')
         const encoded = JSON.stringify(incoming)
         if (request?.eventId === incoming.eventId && signature !== encoded) return neutral(c, 'vtol-flight-request-changed')
+        const superseding = incoming.supersedesEventId !== undefined, replacing = request?.eventId !== incoming.eventId
+        const recovery = c.mission.recovery
+        const recoverySignature = recovery ? JSON.stringify([recovery.failedEventId, recovery.failedTaskId, recovery.hoverTaskId, recovery.triggeredAtMs, recovery.cause]) : ''
+        if (recoveryBinding?.eventId === incoming.eventId && recoveryBinding.signature !== recoverySignature) return neutral(c, 'vtol-recovery-request-changed')
+        if (replacing && (recovery || superseding)) {
+          if (!recovery || incoming.mode !== 'hover' || recovery.hoverTaskId !== incoming.taskId || recovery.triggeredAtMs !== incoming.issuedAtMs || !['timeout', 'controller-aborted', 'operator-abort', 'operator-pause', 'operator-recover'].includes(recovery.cause)) return neutral(c, 'vtol-recovery-request-unqualified')
+          if (recovery.failedEventId === null) {
+            if (superseding || recovery.failedTaskId !== priorTask || request && confirmedEvent !== request.eventId || !['operator-abort', 'operator-pause', 'operator-recover'].includes(recovery.cause)) return neutral(c, 'vtol-recovery-request-unqualified')
+          }
+          else if (!superseding || !request || incoming.supersedesEventId !== request.eventId || recovery.failedEventId !== request.eventId || recovery.failedTaskId !== request.taskId || incoming.reference !== request.reference || incoming.issuedAtMs <= request.issuedAtMs) return neutral(c, 'vtol-recovery-request-unqualified')
+          recoveryBinding = { eventId: incoming.eventId, signature: recoverySignature }
+        }
+        if (replacing && request && confirmedEvent !== request.eventId && !superseding) return neutral(c, 'vtol-pending-request-not-cancelled')
+        if (request?.eventId !== incoming.eventId && incoming.mode === 'hover' && !hasWingControl) { request = structuredClone(incoming); signature = encoded }
         if (request?.eventId !== incoming.eventId && incoming.mode === 'cruise') {
           if (phase !== 'hover' || measurement!.values.onSurface) return neutral(c, 'vtol-front-requires-airborne-hover')
           request = structuredClone(incoming); signature = encoded; phase = 'front-transition'; hasWingControl = true; stableSource = null; stableDecision = null
         }
         if (request?.eventId !== incoming.eventId && incoming.mode === 'hover' && hasWingControl) {
-          if (phase !== 'cruise') return neutral(c, 'vtol-back-requires-observed-cruise')
+          if (phase !== 'cruise' && !superseding) return neutral(c, 'vtol-back-requires-observed-cruise')
           request = structuredClone(incoming); signature = encoded; phase = 'back-transition'; backSlow = false; stableSource = null; stableDecision = null
           for (const pid of velocityPid) pid.reset()
         }
       }
-      if (phase === 'hover' && !hasWingControl) return hover.step(c)
+      if (phase === 'hover' && !hasWingControl) {
+        const response = hover.step(c)
+        if (response.transition?.outcome === 'confirmed') confirmedEvent = response.transition.eventId
+        return response
+      }
       const [roll, pitch, yaw] = quaternionEuler(q!), values = measurement!.values
       const speed = values.airspeedMps as number, alpha = values.alphaRad as number, beta = values.betaRad as number
       const landing = phase === 'hover' && c.mission.state === 'running' && c.mission.taskKind === 'land'
+      if (landing && landingTask !== c.mission.taskId) { landingTask = c.mission.taskId; approachDownM = position![2] }
       const pausedContact = phase === 'hover' && c.mission.state === 'paused' && values.onSurface === true && values.stopped === true
       if (measurement!.values.onSurface && !landing && !pausedContact || speed > 22 || Math.abs(roll) > 0.6 || Math.abs(pitch) > 0.5 || speed > 8 && (Math.abs(alpha) > 0.32 || Math.abs(beta) > 0.4) || phase !== 'hover' && Math.abs(position![2] - request!.positionM[2]) > 2) return neutral(c, 'vtol-transition-envelope')
       if (landing && measurement!.values.onSurface || pausedContact) return output(c, [0, 0, 0, 0, 0, 0, 0, 0], pausedContact ? 'ground-paused' : 'vertical-contact')
@@ -120,7 +143,11 @@ export function createVtolFlightController(): VehicleController {
         }
         else {
           const goal = [...target!] as SensorVector
-          if (landing) goal[2] += 0.1
+          if (landing) {
+            const aligned = Math.hypot(target![0] - position![0], target![1] - position![1]) <= 0.5 && groundSpeed <= 0.2
+            if (approachDownM !== null && !aligned) goal[2] = approachDownM
+            else { approachDownM = null; goal[2] += 0.1 }
+          }
           const desiredVelocity = goal.map((n, i) => n - position![i]!) as SensorVector
           const horizontal = Math.hypot(desiredVelocity[0], desiredVelocity[1])
           if (horizontal > 3) { desiredVelocity[0] *= 3 / horizontal; desiredVelocity[1] *= 3 / horizontal }

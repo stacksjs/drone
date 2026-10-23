@@ -63,7 +63,8 @@ TypeScript controllers. Native board execution, external firmware SITL, HIL and 
 vehicle acceptance remain separate gates. A separate [VTOL development guide](vehicles-vtol.md)
 covers the hover-only command and an experimental lift-and-cruise library profile. The latter
 executes a bounded modeled front/cruise/back/vertical-landing route with stable-phase pause and
-resume. Controlled transition recovery and abort landing, complete hybrid energy qualification,
+resume, plus explicitly declared hover-and-land transition recovery. Complete recovery/abort
+envelopes, hybrid energy qualification,
 a native transition command and a VTOL selection in the common workspace remain open. Helicopter,
 soaring, blimp and other airframe families remain explicit roadmap work.
 

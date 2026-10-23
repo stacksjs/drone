@@ -140,20 +140,75 @@ before that return. Sensor loss, RC takeover, kill and host loss retain authorit
 
 `recover` pauses the already running session until explicit `resume`. Fresh-process restoration after
 host loss or a changed estimator reference remains a separate gate. Pending initial-hover, front or
-back mode work retains uncertain-outcome refusal for pause/recover. Those refusals release modeled
-outputs; a controlled airborne recovery and observed landing still require an explicit route.
-`abort` terminates the modeled mission and releases outputs as well.
+back mode work without a declared recovery route retains uncertain-outcome refusal for pause/recover.
+Those refusals release modeled outputs. Without that route, `abort` also terminates the modeled mission
+and releases outputs. Neither result establishes an airborne landing.
 
 Task execution time stops during pause. Global endurance and the declared energy charge continue,
 so a later scheduled resume can be preempted by reserve, endurance, health or authority refusal.
 Operator actions never extend the original planning allowance or rearm revoked authority. The
 transition library and these actions remain separate from the hover-only CLI and common workspace.
 
+## Declared transition recovery routes
+
+A `vtol-mode` task can declare `onFailure` as the ID of a dedicated hover task followed by a
+terminal landing task on the declared contact plane. The default development profile has no such
+route. Plans opt in explicitly, and every recovery edge participates in the existing acyclic time
+and reserve calculation before session resources are created. Normal success edges cannot enter
+the recovery hover, and recovery cannot retry the interrupted task or declare another failure route.
+
+For example, declare a return to the origin after an interrupted front transition:
+
+```ts
+const profile = createVtolTransitionProfile()
+const front = profile.mission.tasks.find(task => task.id === 'front')!
+if (front.kind !== 'vtol-mode') throw new Error('Expected front mode task')
+front.onFailure = 'recover-hover'
+profile.mission.tasks.push(
+  { id: 'recover-hover', kind: 'vtol-mode', mode: 'hover', headingRad: 0, timeoutMs: 45000, next: 'recover-land' },
+  { id: 'recover-land', kind: 'land', positionM: [0, 0, 0], acceptanceM: 0.3, maxArrivalSpeedMps: 0.2, settleMs: 200, timeoutMs: 35000 },
+)
+const aborted = runVehicleSimulation(profile, {
+  seconds: 160,
+  missionActions: [{ atMs: 13000, action: 'abort' }],
+})
+```
+
+The imports are the same as in the previous example. Timeout or a correlated controller abort uses
+the declared route. An operator `abort`, `pause` or `recover` while that mode task owns execution
+uses it too. A new hover request binds `supersedesEventId` to the actual cancelled request and records
+its original task, cause and epoch in `mission.recovery`. Before the first command dispatch, the
+failed event is null and no cancellation ID is invented. Late old feedback cannot satisfy the new
+request. Qualified source and heading dwell starts again for that new observation; it never retries
+the original transition or regains revoked authority.
+
+Pause and recover continue controlled motion until hover is observed, then hold for a **fresh explicit
+resume**. Resuming follows the recovery landing route. An early resume cannot skip that qualification,
+and repeated recovery does not reset its deadline. Abort continues to observed contact and ends with
+`mission.state: 'aborted'` and reason `vtol-abort-landed`. The simulation report keeps its existing
+`blocked` summary for an aborted mission. This is distinct from successful completion of the original
+route. A timeout/controller rejection that recovers to contact ends with `vtol-recovery-landed`.
+
+Landing holds the captured estimated approach height until horizontal position and speed qualify
+descent to the selected site. Actual failed-pusher and expired-back campaigns retain rotor-supported
+hover and fresh contact. The original 25-second back-recovery approach/landing case still times out
+airborne. A separately declared 35-second allowance completes after about 26.94 seconds, charged to
+the complete 156,520 ms / 52.1733 Wh worst-case plan. A normal 45-second back plus 45-second recovery
+hover and 35-second landing exceeds the unchanged 180-second graph cap and is rejected. The phase
+abort/pause/recover campaigns instead declare 40-second recovery hover and 30-second landing, fitting
+176,520 ms / 58.84 Wh. These remain declared 1200 W planning charges, without identified electrical
+power or measured battery endurance.
+
+Sensor loss, reference/clock guards, RC takeover, kill, fence, reserve and global endurance remain
+authoritative during recovery. Host loss still produces a stale host snapshot and separate independent
+lease expiry. Fault-induced neutral outputs do not become a landing claim. These bounded library
+campaigns do not qualify arbitrary wind, failed lift rotors, every transition state or physical recovery.
+
 ## Remaining implementation
 
 [Issue #12](https://github.com/stacksjs/drone/issues/12) remains open. The experimental nominal
-controller does not establish complete VTOL support. Controlled front/back recovery and fresh-process
-restoration, explicit bounded transition abort and landing, the complete hybrid power/reserve model, native transition CLI and
+controller and opt-in recovery routes do not establish complete VTOL support. Complete recovery/abort
+envelopes, fresh-process restoration, the complete hybrid power/reserve model, native transition CLI and
 the common mission workspace still require implementation and qualification. Wind campaigns and
 broader mission/envelope coverage remain necessary. Full TECS/soaring, tiltrotor/tailsitter mechanisms,
 helicopters and other airframe families remain separate work. Native board control, measured airframe
