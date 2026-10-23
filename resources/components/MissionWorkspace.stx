@@ -3,19 +3,36 @@ import type { MissionWorkspaceProfile, MissionWorkspaceRecording } from '../func
 import { getMissionWorkspaceDefinition, missionWorkspaceProfiles, missionWorkspacePlot, runMissionWorkspace } from '../functions/drone/vehicles/workspace'
 const profile = state<MissionWorkspaceProfile>('quadcopter')
 const scenario = state('nominal')
+const phase = state('front')
+const electrical = state(false)
 const result = state<MissionWorkspaceRecording | null>(null)
-const recording = derived(() => result()?.definition.profile === profile() && result()?.definition.scenario === scenario() ? result() : null)
 const offset = state(600)
 const busy = state(false)
 const error = state('')
 const definition = derived(() => {
   const base = getMissionWorkspaceDefinition(profile(), 'nominal')
-  return base.scenarios.includes(scenario()) ? getMissionWorkspaceDefinition(profile(), scenario()) : base
+  const selected = base.scenarios.includes(scenario()) ? scenario() : 'nominal'
+  if (profile() !== 'vtol') return getMissionWorkspaceDefinition(profile(), selected)
+  const initial = getMissionWorkspaceDefinition('vtol', selected, { electrical: electrical() })
+  return 'vtol' in initial && initial.vtol?.phase ? getMissionWorkspaceDefinition('vtol', selected, { phase: phase(), electrical: electrical() }) : initial
 })
+const vtolDefinition = derived(() => { const d = definition(); return 'vtol' in d ? d.vtol ?? null : null })
+const recording = derived(() => {
+  const r = result(), d = definition()
+  const options = r && 'vtol' in r.definition ? r.definition.vtol : null
+  return r && r.definition.profile === d.profile && r.definition.scenario === d.scenario && (options?.phase ?? null) === (vtolDefinition()?.phase ?? null) && (options?.electrical ?? false) === (vtolDefinition()?.electrical ?? false) ? r : null
+})
+const vtolResult = derived(() => { const r = recording(); return r && 'vtol' in r ? r.vtol ?? null : null })
 const validTime = derived(() => !recording() || Number.isFinite(offset()) && Number.isInteger(offset()) && offset() >= recording()!.minimumTimeMs && offset() <= recording()!.maximumTimeMs && (offset() - recording()!.minimumTimeMs) % 20 === 0)
 const playbackTime = derived(() => validTime() ? offset() : recording()?.minimumTimeMs || 600)
 const rows = derived(() => recording()?.rows.filter(row => row.atMs <= playbackTime()) ?? [])
 const current = derived(() => rows().at(-1) ?? null)
+const modeObservation = derived(() => rows().findLast(row => row.vtol?.observation)?.vtol?.observation ?? null)
+const modeEvents = derived(() => rows().filter((row, index, all) => {
+  const current = row.vtol?.observation, previous = all[index - 1]?.vtol?.observation
+  return current && (!previous || current.eventId !== previous.eventId || current.phase !== previous.phase || current.outcome !== previous.outcome)
+}).map(row => ({ atMs: row.atMs, observation: row.vtol!.observation! })))
+const operatorActions = derived(() => rows().filter(row => row.vtol?.action && row.vtol.action !== 'start'))
 const events = derived(() => recording()?.transitions.filter(row => row.atMs <= playbackTime()) ?? [])
 const requests = derived(() => recording()?.payloads.filter(row => row.issuedAtMs <= playbackTime()) ?? [])
 const acknowledgements = derived(() => rows().filter(row => row.payloadAck).map(row => row.payloadAck!))
@@ -23,7 +40,7 @@ const inspectionFrames = derived(() => recording()?.inspection?.frames.filter(fr
 const plot = derived(() => missionWorkspacePlot(definition(), rows()))
 const computation = useTimeout(() => {
   try {
-    const completed = runMissionWorkspace(profile(), scenario())
+    const completed = runMissionWorkspace(profile(), definition().scenario, vtolDefinition() ? { electrical: electrical(), ...(vtolDefinition()?.phase ? { phase: phase() } : {}) } : {})
     result.set(completed)
     // Mount the playback controls and their dynamic bounds before assigning the value.
     void nextTick(() => { if (result() === completed) offset.set(completed.maximumTimeMs) })
@@ -35,6 +52,7 @@ computation.stop()
 onDestroy(() => computation.stop())
 effect(() => {
   const selectedProfile = profile(), selectedScenario = scenario()
+  phase(); electrical()
   computation.stop(); busy.set(false); result.set(null); error.set(''); offset.set(600)
   if (!getMissionWorkspaceDefinition(selectedProfile, 'nominal').scenarios.includes(selectedScenario)) scenario.set('nominal')
 })
@@ -50,6 +68,8 @@ function vectorLabel(value: number[] | null | undefined) { return value ? value.
     <div class="flex flex-wrap gap-4 items-end mt-8">
       <div><label for="mission-profile" class="block mb-2 text-sm">Vehicle profile</label><select id="mission-profile" x-model="profile" class="px-3 py-3 max-w-full text-neutral-100 bg-neutral-900 border border-neutral-600 rounded focus-visible:outline-emerald-200"><option :for="name in missionWorkspaceProfiles" :value="name">{{ name }}</option></select></div>
       <div><label for="mission-scenario" class="block mb-2 text-sm">Operator scenario</label><select id="mission-scenario" x-model="scenario" class="px-3 py-3 max-w-full text-neutral-100 bg-neutral-900 border border-neutral-600 rounded focus-visible:outline-emerald-200"><option :for="name in definition().scenarios" :value="name">{{ name }}</option></select></div>
+      <div :if="vtolDefinition()?.phases.length"><label for="mission-vtol-phase" class="block mb-2 text-sm">Fault injection phase</label><select id="mission-vtol-phase" x-model="phase" class="px-3 py-3 max-w-full text-neutral-100 bg-neutral-900 border border-neutral-600 rounded focus-visible:outline-emerald-200"><option :for="name in vtolDefinition()?.phases || []" :value="name">{{ name }}</option></select></div>
+      <label :if="profile() === 'vtol'" for="mission-vtol-electrical" class="flex gap-3 items-center py-3 text-sm"><input id="mission-vtol-electrical" type="checkbox" x-model="electrical" class="accent-emerald-200">Modeled electrical load</label>
       <button type="button" @click="execute()" :disabled="busy()" class="px-4 py-3 font-medium text-neutral-950 whitespace-nowrap bg-emerald-200 rounded focus-visible:outline-emerald-200 focus-visible:outline-offset-4 disabled:opacity-60">{{ busy() ? 'Recording…' : 'Run scenario' }}</button>
       <button type="button" @click="reset()" class="px-4 py-3 text-sm whitespace-nowrap border border-neutral-600 rounded focus-visible:outline-emerald-200 focus-visible:outline-offset-4">Clear recording</button>
     </div>
@@ -68,7 +88,7 @@ function vectorLabel(value: number[] | null | undefined) { return value ? value.
           <div><dt class="text-neutral-400">Energy reserve checked</dt><dd class="mt-1">{{ definition().budget.requiredWh.toFixed(2) }} / {{ definition().budget.usableWh.toFixed(2) }} Wh usable</dd></div>
         </dl>
         <h3 class="mt-7 font-semibold text-sm">Tasks and graph edges</h3>
-        <div class="overflow-x-auto mt-3 max-h-96"><table class="w-full text-left text-xs"><thead class="text-neutral-400"><tr><th scope="col" class="pr-3 py-3">Task</th><th scope="col" class="py-3">Goal / next</th></tr></thead><tbody><tr :for="task in definition().tasks" class="border-b border-neutral-800"><td class="pr-3 py-3 align-top"><span class="font-mono">{{ task.id }}</span><span class="block mt-1 text-neutral-400">{{ task.kind }}</span></td><td class="py-3 break-words"><span :if="task.targetM" class="font-mono">N/E/D {{ vectorLabel(task.targetM) }} m</span><span :if="task.operation" class="block font-mono text-emerald-200">{{ task.operation }} / {{ task.containerId || 'no container' }}</span><span class="block mt-1 text-neutral-400">Next: {{ task.edges.join(' / ') || 'end' }}</span></td></tr></tbody></table></div>
+        <div class="overflow-x-auto mt-3 max-h-96"><table class="w-full text-left text-xs"><thead class="text-neutral-400"><tr><th scope="col" class="pr-3 py-3">Task</th><th scope="col" class="py-3">Goal / next</th></tr></thead><tbody><tr :for="task in definition().tasks" class="border-b border-neutral-800"><td class="pr-3 py-3 align-top"><span class="font-mono">{{ task.id }}</span><span class="block mt-1 text-neutral-400">{{ task.kind }}</span></td><td class="py-3 break-words"><span :if="task.targetM" class="font-mono">N/E/D {{ vectorLabel(task.targetM) }} m</span><span :if="task.operation" class="block font-mono text-emerald-200">{{ task.operation }} / {{ task.containerId || 'no container' }}</span><span :if="task.mode" class="block font-mono text-emerald-200">Requested mode: {{ task.mode }}</span><span :if="task.failureEdge" class="block mt-1 text-amber-200">Counted failure route: {{ task.failureEdge }}</span><span class="block mt-1 text-neutral-400">Next: {{ task.edges.join(' / ') || 'end' }}</span></td></tr></tbody></table></div>
         <p class="mt-4 leading-relaxed text-neutral-400 text-xs">{{ definition().assumptions }}</p>
       </aside>
       <div class="min-w-0">
@@ -97,6 +117,30 @@ function vectorLabel(value: number[] | null | undefined) { return value ? value.
           <div class="flex flex-wrap gap-3 items-end mt-3"><div><label for="mission-time-number" class="block mb-1 text-neutral-400 text-xs">Recorded time / ms</label><input id="mission-time-number" type="number" :min="recording()?.minimumTimeMs || 600" :max="recording()?.maximumTimeMs || 600" step="20" x-model.number="offset" class="px-3 py-2 w-36 bg-neutral-900 border border-neutral-600 rounded focus-visible:outline-emerald-200"></div><button type="button" @click="offset.set(recording()?.minimumTimeMs || 600)" class="px-3 py-2 text-sm border border-neutral-600 rounded focus-visible:outline-emerald-200">Beginning</button><button type="button" @click="offset.set(recording()?.maximumTimeMs || 600)" class="px-3 py-2 text-sm border border-neutral-600 rounded focus-visible:outline-emerald-200">End of recording</button></div>
           <p :if="!validTime()" role="alert" class="mt-3 text-amber-200 text-sm">Enter a recorded time from {{ recording()?.minimumTimeMs }} to {{ recording()?.maximumTimeMs }} ms in 20 ms steps. Showing the beginning until the time is valid.</p>
           <p class="mt-5 break-words font-mono text-neutral-400 text-xs">Estimated N/E/D: {{ vectorLabel(current()?.positionM) }} m</p><p class="mt-2 break-words font-mono text-neutral-400 text-xs">Estimated velocity N/E/D: {{ vectorLabel(current()?.velocityMps) }} m/s</p><p class="mt-2 break-words font-mono text-neutral-400 text-xs">Target N/E/D: {{ vectorLabel(current()?.targetM) }}</p>
+          <section :if="profile() === 'vtol'" aria-labelledby="vtol-evidence-title" class="mt-7 pt-5 border-neutral-700 border-t">
+            <h3 id="vtol-evidence-title" class="font-semibold text-sm">Recorded VTOL evidence</h3>
+            <p class="mt-2 text-neutral-400 text-xs" data-vtol-demonstration>Named outcome check: {{ vtolResult()?.demonstrationMatched ? 'matched' : 'unmatched' }}. Final qualified landing contact: {{ vtolResult()?.landingContact ? 'observed' : 'not observed' }}.</p>
+            <p class="mt-2 leading-relaxed text-neutral-400 text-xs">A matched case can be blocked, aborted or host-lost. These are recorded model observations, not physical flight qualification.</p>
+            <p :if="modeObservation()" class="mt-4 break-words font-mono text-sm" data-vtol-mode>{{ modeObservation()?.phase }} / {{ modeObservation()?.outcome }} / {{ modeObservation()?.taskId }}</p>
+            <p :if="modeObservation()" class="mt-2 break-words font-mono text-neutral-400 text-xs">Last mode observation captured {{ modeObservation()?.capturedAtMs }} ms, sensor capture {{ modeObservation()?.measurementCapturedAtMs }} ms. Age at cursor: {{ playbackTime() - (modeObservation()?.capturedAtMs || 0) }} ms.</p>
+            <p :if="!modeObservation()" class="mt-3 text-neutral-400 text-xs">No recorded mode observation at this time.</p>
+            <p :if="current()?.vtol?.request" class="mt-3 break-all font-mono text-neutral-400 text-xs">Mode request {{ current()?.vtol?.request?.mode }} / {{ current()?.vtol?.request?.eventId }} / expires {{ current()?.vtol?.request?.expiresAtMs }} ms</p>
+            <div :if="vtolDefinition()?.electrical" class="mt-5">
+              <h4 class="font-semibold text-sm">Captured battery reading</h4>
+              <dl :if="current()?.vtol?.battery" class="grid gap-4 grid-cols-2 mt-3 text-xs" data-vtol-battery>
+                <div><dt class="text-neutral-400">Chemical energy used</dt><dd class="mt-1 font-mono">{{ current()?.vtol?.battery?.energyUsedWh.toFixed(3) }} Wh</dd></div>
+                <div><dt class="text-neutral-400">Remaining lower bound</dt><dd class="mt-1 font-mono">{{ current()?.vtol?.battery?.remainingWhLowerBound.toFixed(3) }} Wh / {{ current()?.vtol?.battery?.remainingPercentLowerBound.toFixed(2) }}%</dd></div>
+                <div><dt class="text-neutral-400">Source / load</dt><dd class="mt-1 font-mono">{{ current()?.vtol?.battery?.sourcePowerW.toFixed(2) }} / {{ current()?.vtol?.battery?.loadPowerW.toFixed(2) }} W</dd></div>
+                <div><dt class="text-neutral-400">Terminal / current</dt><dd class="mt-1 font-mono">{{ current()?.vtol?.battery?.terminalV.toFixed(3) }} V / {{ current()?.vtol?.battery?.currentA.toFixed(3) }} A</dd></div>
+              </dl>
+              <p :if="current()?.vtol?.battery" class="mt-3 break-words font-mono text-neutral-400 text-xs">Capture {{ current()?.vtol?.battery?.capturedAtMs }} ms / observed {{ current()?.vtol?.battery?.observedAtMs }} ms / sequence {{ current()?.vtol?.battery?.sequence }} / cutoff {{ current()?.vtol?.battery?.cutoff ? 'latched' : 'clear' }}</p>
+              <p :if="!current()?.vtol?.battery" class="mt-3 text-amber-200 text-xs" data-vtol-battery-missing>No qualified battery capture at this recorded time.</p>
+              <p class="mt-3 leading-relaxed text-neutral-400 text-xs">Fictional 100 Wh pack. The remaining lower bound includes worst-case consumption since capture. Host loss freezes host readings. No measured cell or motor calibration.</p>
+            </div>
+            <p :if="!vtolDefinition()?.electrical" class="mt-4 text-neutral-400 text-xs">Electrical measurements are off. The mission still checks its declared planning power ceiling and reserve.</p>
+            <div :for="row in operatorActions()" class="mt-3 break-words font-mono text-neutral-400 text-xs">Operator {{ row.vtol?.action }} at {{ row.atMs }} ms / {{ row.state }} / {{ row.taskId }}</div>
+            <div class="overflow-x-auto mt-4"><table class="w-full text-left text-xs"><caption class="py-2 text-left text-neutral-400">Mode changes and request-bound acknowledgements</caption><thead class="text-neutral-400"><tr><th scope="col" class="pr-3 py-3">Time / ms</th><th scope="col" class="pr-3 py-3">Request task</th><th scope="col" class="py-3">Phase / outcome</th></tr></thead><tbody><tr :for="row in modeEvents()" class="border-b border-neutral-800" data-vtol-mode-event><td class="pr-3 py-3 font-mono">{{ row.atMs }}</td><td class="pr-3 py-3 break-words font-mono">{{ row.observation.taskId }}</td><td class="py-3 break-words font-mono">{{ row.observation.phase }} / {{ row.observation.outcome }}</td></tr></tbody></table></div>
+          </section>
           <h3 class="mt-7 font-semibold text-sm">Payload events <span class="font-mono text-neutral-400" data-mission-payloads>{{ requests().length }}</span></h3>
           <p :if="!requests().length" class="mt-2 text-neutral-400 text-xs">No payload request at this time.</p>
           <div :for="payload in requests()" class="mt-3 py-3 border-neutral-800 border-t"><p class="break-words font-mono text-xs">{{ payload.operation }} / {{ payload.containerId || 'no container' }} / {{ payload.taskId }}</p><p class="mt-1 break-all text-neutral-400 text-xs">{{ payload.eventId }} / {{ payload.evidence }}</p></div>

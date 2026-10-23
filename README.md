@@ -61,7 +61,7 @@ See [public-safety collection and remaining scope](docs/public-safety.md). Physi
 
 ## Owned vehicle missions
 
-Open `/missions` to select quadcopter, fixed-wing, ground, surface or subsea simulation. One workspace shows
+Open `/missions` to select quadcopter, fixed-wing, VTOL, ground, surface or subsea simulation. One workspace shows
 plans, energy budgets, estimated routes, decision playback, payload requests and correlated modeled
 acknowledgements. Host loss shows the last host snapshot separately from independent board expiry.
 
@@ -83,8 +83,9 @@ includes a bounded modeled front/cruise/back experiment with stable-phase pause 
 mode observations. Named scenarios expose phase-bound sensor/manual/host loss, cruise pause/resume,
 declared front/back abort and recovery, pusher open-circuit timeout and global endurance expiry.
 Add `--electrical` to either command for fictional propulsion/battery load and delayed energy measurements.
-Plans can explicitly declare bounded hover-and-land transition recovery. Complete recovery/abort envelopes,
-measured hybrid energy qualification and a selectable VTOL mission workspace remain open.
+Plans can explicitly declare bounded hover-and-land transition recovery. Complete recovery/abort envelopes
+and measured hybrid energy qualification remain open. The VTOL workspace selects the same 14 named
+cases, fault phases and optional electrical model, with captured mode and battery playback.
 
 ## Simulated carried load
 

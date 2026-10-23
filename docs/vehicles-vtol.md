@@ -4,8 +4,8 @@ The owned lift-and-cruise model can execute a **hover-only** mission through the
 estimator, mission, authority and independent output-lease runtime. It takes off vertically, reaches
 a nearby hover waypoint and lands against fresh modeled contact evidence. Wing transitions and
 cruise control are not implemented in this hover profile. A separate experimental library controller
-is described below. This development profile is separate from the selectable
-profiles in the `/missions` workspace.
+is described below. The `/missions` workspace selects the full-route experiment and its named
+cases; the hover-only command remains a separate experiment.
 
 ```sh
 ./buddy vtol:hover
@@ -75,7 +75,7 @@ is a separate development experiment on the same owned runtime. Its nominal miss
 hover, takes off vertically to 15 m, requests a front transition, flies a cruise leg, requests back
 transition, returns to the back request's capture point, observes settled hover, and lands vertically.
 A turning leg also has an actual completed model campaign. The native `vtol:simulate` command runs
-the nominal route and named cases below. This profile is not a selectable workspace profile.
+the nominal route and named cases below. The same cases are selectable in `/missions`.
 
 ```sh
 ./buddy vtol:simulate
@@ -218,7 +218,7 @@ Task execution time stops during pause. Global endurance and the declared energy
 so a later scheduled resume can be preempted by reserve, endurance, health or authority refusal.
 Operator actions never extend the original planning allowance or rearm revoked authority. The
 named presets above expose specific schedules through `vtol:simulate`. Custom schedules remain
-library inputs, and the common workspace does not select this VTOL profile.
+library inputs. The common workspace selects the same named presets without adding live mission control.
 
 ## Declared transition recovery routes
 
@@ -336,12 +336,40 @@ ratio, voltage-dependent thrust, cell temperature/degradation, current-sensor ca
 capacity remain unmodeled or unqualified. The open-circuit fixture removes pusher demand and thrust;
 it does not model a seized motor's electrical current.
 
+## Mission workspace
+
+Open `/missions`, choose `vtol` and select one of the same 14 named cases as `vtol:simulate`.
+The six source/manual/host faults also expose `front`, `cruise`, `back` and `landing` injection
+phases. The optional electrical checkbox selects the fictional 100 Wh model. Changing the vehicle,
+scenario, fault phase or electrical selection clears the previous recording.
+
+The workspace shows the validated worst-case time and energy allowance, requested modes and counted
+`onFailure` routes before running. Record a case, then move the time cursor to inspect estimated
+position, operator actions, request-bound controller observations and their capture epochs. The mode
+table retains changes and confirmations. The last mode observation includes its age at the cursor;
+it does not assert a continuously measured current phase.
+
+With the electrical model enabled, each row uses the runtime's already qualified sensor capture.
+Used chemical energy, source/load power, current, terminal voltage and the age-charged remaining
+lower bound are displayed with capture and observation times. A missing capture stays missing.
+Host loss freezes host readings while the independent modeled board expires its output lease.
+
+The final outcome and mission state retain their actual meanings. A matched abort case remains
+`blocked` / `aborted`, and the held recovery remains `blocked` by global endurance without a landing
+contact. A named outcome match only checks the modeled demonstration. It does not authorize flight.
+
+Both callers construct the case through `createVtolSimulationCase()` in
+`resources/functions/drone/vehicles/vtol/simulation.ts`. Its `run()` returns the recording and the
+same condensed report used by `runVtolSimulation()`. The presentation adapter exposes estimated
+positions and qualified captures, with no plant-position truth shortcut. Playback does not mutate
+the recorded mission, persist a checkpoint or add a physical control endpoint.
+
 ## Remaining implementation
 
 [Issue #12](https://github.com/stacksjs/drone/issues/12) remains open. The experimental nominal
 controller and opt-in recovery routes do not establish complete VTOL support. Complete recovery/abort
-envelopes, fresh-process restoration, identified hybrid power/voltage/cell behavior and
-the common mission workspace still require implementation and qualification. Wind campaigns and
+envelopes, fresh-process restoration and identified hybrid power/voltage/cell behavior still
+require implementation and qualification. Wind campaigns and
 broader mission/envelope coverage remain necessary. Full TECS/soaring, tiltrotor/tailsitter mechanisms,
 helicopters and other airframe families remain separate work. Native board control, measured airframe
 identification, HIL and physical flight require their own evidence.

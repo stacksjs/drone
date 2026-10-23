@@ -1,6 +1,6 @@
 # Owned vehicle runtime
 
-The fixed-wing, ground, surface and subsea profiles execute through one owned raw sensor, estimator,
+The fixed-wing, VTOL, ground, surface and subsea profiles execute through one owned raw sensor, estimator,
 mission, authority and independent modeled board loop. The existing v1 quadcopter mission remains
 compatible. The new v2 graph explicitly declares a vehicle, arrival speed and settling conditions,
 contact-gated land/stop, scoped payload commands and longest-path energy/time budgets.
@@ -65,8 +65,8 @@ covers the hover-only command and an experimental lift-and-cruise library profil
 `vtol:simulate` command for nominal and named fault/operator scenarios. The latter
 executes a bounded modeled front/cruise/back/vertical-landing route with stable-phase pause and
 resume, plus explicitly declared hover-and-land transition recovery. Complete recovery/abort
-envelopes, measured hybrid energy qualification,
-a VTOL selection in the common workspace remain open. Helicopter,
+envelopes and measured hybrid energy qualification remain open. The common workspace now includes
+the same VTOL cases, phase selection, counted recovery edges and captured mode/battery playback. Helicopter,
 soaring, blimp and other airframe families remain explicit roadmap work.
 
 Read [air](vehicles-air.md), [ground](vehicles-ground.md), [surface](vehicles-surface.md), [subsea](vehicles-subsea.md),

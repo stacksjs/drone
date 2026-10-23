@@ -79,6 +79,7 @@
     "./unit/vtol-cli.test.ts",
     "./unit/vtol-transition-cli.test.ts",
     "./unit/vtol-scenarios.test.ts",
+    "./unit/vtol-workspace.test.ts",
     "./unit/vtol-mode-mission.test.ts",
     "./unit/vtol-transition.test.ts",
     "./unit/ground.test.ts",

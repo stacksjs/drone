@@ -51,7 +51,7 @@ profile remains neutral-only. The owned [sensor pipeline](sensors.md),
 journals verified metadata and prepares owned image candidates. Physical board
 installation, persistent boot selection and recovery require separate qualification.
 The [library API](api.md) describes behavior extensions. The
-[shared vehicle contract](vehicles.md) covers quadcopter, fixed-wing, ground,
+[shared vehicle contract](vehicles.md) covers quadcopter, fixed-wing, VTOL, ground,
 surface and subsea profiles. [Optional external drivers](drivers.md) have
 [acknowledged protocol services](driver-protocols.md); scripted peers are distinct
 from [firmware SITL](sitl.md) and physical testing.
@@ -60,8 +60,9 @@ The separate [VTOL development guide](vehicles-vtol.md) covers the hover-only an
 named fault/operator scenarios, and an
 experimental TypeScript library profile for modeled front transition, cruise, back transition and
 vertical landing, with stable-phase pause/resume and explicitly declared hover-and-land recovery
-routes. Complete recovery/abort envelopes, hybrid energy qualification and the common VTOL mission
-workspace remain open.
+routes. The common `/missions` workspace selects the same named cases and displays captured mode
+observations and optional battery readings. Complete recovery/abort envelopes and measured hybrid
+energy qualification remain open.
 
 ## Explore a workflow
 
