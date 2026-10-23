@@ -18,7 +18,9 @@ a scripted peer does not establish that a pinned autopilot firmware implements e
 Do not add a database transaction queue, HTTP arm endpoint or dependency on an external autopilot
 to our own runtime or mission engine.
 
-Keep serial/TCP, command-specific behavior, complete mission/parameter variants, key lifecycle,
-FTP/log/event/time/RTCM services and payload/ROS/CAN gateways as explicit remaining sub-capabilities.
+The initial slice deferred serial and TCP. Explicit loopback TCP was subsequently implemented with
+scripted peers and shared protocol transactions; see the [TCP qualification record](../validation.md#tcp-transport-software-slice).
+Serial, actual firmware transport campaigns, command-specific behavior, complete mission/parameter
+variants, key lifecycle, FTP/log/event/time/RTCM services and payload/ROS/CAN gateways remain open.
 See [the driver contract and limits](../driver-protocols.md) and
 [retained conformance evidence](https://github.com/stacksjs/drone/blob/main/docs/driver-protocol-evidence.json).
