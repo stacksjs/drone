@@ -66,8 +66,10 @@ energy qualification remain open.
 
 The published VTOL scenarios include bounded 2 m/s headwind and tailwind routes,
 plus east/west crosswind plans with explicit wind-facing back-hover headings.
-The original fixed north-facing crosswind plans remain limit cases with blocked
-envelope outcomes. These fictional plans do not establish arbitrary-wind support.
+With startup wind onset, the original fixed north-facing crosswind plans remain
+limit cases with blocked envelope outcomes. The CLI and mission workspace also
+expose phase-bound wind onset; landing-only onset completes those fixed-heading
+plans. These fictional plans do not establish arbitrary-wind support.
 See the [scenario commands and expected outcomes](vehicles-vtol.md) before comparing reports.
 
 ## Explore a workflow
