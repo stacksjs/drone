@@ -55,19 +55,22 @@ restart forward-flight braking during a reverse position return.
 
 The library campaign applies sustained 2 m/s headwind or tailwind to the actual world model from
 1000 ms, including takeoff, transitions, cruise and landing. Both routes complete within their
-original budgets using the raw sensor/estimator/controller runtime. Four named cases are shared by
+original budgets using the raw sensor/estimator/controller runtime. Six named cases are shared by
 Buddy, the copied standalone CLI and the mission workspace:
 
-| Scenario | World wind N/E/D, m/s | Required recorded outcome |
-| --- | --- | --- |
-| `headwind-2mps` | -2, 0, 0 | Completed route and contact |
-| `tailwind-2mps` | 2, 0, 0 | Completed route and contact |
-| `east-crosswind-limit-2mps` | 0, 2, 0 | Blocked back-transition envelope, no hover/landing claim |
-| `west-crosswind-limit-2mps` | 0, -2, 0 | Blocked back-transition envelope, no hover/landing claim |
+| Scenario | World wind N/E/D, m/s | Back-hover heading from north | Required recorded outcome |
+| --- | --- | --- | --- |
+| `headwind-2mps` | -2, 0, 0 | 0 rad, north | Completed route and contact |
+| `tailwind-2mps` | 2, 0, 0 | 0 rad, north | Completed route and contact |
+| `east-crosswind-limit-2mps` | 0, 2, 0 | 0 rad, north | Blocked back-transition envelope, no hover/landing claim |
+| `west-crosswind-limit-2mps` | 0, -2, 0 | 0 rad, north | Blocked back-transition envelope, no hover/landing claim |
+| `east-crosswind-2mps` | 0, 2, 0 | -pi/2 rad, west | Completed route and contact |
+| `west-crosswind-2mps` | 0, -2, 0 | +pi/2 rad, east | Completed route and contact |
 
 ```sh
 ./buddy vtol:simulate --scenario tailwind-2mps --electrical
 ./buddy vtol:simulate --scenario east-crosswind-limit-2mps --electrical
+./buddy vtol:simulate --scenario east-crosswind-2mps --electrical
 ./storage/runtime-build/cli/drone vtol:simulate --scenario headwind-2mps --electrical
 ```
 
@@ -89,12 +92,30 @@ profile.faults = (_scenario, atMs) => ({ windMps: atMs >= 1000 ? [2, 0, 0] : [0,
 const result = runVehicleSimulation(profile, { seconds: 160 })
 ```
 
-The east/west crosswind experiments still reach the back-transition envelope guard
-without confirmed hover or landing. Their yaw excursions and eventual pitch limits remain unsupported
-outcomes. Neutral outputs at those airborne failures do not establish a safe landing. Wider wind directions,
-onset phases and planning/heading feasibility remain in
-[#87](https://github.com/stacksjs/drone/issues/87). No arbitrary-wind, measured-airframe or physical
-flight acceptance is claimed.
+The original fixed north-facing east/west crosswind plans still reach the back-transition
+envelope guard without confirmed hover or landing. During the east case's reverse return at 38,000 ms,
+the modeled aerodynamic yaw moment is approximately -0.729 Nm while the fully allocated opposing
+rotor yaw moment is only +0.416 Nm, with the rudder at its +0.4 rad bound. The qualified airflow capture
+is 60 ms old, attitude 20 ms and position 100 ms, within the unchanged source guards. This is an
+observed authority shortage, not evidence of a mismatched capture frame.
+
+A separate level-hover calculation with the same 2 m/s crosswind and full opposing rudder leaves
+-0.736 Nm of aerodynamic yaw moment. Lift rotors preserving the fictional 24.517 N weight support
+can oppose at most +0.470 Nm. This worked example does not establish a full steady-flight feasibility
+envelope, but changing gains cannot supply the missing torque in that condition. Neutral outputs
+at the original airborne failure do not establish a safe landing.
+
+The two wind-facing plans change only the declared back-hover heading and plan identity. They use
+the existing `vtol-mode.headingRad` mission contract and unchanged controller, model, reserve and
+finite budgets. The front heading remains north. These plans complete the source-qualified modeled hover
+confirmation and contact route in the declared wind. Their extra `backHeadingRad` declaration and
+`backHeadingMatched` check bind qualification to the actual recorded plan; a completed route under
+a different heading remains unmatched. No automatic heading substitution or retry is performed.
+The original `*-limit-2mps` cases keep their prior plans and blocked outcomes.
+
+Wider wind directions, onset phases, a general feasibility planner and full-angle model qualification
+remain in [#87](https://github.com/stacksjs/drone/issues/87). No arbitrary-wind, measured-airframe or
+physical flight acceptance is claimed.
 
 The hover demonstration commands the pusher and three surfaces to zero. Calibrated modeled raw
 IMU/GNSS samples feed the owned estimator. The controller receives estimated pose, a current qualified
@@ -400,7 +421,7 @@ it does not model a seized motor's electrical current.
 
 ## Mission workspace
 
-Open `/missions`, choose `vtol` and select one of the same 18 named cases as `vtol:simulate`.
+Open `/missions`, choose `vtol` and select one of the same 20 named cases as `vtol:simulate`.
 The six source/manual/host faults also expose `front`, `cruise`, `back` and `landing` injection
 phases. The optional electrical checkbox selects the fictional 100 Wh model. Changing the vehicle,
 scenario, fault phase or electrical selection clears the previous recording.
@@ -411,9 +432,11 @@ position, operator actions, request-bound controller observations and their capt
 table retains changes and confirmations. The last mode observation includes its age at the cursor;
 it does not assert a continuously measured current phase.
 
-Wind playback shows the declared vector/onset, the actual world exposure check and the expected
-completed-route or envelope-stop outcome. The wind is a fixture input, not a measured wind estimate.
-Crosswind limit recordings retain their blocked status and unsupported-envelope disclosure.
+Task playback shows each requested VTOL heading in radians from north. Wind playback shows
+the declared vector/onset, the actual world exposure check and the expected completed-route or
+envelope-stop outcome. The explicit wind-facing plans also show their back heading and recorded-plan
+binding. The wind is a fixture input, not a measured wind estimate. The separate fixed-heading
+crosswind limit recordings retain their blocked status and unsupported-envelope disclosure.
 
 With the electrical model enabled, each row uses the runtime's already qualified sensor capture.
 Used chemical energy, source/load power, current, terminal voltage and the age-charged remaining

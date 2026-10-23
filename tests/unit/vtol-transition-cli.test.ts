@@ -17,6 +17,8 @@ test('CI qualifies nominal and failure full-route commands outside the checkout'
     { command: '$GITHUB_WORKSPACE/storage/runtime-build/cli/drone vtol:simulate --scenario tailwind-2mps --electrical', directory: '${{ runner.temp }}' },
     { command: '$GITHUB_WORKSPACE/storage/runtime-build/cli/drone vtol:simulate --scenario east-crosswind-limit-2mps --electrical', directory: '${{ runner.temp }}' },
     { command: '$GITHUB_WORKSPACE/storage/runtime-build/cli/drone vtol:simulate --scenario west-crosswind-limit-2mps --electrical', directory: '${{ runner.temp }}' },
+    { command: '$GITHUB_WORKSPACE/storage/runtime-build/cli/drone vtol:simulate --scenario east-crosswind-2mps --electrical', directory: '${{ runner.temp }}' },
+    { command: '$GITHUB_WORKSPACE/storage/runtime-build/cli/drone vtol:simulate --scenario west-crosswind-2mps --electrical', directory: '${{ runner.temp }}' },
   ])
 })
 
@@ -146,4 +148,20 @@ test('native wind selectors retain actual exposure and distinct completed or env
   const short = await command(['vtol:simulate', '--scenario', 'tailwind-2mps', '--seconds', '2']).withTimeout(60000)
   expect(short.exitCode).toBe(1)
   expect(JSON.parse(short.stdout).windEvidence.outcomeMatched).toBe(false)
+}, 90000)
+
+test('native wind-aligned plans retain their explicit headings, fresh hover and completed contact', async () => {
+  for (const [scenario, heading] of [['east-crosswind-2mps', -Math.PI / 2], ['west-crosswind-2mps', Math.PI / 2]] as const) {
+    const result = await command(['vtol:simulate', '--scenario', scenario, '--electrical']).withTimeout(60000)
+    expect(result.exitCode).toBe(0)
+    const report = JSON.parse(result.stdout)
+    expect(report.status).toBe('completed')
+    expect(report.demonstrationMatched).toBe(true)
+    expect(report.windEvidence).toMatchObject({ backHeadingRad: heading, backHeadingMatched: true, worldMatched: true, outcomeMatched: true })
+    expect(report.transitionEvidence.map((row: { taskId: string }) => row.taskId)).toEqual(['initial-hover', 'front', 'back'])
+    expect(report.transitionEvidence.at(-1).eventId).toStartWith(`vtol-${scenario}:`)
+    expect(report.landingContact).toBe(true)
+    expect(report.boardNeutral).toBe(true)
+    expect(report.board.physicalActuationEnabled).toBe(false)
+  }
 }, 90000)

@@ -4,7 +4,7 @@ import { createVtolSimulationCase } from '../../resources/functions/drone/vehicl
 
 test('VTOL workspace records the complete modeled route with capture-bound mode acknowledgements', () => {
   const definition = getMissionWorkspaceDefinition('vtol')
-  expect(definition.scenarios).toHaveLength(18)
+  expect(definition.scenarios).toHaveLength(20)
   const run = runMissionWorkspace('vtol')
   expect(run.status).toBe('completed')
   expect(run.physicalActuationEnabled).toBe(false)
@@ -100,3 +100,16 @@ test('the shared VTOL case factory runs isolated sessions and retains the CLI re
   first.result.path[0]!.actuators[0] = 999
   expect(second.result.path[0]!.actuators[0]).not.toBe(999)
 }, 60000)
+
+test('the workspace exposes the explicit crosswind back heading with its completed recording', () => {
+  const definition = getMissionWorkspaceDefinition('vtol', 'east-crosswind-2mps', { electrical: true })
+  expect(definition.planId).toBe('vtol-east-crosswind-2mps')
+  expect(definition.tasks.find(task => task.id === 'back')?.headingRad).toBe(-Math.PI / 2)
+  const run = runMissionWorkspace('vtol', 'east-crosswind-2mps', { electrical: true })
+  if (!('vtol' in run)) throw new Error('Expected VTOL recording')
+  expect(run.status).toBe('completed')
+  expect(run.vtol!.windEvidence).toMatchObject({ windMps: [0, 2, 0], backHeadingRad: -Math.PI / 2, backHeadingMatched: true, worldMatched: true, outcomeMatched: true })
+  expect(run.vtol!.landingContact).toBe(true)
+  expect(run.rows.at(-1)!.state).toBe('completed')
+  expect(run.boardNeutral).toBe(true)
+})
