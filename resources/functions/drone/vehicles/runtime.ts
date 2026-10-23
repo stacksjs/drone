@@ -7,14 +7,31 @@ import { observeMission } from '../missions/engine'
 import { createVehicleMissionEngine, validateVehicleMission } from '../missions/vehicle'
 import { createVehicleAuthoritySupervisor, createVehicleOutputWatchdog } from '../authority/vehicle'
 import { createVehicleMeasurementQualifier, predictVehicleMeasurementPose, vehicleReference } from './measurements'
+type ScheduledMissionAction = { atMs: number, action: Exclude<VehicleMissionAction, 'start'> }
+function captureMissionActions(input: unknown, maximumMs: number): ScheduledMissionAction[] {
+  const invalid = (): never => { throw new TypeError('Invalid vehicle mission action schedule') }
+  if (input === undefined) return []
+  if (!Array.isArray(input) || input.length > 32 || Reflect.ownKeys(input).length !== input.length + 1) invalid()
+  const result: ScheduledMissionAction[] = []
+  let previousMs = 600
+  for (let i = 0; i < input.length; i++) {
+    const slot = Object.getOwnPropertyDescriptor(input, String(i))
+    if (!slot || !('value' in slot) || !slot.value || typeof slot.value !== 'object' || ![Object.prototype, null].includes(Object.getPrototypeOf(slot.value)) || Reflect.ownKeys(slot.value).length !== 2) invalid()
+    const time = Object.getOwnPropertyDescriptor(slot.value, 'atMs'), action = Object.getOwnPropertyDescriptor(slot.value, 'action')
+    if (!time || !('value' in time) || !Number.isSafeInteger(time.value) || time.value <= previousMs || time.value > maximumMs || time.value % 20 !== 0 || !action || !('value' in action) || !['pause', 'resume', 'recover', 'abort'].includes(action.value)) invalid()
+    result.push({ atMs: time.value, action: action.value })
+    previousMs = time.value
+  }
+  return result
+}
 /** Owned raw sensor -> estimator -> mission -> vehicle policy -> authority -> independent board loop. */
-export function runVehicleSimulation(profileInput: VehicleProfile, options: { scenario?: string, seconds?: number, neutralTailMs?: number, missionActions?: readonly { atMs: number, action: Exclude<VehicleMissionAction, 'start'> }[] } = {}) {
+export function runVehicleSimulation(profileInput: VehicleProfile, options: { scenario?: string, seconds?: number, neutralTailMs?: number, missionActions?: readonly ScheduledMissionAction[] } = {}) {
   const scenario = options.scenario ?? profileInput.scenario, seconds = options.seconds ?? 120
   const neutralTailMs = options.neutralTailMs ?? 0
-  const missionActions = options.missionActions ?? []
   let missionActionIndex = 0
   if (!Number.isSafeInteger(neutralTailMs) || neutralTailMs < 0 || neutralTailMs > 15000 || neutralTailMs % 4 !== 0) throw new RangeError('Invalid independent vehicle neutral tail')
   if (!Number.isInteger(seconds) || seconds < 2 || seconds > 180 || scenario !== profileInput.scenario || !profileInput.scenarios.includes(scenario) || profileInput.evidence !== 'modeled-vehicle-profile' || profileInput.physicalFlightEnabled !== false) throw new RangeError('Invalid vehicle simulation profile, scenario or duration')
+  const missionActions = captureMissionActions(options.missionActions, seconds * 1000)
   const { plan, worstCaseMs, requiredWh } = validateVehicleMission(profileInput.mission)
   if (profileInput.vehicle !== plan.vehicle || plan.origin.latitudeDeg !== 0 || plan.origin.longitudeDeg !== 0 || plan.origin.ellipsoidHeightM !== 100) throw new TypeError('Vehicle fixture requires its declared 0,0,100 WGS84 origin')
   const hasTransitions = plan.tasks.some(task => task.kind === 'vtol-mode')
