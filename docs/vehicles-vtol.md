@@ -11,6 +11,7 @@ profiles in the `/missions` workspace.
 ./buddy vtol:hover
 ./buddy vtol:hover --scenario host-loss
 ./buddy vtol:hover --scenario imu-loss
+./buddy vtol:hover --electrical
 ```
 
 The native Stacks command defaults to 60 virtual seconds. It accepts `hover`, `imu-loss`,
@@ -25,6 +26,7 @@ The copied standalone CLI registers the same command definition:
 ```sh
 bun run runtime:cli
 ./storage/runtime-build/cli/drone vtol:hover
+./storage/runtime-build/cli/drone vtol:hover --electrical
 ```
 
 ## Model and measurements
@@ -50,8 +52,9 @@ RC takeover, kill and sensor loss revoke shared authority. Host death leaves its
 stale while the independently ticking modeled board expires the output lease.
 
 The mission's 50 Wh capacity, 1200 W ceiling and 30% reserve are declared budget inputs for this
-fictional hover experiment. They are not identified electrical power, measured endurance or a
-complete hybrid energy model. Neutral outputs during an airborne fault do not establish a safe
+fictional hover experiment. The default retains a constant declared-ceiling charge. The optional
+electrical model below supplies fictional propulsion/battery dynamics and delayed energy measurements.
+Neither mode identifies hardware power or measured endurance. Neutral outputs during an airborne fault do not establish a safe
 emergency landing. Physical flight commands remain disabled.
 
 ## Explicit hover observation in library plans
@@ -96,8 +99,8 @@ requires wrapped heading error within 0.1 rad for the complete 500 ms dwell. Hov
 therefore have a finite 45-second ceiling; front requests retain 15 seconds. The original 15-second
 back budget still fails without retry or a claimed landing. This is a virtual task allowance,
 not a wall-clock test timeout. The complete declared mission budget is 131,520 ms, or 43.84 Wh at its
-1200 W ceiling, with 100 Wh capacity and 30% reserve. These remain declared planning values, without
-a complete hybrid electrical-power law or measured battery identification.
+1200 W ceiling, with 100 Wh capacity and 30% reserve. These remain declared planning values. Select
+the optional electrical law below for modeled consumption; measured battery identification remains open.
 
 The experiment keeps the 2 m transition-height deviation, 0.6 rad roll, 0.5 rad pitch and 22 m/s
 speed guards. Its own target range is bounded to 400 m. The quadcopter and hover development kernel's
@@ -196,7 +199,7 @@ airborne. A separately declared 35-second allowance completes after about 26.94 
 the complete 156,520 ms / 52.1733 Wh worst-case plan. A normal 45-second back plus 45-second recovery
 hover and 35-second landing exceeds the unchanged 180-second graph cap and is rejected. The phase
 abort/pause/recover campaigns instead declare 40-second recovery hover and 30-second landing, fitting
-176,520 ms / 58.84 Wh. These remain declared 1200 W planning charges, without identified electrical
+176,520 ms / 58.84 Wh. These remain conservative 1200 W planning charges, without identified electrical
 power or measured battery endurance.
 
 Sensor loss, reference/clock guards, RC takeover, kill, fence, reserve and global endurance remain
@@ -204,11 +207,72 @@ authoritative during recovery. Host loss still produces a stale host snapshot an
 lease expiry. Fault-induced neutral outputs do not become a landing claim. These bounded library
 campaigns do not qualify arbitrary wind, failed lift rotors, every transition state or physical recovery.
 
+## Fictional electrical model
+
+Select `--electrical` in the hover command, or pass `{ electrical: true }` to
+`createVtolHoverProfile('hover', options)` or `createVtolTransitionProfile(options)` in TypeScript.
+The default/disabled profiles keep their prior reports and declared-ceiling energy accounting.
+The same hover option runs through Buddy and the copied standalone CLI. Full transition execution
+remains a library feature.
+
+Each session owns its electrical state. The plant uses actual lagged individual rotor and pusher
+thrust, with these declared coefficients:
+
+| Source | Fictional law |
+| --- | --- |
+| Each of four lift motors | `4 * thrustN ** 1.5` W |
+| Independent pusher | `5 * thrustN ** 1.5` W |
+| Avionics and idle auxiliaries | 12 W |
+| Each surface | `3 * abs(deflectionRad) / 0.4` W |
+| Open-circuit voltage | 20 to 24 V, linear in remaining chemical energy fraction |
+| Series resistance | 0.04 ohm |
+
+The low-current solution of `loadW = (openCircuitV - currentA * resistanceOhm) * currentA`
+sets terminal voltage and current. Chemical source power is `openCircuitV * currentA`, including
+series loss. The four motors, full pusher and all surfaces together draw 948.023527 W at the load.
+At the minimum open-circuit voltage their chemical source demand is 1060.486740 W, rounded upward
+to a **1061 W envelope**. This is an analytic bound on this fictional law, not a motor/battery rating.
+The 20 to 24 V open-circuit range is a simulation parameter; the hardware list's 4S pack retains
+its own specification.
+
+Before session allocation, the runtime requires a planning ceiling at least this envelope and
+capacity matching the captured plant declaration. Existing longest-path graph validation charges
+the complete declared ceiling across normal and supported failure/recovery/landing routes. With the
+1200 W planning ceiling, the normal route is 43.84 Wh and the declared back-abort route is 58.84 Wh.
+At 50% reserve of 100 Wh, the former fits and the latter is refused before resources are created.
+The front-failure path is shorter than the normal route, so it does not increase that worst-case budget.
+
+The plant integrates chemical source energy on its independent 4 ms steps. Before remaining energy
+cannot fund one complete worst-case step, propulsion demand is cut and latched. Retained motor response
+may coast down; it cannot rearm from a voltage rebound. Auxiliary draw continues to exhaustion.
+Rejected rigid-body integration commits neither body nor electrical state.
+
+Battery data travels through existing delayed, sequence/reference/capture-qualified measurements.
+Energy use rounds upward to micro-watt-hours; current/voltage/load use declared milli-unit quantization.
+The common qualifier rejects missing, nonfinite, inconsistent, over-envelope or decreasing consumption.
+The authority and mission receive a conservative remaining-energy bound after charging the maximum
+source envelope over the measurement's age. A reported supply cutoff withdraws authority even if
+chemical capacity remains. Source loss never substitutes a full battery.
+
+Reports add `energy.model` and `energy.lastObservation`. `energyUsedWh` belongs to its capture epoch;
+`remainingWhLowerBound` and `remainingPercentLowerBound` include the worst-case age charge at
+`observedAtMs`. Host loss leaves this host observation unchanged while independent plant consumption
+and board expiry continue. Mission-policy replay uses the recorded battery observations; it does not
+reconstruct the electrical plant from a mission trace alone.
+
+Actual model campaigns cover combined front demand, all nominal phases, open-circuit pusher timeout, initial/front/back abort
+landing, held recovery/resume, global endurance during pause, supply cutoff, bad battery observations,
+reserve, host loss and independent sessions. The nominal example's front peak is 347.313 W; its
+last captured use is about 4.62 Wh. Neither value predicts aircraft endurance. Motor/propeller advance
+ratio, voltage-dependent thrust, cell temperature/degradation, current-sensor calibration and measured
+capacity remain unmodeled or unqualified. The open-circuit fixture removes pusher demand and thrust;
+it does not model a seized motor's electrical current.
+
 ## Remaining implementation
 
 [Issue #12](https://github.com/stacksjs/drone/issues/12) remains open. The experimental nominal
 controller and opt-in recovery routes do not establish complete VTOL support. Complete recovery/abort
-envelopes, fresh-process restoration, the complete hybrid power/reserve model, native transition CLI and
+envelopes, fresh-process restoration, identified hybrid power/voltage/cell behavior, native transition CLI and
 the common mission workspace still require implementation and qualification. Wind campaigns and
 broader mission/envelope coverage remain necessary. Full TECS/soaring, tiltrotor/tailsitter mechanisms,
 helicopters and other airframe families remain separate work. Native board control, measured airframe

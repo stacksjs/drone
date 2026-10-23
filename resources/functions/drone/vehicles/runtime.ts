@@ -1,12 +1,12 @@
 import type { EstimatorSnapshot } from '../estimation/estimator'
 import type { ImuMeasurement, SensorVector } from '../sensors/types'
-import type { VehicleControlOutput, VehicleControllerContext, VehicleMeasurement, VehicleMeasurementPose, VehicleMissionAction, VehicleProfile, VehicleVtolTransitionObservation } from './types'
+import type { VehicleBatteryObservation, VehicleControlOutput, VehicleControllerContext, VehicleMeasurement, VehicleMeasurementPose, VehicleMissionAction, VehicleProfile, VehicleVtolTransitionObservation } from './types'
 import { createPhysicsSensorFeed } from '../controls/sensors'
 import { createEstimator } from '../estimation/estimator'
 import { observeMission } from '../missions/engine'
 import { createVehicleMissionEngine, validateVehicleMission } from '../missions/vehicle'
 import { createVehicleAuthoritySupervisor, createVehicleOutputWatchdog } from '../authority/vehicle'
-import { createVehicleMeasurementQualifier, predictVehicleMeasurementPose, vehicleReference } from './measurements'
+import { captureVehicleBatteryModel, createVehicleMeasurementQualifier, observeVehicleBattery, predictVehicleMeasurementPose, vehicleReference } from './measurements'
 type ScheduledMissionAction = { atMs: number, action: Exclude<VehicleMissionAction, 'start'> }
 function captureMissionActions(input: unknown, maximumMs: number): ScheduledMissionAction[] {
   function invalid(): never { throw new TypeError('Invalid vehicle mission action schedule') }
@@ -33,6 +33,7 @@ export function runVehicleSimulation(profileInput: VehicleProfile, options: { sc
   if (!Number.isInteger(seconds) || seconds < 2 || seconds > 180 || scenario !== profileInput.scenario || !profileInput.scenarios.includes(scenario) || profileInput.evidence !== 'modeled-vehicle-profile' || profileInput.physicalFlightEnabled !== false) throw new RangeError('Invalid vehicle simulation profile, scenario or duration')
   const missionActions = captureMissionActions(options.missionActions, seconds * 1000)
   const { plan, worstCaseMs, requiredWh } = validateVehicleMission(profileInput.mission)
+  const batteryModel = captureVehicleBatteryModel(profileInput.batteryModel, plan.power)
   if (profileInput.vehicle !== plan.vehicle || plan.origin.latitudeDeg !== 0 || plan.origin.longitudeDeg !== 0 || plan.origin.ellipsoidHeightM !== 100) throw new TypeError('Vehicle fixture requires its declared 0,0,100 WGS84 origin')
   const hasTransitions = plan.tasks.some(task => task.kind === 'vtol-mode')
   let transitionObservation: VehicleVtolTransitionObservation | null = null
@@ -43,11 +44,12 @@ export function runVehicleSimulation(profileInput: VehicleProfile, options: { sc
   const supervisor = createVehicleAuthoritySupervisor({ bootId: 55n, sessionId: 123n, vehicle: profileInput.vehicle, actuators, fence })
   const board = createVehicleOutputWatchdog({ bootId: 55n, sessionId: 123n, vehicle: profileInput.vehicle, actuators })
   const feed = createPhysicsSensorFeed(0), estimator = createEstimator({ origin: plan.origin, gravityCorrection: 'initialization-only' })
-  const qualifier = createVehicleMeasurementQualifier(profileInput.vehicle)
+  const qualifier = createVehicleMeasurementQualifier(profileInput.vehicle, batteryModel ?? undefined)
   const observedSensors = { imu: 0, gnss: 0 }, sensorSequences = { imu: 0, gnss: 0 }
   let truth = plant.snapshot(), mission = engine.snapshot()
   let estimate: EstimatorSnapshot = estimator.snapshot(0)
   let measurement: VehicleMeasurement | null = null, measurementPose: VehicleMeasurementPose | null = null
+  let batteryObservation: VehicleBatteryObservation | null = null
   const queue: { measurement: VehicleMeasurement, pose: VehicleMeasurementPose | null }[] = []
   const requested = new Set<string>()
   let status: 'completed' | 'blocked' | 'host-lost' | 'duration-exhausted' = 'duration-exhausted', fault: string | null = null, hostLostAt: number | null = null
@@ -91,14 +93,19 @@ export function runVehicleSimulation(profileInput: VehicleProfile, options: { sc
       try { qualified = qualifier.qualify(measurement, nowMs, reference) }
       catch (error) { fault ??= error instanceof Error ? error.message : 'vehicle-sensor-envelope'; measurementPose = null }
       measurement = qualified
+      if (batteryModel && qualified) {
+        batteryObservation = observeVehicleBattery(qualified, batteryModel, nowMs)
+        if (batteryObservation.cutoff) fault ??= 'modeled-battery-supply-cutoff'
+      }
       if (navigation) estimate = navigation.update(baseEstimate, qualified, nowMs)
       if (nowMs < 600) continue
-      const b = board.snapshot(), batteryPercent = 100 - plan.power.maxW * Math.max(0, nowMs - 600) / 3600000 / plan.power.availableWh * 100
+      const b = board.snapshot()
+      const batteryPercent = batteryModel ? qualified && batteryObservation && !batteryObservation.cutoff ? batteryObservation.remainingPercentLowerBound : 0 : 100 - plan.power.maxW * Math.max(0, nowMs - 600) / 3600000 / plan.power.availableWh * 100
       const observation = { kind: 'simulation' as const, nowMs, estimate,
         runtime: { bootId: b.bootId, capturedAtMs: nowMs, watchdogHealthy: b.fault === null },
         rc: { capturedAtMs: nowMs, connected: true, armSwitch: true, override: faults.rcOverride ?? false },
         interlocks: { capturedAtMs: qualified?.capturedAtMs ?? nowMs - 1000, killActive: faults.kill ?? false, onGround: qualified?.values.onSurface === true, motorsStopped: qualified?.values.stopped === true },
-        battery: { capturedAtMs: nowMs, remainingPercent: batteryPercent }, link: { capturedAtMs: nowMs, connected: !faults.linkLost } }
+        battery: { capturedAtMs: batteryModel ? qualified?.capturedAtMs ?? nowMs - 1000 : nowMs, remainingPercent: batteryPercent }, link: { capturedAtMs: nowMs, connected: !faults.linkLost } }
       const send = (action: 'arm' | 'engage' | 'renew' | 'disarm', targetM = mission.targetM) => {
         const s = supervisor.snapshot()
         return supervisor.update(observation, { version: 1, sessionId: s.sessionId, bootId: s.bootId, epoch: s.epoch, sequence: s.sequence + 1, issuedAtMs: nowMs, action, mode: 'position', leaseMs: 100, target: { positionM: targetM ?? [0, 0, 0], yawRad: 0 } })
@@ -143,5 +150,5 @@ export function runVehicleSimulation(profileInput: VehicleProfile, options: { sc
     session.observeIndependent?.(structuredClone(truth), nowMs, [...boardState.actuators], false)
     finalAtMs = nowMs
   }
-  return { version: 1, evidence: 'owned-vehicle-physics-simulation' as const, physicalFlightEnabled: false as const, boardOutputsInhibited: true as const, vehicle: profileInput.vehicle, scenario, status, fault, navigationEvidence: { observedSensors, datum: estimate.localPosition?.altitudeDatum ?? null, quality: [...estimate.quality], localPositionHealthy: estimate.health.localPosition }, mission, trace: engine.trace(), path, transitions, budget: { worstCaseMs, requiredWh }, authority: supervisor.snapshot(), board: board.snapshot(), finalTruthPositionM: [...truth.positionM] as SensorVector }
+  return { version: 1, evidence: 'owned-vehicle-physics-simulation' as const, physicalFlightEnabled: false as const, boardOutputsInhibited: true as const, vehicle: profileInput.vehicle, scenario, status, fault, navigationEvidence: { observedSensors, datum: estimate.localPosition?.altitudeDatum ?? null, quality: [...estimate.quality], localPositionHealthy: estimate.health.localPosition }, mission, trace: engine.trace(), path, transitions, budget: { worstCaseMs, requiredWh }, authority: supervisor.snapshot(), board: board.snapshot(), finalTruthPositionM: [...truth.positionM] as SensorVector, ...(batteryModel ? { energy: { evidence: 'modeled-vehicle-battery-v1' as const, model: batteryModel, lastObservation: batteryObservation } } : {}) }
 }

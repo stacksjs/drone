@@ -27,6 +27,22 @@ export interface VehicleMeasurement {
   receivedAtMs: number
   values: Record<string, number | boolean | string | number[]>
 }
+export interface VehicleBatteryModel { evidence: 'modeled-vehicle-battery-v1', capacityWh: number, maximumSourceW: number }
+export interface VehicleBatteryObservation {
+  evidence: 'modeled-vehicle-battery-v1'
+  observedAtMs: number
+  capturedAtMs: number
+  sequence: number
+  reference: string
+  energyUsedWh: number
+  remainingWhLowerBound: number
+  remainingPercentLowerBound: number
+  sourcePowerW: number
+  loadPowerW: number
+  currentA: number
+  terminalV: number
+  cutoff: boolean
+}
 export type VehiclePayloadOperation = 'camera-still' | 'material-drop' | 'water-sample' | 'mower-enable' | 'mower-disable' | 'inspection-capture'
 export interface VehiclePayloadCommand { eventId: string, taskId: string, operation: VehiclePayloadOperation, containerId: string | null, issuedAtMs: number, expiresAtMs: number, positionM: SensorVector, reference: string }
 export interface VehiclePayloadAck { eventId: string, taskId: string, operation: VehiclePayloadOperation, containerId: string | null, capturedAtMs: number, reference: string, positionM: SensorVector, outcome: 'confirmed' | 'rejected' | 'uncertain', metadata?: Record<string, number | string | boolean> }
@@ -126,6 +142,8 @@ export interface VehicleProfile {
   actuators: VehicleActuator[]
   authorityFence: { radiusM: number, minDownM: number, maxDownM: number }
   mission: VehicleMissionPlan
+  /** Optional captured source envelope. Legacy profiles retain declared-ceiling energy accounting. */
+  batteryModel?: VehicleBatteryModel
   scenarios: readonly string[]
   /** Allocate independent mutable state for each execution. Never reuse a session for another run. */
   createSession(): VehicleSession

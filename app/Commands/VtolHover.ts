@@ -9,10 +9,11 @@ export default defineCommand({
   options: {
     '--scenario <name>': { description: vtolHoverScenarios.join(', '), default: 'hover' },
     '--seconds <n>': { description: 'Maximum virtual duration, 2..180 seconds', default: '60' },
+    '--electrical': { description: 'Use modeled electrical load, battery loss and delayed energy measurements', default: false },
   },
   handle(options) {
     try {
-      const result = runVehicleSimulation(createVtolHoverProfile(options.scenario), { scenario: options.scenario, seconds: Number(options.seconds) })
+      const result = runVehicleSimulation(createVtolHoverProfile(options.scenario, { electrical: options.electrical }), { scenario: options.scenario, seconds: Number(options.seconds) })
       const { trace, path, ...report } = result
       const expectedStatus = options.scenario === 'hover' ? 'completed' : options.scenario === 'host-loss' ? 'host-lost' : 'blocked'
       const observedFlight = path.some(row => row.truthPositionM[2] < -1 && row.actuators.slice(0, 4).some(n => n > 0))

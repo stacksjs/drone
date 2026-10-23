@@ -1,11 +1,15 @@
 import type { VehicleProfile } from '../types'
 import { createVtolPlant, vtolModel } from './plant'
 import { createVtolVehicleHoverController } from './controller'
+import { renderVtolElectricalMeasurement, vtolElectricalMaximumW } from './power'
 export const vtolHoverScenarios = Object.freeze(['hover', 'imu-loss', 'position-loss', 'vehicle-sensor-loss', 'host-loss', 'rc-override', 'kill'] as const)
 
 /** Development hover mission only. Front/cruise/back transitions remain unimplemented. */
-export function createVtolHoverProfile(scenario = 'hover'): VehicleProfile {
+export function createVtolHoverProfile(scenario = 'hover', options: { electrical?: boolean } = {}): VehicleProfile {
   if (!(vtolHoverScenarios as readonly string[]).includes(scenario)) throw new RangeError('Unknown VTOL hover scenario')
+  const electrical = options.electrical
+  if (electrical !== undefined && typeof electrical !== 'boolean') throw new TypeError('Invalid VTOL electrical model selection')
+  const batteryModel = electrical ? Object.freeze({ evidence: 'modeled-vehicle-battery-v1' as const, capacityWh: 50, maximumSourceW: vtolElectricalMaximumW(vtolModel.maxRotorThrustN, vtolModel.maxPusherThrustN) }) : undefined
   return {
     scenario, vehicle: 'vtol', name: 'Owned VTOL hover development', evidence: 'modeled-vehicle-profile', physicalFlightEnabled: false,
     actuators: [
@@ -27,11 +31,12 @@ export function createVtolHoverProfile(scenario = 'hover'): VehicleProfile {
       ],
     },
     scenarios: vtolHoverScenarios,
+    ...(batteryModel ? { batteryModel } : {}),
     createSession() {
-      return { createPlant: createVtolPlant, createController: createVtolVehicleHoverController,
+      return { createPlant: batteryModel ? () => createVtolPlant({ electricalCapacityWh: batteryModel.capacityWh }) : createVtolPlant, createController: createVtolVehicleHoverController,
         renderMeasurement(state, atMs, reference) {
           return { version: 1, evidence: 'modeled-vehicle-sensors', vehicle: 'vtol', sequence: Math.floor(atMs / 20) + 1, reference, capturedAtMs: atMs, receivedAtMs: atMs + 60,
-            values: { onSurface: state.onSurface, stopped: Math.hypot(...state.velocityMps) <= 0.2, airspeedMps: Math.round((state.details.airspeedMps as number) * 1000) / 1000 } }
+            values: { onSurface: state.onSurface, stopped: Math.hypot(...state.velocityMps) <= 0.2, airspeedMps: Math.round((state.details.airspeedMps as number) * 1000) / 1000, ...renderVtolElectricalMeasurement(state) } }
         },
       }
     },
