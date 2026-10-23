@@ -61,8 +61,22 @@ not explain an earlier failure whose Chrome evidence was removed.
   The generated server function registry also loads successfully without duplicate runtime exports.
 - This is scripted protocol-peer conformance, not actual autopilot firmware SITL, flight or HIL.
   [Issue #7](https://github.com/stacksjs/drone/issues/7) remains open for pinned-firmware campaigns,
-  serial/TCP, complete command/mission/parameter variants, persistent signing/key lifecycle and the
+  serial, complete command/mission/parameter variants, persistent signing/key lifecycle and the
   explicit FTP/log/event/time/RTCM/payload/ROS/CAN sub-capabilities. Physical writes remain disabled.
+
+## TCP transport software slice
+
+The optional ArduPilot and PX4 factories also expose explicit loopback TCP. Scripted peer tests
+cover incremental framing, bounded pending writes, link loss, cancellation, signed input and fresh
+session construction after failure. The native `drivers:bench --transport tcp` command uses the same
+protocol implementation as UDP; copied standalone CLI campaigns exercise both firmware identities
+and transports outside the checkout.
+
+This transport slice was published in [b18e1d6](https://github.com/stacksjs/drone/commit/b18e1d63d344452cf45719cf3b4072a752b71bce),
+with its [exact-head qualification run](https://github.com/stacksjs/drone/actions/runs/39870834185).
+These are scripted peer and software-runtime results. They do not qualify actual firmware execution,
+physical writes, serial transport, transparent operation replay or persistent signing state.
+Read the [transport deadlines, queue limits and reconnection contract](driver-protocols.md#tcp-framing-loss-and-reconnection).
 
 ## Simulated authority and failsafe slice
 
