@@ -56,6 +56,9 @@ surface and subsea profiles. [Optional external drivers](drivers.md) have
 [acknowledged protocol services](driver-protocols.md); scripted peers are distinct
 from [firmware SITL](sitl.md) and physical testing.
 
+The separate [VTOL hover development command](vehicles-vtol.md) exercises vertical takeoff,
+hover and landing. Front/cruise/back transitions and the common VTOL mission workspace remain open.
+
 ## Explore a workflow
 
 | Workflow | Current development surface | Guide |

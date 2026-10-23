@@ -61,7 +61,9 @@ recompute mission replay, reject altered traces and exercise payload uncertainty
 All evidence is owned physics simulation. The Pico neutral-only board image does not run these
 TypeScript controllers. Native board execution, external firmware SITL, HIL and measured physical
 vehicle acceptance remain separate gates. VTOL, helicopter, soaring, blimp and other vehicle
-families remain explicit roadmap work.
+families remain explicit roadmap work. A separate [VTOL hover development command](vehicles-vtol.md)
+now exercises vertical takeoff, a nearby hover waypoint and contact-gated landing. It does not
+implement wing transitions or add a VTOL selection to the common workspace.
 
 Read [air](vehicles-air.md), [ground](vehicles-ground.md), [surface](vehicles-surface.md), [subsea](vehicles-subsea.md),
 [mission semantics](missions.md) and [the replacement matrix](roadmap/feature-coverage.md).

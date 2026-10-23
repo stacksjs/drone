@@ -50,6 +50,7 @@ import PatrolReplay from '../app/Commands/PatrolReplay'
 
 import AntennaBench from '../app/Commands/AntennaBench'
 import AirSimulate from '../app/Commands/AirSimulate'
+import VtolHover from '../app/Commands/VtolHover'
 import GroundSimulate from '../app/Commands/GroundSimulate'
 import SurfaceSimulate from '../app/Commands/SurfaceSimulate'
 import SubseaSimulate from '../app/Commands/SubseaSimulate'
@@ -126,6 +127,7 @@ PatrolSimulate(app)
 PatrolReplay(app)
 AntennaBench(app)
 AirSimulate(app)
+VtolHover(app)
 GroundSimulate(app)
 SurfaceSimulate(app)
 SubseaSimulate(app)

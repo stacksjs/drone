@@ -76,6 +76,10 @@ These profiles use owned raw sensors, estimation, mission policy, controls and a
 outputs remain inhibited. Read the [shared contract](docs/vehicles.md), [air model](docs/vehicles-air.md),
 [ground model](docs/vehicles-ground.md) and [surface corrections](docs/vehicles-surface.md) and [subsea pressure/DVL inspection](docs/vehicles-subsea.md).
 
+`./buddy vtol:hover` separately exercises [VTOL hover development](docs/vehicles-vtol.md):
+vertical takeoff, a nearby hover waypoint and contact-gated landing. Wing transitions, cruise,
+hybrid energy qualification and a selectable VTOL mission workspace remain open.
+
 ## Simulated carried load
 
 Characterize a centered or forward point mass, a prescribed separation and native link loss through
