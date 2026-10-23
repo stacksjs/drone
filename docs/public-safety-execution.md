@@ -116,3 +116,32 @@ EXECUTION_BROWSER_QA=true BROWSE_BROWSER=/path/to/google-chrome bun test tests/u
 Native controller and HTTP checks separately cover authority replacement,
 elapsed deadlines, stream capacity, cleanup and durable COMMIT with a withheld
 response. The existing workspace browser scenarios remain required regressions.
+
+### HTTP fixture failure observations
+
+The native HTTP fixture records parent and child Bun identity separately, bounded
+phase timings and the actual settled exit code and signal. Parent and child
+elapsed times have separate local monotonic origins. The original 35,000 ms
+SIGKILL guard and 40,000 ms test limit remain unchanged.
+
+To collect a focused observation in an operator-controlled private directory:
+
+```sh
+EXECUTION_HTTP_EVIDENCE="$HOME/private-drone-http-evidence" bun test tests/unit/public-safety-execution-http-limits.test.ts --test-name-pattern 'native execution HTTP limits nativeRoutes=true'
+```
+
+Successful, fully captured fixtures are removed. A failed fixture or unavailable
+evidence write retains its directory, including available `fixture.stdout`,
+`fixture.stderr` and `lifecycle.json`. Failed fixture databases contain generated
+test credentials and remain private. Evidence write failures are reported without
+replacing the child's settled result.
+
+`watchdogFired` records that the parent's guard callback ran; `watchdogKill`
+records its SIGKILL request. `cleanupKill` records a separate cleanup request.
+The actual child signal and settled status are independent observations. Exit 137
+alone does not identify the kill actor. A missing child runtime record remains
+unknown, including when termination precedes entry-module evaluation.
+
+These observations support the [open HTTP timeout investigation](https://github.com/stacksjs/drone/issues/93).
+They do not establish its original cause or turn a later passing control into a
+fix for an earlier failed run.
