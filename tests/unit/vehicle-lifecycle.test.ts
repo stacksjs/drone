@@ -2,6 +2,8 @@ import { expect, test } from 'bun:test'
 import { createVtolHoverProfile } from '../../resources/functions/drone/vehicles/vtol'
 import { runVehicleSimulation } from '../../resources/functions/drone/vehicles/runtime'
 import { replayVehicleMission } from '../../resources/functions/drone/missions/vehicle'
+import { createVtolTransitionProfile } from '../../resources/functions/drone/vehicles/vtol/transition-profile'
+import type { VehiclePlantState } from '../../resources/functions/drone/vehicles/types'
 
 // Agreed shared-runtime seam: actual sensor/estimator/mission/controller/independent lease
 // execution. This verifies operator lifecycle delivery, not physical pause or recovery.
@@ -83,4 +85,35 @@ test('an empty lifecycle schedule preserves every legacy hover recording and rep
   expect(empty).toEqual(legacy)
   expect(Object.keys(empty)).toEqual(Object.keys(legacy))
   expect(empty.trace.rows.every(row => row.action === null || row.action === 'start')).toBe(true)
+})
+
+
+test('a paused wing-borne VTOL flies a bounded 60 m loiter before resuming its route and landing', () => {
+  const profile = createVtolTransitionProfile(), createSession = profile.createSession
+  const observed: { atMs: number, state: VehiclePlantState }[] = []
+  profile.createSession = () => {
+    const session = createSession()
+    return { ...session, observeIndependent(state, atMs) {
+      if (atMs % 20 === 0 && atMs >= 20000 && atMs < 40000) observed.push({ atMs, state: structuredClone(state) })
+    } }
+  }
+  const report = runVehicleSimulation(profile, { seconds: 160, missionActions: [{ atMs: 20000, action: 'pause' }, { atMs: 40000, action: 'resume' }] })
+  const entry = report.trace.rows.find(row => row.observation.nowMs === 20000)!.observation
+  const course = Math.atan2(entry.velocityMps[1], entry.velocityMps[0])
+  const center = [entry.positionM[0] - 60 * Math.sin(course), entry.positionM[1] + 60 * Math.cos(course)]
+  const settled = observed.filter(row => row.atMs >= 26000)
+  const radialError = Math.max(...settled.map(row => Math.abs(Math.hypot(row.state.positionM[0] - center[0]!, row.state.positionM[1] - center[1]!) - 60)))
+  const paused = report.path.filter(row => row.mission.state === 'paused')
+  console.log('VTOL_PAUSE_LOITER', JSON.stringify({ status: report.status, fault: report.fault, pausedRows: paused.length, settledRows: settled.length, maximumRadialErrorM: radialError }))
+  expect(paused).toHaveLength(1000)
+  expect(settled.length).toBeGreaterThan(600)
+  expect(radialError).toBeLessThan(8)
+  expect(settled.every(row => Math.abs(row.state.positionM[2] + 15) < 2)).toBe(true)
+  expect(settled.every(row => (row.state.details.airspeedMps as number) >= 12 && (row.state.details.airspeedMps as number) <= 14)).toBe(true)
+  expect(settled.every(row => (row.state.details.rotorThrustN as number) < 1)).toBe(true)
+  expect(report.status).toBe('completed')
+  expect(report.finalTruthPositionM[2]).toBe(0)
+  expect(Math.hypot(report.finalTruthPositionM[0] - 180, report.finalTruthPositionM[1])).toBeLessThan(0.3)
+  expect(report.board.actuators).toEqual([0, 0, 0, 0, 0, 0, 0, 0])
+  expect(replayVehicleMission(report.trace).snapshot()).toEqual(report.mission)
 })
