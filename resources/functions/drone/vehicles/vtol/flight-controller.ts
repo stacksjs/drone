@@ -79,8 +79,9 @@ export function createVtolFlightController(): VehicleController {
       const [roll, pitch, yaw] = quaternionEuler(q!), values = measurement!.values
       const speed = values.airspeedMps as number, alpha = values.alphaRad as number, beta = values.betaRad as number
       const landing = phase === 'hover' && c.mission.state === 'running' && c.mission.taskKind === 'land'
-      if (measurement!.values.onSurface && !landing || speed > 22 || Math.abs(roll) > 0.6 || Math.abs(pitch) > 0.5 || speed > 8 && (Math.abs(alpha) > 0.32 || Math.abs(beta) > 0.4) || phase !== 'hover' && Math.abs(position![2] - request!.positionM[2]) > 2) return neutral(c, 'vtol-transition-envelope')
-      if (landing && measurement!.values.onSurface) return output(c, [0, 0, 0, 0, 0, 0, 0, 0], 'vertical-contact')
+      const pausedContact = phase === 'hover' && c.mission.state === 'paused' && values.onSurface === true && values.stopped === true
+      if (measurement!.values.onSurface && !landing && !pausedContact || speed > 22 || Math.abs(roll) > 0.6 || Math.abs(pitch) > 0.5 || speed > 8 && (Math.abs(alpha) > 0.32 || Math.abs(beta) > 0.4) || phase !== 'hover' && Math.abs(position![2] - request!.positionM[2]) > 2) return neutral(c, 'vtol-transition-envelope')
+      if (landing && measurement!.values.onSurface || pausedContact) return output(c, [0, 0, 0, 0, 0, 0, 0, 0], pausedContact ? 'ground-paused' : 'vertical-contact')
       const rotary = phase === 'back-transition' || phase === 'hover'
       let heading = phase === 'front-transition' || rotary ? request!.headingRad : Math.atan2(target![1] - position![1], target![0] - position![0])
       const groundSpeed = Math.hypot(velocity![0], velocity![1])
