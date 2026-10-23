@@ -13,6 +13,10 @@ test('CI qualifies nominal and failure full-route commands outside the checkout'
     { command: '$GITHUB_WORKSPACE/storage/runtime-build/cli/drone vtol:simulate --scenario front-abort --electrical', directory: '${{ runner.temp }}' },
     { command: '$GITHUB_WORKSPACE/storage/runtime-build/cli/drone vtol:simulate --scenario pusher-open-circuit --electrical', directory: '${{ runner.temp }}' },
     { command: '$GITHUB_WORKSPACE/storage/runtime-build/cli/drone vtol:simulate --scenario back-recovery-hold --electrical', directory: '${{ runner.temp }}' },
+    { command: '$GITHUB_WORKSPACE/storage/runtime-build/cli/drone vtol:simulate --scenario headwind-2mps --electrical', directory: '${{ runner.temp }}' },
+    { command: '$GITHUB_WORKSPACE/storage/runtime-build/cli/drone vtol:simulate --scenario tailwind-2mps --electrical', directory: '${{ runner.temp }}' },
+    { command: '$GITHUB_WORKSPACE/storage/runtime-build/cli/drone vtol:simulate --scenario east-crosswind-limit-2mps --electrical', directory: '${{ runner.temp }}' },
+    { command: '$GITHUB_WORKSPACE/storage/runtime-build/cli/drone vtol:simulate --scenario west-crosswind-limit-2mps --electrical', directory: '${{ runner.temp }}' },
   ])
 })
 
@@ -119,4 +123,27 @@ test('native scenario selectors cannot silently become a nominal demonstration',
   expect(report.status).toBe('duration-exhausted')
   expect(report.demonstrationMatched).toBe(false)
   expect(report.scenarioEvidence.faultObserved).toBe(false)
+}, 90000)
+
+test('native wind selectors retain actual exposure and distinct completed or envelope-stop outcomes', async () => {
+  for (const [scenario, status] of [['headwind-2mps', 'completed'], ['tailwind-2mps', 'completed'], ['east-crosswind-limit-2mps', 'blocked'], ['west-crosswind-limit-2mps', 'blocked']] as const) {
+    const result = await command(['vtol:simulate', '--scenario', scenario, '--electrical']).withTimeout(60000)
+    expect(result.exitCode).toBe(0)
+    const report = JSON.parse(result.stdout)
+    expect(report.scenario).toBe(scenario)
+    expect(report.status).toBe(status)
+    expect(report.demonstrationMatched).toBe(true)
+    expect(report.windEvidence.worldMatched).toBe(true)
+    expect(report.windEvidence.outcomeMatched).toBe(true)
+    expect(report.windEvidence.firstAppliedAtMs).toBe(1000)
+    expect(report.landingContact).toBe(status === 'completed')
+    expect(report.board.expiresAtMs).toBeNull()
+    expect(report.board.physicalActuationEnabled).toBe(false)
+  }
+  const invalid = await command(['vtol:simulate', '--scenario', 'headwind-2mps', '--phase', 'back']).withTimeout(60000)
+  expect(invalid.exitCode).toBe(1)
+  expect(invalid.stdout).toBe('')
+  const short = await command(['vtol:simulate', '--scenario', 'tailwind-2mps', '--seconds', '2']).withTimeout(60000)
+  expect(short.exitCode).toBe(1)
+  expect(JSON.parse(short.stdout).windEvidence.outcomeMatched).toBe(false)
 }, 90000)

@@ -121,6 +121,13 @@ function vectorLabel(value: number[] | null | undefined) { return value ? value.
             <h3 id="vtol-evidence-title" class="font-semibold text-sm">Recorded VTOL evidence</h3>
             <p class="mt-2 text-neutral-400 text-xs" data-vtol-demonstration>Named outcome check: {{ vtolResult()?.demonstrationMatched ? 'matched' : 'unmatched' }}. Final qualified landing contact: {{ vtolResult()?.landingContact ? 'observed' : 'not observed' }}.</p>
             <p class="mt-2 leading-relaxed text-neutral-400 text-xs">A matched case can be blocked, aborted or host-lost. These are recorded model observations, not physical flight qualification.</p>
+            <div :if="vtolResult()?.windEvidence" class="mt-5" data-vtol-wind>
+              <h4 class="font-semibold text-sm">Declared world wind</h4>
+              <p class="mt-2 break-words font-mono text-neutral-400 text-xs">LOCAL_NED {{ vectorLabel(vtolResult()?.windEvidence?.windMps) }} m/s, from {{ vtolResult()?.windEvidence?.beginsAtMs }} ms.</p>
+              <p class="mt-2 text-neutral-400 text-xs">World exposure check: {{ vtolResult()?.windEvidence?.worldMatched ? 'matched' : 'unmatched' }}. Expected result: {{ vtolResult()?.windEvidence?.expectedOutcome === 'completed-route' ? 'completed route' : 'back-transition envelope stop' }}.</p>
+              <p class="mt-2 text-neutral-400 text-xs">The wind is a model input. It is not supplied to the controller or reported as a measured wind estimate.</p>
+              <p :if="vtolResult()?.windEvidence?.expectedOutcome === 'envelope-stop'" class="mt-2 leading-relaxed text-amber-200 text-xs" data-vtol-wind-limit>This crosswind remains outside the supported route envelope. A matched stop does not certify hover, contact or a safe landing.</p>
+            </div>
             <p :if="modeObservation()" class="mt-4 break-words font-mono text-sm" data-vtol-mode>{{ modeObservation()?.phase }} / {{ modeObservation()?.outcome }} / {{ modeObservation()?.taskId }}</p>
             <p :if="modeObservation()" class="mt-2 break-words font-mono text-neutral-400 text-xs">Last mode observation captured {{ modeObservation()?.capturedAtMs }} ms, sensor capture {{ modeObservation()?.measurementCapturedAtMs }} ms. Age at cursor: {{ playbackTime() - (modeObservation()?.capturedAtMs || 0) }} ms.</p>
             <p :if="!modeObservation()" class="mt-3 text-neutral-400 text-xs">No recorded mode observation at this time.</p>

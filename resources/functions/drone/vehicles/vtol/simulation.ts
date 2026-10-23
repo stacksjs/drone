@@ -1,6 +1,7 @@
 import { createVtolTransitionProfile } from './transition-profile'
 import { runVehicleSimulation } from '../runtime'
 import type { VehicleMissionAction } from '../types'
+import type { SensorVector } from '../../sensors/types'
 
 const faults = { 'host-loss': 'hostLost', 'imu-loss': 'dropImu', 'position-loss': 'dropPosition', 'vehicle-sensor-loss': 'dropVehicleSensor', 'rc-override': 'rcOverride', 'kill': 'kill' } as const
 interface OperatorCase { actions: readonly { atMs: number, action: Exclude<VehicleMissionAction, 'start'> }[], recovery?: 'front' | 'back', outcome: 'abort' | 'resume' | 'timeout' | 'hold-expiry', openCircuit?: boolean, seconds?: number }
@@ -13,7 +14,14 @@ const operatorCases = {
   'pusher-open-circuit': { actions: [], recovery: 'front', outcome: 'timeout', openCircuit: true },
   'back-recovery-hold': { actions: [{ atMs: 30000, action: 'recover' }], recovery: 'back', outcome: 'hold-expiry', seconds: 180 },
 } as const satisfies Record<string, OperatorCase>
-export const vtolSimulationScenarios = Object.freeze(['nominal', ...Object.keys(faults), ...Object.keys(operatorCases)])
+const windCases = {
+  'headwind-2mps': { windMps: [-2, 0, 0], expectedOutcome: 'completed-route' },
+  'tailwind-2mps': { windMps: [2, 0, 0], expectedOutcome: 'completed-route' },
+  'east-crosswind-limit-2mps': { windMps: [0, 2, 0], expectedOutcome: 'envelope-stop' },
+  'west-crosswind-limit-2mps': { windMps: [0, -2, 0], expectedOutcome: 'envelope-stop' },
+} as const
+const windExposure = () => ({ calmSteps: 0, appliedSteps: 0, mismatchSteps: 0, firstAppliedAtMs: null as number | null, lastAppliedAtMs: null as number | null })
+export const vtolSimulationScenarios = Object.freeze(['nominal', ...Object.keys(faults), ...Object.keys(operatorCases), ...Object.keys(windCases)])
 export const vtolSimulationPhases = Object.freeze(['front', 'cruise', 'back', 'landing'] as const)
 const phases = [
   { phase: 'front', atMs: 13000, taskId: 'front' },
@@ -35,6 +43,9 @@ export function createVtolSimulationCase(scenario = 'nominal', options: VtolSimu
   if (phase === undefined) throw new RangeError('Unknown VTOL simulation phase')
   const profile = createVtolTransitionProfile({ electrical: options.electrical })
   const operator: OperatorCase | undefined = Object.hasOwn(operatorCases, scenario) ? operatorCases[scenario as keyof typeof operatorCases] : undefined
+  const windCase = Object.hasOwn(windCases, scenario) ? windCases[scenario as keyof typeof windCases] : null
+  const wind = windCase ? { frame: 'LOCAL_NED' as const, windMps: [...windCase.windMps] as SensorVector, beginsAtMs: 1000, expectedOutcome: windCase.expectedOutcome } : null
+  let exposure = windExposure()
   const actions = operator?.actions
   if (operator?.recovery) {
     const source = profile.mission.tasks.find(task => task.id === operator.recovery)
@@ -76,9 +87,33 @@ export function createVtolSimulationCase(scenario = 'nominal', options: VtolSimu
       } }
     }
   }
+  if (windCase) {
+    const factory = profile.createSession
+    profile.faults = (_scenario, atMs) => ({ windMps: atMs >= 1000 ? [...windCase.windMps] as SensorVector : [0, 0, 0] })
+    profile.createSession = () => {
+      const session = factory()
+      let appliedWind: SensorVector | null = null
+      return { ...session, createPlant() {
+        const plant = session.createPlant()
+        return { snapshot: () => plant.snapshot(), step(actuators, dtS, world) {
+          const state = plant.step(actuators, dtS, world)
+          appliedWind = [...world.windMps]
+          return state
+        } }
+      }, observeIndependent(state, atMs, actuators, hostAvailable) {
+        session.observeIndependent?.(state, atMs, actuators, hostAvailable)
+        if (!appliedWind || atMs <= 600) return
+        const matches = appliedWind.every((value, index) => value === (atMs >= 1000 ? windCase.windMps[index] : 0))
+        if (!matches) exposure.mismatchSteps++
+        else if (atMs < 1000) exposure.calmSteps++
+        else { exposure.appliedSteps++; exposure.firstAppliedAtMs ??= atMs; exposure.lastAppliedAtMs = atMs }
+      } }
+    }
+  }
   const seconds = options.seconds ?? operator?.seconds ?? 160
-  return { profile, seconds, phase: phase?.phase ?? null, electrical: options.electrical ?? false, run() {
+  return { profile, seconds, phase: phase?.phase ?? null, electrical: options.electrical ?? false, wind: wind ? structuredClone(wind) : null, run() {
     sources.last = null
+    exposure = windExposure()
     const result = runVehicleSimulation(profile, { seconds, missionActions: actions })
     const { trace, path, ...report } = result
     const transitionEvidence = trace.rows.flatMap(row => row.observation.transition?.outcome === 'confirmed' ? [row.observation.transition] : [])
@@ -121,9 +156,12 @@ export function createVtolSimulationCase(scenario = 'nominal', options: VtolSimu
     const globalEnduranceExpired = operator?.outcome === 'hold-expiry' && recoveryCorrelated && confirmed(['initial-hover', 'front', 'recover-hover']) && result.status === 'blocked' && result.mission.state === 'blocked' && result.mission.reason === 'mission-endurance-exhausted' && result.fault === 'mission-endurance-exhausted' && lastAtMs > 600 + result.budget.worstCaseMs && lastAtMs <= 620 + result.budget.worstCaseMs && !landingStarted && observedFlight && !landingContact && boardNeutral
     const operatorPhaseMatched = operator?.recovery ? recoveryCorrelated : tasksBeforeActions.length === 2 && tasksBeforeActions[0]?.taskId === 'cruise-leg' && tasksBeforeActions[0].state === 'running' && tasksBeforeActions[1]?.taskId === 'cruise-leg' && tasksBeforeActions[1].state === 'paused'
     const operatorMatched = !!operator && operatorPhaseMatched && JSON.stringify(actualActions) === JSON.stringify(actions) && (!['resume', 'hold-expiry'].includes(operator.outcome) || observedPaused) && (operator.outcome === 'hold-expiry' ? globalEnduranceExpired : operator.recovery ? recoveredRoute : completedRoute) && (!operator.openCircuit || pusherOpenCircuitObserved)
-    const demonstrationMatched = scenario === 'nominal' ? completedRoute : actions ? operatorMatched : faultObserved && observedFlight && !landingContact && result.mission.state !== 'completed' && boardNeutral
+    const worldMatched = !!wind && exposure.calmSteps > 0 && exposure.appliedSteps > 0 && exposure.firstAppliedAtMs === wind.beginsAtMs && exposure.lastAppliedAtMs === lastAtMs && exposure.mismatchSteps === 0
+    const windOutcomeMatched = !!wind && (wind.expectedOutcome === 'completed-route' ? completedRoute : result.status === 'blocked' && result.fault === 'vtol-transition-envelope' && result.mission.taskId === 'back' && result.mission.state === 'blocked' && result.mission.targetM === null && result.mission.transition === null && confirmed(['initial-hover', 'front']) && observedFlight && !landingContact && boardNeutral)
+    const demonstrationMatched = wind ? worldMatched && windOutcomeMatched : scenario === 'nominal' ? completedRoute : actions ? operatorMatched : faultObserved && observedFlight && !landingContact && result.mission.state !== 'completed' && boardNeutral
     const summary = { ...report, scope: 'development-lift-and-cruise' as const, transitionEvidence, completeTransitions, observedFlight, landingContact, boardNeutral, demonstrationMatched, recordedMissionRows: trace.rows.length, evaluatedPathRows: path.length,
       ...(phase ? { scenarioEvidence: { phase: phase.phase, injectedAtMs: phase.atMs, taskId: before?.mission.taskId ?? null, faultObserved, sources: capturedSources } } : {}),
+      ...(wind ? { windEvidence: { ...structuredClone(wind), ...exposure, worldMatched, outcomeMatched: windOutcomeMatched } } : {}),
       ...(actions ? { operatorEvidence: { actions: actualActions, tasksBeforeActions, phaseMatched: operatorPhaseMatched, observedPaused, matched: operatorMatched, ...(operator?.recovery ? { recoveryCorrelated } : {}), ...(operator?.openCircuit ? { pusherOpenCircuitObserved } : {}), ...(operator?.outcome === 'hold-expiry' ? { globalEnduranceExpired, landingStarted } : {}) } } : {}) }
     return { result, report: summary }
   } }

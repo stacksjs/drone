@@ -84,8 +84,11 @@ mode observations. Named scenarios expose phase-bound sensor/manual/host loss, c
 declared front/back abort and recovery, pusher open-circuit timeout and global endurance expiry.
 Add `--electrical` to either command for fictional propulsion/battery load and delayed energy measurements.
 Plans can explicitly declare bounded hover-and-land transition recovery. Complete recovery/abort envelopes
-and measured hybrid energy qualification remain open. The VTOL workspace selects the same 14 named
+and measured hybrid energy qualification remain open. The VTOL workspace selects the same 18 named
 cases, fault phases and optional electrical model, with captured mode and battery playback.
+The 2 m/s headwind and tailwind cases complete their routes. East/west crosswind limit cases retain
+their blocked envelope outcome, without confirmed hover or landing. Reports and playback distinguish
+declared world wind from observed exposure checks; controller inputs contain no wind oracle.
 
 ## Simulated carried load
 

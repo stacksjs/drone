@@ -51,12 +51,34 @@ thrust while supporting the requested vertical force; high-speed candidate incid
 apply. Replacing a correlated back request preserves rotary capture once reached, so recovery cannot
 restart forward-flight braking during a reverse position return.
 
-### Bounded library wind experiment
+### Bounded wind cases
 
 The library campaign applies sustained 2 m/s headwind or tailwind to the actual world model from
 1000 ms, including takeoff, transitions, cruise and landing. Both routes complete within their
-original budgets using the raw sensor/estimator/controller runtime. This does not add wind selectors
-to the 14 named CLI/workspace cases below. A tailwind library run can be constructed explicitly:
+original budgets using the raw sensor/estimator/controller runtime. Four named cases are shared by
+Buddy, the copied standalone CLI and the mission workspace:
+
+| Scenario | World wind N/E/D, m/s | Required recorded outcome |
+| --- | --- | --- |
+| `headwind-2mps` | -2, 0, 0 | Completed route and contact |
+| `tailwind-2mps` | 2, 0, 0 | Completed route and contact |
+| `east-crosswind-limit-2mps` | 0, 2, 0 | Blocked back-transition envelope, no hover/landing claim |
+| `west-crosswind-limit-2mps` | 0, -2, 0 | Blocked back-transition envelope, no hover/landing claim |
+
+```sh
+./buddy vtol:simulate --scenario tailwind-2mps --electrical
+./buddy vtol:simulate --scenario east-crosswind-limit-2mps --electrical
+./storage/runtime-build/cli/drone vtol:simulate --scenario headwind-2mps --electrical
+```
+
+`windEvidence` retains the declared LOCAL_NED vector and onset, observed calm/applied plant steps,
+first/last matching application epochs, mismatch count and separate world/outcome checks. Actual
+world inputs are observed after plant integration, outside controller inputs. An absent, wrong or
+mistimed wind cannot pass under the scenario name. A partial route remains unmatched. Wind cases
+reject `--phase`; their declared onset is 1000 ms. Exit 0 means the selected demonstration matched,
+so a crosswind limit report still has `status: 'blocked'`, no confirmed back hover and no contact.
+
+A tailwind library run can also be constructed explicitly from a script under `scripts/`:
 
 ```ts
 import { createVtolTransitionProfile } from '../resources/functions/drone/vehicles/vtol/transition-profile'
@@ -67,10 +89,10 @@ profile.faults = (_scenario, atMs) => ({ windMps: atMs >= 1000 ? [2, 0, 0] : [0,
 const result = runVehicleSimulation(profile, { seconds: 160 })
 ```
 
-The same `[0, 2, 0]` m/s crosswind experiment still reaches the back-transition envelope guard
-without confirmed hover or landing. Its yaw excursion and eventual pitch limit remain an unsupported
-case. Neutral outputs at that airborne failure do not establish a safe landing. Wider wind directions,
-onset phases, planning/heading feasibility and named native/workspace cases remain in
+The east/west crosswind experiments still reach the back-transition envelope guard
+without confirmed hover or landing. Their yaw excursions and eventual pitch limits remain unsupported
+outcomes. Neutral outputs at those airborne failures do not establish a safe landing. Wider wind directions,
+onset phases and planning/heading feasibility remain in
 [#87](https://github.com/stacksjs/drone/issues/87). No arbitrary-wind, measured-airframe or physical
 flight acceptance is claimed.
 
@@ -378,7 +400,7 @@ it does not model a seized motor's electrical current.
 
 ## Mission workspace
 
-Open `/missions`, choose `vtol` and select one of the same 14 named cases as `vtol:simulate`.
+Open `/missions`, choose `vtol` and select one of the same 18 named cases as `vtol:simulate`.
 The six source/manual/host faults also expose `front`, `cruise`, `back` and `landing` injection
 phases. The optional electrical checkbox selects the fictional 100 Wh model. Changing the vehicle,
 scenario, fault phase or electrical selection clears the previous recording.
@@ -388,6 +410,10 @@ The workspace shows the validated worst-case time and energy allowance, requeste
 position, operator actions, request-bound controller observations and their capture epochs. The mode
 table retains changes and confirmations. The last mode observation includes its age at the cursor;
 it does not assert a continuously measured current phase.
+
+Wind playback shows the declared vector/onset, the actual world exposure check and the expected
+completed-route or envelope-stop outcome. The wind is a fixture input, not a measured wind estimate.
+Crosswind limit recordings retain their blocked status and unsupported-envelope disclosure.
 
 With the electrical model enabled, each row uses the runtime's already qualified sensor capture.
 Used chemical energy, source/load power, current, terminal voltage and the age-charged remaining

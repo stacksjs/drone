@@ -4,7 +4,7 @@ import { createVtolSimulationCase } from '../../resources/functions/drone/vehicl
 
 test('VTOL workspace records the complete modeled route with capture-bound mode acknowledgements', () => {
   const definition = getMissionWorkspaceDefinition('vtol')
-  expect(definition.scenarios).toHaveLength(14)
+  expect(definition.scenarios).toHaveLength(18)
   const run = runMissionWorkspace('vtol')
   expect(run.status).toBe('completed')
   expect(run.physicalActuationEnabled).toBe(false)
@@ -68,6 +68,24 @@ test('VTOL choices reject irrelevant phases and do not apply electrical flags to
   expect(() => getMissionWorkspaceDefinition('vtol', 'imu-loss', { phase: 'unknown' })).toThrow()
   expect(() => getMissionWorkspaceDefinition('ground', 'nominal', { electrical: true })).toThrow()
   expect(() => getMissionWorkspaceDefinition('vtol', 'physical')).toThrow()
+})
+
+test('the workspace retains planned wind separately from observed exposure and a blocked crosswind recording', () => {
+  const definition = getMissionWorkspaceDefinition('vtol', 'tailwind-2mps', { electrical: true })
+  if (!('vtol' in definition)) throw new Error('Expected the VTOL definition')
+  expect(definition.vtol!.wind).toEqual({ frame: 'LOCAL_NED', windMps: [2, 0, 0], beginsAtMs: 1000, expectedOutcome: 'completed-route' })
+  expect(definition.vtol!.phases).toEqual([])
+  const run = runMissionWorkspace('vtol', 'west-crosswind-limit-2mps', { electrical: true })
+  if (!('vtol' in run)) throw new Error('Expected the VTOL recording')
+  expect(run.status).toBe('blocked')
+  expect(run.fault).toBe('vtol-transition-envelope')
+  expect(run.vtol!.windEvidence).toMatchObject({ windMps: [0, -2, 0], expectedOutcome: 'envelope-stop', worldMatched: true, outcomeMatched: true })
+  expect(run.vtol!.demonstrationMatched).toBe(true)
+  expect(run.vtol!.landingContact).toBe(false)
+  expect(run.rows.at(-1)!.taskId).toBe('back')
+  expect(run.rows.at(-1)!.state).toBe('blocked')
+  expect(run.boardNeutral).toBe(true)
+  expect(run.physicalActuationEnabled).toBe(false)
 })
 
 test('the shared VTOL case factory runs isolated sessions and retains the CLI report from the same recording', () => {
