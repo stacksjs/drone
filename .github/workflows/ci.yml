@@ -21,3 +21,9 @@ jobs:
           git rev-parse HEAD
       - name: Exercise the public lifecycle boundary
         run: bun test ./tests/unit/vehicle-lifecycle.test.ts
+      - name: Native Pickier lint
+        run: ./buddy lint
+      - name: Application types
+        run: ./buddy typecheck
+      - name: Runtime types
+        run: bun run typecheck:runtime

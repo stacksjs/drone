@@ -60,3 +60,27 @@ test('invalid operator schedules are refused before creating a session or invoki
   expect(violations).toEqual([])
   expect(accessorCalls).toBe(0)
 })
+
+
+test('validated lifecycle events are independent of caller mutation during session creation', () => {
+  const first = { atMs: 4000, action: 'pause' as const }, second = { atMs: 6000, action: 'resume' as const }
+  const missionActions = [first, second], profile = createVtolHoverProfile(), createSession = profile.createSession
+  profile.createSession = () => {
+    first.atMs = 2000; second.atMs = 2020; missionActions.reverse()
+    return createSession()
+  }
+  const report = runVehicleSimulation(profile, { seconds: 60, missionActions })
+  expect(report.trace.rows.filter(row => row.action === 'pause' || row.action === 'resume').map(row => [row.observation.nowMs, row.action])).toEqual([[4000, 'pause'], [6000, 'resume']])
+  expect(report.status).toBe('completed')
+  expect(report.finalTruthPositionM[2]).toBe(0)
+  expect(replayVehicleMission(report.trace).snapshot()).toEqual(report.mission)
+})
+
+
+test('an empty lifecycle schedule preserves every legacy hover recording and report field', () => {
+  const legacy = runVehicleSimulation(createVtolHoverProfile(), { seconds: 60 })
+  const empty = runVehicleSimulation(createVtolHoverProfile(), { seconds: 60, missionActions: [] })
+  expect(empty).toEqual(legacy)
+  expect(Object.keys(empty)).toEqual(Object.keys(legacy))
+  expect(empty.trace.rows.every(row => row.action === null || row.action === 'start')).toBe(true)
+})

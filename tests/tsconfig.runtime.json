@@ -115,6 +115,7 @@
     "./unit/gimbal-authority.test.ts",
     "./unit/cinema-managed.test.ts",
     "./unit/cinema-counted-encoder.test.ts",
-    "./unit/cinema-counted-translation.test.ts"
+    "./unit/cinema-counted-translation.test.ts",
+    "unit/vehicle-lifecycle.test.ts"
   ]
 }
