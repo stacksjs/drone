@@ -60,6 +60,10 @@ Hover control aligns the thrust direction separately from its heading correction
 yaw error therefore cannot rotate the requested position correction into another axis. Opposite
 thrust directions have no unique shortest tilt axis; that unsupported condition inhibits and latches
 neutral output. Existing body-rate bounds, PID gains, source guards and allocation priorities remain.
+The VTOL wrapper explicitly selects the shared cascade's `thrust-heading-v2` attitude profile.
+Quad-X retains its original `quaternion-error-v1` arithmetic, preserving byte-for-byte replay of
+existing multirotor-derived incident recordings. Sharing the cascade does not change a pinned
+recording profile's dynamics.
 
 Back-transition braking compares the linear pre-stall estimate with 41 pitch candidates in the
 existing -0.08 to 0.3 rad range. It evaluates the declared nonlinear wing/rotor force balance against

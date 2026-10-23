@@ -6,5 +6,5 @@ export type { SimulatedControlInput, SimulatedControlOutput } from './lift-contr
 
 /** Original quad-X model and tuning, on the shared simulation-only lift cascade. */
 export function createSimulatedMultirotorController(options: { headingAlignment: 'initial-simulation-north' }) {
-  return createSimulatedLiftController(options, { massKg: model.massKg, gravityMps2: model.gravityMps2, rateScale: [1, 1, 1], allocate: allocateQuadX })
+  return createSimulatedLiftController(options, { massKg: model.massKg, gravityMps2: model.gravityMps2, rateScale: [1, 1, 1], attitudeControl: 'quaternion-error-v1', allocate: allocateQuadX })
 }

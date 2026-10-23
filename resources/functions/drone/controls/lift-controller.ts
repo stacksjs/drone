@@ -14,13 +14,13 @@ export interface SimulatedControlInput {
   rateCapturedAtMs: number
   target: { positionM: SensorVector, yawRad: number, issuedAtMs: number }
 }
-interface LiftProfile { massKg: number, gravityMps2: number, rateScale: SensorVector, allocate(wrench: Wrench, previous: Motors, dtS: number): { motorsN: Motors, achieved: Wrench, limited: boolean } }
+interface LiftProfile { massKg: number, gravityMps2: number, rateScale: SensorVector, attitudeControl: 'quaternion-error-v1' | 'thrust-heading-v2', allocate(wrench: Wrench, previous: Motors, dtS: number): { motorsN: Motors, achieved: Wrench, limited: boolean } }
 /** Shared simulated lift cascade. Vehicle wrappers own mass, tuning and allocation; no vehicle IO. */
 export function createSimulatedLiftController(options: { headingAlignment: 'initial-simulation-north' }, profile: LiftProfile) {
   if (options.headingAlignment !== 'initial-simulation-north') throw new TypeError('An explicit simulation heading alignment is required')
-  const model = { massKg: profile.massKg, gravityMps2: profile.gravityMps2 }, allocate = profile.allocate
+  const model = { massKg: profile.massKg, gravityMps2: profile.gravityMps2 }, allocate = profile.allocate, attitudeControl = profile.attitudeControl
   const rateScale = Array.isArray(profile.rateScale) ? [...profile.rateScale] : []
-  if (!Number.isFinite(model.massKg) || model.massKg <= 0 || !Number.isFinite(model.gravityMps2) || model.gravityMps2 <= 0 || !validVector(rateScale) || rateScale.some(n => n <= 0) || typeof allocate !== 'function') throw new RangeError('Invalid simulated lift profile')
+  if (!Number.isFinite(model.massKg) || model.massKg <= 0 || !Number.isFinite(model.gravityMps2) || model.gravityMps2 <= 0 || !validVector(rateScale) || rateScale.some(n => n <= 0) || !['quaternion-error-v1', 'thrust-heading-v2'].includes(attitudeControl) || typeof allocate !== 'function') throw new RangeError('Invalid simulated lift profile')
   const velocityPid = [0, 1, 2].map(() => createBoundedPid({ kp: 1.6, ki: 0.25, kd: 0, integralLimit: 1.5, outputLimit: 3, derivativeTauS: 0.03, trackingGain: 1 }))
   const ratePid = [0, 1, 2].map(i => createBoundedPid({ kp: (i === 2 ? 0.08 : 0.12) * rateScale[i]!, ki: (i === 2 ? 0.04 : 0.08) * rateScale[i]!, kd: (i === 2 ? 0.001 : 0.002) * rateScale[i]!, integralLimit: 0.12 * rateScale[i]!, outputLimit: (i === 2 ? 0.25 : 0.6) * rateScale[i]!, derivativeTauS: 0.03, trackingGain: 4 }))
   let previous: Motors = [0, 0, 0, 0], lastNow: number | null = null, reference: string | null = null, fault: string | null = null
@@ -67,18 +67,27 @@ export function createSimulatedLiftController(options: { headingAlignment: 'init
       const yaw = target.yawRad, ax = Math.cos(yaw) * acceleration[0] + Math.sin(yaw) * acceleration[1], ay = -Math.sin(yaw) * acceleration[0] + Math.cos(yaw) * acceleration[1]
       const vertical = model.gravityMps2 - acceleration[2]
       const desired = multiplyQuaternion([Math.cos(yaw / 2), 0, 0, Math.sin(yaw / 2)], quaternionFromTilt(Math.atan2(ay, Math.hypot(ax, vertical)), Math.atan2(-ax, vertical)))
-      const q = normalizeQuaternion(attitude.quaternionWxyz)
-      // First align the thrust direction without twisting about it. An
-      // unattainable yaw goal must not rotate the position correction.
-      const from = rotateBodyToNed(q, [0, 0, 1]), to = rotateBodyToNed(desired, [0, 0, 1])
-      const dot = Math.max(-1, Math.min(1, from.reduce((sum, n, i) => sum + n * to[i]!, 0)))
-      if (1 + dot <= 1e-8) return inhibit('antipodal-thrust-direction')
-      const alignment = normalizeQuaternion([1 + dot, from[1] * to[2] - from[2] * to[1], from[2] * to[0] - from[0] * to[2], from[0] * to[1] - from[1] * to[0]])
-      const reduced = normalizeQuaternion(multiplyQuaternion(alignment, q))
-      const tiltError = multiplyQuaternion([q[0], -q[1], -q[2], -q[3]], reduced)
-      const yawError = multiplyQuaternion([reduced[0], -reduced[1], -reduced[2], -reduced[3]], desired)
-      const correction = [tiltError[1] * (tiltError[0] < 0 ? -1 : 1), tiltError[2] * (tiltError[0] < 0 ? -1 : 1), yawError[3] * (yawError[0] < 0 ? -1 : 1)]
-      const rates = correction.map((n, i) => clampControl(8 * n, i === 2 ? 1.5 : 3)) as SensorVector
+      let rates: SensorVector
+      if (attitudeControl === 'quaternion-error-v1') {
+        // Preserve the original quad model's deterministic recording profile.
+        const q = attitude.quaternionWxyz
+        const error = multiplyQuaternion([q[0], -q[1], -q[2], -q[3]], desired)
+        rates = error.slice(1).map((n, i) => clampControl(8 * n * (error[0] < 0 ? -1 : 1), i === 2 ? 1.5 : 3)) as SensorVector
+      }
+      else {
+        const q = normalizeQuaternion(attitude.quaternionWxyz)
+        // First align the thrust direction without twisting about it. An
+        // unattainable yaw goal must not rotate the position correction.
+        const from = rotateBodyToNed(q, [0, 0, 1]), to = rotateBodyToNed(desired, [0, 0, 1])
+        const dot = Math.max(-1, Math.min(1, from.reduce((sum, n, i) => sum + n * to[i]!, 0)))
+        if (1 + dot <= 1e-8) return inhibit('antipodal-thrust-direction')
+        const alignment = normalizeQuaternion([1 + dot, from[1] * to[2] - from[2] * to[1], from[2] * to[0] - from[0] * to[2], from[0] * to[1] - from[1] * to[0]])
+        const reduced = normalizeQuaternion(multiplyQuaternion(alignment, q))
+        const tiltError = multiplyQuaternion([q[0], -q[1], -q[2], -q[3]], reduced)
+        const yawError = multiplyQuaternion([reduced[0], -reduced[1], -reduced[2], -reduced[3]], desired)
+        const correction = [tiltError[1] * (tiltError[0] < 0 ? -1 : 1), tiltError[2] * (tiltError[0] < 0 ? -1 : 1), yawError[3] * (yawError[0] < 0 ? -1 : 1)]
+        rates = correction.map((n, i) => clampControl(8 * n, i === 2 ? 1.5 : 3)) as SensorVector
+      }
       const torque = rates.map((n, i) => ratePid[i]!.step(n - input.angularRateRadS[i]!, input.angularRateRadS[i]!, dt)) as SensorVector
       const desiredWrench = { thrustN: model.massKg * Math.hypot(...[acceleration[0], acceleration[1], vertical]), torqueNm: torque }
       const allocation = allocate(desiredWrench, previous, dt)
