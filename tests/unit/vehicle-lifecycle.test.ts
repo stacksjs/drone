@@ -122,3 +122,23 @@ for (const bankedEntry of [false, true]) test(`a paused wing-borne VTOL flies a 
   expect(report.board.actuators).toEqual([0, 0, 0, 0, 0, 0, 0, 0])
   expect(replayVehicleMission(report.trace).snapshot()).toEqual(report.mission)
 })
+
+
+test('a qualified post-back landing contact can pause with neutral outputs and explicitly resume', () => {
+  const baseline = runVehicleSimulation(createVtolTransitionProfile(), { seconds: 160 })
+  expect(baseline.status).toBe('completed')
+  const contact = baseline.path.find(row => row.mission.state === 'running' && row.mission.taskKind === 'land' && row.measurement?.values.onSurface === true)
+  expect(contact).toBeDefined()
+  const pauseAtMs = contact!.atMs
+  const report = runVehicleSimulation(createVtolTransitionProfile(), { seconds: 160, missionActions: [{ atMs: pauseAtMs, action: 'pause' }, { atMs: pauseAtMs + 2000, action: 'resume' }] })
+  const paused = report.path.filter(row => row.mission.state === 'paused')
+  console.log('VTOL_CONTACT_PAUSE', JSON.stringify({ pauseAtMs, status: report.status, fault: report.fault, pausedRows: paused.length }))
+  expect(paused).toHaveLength(100)
+  expect(paused.every(row => row.measurement!.values.onSurface === true && row.truthPositionM[2] === 0 && row.actuators.every(n => n === 0))).toBe(true)
+  expect(report.status).toBe('completed')
+  expect(report.fault).toBeNull()
+  expect(report.mission.reason).toBe('landed')
+  expect(report.finalTruthPositionM[2]).toBe(0)
+  expect(report.board.actuators).toEqual([0, 0, 0, 0, 0, 0, 0, 0])
+  expect(replayVehicleMission(report.trace).snapshot()).toEqual(report.mission)
+})
