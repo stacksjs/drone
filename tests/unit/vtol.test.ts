@@ -1,5 +1,6 @@
 import { expect, test } from 'bun:test'
 import { createVtolPlant } from '../../resources/functions/drone/vehicles/vtol/plant'
+import { allocateVtolLift } from '../../resources/functions/drone/vehicles/vtol/allocation'
 
 // Public plant seam: checks vertical force integration without forward airspeed; it does not qualify a controller or physical aircraft.
 test('lift-and-cruise rotors support the declared airframe without forward airspeed or an imposed position', () => {
@@ -129,4 +130,44 @@ test('a divergent integration leaves the retained body intact and the next ordin
     const environment = { windMps: [0, 0, 0] as [number, number, number], currentMps: [0, 0, 0] as [number, number, number] }
     expect(plant.step(command, 0.004, environment)).toEqual(reference.step(command, 0.004, environment))
   }
+})
+
+test('VTOL lift allocation produces the declared BODY_FRD wrench in front-left rotor order', () => {
+  // Independent inverse: [10, 6, 4, 4] N produces 24 N and [1.6, 3.2, 0.08] Nm.
+  const result = allocateVtolLift({ thrustN: 24, torqueNm: [1.6, 3.2, 0.08] })
+  expect(result.rotorsN).toEqual([10, 6, 4, 4])
+  expect(result.achieved.thrustN).toBe(24)
+  expect(result.achieved.torqueNm[0]).toBeCloseTo(1.6, 10)
+  expect(result.achieved.torqueNm[1]).toBeCloseTo(3.2, 10)
+  expect(result.achieved.torqueNm[2]).toBeCloseTo(0.08, 10)
+  expect(result.limited).toBe(false)
+})
+
+test('saturated lift allocation preserves collective before roll and pitch and sacrifices yaw first', () => {
+  const result = allocateVtolLift({ thrustN: 44, torqueNm: [3.2, 0, 0.08] })
+  expect(result.rotorsN).toEqual([12, 10, 10, 12])
+  expect(result.achieved.thrustN).toBe(44)
+  expect(result.achieved.torqueNm).toEqual([1.6, 0, 0])
+  expect(result.limited).toBe(true)
+})
+
+test('lift allocation refuses malformed and nonfinite wrench packets instead of returning invalid rotor commands', () => {
+  const sparse: number[] = []
+  sparse.length = 3
+  sparse.fill(0, 1)
+  for (const wrench of [{ thrustN: Number.NaN, torqueNm: [0, 0, 0] }, { thrustN: 24, torqueNm: sparse }, { thrustN: 24, torqueNm: [0, 0, Infinity] }, { thrustN: 24, torqueNm: [0, 0, 0, 1] }, { thrustN: 24, torqueNm: null }]) {
+    expect(() => allocateVtolLift(wrench as never)).toThrow()
+  }
+})
+
+test('inherited slots and custom iterators cannot disguise malformed lift torque packets', () => {
+  const sparse: number[] = []
+  sparse.length = 3
+  sparse.fill(0, 1)
+  Object.setPrototypeOf(sparse, Object.assign(Object.create(Array.prototype), { 0: 0 }))
+  let iteratorCalls = 0
+  const rewritten = [NaN, 0, 0]
+  Object.defineProperty(rewritten, Symbol.iterator, { value: function* () { iteratorCalls++; yield 0; yield 0; yield 0 } })
+  for (const torqueNm of [sparse, rewritten]) expect(() => allocateVtolLift({ thrustN: 24, torqueNm } as never)).toThrow()
+  expect(iteratorCalls).toBe(0)
 })

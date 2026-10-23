@@ -5,20 +5,10 @@ import { validVector } from '../../controls/model'
 import { multiplyQuaternion, normalizeQuaternion } from '../../estimation/frames'
 import { rotateBodyToNed, rotateNedToBody } from '../../controls/physics'
 import { airAerodynamics, airModel } from '../air/plant'
+import { numericPacket } from './packets'
 
 /** Fictional lift-and-cruise model. No measured hardware coefficients or flight qualification. */
 export const vtolModel = Object.freeze({ massKg: 2.5, gravityMps2: 9.80665, maxRotorThrustN: 12, rotorTimeConstantS: 0.06, rotorSlewNPerS: 120, rotorArmProjectionM: 0.4, reactionTorqueM: 0.02, inertiaKgM2: Object.freeze([0.3, 0.4, 0.6] as const), maxPusherThrustN: airModel.maxThrustN, pusherTimeConstantS: 0.08, pusherSlewNPerS: 60, wing: airModel })
-
-function numericPacket(value: unknown, length: number): number[] {
-  if (!Array.isArray(value) || value.length !== length) throw new RangeError('Invalid VTOL numeric packet')
-  const packet: number[] = []
-  for (let index = 0; index < length; index++) {
-    const field = Object.getOwnPropertyDescriptor(value, String(index))
-    if (!field?.enumerable || !Object.hasOwn(field, 'value') || typeof field.value !== 'number' || !Number.isFinite(field.value)) throw new RangeError('Invalid VTOL numeric packet')
-    packet.push(field.value)
-  }
-  return packet
-}
 
 /** Independent lift rotors and the owned trainer wing/pusher share one rigid body. */
 export function createVtolPlant(initial: { positionM?: SensorVector, velocityMps?: SensorVector, quaternionWxyz?: Quaternion, rotorsN?: [number, number, number, number], pusherThrustN?: number } = {}): VehiclePlant {
