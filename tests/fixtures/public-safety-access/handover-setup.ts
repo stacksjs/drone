@@ -2,8 +2,13 @@ import { randomUUID } from 'node:crypto'
 import { setupIncidentDatabase } from './setup'
 import { examplePublicSafetyConfig } from '../../../resources/functions/drone/public-safety/fixtures'
 import { simulatePublicSafety } from '../../../resources/functions/drone/public-safety/runtime'
-export async function setupHandoverFixture() {
-  const { database, User } = await setupIncidentDatabase()
+export type FixturePhaseObserver = <T>(phase: string, work: () => Promise<T>) => Promise<T>
+
+export async function setupHandoverFixture(observe: FixturePhaseObserver = (phase, work) => {
+  void phase
+  return work()
+}) {
+  const { database, User } = await observe('fixture-database', () => setupIncidentDatabase())
   const access = await import('../../../resources/functions/drone/public-safety/access/service')
   const records = await import('../../../resources/functions/drone/public-safety/access/records')
   const handover = await import('../../../resources/functions/drone/public-safety/access/handover')
@@ -20,14 +25,18 @@ export async function setupHandoverFixture() {
   for (const ability of incidentAbilities) Gate.define(`public-safety:${ability}`, (user, key) => publicSafetyIncidentGate(user, key, ability))
   for (const ability of ['read', 'write'] as const) Gate.define(`public-safety:handover-${ability}`, (user, key) => policy.publicSafetyHandoverGate(user, key, ability))
   const as = <T>(token: string, work: () => Promise<T>) => runWithRequest(enhanceRequest(new Request('https://incident.invalid/api/public-safety/incidents', { headers: { authorization: `Bearer ${token}` } }) as Parameters<typeof enhanceRequest>[0]), work)
-  const sender = await User.create({ name: 'Outgoing Coordinator', email: 'handover-sender@example.invalid', password: 'temporary-fixture-password' })
-  const recipient = await User.create({ name: 'Incoming Coordinator', email: 'handover-recipient@example.invalid', password: 'temporary-fixture-password' })
-  const unrelated = await User.create({ name: 'Unrelated Observer', email: 'handover-unrelated@example.invalid', password: 'temporary-fixture-password' })
-  for (const permission of ['public-safety:access', 'public-safety:create']) await Rbac.createPermission(permission, 'web')
-  for (const user of [sender, recipient, unrelated]) await Rbac.givePermission(user.id, 'public-safety:access', 'web')
-  for (const user of [sender, recipient]) await Rbac.givePermission(user.id, 'public-safety:create', 'web')
+  const sender = await observe('fixture-sender-account', async () => User.create({ name: 'Outgoing Coordinator', email: 'handover-sender@example.invalid', password: 'temporary-fixture-password' }))
+  const recipient = await observe('fixture-recipient-account', async () => User.create({ name: 'Incoming Coordinator', email: 'handover-recipient@example.invalid', password: 'temporary-fixture-password' }))
+  const unrelated = await observe('fixture-unrelated-account', async () => User.create({ name: 'Unrelated Observer', email: 'handover-unrelated@example.invalid', password: 'temporary-fixture-password' }))
+  await observe('fixture-rbac', async () => {
+    for (const permission of ['public-safety:access', 'public-safety:create']) await Rbac.createPermission(permission, 'web')
+    for (const user of [sender, recipient, unrelated]) await Rbac.givePermission(user.id, 'public-safety:access', 'web')
+    for (const user of [sender, recipient]) await Rbac.givePermission(user.id, 'public-safety:create', 'web')
+  })
   const credential = async (userId: number, scopes = ['public-safety:read', 'public-safety:coordinate']) => (await tokens.createToken(userId, 'handover fixture', scopes, { withRefreshToken: false })).plainTextToken
-  const senderToken = await credential(sender.id), recipientToken = await credential(recipient.id), unrelatedToken = await credential(unrelated.id)
+  const senderToken = await observe('fixture-sender-token', () => credential(sender.id))
+  const recipientToken = await observe('fixture-recipient-token', () => credential(recipient.id))
+  const unrelatedToken = await observe('fixture-unrelated-token', () => credential(unrelated.id))
   const seed = async (key: string, lifetime = 86400000) => as(senderToken, async () => {
     const config = examplePublicSafetyConfig()
     config.id = key

@@ -116,3 +116,25 @@ EXECUTION_BROWSER_QA=true BROWSE_BROWSER=/path/to/google-chrome bun test tests/u
 Native controller and HTTP checks separately cover authority replacement,
 elapsed deadlines, stream capacity, cleanup and durable COMMIT with a withheld
 response. The existing workspace browser scenarios remain required regressions.
+
+The native lifetime fixture emits bounded phase observations around setup,
+authority reads, retention waits and cleanup. Parent-start and child-runtime
+records identify their Bun versions and executable paths independently. Its parent records the observed
+exit code and signal separately from whether its own watchdog fired or cleanup
+requested a kill. The settled `exited` status is distinct from the raw
+`exitCode` property, which can remain null after a signal. Elapsed time includes process work and output handling, not
+just a native check. Failed cases retain their private temporary directory,
+stdout, stderr and lifecycle receipt when storage permits. A fixed warning
+identifies each unavailable evidence file if its write fails; this does not
+replace the captured child diagnostics or its original test verdict. Successful
+cases remove their temporary files as before. CI sets `EXECUTION_LIFETIME_EVIDENCE`
+to an owned runner directory and retains the failed synthetic database, process
+configuration and captured diagnostics for seven days, using explicit file
+patterns that exclude linked dependencies. No account tokens, scope identifiers or recording contents are included
+in the scalar phase and lifecycle observations.
+
+These observations support [the unresolved Mac failure](https://github.com/stacksjs/drone/issues/60);
+they do not establish its cause or repair it. The production authority-check
+limit, actual 60-second retention, 90-second child watchdog and 100-second test
+guard are unchanged. An observed signal or watchdog marker alone does not prove
+an individually joined Worker thread or the cause of an earlier exit.
