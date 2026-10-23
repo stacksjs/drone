@@ -25,3 +25,38 @@ test('scheduled operator pause and resume reach the real hover loop and its repl
   expect(report.physicalFlightEnabled).toBe(false)
   expect(replayVehicleMission(report.trace).snapshot()).toEqual(report.mission)
 })
+
+
+test('invalid operator schedules are refused before creating a session or invoking data accessors', () => {
+  let accessorCalls = 0
+  const getterEvent = Object.defineProperty({ action: 'pause' }, 'atMs', { enumerable: true, get() { accessorCalls++; return 1000 } })
+  const cases: [string, unknown][] = [
+    ['off-grid', [{ atMs: 1001, action: 'pause' }]],
+    ['null', null],
+    ['not-an-array', {}],
+    ['sparse', new Array(1)],
+    ['too-many', Array.from({ length: 33 }, () => ({ atMs: 1000, action: 'pause' }))],
+    ['automatic-start-collision', [{ atMs: 600, action: 'pause' }]],
+    ['before-start', [{ atMs: 580, action: 'pause' }]],
+    ['past-duration', [{ atMs: 2020, action: 'pause' }]],
+    ['non-finite', [{ atMs: NaN, action: 'pause' }]],
+    ['unsafe-integer', [{ atMs: Number.MAX_SAFE_INTEGER + 1, action: 'pause' }]],
+    ['duplicate', [{ atMs: 1000, action: 'pause' }, { atMs: 1000, action: 'resume' }]],
+    ['reversed', [{ atMs: 1020, action: 'pause' }, { atMs: 1000, action: 'resume' }]],
+    ['second-start', [{ atMs: 1000, action: 'start' }]],
+    ['unknown-action', [{ atMs: 1000, action: 'fly' }]],
+    ['extra-field', [{ atMs: 1000, action: 'pause', retry: true }]],
+    ['accessor', [getterEvent]],
+  ]
+  const violations: { label: string, created: number, message: string }[] = []
+  for (const [label, missionActions] of cases) {
+    const profile = createVtolHoverProfile(), createSession = profile.createSession
+    let created = 0, message = ''
+    profile.createSession = () => { created++; return createSession() }
+    try { runVehicleSimulation(profile, { seconds: 2, missionActions: missionActions as never }) }
+    catch (error) { message = error instanceof Error ? error.message : String(error) }
+    if (created !== 0 || message !== 'Invalid vehicle mission action schedule') violations.push({ label, created, message })
+  }
+  expect(violations).toEqual([])
+  expect(accessorCalls).toBe(0)
+})
