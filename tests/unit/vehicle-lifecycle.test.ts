@@ -88,8 +88,13 @@ test('an empty lifecycle schedule preserves every legacy hover recording and rep
 })
 
 
-test('a paused wing-borne VTOL flies a bounded 60 m loiter before resuming its route and landing', () => {
+for (const bankedEntry of [false, true]) test(`a paused wing-borne VTOL flies a bounded clockwise 60 m loiter from ${bankedEntry ? 'banked' : 'straight'} entry before resuming and landing`, () => {
   const profile = createVtolTransitionProfile(), createSession = profile.createSession
+  const destination = bankedEntry ? [150, 100] : [180, 0]
+  if (bankedEntry) for (const task of profile.mission.tasks) {
+    if ((task.id === 'cruise-leg' || task.id === 'land') && 'positionM' in task) { task.positionM[0] = destination[0]!; task.positionM[1] = destination[1]! }
+    if (task.id === 'back' && task.kind === 'vtol-mode') task.headingRad = 1
+  }
   const observed: { atMs: number, state: VehiclePlantState }[] = []
   profile.createSession = () => {
     const session = createSession()
@@ -104,7 +109,7 @@ test('a paused wing-borne VTOL flies a bounded 60 m loiter before resuming its r
   const settled = observed.filter(row => row.atMs >= 26000)
   const radialError = Math.max(...settled.map(row => Math.abs(Math.hypot(row.state.positionM[0] - center[0]!, row.state.positionM[1] - center[1]!) - 60)))
   const paused = report.path.filter(row => row.mission.state === 'paused')
-  console.log('VTOL_PAUSE_LOITER', JSON.stringify({ status: report.status, fault: report.fault, pausedRows: paused.length, settledRows: settled.length, maximumRadialErrorM: radialError }))
+  console.log('VTOL_PAUSE_LOITER', JSON.stringify({ bankedEntry, status: report.status, fault: report.fault, pausedRows: paused.length, settledRows: settled.length, maximumRadialErrorM: radialError }))
   expect(paused).toHaveLength(1000)
   expect(settled.length).toBeGreaterThan(600)
   expect(radialError).toBeLessThan(8)
@@ -113,7 +118,7 @@ test('a paused wing-borne VTOL flies a bounded 60 m loiter before resuming its r
   expect(settled.every(row => (row.state.details.rotorThrustN as number) < 1)).toBe(true)
   expect(report.status).toBe('completed')
   expect(report.finalTruthPositionM[2]).toBe(0)
-  expect(Math.hypot(report.finalTruthPositionM[0] - 180, report.finalTruthPositionM[1])).toBeLessThan(0.3)
+  expect(Math.hypot(report.finalTruthPositionM[0] - destination[0]!, report.finalTruthPositionM[1] - destination[1]!)).toBeLessThan(0.3)
   expect(report.board.actuators).toEqual([0, 0, 0, 0, 0, 0, 0, 0])
   expect(replayVehicleMission(report.trace).snapshot()).toEqual(report.mission)
 })
