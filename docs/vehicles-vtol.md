@@ -434,8 +434,10 @@ reconstruct the electrical plant from a mission trace alone.
 
 Actual model campaigns cover combined front demand, all nominal phases, open-circuit pusher timeout, initial/front/back abort
 landing, held recovery/resume, global endurance during pause, supply cutoff, bad battery observations,
-reserve, host loss and independent sessions. The nominal example's front peak is 347.313 W; its
-last captured use is about 4.62 Wh. Neither value predicts aircraft endurance. Motor/propeller advance
+reserve, host loss and independent sessions. With `projected-incidence-v3`,
+`./buddy vtol:simulate --scenario nominal --electrical` reports a last captured use of 4.238631 Wh
+at `capturedAtMs: 75680` in the retained native campaign. This fictional example does not predict
+aircraft endurance. Motor/propeller advance
 ratio, voltage-dependent thrust, cell temperature/degradation, current-sensor calibration and measured
 capacity remain unmodeled or unqualified. The open-circuit fixture removes pusher demand and thrust;
 it does not model a seized motor's electrical current.
