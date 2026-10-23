@@ -176,6 +176,10 @@ jobs:
         working-directory: ${{ runner.temp }}
       - run: $GITHUB_WORKSPACE/storage/runtime-build/cli/drone vtol:simulate --scenario west-crosswind-2mps --electrical
         working-directory: ${{ runner.temp }}
+      - run: $GITHUB_WORKSPACE/storage/runtime-build/cli/drone vtol:simulate --scenario east-crosswind-limit-2mps --phase back --electrical
+        working-directory: ${{ runner.temp }}
+      - run: $GITHUB_WORKSPACE/storage/runtime-build/cli/drone vtol:simulate --scenario east-crosswind-limit-2mps --phase landing --electrical
+        working-directory: ${{ runner.temp }}
       - run: $GITHUB_WORKSPACE/storage/runtime-build/cli/drone authority:simulate --scenario pi-loss --seconds 4
         working-directory: ${{ runner.temp }}
       - run: $GITHUB_WORKSPACE/storage/runtime-build/cli/drone drivers:bench --driver ardupilot --drop-first-ack

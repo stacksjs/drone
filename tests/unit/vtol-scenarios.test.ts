@@ -44,7 +44,7 @@ test('unknown or inapplicable selectors and pre-onset duration cannot qualify a 
   expect(() => runVtolSimulation('foreign')).toThrow('Unknown VTOL simulation scenario')
   expect(() => runVtolSimulation('host-loss', { phase: 'foreign' })).toThrow('Unknown VTOL simulation phase')
   expect(() => runVtolSimulation('host-loss', { phase: null } as never)).toThrow('Unknown VTOL simulation phase')
-  expect(() => runVtolSimulation('nominal', { phase: 'back' })).toThrow('requires a fault scenario')
+  expect(() => runVtolSimulation('nominal', { phase: 'back' })).toThrow('requires a fault or wind scenario')
   for (const scenario of ['host-loss', 'imu-loss', 'position-loss', 'vehicle-sensor-loss', 'rc-override', 'kill']) {
     const report = runVtolSimulation(scenario, { seconds: 2 })
     expect(report.status).toBe('duration-exhausted')
@@ -141,7 +141,7 @@ for (const electrical of [false, true]) for (const [scenario, reason] of [
 })
 
 test('operator presets refuse phase selectors and duration that would drop scheduled actions', () => {
-  expect(() => runVtolSimulation('front-abort', { phase: 'front' })).toThrow('requires a fault scenario')
+  expect(() => runVtolSimulation('front-abort', { phase: 'front' })).toThrow('requires a fault or wind scenario')
   expect(() => runVtolSimulation('cruise-pause-resume', { seconds: 30 })).toThrow('action schedule')
   expect(() => runVtolSimulation('back-recover-resume', { seconds: 60 })).toThrow('action schedule')
   const first = runVtolSimulation('back-abort', { electrical: true })

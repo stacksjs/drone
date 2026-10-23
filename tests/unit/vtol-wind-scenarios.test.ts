@@ -69,8 +69,8 @@ for (const mutation of ['absent', 'early', 'late', 'opposite'] as const) test(`$
   expect(report.boardNeutral).toBe(true)
 })
 
-test('wind selection rejects unrelated phase controls and cannot qualify a partial route', () => {
-  expect(() => createVtolSimulationCase('tailwind-2mps', { phase: 'front' })).toThrow('requires a fault scenario')
+test('wind selection rejects unknown phases and cannot qualify a partial route', () => {
+  expect(() => createVtolSimulationCase('tailwind-2mps', { phase: 'unknown' })).toThrow('Unknown VTOL simulation phase')
   const { report } = createVtolSimulationCase('tailwind-2mps', { seconds: 2 }).run()
   expect(report.status).toBe('duration-exhausted')
   expect(report.windEvidence!.worldMatched).toBe(true)

@@ -3,7 +3,7 @@ import type { MissionWorkspaceProfile, MissionWorkspaceRecording } from '../func
 import { getMissionWorkspaceDefinition, missionWorkspaceProfiles, missionWorkspacePlot, runMissionWorkspace } from '../functions/drone/vehicles/workspace'
 const profile = state<MissionWorkspaceProfile>('quadcopter')
 const scenario = state('nominal')
-const phase = state('front')
+const phase = state('startup')
 const electrical = state(false)
 const result = state<MissionWorkspaceRecording | null>(null)
 const offset = state(600)
@@ -14,7 +14,7 @@ const definition = derived(() => {
   const selected = base.scenarios.includes(scenario()) ? scenario() : 'nominal'
   if (profile() !== 'vtol') return getMissionWorkspaceDefinition(profile(), selected)
   const initial = getMissionWorkspaceDefinition('vtol', selected, { electrical: electrical() })
-  return 'vtol' in initial && initial.vtol?.phase ? getMissionWorkspaceDefinition('vtol', selected, { phase: phase(), electrical: electrical() }) : initial
+  return 'vtol' in initial && initial.vtol?.phases.includes(phase()) && phase() !== 'startup' ? getMissionWorkspaceDefinition('vtol', selected, { phase: phase(), electrical: electrical() }) : initial
 })
 const vtolDefinition = derived(() => { const d = definition(); return 'vtol' in d ? d.vtol ?? null : null })
 const recording = derived(() => {
@@ -55,6 +55,10 @@ effect(() => {
   phase(); electrical()
   computation.stop(); busy.set(false); result.set(null); error.set(''); offset.set(600)
   if (!getMissionWorkspaceDefinition(selectedProfile, 'nominal').scenarios.includes(selectedScenario)) scenario.set('nominal')
+  else {
+    const selected = getMissionWorkspaceDefinition(selectedProfile, selectedScenario)
+    if ('vtol' in selected && selected.vtol?.phases.length && !selected.vtol.phases.includes(phase())) phase.set(selected.vtol.phase ?? 'startup')
+  }
 })
 function execute() { error.set(''); result.set(null); offset.set(600); busy.set(true); computation.start() }
 function reset() { computation.stop(); result.set(null); error.set(''); offset.set(600); busy.set(false) }
@@ -68,7 +72,7 @@ function vectorLabel(value: number[] | null | undefined) { return value ? value.
     <div class="flex flex-wrap gap-4 items-end mt-8">
       <div><label for="mission-profile" class="block mb-2 text-sm">Vehicle profile</label><select id="mission-profile" x-model="profile" class="px-3 py-3 max-w-full text-neutral-100 bg-neutral-900 border border-neutral-600 rounded focus-visible:outline-emerald-200"><option :for="name in missionWorkspaceProfiles" :value="name">{{ name }}</option></select></div>
       <div><label for="mission-scenario" class="block mb-2 text-sm">Operator scenario</label><select id="mission-scenario" x-model="scenario" class="px-3 py-3 max-w-full text-neutral-100 bg-neutral-900 border border-neutral-600 rounded focus-visible:outline-emerald-200"><option :for="name in definition().scenarios" :value="name">{{ name }}</option></select></div>
-      <div :if="vtolDefinition()?.phases.length"><label for="mission-vtol-phase" class="block mb-2 text-sm">Fault injection phase</label><select id="mission-vtol-phase" x-model="phase" class="px-3 py-3 max-w-full text-neutral-100 bg-neutral-900 border border-neutral-600 rounded focus-visible:outline-emerald-200"><option :for="name in vtolDefinition()?.phases || []" :value="name">{{ name }}</option></select></div>
+      <div :if="vtolDefinition()?.phases.length"><label for="mission-vtol-phase" class="block mb-2 text-sm">{{ vtolDefinition()?.wind ? 'Wind onset' : 'Fault injection phase' }}</label><select id="mission-vtol-phase" x-model="phase" class="px-3 py-3 max-w-full text-neutral-100 bg-neutral-900 border border-neutral-600 rounded focus-visible:outline-emerald-200"><option :for="name in vtolDefinition()?.phases || []" :value="name">{{ name === 'startup' ? 'startup (1000 ms)' : name }}</option></select></div>
       <label :if="profile() === 'vtol'" for="mission-vtol-electrical" class="flex gap-3 items-center py-3 text-sm"><input id="mission-vtol-electrical" type="checkbox" x-model="electrical" class="accent-emerald-200">Modeled electrical load</label>
       <button type="button" @click="execute()" :disabled="busy()" class="px-4 py-3 font-medium text-neutral-950 whitespace-nowrap bg-emerald-200 rounded focus-visible:outline-emerald-200 focus-visible:outline-offset-4 disabled:opacity-60">{{ busy() ? 'Recording…' : 'Run scenario' }}</button>
       <button type="button" @click="reset()" class="px-4 py-3 text-sm whitespace-nowrap border border-neutral-600 rounded focus-visible:outline-emerald-200 focus-visible:outline-offset-4">Clear recording</button>
@@ -123,10 +127,11 @@ function vectorLabel(value: number[] | null | undefined) { return value ? value.
             <p class="mt-2 leading-relaxed text-neutral-400 text-xs">A matched case can be blocked, aborted or host-lost. These are recorded model observations, not physical flight qualification.</p>
             <div :if="vtolResult()?.windEvidence" class="mt-5" data-vtol-wind>
               <h4 class="font-semibold text-sm">Declared world wind</h4>
-              <p class="mt-2 break-words font-mono text-neutral-400 text-xs">LOCAL_NED {{ vectorLabel(vtolResult()?.windEvidence?.windMps) }} m/s, from {{ vtolResult()?.windEvidence?.beginsAtMs }} ms.</p>
+              <p class="mt-2 break-words font-mono text-neutral-400 text-xs">LOCAL_NED {{ vectorLabel(vtolResult()?.windEvidence?.windMps) }} m/s, from {{ vtolResult()?.windEvidence?.beginsAtMs === null ? 'unobserved onset' : vtolResult()?.windEvidence?.beginsAtMs + ' ms' }}.</p>
+              <p :if="vtolResult()?.windEvidence?.phase" class="mt-2 text-neutral-400 text-xs" data-vtol-wind-phase>Observed {{ vtolResult()?.windEvidence?.phase }} entry: {{ vtolResult()?.windEvidence?.phaseEnteredAtMs }} ms. Phase binding: {{ vtolResult()?.windEvidence?.phaseMatched ? 'matched' : 'unmatched' }}. Wind starts on the next 4 ms integration step.</p>
               <p class="mt-2 text-neutral-400 text-xs">World exposure check: {{ vtolResult()?.windEvidence?.worldMatched ? 'matched' : 'unmatched' }}. Expected result: {{ vtolResult()?.windEvidence?.expectedOutcome === 'completed-route' ? 'completed route' : 'back-transition envelope stop' }}.</p>
               <p class="mt-2 text-neutral-400 text-xs">The wind is a model input. It is not supplied to the controller or reported as a measured wind estimate.</p>
-              <p :if="vtolResult()?.windEvidence?.backHeadingRad !== undefined" class="mt-2 text-neutral-400 text-xs" data-vtol-wind-heading>Back hover heading: {{ vtolResult()?.windEvidence?.backHeadingRad?.toFixed(3) }} rad from north. Plan heading check: {{ vtolResult()?.windEvidence?.backHeadingMatched ? 'matched' : 'unmatched' }}. This separately declared plan keeps the fixed north-facing limit cases unchanged.</p>
+              <p :if="vtolResult()?.windEvidence?.backHeadingRad !== undefined" class="mt-2 text-neutral-400 text-xs" data-vtol-wind-heading>Back hover heading: {{ vtolResult()?.windEvidence?.backHeadingRad?.toFixed(3) }} rad from north. Plan heading check: {{ vtolResult()?.windEvidence?.backHeadingMatched ? 'matched' : 'unmatched' }}. This result does not qualify other wind onset or heading plans.</p>
               <p :if="vtolResult()?.windEvidence?.expectedOutcome === 'envelope-stop'" class="mt-2 leading-relaxed text-amber-200 text-xs" data-vtol-wind-limit>This plan with a fixed north heading remains outside the supported route envelope. A matched stop does not certify hover, contact or a safe landing.</p>
             </div>
             <p :if="modeObservation()" class="mt-4 break-words font-mono text-sm" data-vtol-mode>{{ modeObservation()?.phase }} / {{ modeObservation()?.outcome }} / {{ modeObservation()?.taskId }}</p>
