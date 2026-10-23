@@ -7,7 +7,7 @@ export default defineCommand({
   description: 'Exercise the fictional owned front/cruise/back/landing route; no physical control',
   options: {
     '--scenario <name>': { description: vtolSimulationScenarios.join(', '), default: 'nominal' },
-    '--phase <name>': { description: `Fault injection phase: ${vtolSimulationPhases.join(', ')}; default front` },
+    '--phase <name>': { description: `Observed wind onset or fault injection: ${vtolSimulationPhases.join(', ')}; wind also accepts startup (default, 1000 ms); faults default front` },
     '--seconds <n>': { description: 'Maximum virtual duration, 2..180 seconds; default 160, or 180 for recovery hold' },
     '--electrical': { description: 'Use fictional electrical load and delayed battery measurements', default: false },
   },

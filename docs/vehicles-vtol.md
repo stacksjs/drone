@@ -54,7 +54,8 @@ unpowered airflow work. They establish bounded mathematical properties, not a ca
 A predeclared 16-case runtime campaign introduces 2 m/s head, tail, east and west wind at observed
 front, cruise, back and landing phase entries. All complete their declared heading plans through
 source-qualified hover, contact and replay within the original budgets. Wind onset is applied on
-the next actual integration step; the CLI/workspace wind selectors still use the fixed 1000 ms onset.
+the next actual integration step. CLI/workspace selectors now expose the same observed phase onset;
+the default remains the fixed 1000 ms startup onset.
 
 Hover control aligns the thrust direction separately from its heading correction. A large, saturated
 yaw error therefore cannot rotate the requested position correction into another axis. Opposite
@@ -78,7 +79,7 @@ The library campaign applies sustained 2 m/s headwind or tailwind to the actual 
 original budgets using the raw sensor/estimator/controller runtime. Six named cases are shared by
 Buddy, the copied standalone CLI and the mission workspace:
 
-| Scenario | World wind N/E/D, m/s | Back-hover heading from north | Required recorded outcome |
+| Scenario | World wind N/E/D, m/s | Back-hover heading from north | Default startup outcome |
 | --- | --- | --- | --- |
 | `headwind-2mps` | -2, 0, 0 | 0 rad, north | Completed route and contact |
 | `tailwind-2mps` | 2, 0, 0 | 0 rad, north | Completed route and contact |
@@ -98,8 +99,28 @@ Buddy, the copied standalone CLI and the mission workspace:
 first/last matching application epochs, mismatch count and separate world/outcome checks. Actual
 world inputs are observed after plant integration, outside controller inputs. An absent, wrong or
 mistimed wind cannot pass under the scenario name. A partial route remains unmatched. Wind cases
-reject `--phase`; their declared onset is 1000 ms. Exit 0 means the selected demonstration matched,
-so a crosswind limit report still has `status: 'blocked'`, no confirmed back hover and no contact.
+accept `--phase startup|front|cruise|back|landing`; startup remains the default 1000 ms onset.
+For a phase onset, the factory observes the actual running task entry and schedules the weather
+for the next 4 ms plant integration. It never supplies wind or plant truth to controller inputs.
+The declaration has `beginsAtMs: null` until that entry is observed. Reports retain `phase`,
+`phaseEnteredAtMs`, actual onset and `phaseMatched`, independently bound to the recorded task entry.
+An unreached phase remains unexposed and unmatched. Exit 0 means the selected demonstration matched,
+so a startup crosswind limit report still has `status: 'blocked'`, no confirmed back hover and no contact.
+
+All 24 wind/phase combinations run through the actual runtime with the original time/energy
+budget and heading plans. Headwind, tailwind and the two explicit wind-facing plans complete
+for each phase. The fixed north crosswind limit cases stop at the back-transition envelope
+when wind begins in front, cruise or back. With wind beginning only at landing, those same
+fixed north plans complete through contact. Their `expectedOutcome` is therefore
+`completed-route` for landing onset, and `envelope-stop` for the earlier phases. These are
+distinct modeled cases, not a general wind or landing guarantee. The original startup limit
+cases keep their blocked result. Every selected phase also binds the actual final heading.
+
+```bash
+./buddy vtol:simulate --scenario east-crosswind-limit-2mps --phase back --electrical
+./buddy vtol:simulate --scenario east-crosswind-limit-2mps --phase landing --electrical
+./storage/runtime-build/cli/drone vtol:simulate --scenario west-crosswind-2mps --phase cruise
+```
 
 A tailwind library run can also be constructed explicitly from a script under `scripts/`:
 
@@ -112,7 +133,7 @@ profile.faults = (_scenario, atMs) => ({ windMps: atMs >= 1000 ? [2, 0, 0] : [0,
 const result = runVehicleSimulation(profile, { seconds: 160 })
 ```
 
-The fixed north-facing east/west crosswind plans still reach the back-transition envelope guard
+With startup, front, cruise or back onset, the fixed north-facing east/west crosswind plans reach the back-transition envelope guard
 without confirmed hover or landing. The retained v2 east-case diagnosis, before the v3 flow projection,
 records a reverse return at 38,000 ms where
 the modeled aerodynamic yaw moment is approximately -0.729 Nm while the fully allocated opposing
@@ -134,7 +155,7 @@ confirmation and contact route in the declared wind. Their extra `backHeadingRad
 a different heading remains unmatched. The plan retains its declared final heading, and there are no automatic retries.
 The original `*-limit-2mps` cases keep their prior plans and blocked outcomes.
 
-Wider wind directions, onset phases, a general feasibility planner and measured full-angle model qualification
+Wider wind directions and arbitrary onset times, a general feasibility planner and measured full-angle model qualification
 remain in [#87](https://github.com/stacksjs/drone/issues/87). No arbitrary-wind, measured-airframe or
 physical flight acceptance is claimed.
 
@@ -242,8 +263,8 @@ locked-rotor electrical current.
 
 For a named case, exit 0 means its specific expected outcome matched. It does not turn `blocked`,
 `host-lost` or `aborted` into a completed mission. `completeTransitions` still describes the nominal
-three confirmations. Invalid selectors, `--phase` on a non-fault case, mismatched outcomes or insufficient
-duration exit 1. A duration that excludes a scheduled operator action is rejected before resources
+three confirmations. Invalid selectors, `--phase` on a case without a fault or wind fixture,
+mismatched outcomes or insufficient duration exit 1. A duration that excludes a scheduled operator action is rejected before resources
 are created. Custom schedules and recovery graphs remain TypeScript inputs to the shared runtime.
 
 The controller receives measured relative airspeed, differential pressure, airflow angles and modeled
@@ -445,8 +466,8 @@ it does not model a seized motor's electrical current.
 ## Mission workspace
 
 Open `/missions`, choose `vtol` and select one of the same 20 named cases as `vtol:simulate`.
-The six source/manual/host faults also expose `front`, `cruise`, `back` and `landing` injection
-phases. The optional electrical checkbox selects the fictional 100 Wh model. Changing the vehicle,
+The six source/manual/host faults expose `front`, `cruise`, `back` and `landing` injection
+phases. All six wind cases expose startup or observed front/cruise/back/landing onset. The optional electrical checkbox selects the fictional 100 Wh model. Changing the vehicle,
 scenario, fault phase or electrical selection clears the previous recording.
 
 The workspace shows the validated worst-case time and energy allowance, requested modes and counted
@@ -458,8 +479,10 @@ it does not assert a continuously measured current phase.
 Task playback shows each requested VTOL heading in radians from north. Wind playback shows
 the declared vector/onset, the actual world exposure check and the expected completed-route or
 envelope-stop outcome. The explicit wind-facing plans also show their back heading and recorded-plan
-binding. The wind is a fixture input, not a measured wind estimate. The separate fixed-heading
-crosswind limit recordings retain their blocked status and unsupported-envelope disclosure.
+binding. The wind is a fixture input, not a measured wind estimate. With startup, front, cruise
+or back onset, fixed-heading crosswind limit recordings remain blocked and show the unsupported-envelope
+disclosure. Landing-only onset completes through contact and displays the recorded phase binding
+and completed-route expectation.
 
 With the electrical model enabled, each row uses the runtime's already qualified sensor capture.
 Used chemical energy, source/load power, current, terminal voltage and the age-charged remaining

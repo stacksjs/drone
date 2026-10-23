@@ -14,7 +14,7 @@ import type { SubseaScenario } from './subsea'
 import { reduceSubseaInspection } from './subsea/inspection'
 import { runVehicleSimulation } from './runtime'
 import { observeVehicleBattery } from './measurements'
-import { createVtolSimulationCase, vtolSimulationPhases, vtolSimulationScenarios } from './vtol/simulation'
+import { createVtolSimulationCase, vtolSimulationScenarios } from './vtol/simulation'
 export const missionWorkspaceProfiles = ['quadcopter', 'fixed-wing', 'vtol', 'ground', 'surface', 'subsea'] as const
 export type MissionWorkspaceProfile = typeof missionWorkspaceProfiles[number]
 export interface WorkspaceTask { id: string, kind: string, targetM: SensorVector | null, edges: string[], operation: string | null, containerId: string | null, failureEdge?: string | null, mode?: string | null, headingRad?: number | null }
@@ -46,7 +46,7 @@ export function getMissionWorkspaceDefinition(profile: MissionWorkspaceProfile =
   const vtolCase = profile === 'vtol' ? createVtolSimulationCase(scenario, options) : null
   const p = vtolCase ? vtolCase.profile : vehicleProfile(profile as Exclude<MissionWorkspaceProfile, 'quadcopter' | 'vtol'>, scenario), { plan, worstCaseMs, requiredWh } = validateVehicleMission(p.mission)
   return { profile, scenario, version: 2, name: p.name, planId: plan.id, scenarios: [...scenarios], frame: plan.frame, origin: { ...plan.origin }, fence: { ...plan.fence }, rallyM: [...plan.rallyM], budget: { worstCaseMs, requiredWh, usableWh: plan.power.availableWh * (1 - plan.power.reservePercent / 100) }, tasks: plan.tasks.map((t): WorkspaceTask => ({ id: t.id, kind: t.kind, targetM: vector(vehicleTaskTarget(plan, t)), edges: t.kind === 'branch' ? [t.then, t.otherwise] : 'next' in t && t.next ? [t.next] : [], operation: t.kind === 'payload' ? t.operation : null, containerId: t.kind === 'payload' ? t.containerId : null, ...(profile === 'vtol' ? { failureEdge: t.kind === 'vtol-mode' ? t.onFailure ?? null : null, mode: t.kind === 'vtol-mode' ? t.mode : null, headingRad: t.kind === 'vtol-mode' ? t.headingRad : null } : {}) } satisfies WorkspaceTask)), assumptions: vtolCase ? 'Fictional lift-and-cruise model. Captured mode observations and optional battery readings are modeled evidence. No physical transition or recovery qualification.' : vehicleProfiles[profile as Exclude<MissionWorkspaceProfile, 'quadcopter' | 'vtol'>].assumptions,
-    ...(vtolCase ? { vtol: { phase: vtolCase.phase, phases: vtolCase.phase ? [...vtolSimulationPhases] : [], electrical: vtolCase.electrical, seconds: vtolCase.seconds, ...(vtolCase.wind ? { wind: structuredClone(vtolCase.wind) } : {}) } } : {}) }
+    ...(vtolCase ? { vtol: { phase: vtolCase.phase, phases: [...vtolCase.phases], electrical: vtolCase.electrical, seconds: vtolCase.seconds, ...(vtolCase.wind ? { wind: structuredClone(vtolCase.wind) } : {}) } } : {}) }
 }
 function request(payload: VehiclePayloadCommand): WorkspacePayload { return { eventId: payload.eventId, taskId: payload.taskId, operation: payload.operation, containerId: payload.containerId, issuedAtMs: payload.issuedAtMs, expiresAtMs: payload.expiresAtMs, reference: payload.reference, evidence: 'modeled-request' } }
 function ackFor(ack: VehiclePayloadAck, seen: Map<string, WorkspacePayload>): WorkspaceAck {

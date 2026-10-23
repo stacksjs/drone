@@ -74,7 +74,7 @@ test('the workspace retains planned wind separately from observed exposure and a
   const definition = getMissionWorkspaceDefinition('vtol', 'tailwind-2mps', { electrical: true })
   if (!('vtol' in definition)) throw new Error('Expected the VTOL definition')
   expect(definition.vtol!.wind).toEqual({ frame: 'LOCAL_NED', windMps: [2, 0, 0], beginsAtMs: 1000, expectedOutcome: 'completed-route' })
-  expect(definition.vtol!.phases).toEqual([])
+  expect(definition.vtol!.phases).toEqual(['startup', 'front', 'cruise', 'back', 'landing'])
   const run = runMissionWorkspace('vtol', 'west-crosswind-limit-2mps', { electrical: true })
   if (!('vtol' in run)) throw new Error('Expected the VTOL recording')
   expect(run.status).toBe('blocked')
@@ -86,6 +86,21 @@ test('the workspace retains planned wind separately from observed exposure and a
   expect(run.rows.at(-1)!.state).toBe('blocked')
   expect(run.boardNeutral).toBe(true)
   expect(run.physicalActuationEnabled).toBe(false)
+})
+
+test('workspace wind onset remains a declaration until the selected phase is actually observed', () => {
+  const definition = getMissionWorkspaceDefinition('vtol', 'east-crosswind-limit-2mps', { phase: 'landing', electrical: true })
+  if (!('vtol' in definition)) throw new Error('Expected VTOL definition')
+  expect(definition.vtol!.phase).toBe('landing')
+  expect(definition.vtol!.wind).toMatchObject({ phase: 'landing', beginsAtMs: null, expectedOutcome: 'completed-route', backHeadingRad: 0 })
+  const run = runMissionWorkspace('vtol', 'east-crosswind-limit-2mps', { phase: 'landing', electrical: true })
+  if (!('vtol' in run)) throw new Error('Expected VTOL recording')
+  const enteredAt = run.rows.find(row => row.state === 'running' && row.taskId === 'land')!.atMs
+  expect(run.vtol!.windEvidence).toMatchObject({ phase: 'landing', phaseEnteredAtMs: enteredAt, beginsAtMs: enteredAt + 4, firstAppliedAtMs: enteredAt + 4, phaseMatched: true, worldMatched: true, outcomeMatched: true })
+  expect(run.status).toBe('completed')
+  expect(run.vtol!.landingContact).toBe(true)
+  expect(run.vtol!.demonstrationMatched).toBe(true)
+  expect(run.boardNeutral).toBe(true)
 })
 
 test('the shared VTOL case factory runs isolated sessions and retains the CLI report from the same recording', () => {

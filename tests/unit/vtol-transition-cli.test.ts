@@ -19,6 +19,8 @@ test('CI qualifies nominal and failure full-route commands outside the checkout'
     { command: '$GITHUB_WORKSPACE/storage/runtime-build/cli/drone vtol:simulate --scenario west-crosswind-limit-2mps --electrical', directory: '${{ runner.temp }}' },
     { command: '$GITHUB_WORKSPACE/storage/runtime-build/cli/drone vtol:simulate --scenario east-crosswind-2mps --electrical', directory: '${{ runner.temp }}' },
     { command: '$GITHUB_WORKSPACE/storage/runtime-build/cli/drone vtol:simulate --scenario west-crosswind-2mps --electrical', directory: '${{ runner.temp }}' },
+    { command: '$GITHUB_WORKSPACE/storage/runtime-build/cli/drone vtol:simulate --scenario east-crosswind-limit-2mps --phase back --electrical', directory: '${{ runner.temp }}' },
+    { command: '$GITHUB_WORKSPACE/storage/runtime-build/cli/drone vtol:simulate --scenario east-crosswind-limit-2mps --phase landing --electrical', directory: '${{ runner.temp }}' },
   ])
 })
 
@@ -143,12 +145,26 @@ test('native wind selectors retain actual exposure and distinct completed or env
     expect(report.board.expiresAtMs).toBeNull()
     expect(report.board.physicalActuationEnabled).toBe(false)
   }
-  const invalid = await command(['vtol:simulate', '--scenario', 'headwind-2mps', '--phase', 'back']).withTimeout(60000)
+  const invalid = await command(['vtol:simulate', '--scenario', 'headwind-2mps', '--phase', 'unknown']).withTimeout(60000)
   expect(invalid.exitCode).toBe(1)
   expect(invalid.stdout).toBe('')
   const short = await command(['vtol:simulate', '--scenario', 'tailwind-2mps', '--seconds', '2']).withTimeout(60000)
   expect(short.exitCode).toBe(1)
   expect(JSON.parse(short.stdout).windEvidence.outcomeMatched).toBe(false)
+}, 90000)
+
+test('native wind phase selection retains observed onset and the landing-only fixed-heading result', async () => {
+  for (const phase of ['back', 'landing']) {
+    const result = await command(['vtol:simulate', '--scenario', 'east-crosswind-limit-2mps', '--phase', phase, '--electrical']).withTimeout(60000)
+    expect(result.exitCode).toBe(0)
+    const report = JSON.parse(result.stdout)
+    expect(report.status).toBe(phase === 'landing' ? 'completed' : 'blocked')
+    expect(report.windEvidence).toMatchObject({ phase, backHeadingRad: 0, backHeadingMatched: true, phaseMatched: true, worldMatched: true, outcomeMatched: true })
+    expect(report.windEvidence.firstAppliedAtMs).toBe(report.windEvidence.phaseEnteredAtMs + 4)
+    expect(report.landingContact).toBe(phase === 'landing')
+    expect(report.demonstrationMatched).toBe(true)
+    expect(report.boardNeutral).toBe(true)
+  }
 }, 90000)
 
 test('native wind-aligned plans retain their explicit headings, fresh hover and completed contact', async () => {
