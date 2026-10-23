@@ -80,7 +80,9 @@ outputs remain inhibited. Read the [shared contract](docs/vehicles.md), [air mod
 vertical takeoff, a nearby hover waypoint and contact-gated landing. The TypeScript library also
 includes a bounded modeled front/cruise/back experiment with stable-phase pause and resume.
 `./buddy vtol:simulate` runs its nominal route through vertical landing and reports the qualified
-mode observations. Add `--electrical` to either command for fictional propulsion/battery load and delayed energy measurements.
+mode observations. Named scenarios expose phase-bound sensor/manual/host loss, cruise pause/resume,
+declared front/back abort and recovery, pusher open-circuit timeout and global endurance expiry.
+Add `--electrical` to either command for fictional propulsion/battery load and delayed energy measurements.
 Plans can explicitly declare bounded hover-and-land transition recovery. Complete recovery/abort envelopes,
 measured hybrid energy qualification and a selectable VTOL mission workspace remain open.
 

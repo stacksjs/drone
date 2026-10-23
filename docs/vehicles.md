@@ -62,11 +62,11 @@ All evidence is owned physics simulation. The Pico neutral-only board image does
 TypeScript controllers. Native board execution, external firmware SITL, HIL and measured physical
 vehicle acceptance remain separate gates. A separate [VTOL development guide](vehicles-vtol.md)
 covers the hover-only command and an experimental lift-and-cruise library profile with a native
-`vtol:simulate` nominal-route command. The latter
+`vtol:simulate` command for nominal and named fault/operator scenarios. The latter
 executes a bounded modeled front/cruise/back/vertical-landing route with stable-phase pause and
 resume, plus explicitly declared hover-and-land transition recovery. Complete recovery/abort
 envelopes, measured hybrid energy qualification,
-CLI fault/operator scenarios and a VTOL selection in the common workspace remain open. Helicopter,
+a VTOL selection in the common workspace remain open. Helicopter,
 soaring, blimp and other airframe families remain explicit roadmap work.
 
 Read [air](vehicles-air.md), [ground](vehicles-ground.md), [surface](vehicles-surface.md), [subsea](vehicles-subsea.md),

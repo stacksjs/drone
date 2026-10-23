@@ -75,26 +75,74 @@ is a separate development experiment on the same owned runtime. Its nominal miss
 hover, takes off vertically to 15 m, requests a front transition, flies a cruise leg, requests back
 transition, returns to the back request's capture point, observes settled hover, and lands vertically.
 A turning leg also has an actual completed model campaign. The native `vtol:simulate` command runs
-the nominal route. This profile is not a selectable workspace profile.
+the nominal route and named cases below. This profile is not a selectable workspace profile.
 
 ```sh
 ./buddy vtol:simulate
 ./buddy vtol:simulate --electrical
+./buddy vtol:simulate --scenario host-loss --phase back --electrical
+./buddy vtol:simulate --scenario front-abort --electrical
 ./storage/runtime-build/cli/drone vtol:simulate --electrical
 ```
 
-The command defaults to 160 virtual seconds and accepts an integer `--seconds` from 2 to 180.
+The nominal command defaults to 160 virtual seconds and accepts an integer `--seconds` from 2 to 180.
 It reports the existing runtime's actual status and the three qualified initial-hover, cruise and
-back-hover observations, including their event, task, reference and capture epochs. Exit 0 requires
+back-hover observations, including their event, task, reference and capture epochs. Nominal exit 0 requires
 those ordered confirmations, observed estimated flight, completed landing with qualified modeled
 contact, no runtime fault, neutral board outputs and no active output lease. An incomplete route
 retains its partial observations and status and exits 1. The condensed report omits the full path
 and trace. The library still exposes both for replay and evaluation.
 
 Buddy discovers the typed command natively; the standalone binary registers the same definition.
-This command currently exposes the nominal route only. Fault scenarios, operator schedules and
-recovery route selection remain library capabilities. Simulation completion does not qualify
-physical transitions, arbitrary flight envelopes or hardware landing.
+`runVtolSimulation(scenario, options)` in `resources/functions/drone/vehicles/vtol/simulation.ts`
+owns the case logic and condensed report for both. Simulation completion does not qualify physical
+transitions, arbitrary flight envelopes or hardware landing.
+
+### Named fault and operator cases
+
+`--scenario` accepts `imu-loss`, `position-loss`, `vehicle-sensor-loss`, `host-loss`, `rc-override`
+and `kill`. These six cases also accept `--phase`, which defaults to `front`:
+
+| Phase | Declared injection epoch | Required pre-injection task |
+| --- | --- | --- |
+| `front` | 13,000 ms | Front transition |
+| `cruise` | 20,000 ms | Cruise leg |
+| `back` | 30,000 ms | Back transition |
+| `landing` | 68,000 ms | Vertical landing |
+
+These are fixed model epochs. The checker verifies the actual task immediately before injection;
+a changed model that reaches another task cannot silently pass under the requested phase name.
+Reports retain final source epochs observed at the controller boundary. Source failures must block
+within 500 ms, with the selected source absent or captured before injection. Position and vehicle
+sensor cases also require the other relevant source epochs to reach injection time. RC and kill require the
+matching authority observation at injection. Host loss requires the independently expired output
+lease and an older host authority snapshot. None can claim mission completion or landing.
+
+The remaining named cases use captured schedules and explicit, counted recovery routes:
+
+| Scenario | Declared behavior | Required final outcome |
+| --- | --- | --- |
+| `cruise-pause-resume` | Pause at 20,000 ms, resume at 40,000 ms in the cruise leg | Completed nominal landing |
+| `front-abort` | Abort at 13,000 ms through front recovery | `aborted`, `vtol-abort-landed` |
+| `back-abort` | Abort at 30,000 ms through back recovery | `aborted`, `vtol-abort-landed` |
+| `front-recover-resume` | Recover at 13,000 ms, resume at 40,000 ms | Completed recovery landing |
+| `back-recover-resume` | Recover at 30,000 ms, resume at 80,000 ms | Completed recovery landing |
+| `pusher-open-circuit` | Remove pusher demand/thrust; let front confirmation time out | Completed recovery landing, no cruise or retry |
+| `back-recovery-hold` | Recover at 30,000 ms with no resume | Blocked by global endurance, no landing |
+
+Recovery cases require the original event, replacement cancellation and source task to match, plus
+the ordered mode confirmations. `operatorEvidence` retains actual actions, tasks before those actions,
+pause and recovery evidence. The hold case defaults to 180 virtual seconds so it reaches the existing
+176,520 ms complete mission allowance. A 160-second run remains duration-exhausted and exits 1.
+The landing task may be queued while paused; it must never run without resume. The open-circuit case
+requires attempted pusher command, zero measured thrust and one front attempt. It does not model
+locked-rotor electrical current.
+
+For a named case, exit 0 means its specific expected outcome matched. It does not turn `blocked`,
+`host-lost` or `aborted` into a completed mission. `completeTransitions` still describes the nominal
+three confirmations. Invalid selectors, `--phase` on a non-fault case, mismatched outcomes or insufficient
+duration exit 1. A duration that excludes a scheduled operator action is rejected before resources
+are created. Custom schedules and recovery graphs remain TypeScript inputs to the shared runtime.
 
 The controller receives measured relative airspeed, differential pressure, airflow angles and modeled
 rotor/pusher response, together with the qualified raw gyro and estimated navigation. Delayed airflow
@@ -169,8 +217,8 @@ and releases outputs. Neither result establishes an airborne landing.
 Task execution time stops during pause. Global endurance and the declared energy charge continue,
 so a later scheduled resume can be preempted by reserve, endurance, health or authority refusal.
 Operator actions never extend the original planning allowance or rearm revoked authority. The
-operator schedules remain library-only; neither CLI command exposes them, and the common workspace
-does not select this VTOL profile.
+named presets above expose specific schedules through `vtol:simulate`. Custom schedules remain
+library inputs, and the common workspace does not select this VTOL profile.
 
 ## Declared transition recovery routes
 
@@ -292,7 +340,7 @@ it does not model a seized motor's electrical current.
 
 [Issue #12](https://github.com/stacksjs/drone/issues/12) remains open. The experimental nominal
 controller and opt-in recovery routes do not establish complete VTOL support. Complete recovery/abort
-envelopes, fresh-process restoration, identified hybrid power/voltage/cell behavior, CLI fault/operator scenarios and
+envelopes, fresh-process restoration, identified hybrid power/voltage/cell behavior and
 the common mission workspace still require implementation and qualification. Wind campaigns and
 broader mission/envelope coverage remain necessary. Full TECS/soaring, tiltrotor/tailsitter mechanisms,
 helicopters and other airframe families remain separate work. Native board control, measured airframe

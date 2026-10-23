@@ -154,6 +154,16 @@ jobs:
         working-directory: ${{ runner.temp }}
       - run: $GITHUB_WORKSPACE/storage/runtime-build/cli/drone vtol:simulate --electrical
         working-directory: ${{ runner.temp }}
+      - run: $GITHUB_WORKSPACE/storage/runtime-build/cli/drone vtol:simulate --scenario host-loss --phase back --electrical
+        working-directory: ${{ runner.temp }}
+      - run: $GITHUB_WORKSPACE/storage/runtime-build/cli/drone vtol:simulate --scenario cruise-pause-resume --electrical
+        working-directory: ${{ runner.temp }}
+      - run: $GITHUB_WORKSPACE/storage/runtime-build/cli/drone vtol:simulate --scenario front-abort --electrical
+        working-directory: ${{ runner.temp }}
+      - run: $GITHUB_WORKSPACE/storage/runtime-build/cli/drone vtol:simulate --scenario pusher-open-circuit --electrical
+        working-directory: ${{ runner.temp }}
+      - run: $GITHUB_WORKSPACE/storage/runtime-build/cli/drone vtol:simulate --scenario back-recovery-hold --electrical
+        working-directory: ${{ runner.temp }}
       - run: $GITHUB_WORKSPACE/storage/runtime-build/cli/drone authority:simulate --scenario pi-loss --seconds 4
         working-directory: ${{ runner.temp }}
       - run: $GITHUB_WORKSPACE/storage/runtime-build/cli/drone drivers:bench --driver ardupilot --drop-first-ack
