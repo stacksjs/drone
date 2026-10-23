@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict'
-import { mkdir, readFile } from 'node:fs/promises'
+import { mkdir, readFile, writeFile } from 'node:fs/promises'
 import { basename, join } from 'node:path'
 import { startWorkspaceBrowser } from './workspace-browser'
 import { settleExecutionDiagnostics } from './execution-diagnostics'
@@ -41,6 +41,7 @@ async function failureDiagnostics() {
         workspaceStatus: selected('[data-workspace-status]', ['disconnected', 'connecting', 'synchronizing', 'current', 'reconnecting', 'refused']),
         executionPhase: selected('[data-execution-phase]', ['no current run', 'waiting-for-consumer', 'running', 'stopping', 'completed', 'canceled', 'failed', 'discarded']),
         hasExecutionId: !!document.querySelector('[data-execution-id]'), hasCompletion: !!document.querySelector('[data-execution-completion]'),
+        hasSelectedSource: !!document.querySelector('[data-workspace-source]'),
         startDisabled: start ? start.disabled === true : null, admitDisabled: admit ? admit.disabled === true : null,
         hasSourceExists: !!document.querySelector('[data-execution-source-exists]'), hasExecutionError: !!document.querySelector('[data-execution-error]')
       };
@@ -53,7 +54,9 @@ async function failureDiagnostics() {
       admissionRequests: diagnosticPage ? diagnosticPage.requests.filter(request => request.method === 'POST' && request.url.endsWith('/workspace/execution/admission')).length : null,
     }
     const text = JSON.stringify({ ...base, ...parts })
-    console.error(Buffer.byteLength(text, 'utf8') <= 8192 ? text : JSON.stringify({ ...base, server: { available: false }, dom: null, byteBudgetExceeded: true }))
+    const bounded = Buffer.byteLength(text, 'utf8') <= 8192 ? text : JSON.stringify({ ...base, server: { available: false }, dom: null, byteBudgetExceeded: true })
+    console.error(bounded)
+    await writeFile(join(evidence, 'failure-diagnostics.json'), `${bounded}\n`, { mode: 0o600, flag: 'wx' })
   }
   catch { console.error(JSON.stringify({ label: 'execution-browser-failure-diagnostics', phase, available: false })) }
   finally {
@@ -130,10 +133,32 @@ try {
   await first.screenshot(join(evidence, 'execution-completed-mobile.png'), 375, 900)
   assert.equal(await first.evaluate('Math.max(0, document.documentElement.scrollWidth - innerWidth)'), 0, 'Execution UUID and digest wrap at375px')
   mark('explicit source admission')
+  await first.evaluate(`(() => {
+    const probe = { samples: [], overflow: false };
+    const sample = () => {
+      const value = document.querySelector('[data-workspace-source]')?.textContent.trim();
+      const selected = !value ? 'absent' : value === ${JSON.stringify(data.sourceDigest)} ? 'original' : 'other';
+      if (probe.samples.at(-1) === selected) return;
+      if (probe.samples.length >= 64) { probe.overflow = true; return; }
+      probe.samples.push(selected);
+    };
+    const observer = new MutationObserver(sample);
+    observer.observe(document.body, { childList: true, characterData: true, subtree: true });
+    sample(); globalThis.executionSourceProbe = { probe, stop: () => observer.disconnect() };
+  })()`)
   await first.click('Admit completed source')
   await first.wait("!!document.querySelector('[data-execution-source-exists]')", 'Explicit admission must refresh actual source catalog', 15000)
   await control('verify-admitted')
-  assert.equal(await first.evaluate("document.querySelector('[data-workspace-source]')?.textContent.trim()"), data.sourceDigest, 'Admission cannot select its new source')
+  mark('fresh workspace after admission renewal')
+  assert.equal(await first.evaluate("!!document.querySelector('[data-workspace-source]') || !!document.querySelector('[data-execution-completion]')"), false, 'Native renewal must clear private panes before fresh authorization')
+  await control('release-workspace')
+  await first.wait(`document.querySelector('[data-workspace-status]')?.textContent.trim() === 'current' && !!document.querySelector('[data-execution-source-exists]') && document.querySelector('[data-workspace-source]')?.textContent.trim() === ${JSON.stringify(data.sourceDigest)}`, 'Fresh authorization must restore the original selection after admission', 15000)
+  const selections = await first.evaluate<{ samples: string[], overflow: boolean }>('(() => { globalThis.executionSourceProbe.stop(); return globalThis.executionSourceProbe.probe; })()')
+  assert.equal(selections.overflow, false, 'The complete bounded selection history must be available')
+  assert(selections.samples.includes('absent'), 'The actual native renewal must hide selected imagery')
+  assert.equal(selections.samples.at(-1), 'original')
+  assert(selections.samples.every(value => value === 'original' || value === 'absent'), 'Admission must never select the new source, including during renewal')
+  await writeFile(join(evidence, 'admission-renewal.json'), `${JSON.stringify(selections)}\n`, { mode: 0o600, flag: 'wx' })
   assert.equal(await first.evaluate("document.querySelector('#incident-note')?.value"), 'Later unsent observation survives execution success')
   mark('read-only credential')
   const { token } = await control('read-only')

@@ -21,6 +21,8 @@ const { executionWords: words } = await import('../../../resources/functions/dro
 let holdArmed = false, holdUsed = false, held = false, releaseCredit: (() => void) | undefined
 let delayStart = true, releaseStart: (() => void) | undefined
 let streamStarts = 0, startRequests = 0, admissionRequests = 0, closeStream: (() => Promise<void>) | undefined
+let closeWorkspaceStream: (() => Promise<void>) | undefined, releaseWorkspace: (() => void) | undefined
+let holdWorkspace = false, workspaceHeld = false
 
 // Diagnostic state belongs only to this disposable fixture, never the execution controller.
 type RouteClass = 'execution-start' | 'execution-close' | 'execution-admission' | 'execution-events' | 'execution-status' | 'workspace-read'
@@ -51,7 +53,7 @@ function diagnosticSnapshot() {
   }
   return {
     available: true, pendingChecks: scalar(owner.pendingChecks),
-    fixture: { startRequests, admissionRequests, streamStarts, holdArmed, held, holdUsed }, lastStart, lastAdmission, responses: responses.slice(),
+    fixture: { startRequests, admissionRequests, streamStarts, holdArmed, held, holdUsed, holdWorkspace, workspaceHeld }, lastStart, lastAdmission, responses: responses.slice(),
     slot: slot === null ? null : {
       ordinal: ordinal(slot),
       phase: choice(field(slot, 'phase'), ['waiting-for-consumer', 'running', 'stopping', 'completed', 'canceled', 'failed', 'discarded'] satisfies ExecutionView['phase'][]),
@@ -138,8 +140,15 @@ const control = async (request: Request) => {
     assert(rows.some(row => row.digest !== seeded.source.digest))
     const committed = await fixture.snapshot(seeded.key)
     assert.equal(committed.audits.filter(audit => audit.action === 'source-registered').length, 2)
+    holdWorkspace = true
+    assert(closeWorkspaceStream, 'The real workspace stream must exist before renewal')
+    await closeWorkspaceStream()
+    const until = Date.now() + 5000
+    while (!workspaceHeld && Date.now() < until) await Bun.sleep(5)
+    assert(workspaceHeld, 'Native workspace renewal must request a fresh authorized snapshot')
     return Response.json({ ok: true })
   }
+  if (action === 'release-workspace') { assert(workspaceHeld, 'Release only the held native renewal'); releaseWorkspace?.(); return Response.json({ ok: true }) }
   if (action === 'read-only') return Response.json({ token: await fixture.credential(fixture.sender.id, ['public-safety:read']) })
   if (action === 'revoke') { await fixture.tokens.revokeToken(fixture.senderToken); return Response.json({ ok: true }) }
   return new Response(null, { status: 404 })
@@ -153,15 +162,25 @@ route.use(async (request: Request, next: () => Promise<Response | null> | Respon
   if (admissionOrdinal !== null) lastAdmission = { ordinal: admissionOrdinal, settled: false, status: null, elapsedMs: null }
   let status: number | null = null
   try {
+    if (kind === 'workspace-read' && holdWorkspace) {
+      holdWorkspace = false; workspaceHeld = true
+      await new Promise<void>(resolve => {
+        const release = () => { workspaceHeld = false; resolve() }
+        const timeout = setTimeout(release, 5000)
+        releaseWorkspace = () => { clearTimeout(timeout); release() }
+      })
+    }
     const response = await next()
     status = response?.status ?? null
     if (delayStart && request.method === 'POST' && pathname.endsWith('/workspace/execution') && response?.ok) { delayStart = false; await new Promise<void>(resolve => { releaseStart = resolve }) }
-    if (request.method !== 'GET' || !/\/workspace\/execution\/[a-f0-9-]+\/events$/.test(pathname) || !response?.ok || !response.body) return response
-    streamStarts++
+    const executionEvents = /\/workspace\/execution\/[a-f0-9-]+\/events$/.test(pathname), workspaceEvents = pathname.endsWith('/workspace/events')
+    if (request.method !== 'GET' || !(executionEvents || workspaceEvents) || !response?.ok || !response.body) return response
+    if (executionEvents) streamStarts++
     const reader = response.body.getReader()
     let closed = false, output: ReadableStreamDefaultController<Uint8Array> | undefined
     const close = async () => { if (closed) return; closed = true; output?.close(); await reader.cancel().catch(() => {}) }
-    closeStream = close
+    if (executionEvents) closeStream = close
+    else closeWorkspaceStream = close
     // Opaque native chunks pass unchanged. Only the private fixture can end a connection.
     const body = new ReadableStream<Uint8Array>({
       start(controller) { output = controller },
@@ -188,7 +207,7 @@ route.use(async (request: Request, next: () => Promise<Response | null> | Respon
 })
 const page = () => new Response(html, { headers: { 'content-type': 'text/html', 'cache-control': 'no-store' } })
 route.get('/incidents', page)
-for (const action of ['status', 'diagnostics', 'release-start', 'arm-before-return', 'before-return', 'release-and-renew', 'before-admission', 'verify-admitted', 'read-only', 'revoke']) route.get(`/__fixture/${action}`, control)
+for (const action of ['status', 'diagnostics', 'release-start', 'arm-before-return', 'before-return', 'release-and-renew', 'before-admission', 'verify-admitted', 'release-workspace', 'read-only', 'revoke']) route.get(`/__fixture/${action}`, control)
 const server = await route.serve({ hostname: '127.0.0.1', port: 0, nativeRoutes: false })
 if (process.env.EXECUTION_BROWSER_EVIDENCE) { await mkdir(process.env.EXECUTION_BROWSER_EVIDENCE, { recursive: true }); await writeFile(join(process.env.EXECUTION_BROWSER_EVIDENCE, 'compiled.html'), html) }
 await writeFile(join(root, 'execution-credentials.json'), JSON.stringify({ url: `http://127.0.0.1:${server.port}`, key: seeded.key, sourceDigest: seeded.source.digest, token: fixture.senderToken, control: secret }), { mode: 0o600 })
@@ -197,8 +216,8 @@ try {
   assert.equal(await child.exited, 0, 'Isolated real execution browser driver must pass')
 }
 finally {
-  releaseStart?.(); releaseCredit?.()
-  await closeStream?.(); await server.stop(true)
+  releaseStart?.(); releaseCredit?.(); releaseWorkspace?.()
+  await closeStream?.(); await closeWorkspaceStream?.(); await server.stop(true)
   const slot = executionOwner().slot as { execution: string, binding: { scope: string }, producer: string, worker: Worker | null } | null
   if (slot?.producer === 'pending') {
     const core = await import('../../../resources/functions/drone/public-safety/execution/service')

@@ -491,6 +491,8 @@ jobs:
             ${{ runner.temp }}/execution-browser-evidence/*.png
             ${{ runner.temp }}/execution-browser-evidence/compiled.html
             ${{ runner.temp }}/execution-browser-evidence/browser-launch.json
+            ${{ runner.temp }}/execution-browser-evidence/failure-diagnostics.json
+            ${{ runner.temp }}/execution-browser-evidence/admission-renewal.json
             ${{ runner.temp }}/execution-browser-evidence/chrome-startup-stderr.log
   purge-namespace:
     runs-on: ubuntu-latest
