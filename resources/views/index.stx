@@ -1,11 +1,12 @@
 @nolayout
 <!DOCTYPE html>
 <html lang="en">
-  <head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="description" content="An open Stacks workspace for custom drone behavior, simulation, and Raspberry Pi companion computing."><title>Drone / Stacks</title></head>
+  <head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="description" content="Build owned vehicle autonomy with Stacks: runtime, sensors, estimation, controls, missions and Pi AI Camera tracking. Experimental simulation and bench development."><title>Drone / Stacks</title></head>
   <body class="min-h-[100dvh] antialiased text-neutral-100 bg-neutral-950">
+    <a href="#main" class="skip-link">Skip to content</a>
     <div class="mx-auto px-5 sm:px-8 max-w-6xl">
-      <header class="flex flex-wrap gap-4 items-center justify-between py-6 border-b border-neutral-700"><a href="/" class="font-semibold text-lg tracking-tight">stacks<span class="mx-2 text-neutral-500">/</span>drone</a><nav aria-label="Main navigation" class="flex flex-wrap gap-5 items-center text-neutral-300 text-sm"><a href="#simulation" class="hover:text-white">Simulator</a><a href="/camera" class="hover:text-white">Camera</a><a href="/vision" class="hover:text-white">Target fusion</a><a href="/diagnostics" class="hover:text-white">Diagnostics</a><a href="/missions" class="hover:text-white">Missions</a><a href="/mapping" class="hover:text-white">Mapping</a><a href="/volumes" class="hover:text-white">Volumes</a><a href="/inspection" class="hover:text-white">Inspection</a><a href="/incidents" class="hover:text-white">Incidents</a><a href="/agriculture" class="hover:text-white">Field observations</a><a href="#hardware" class="hover:text-white">Hardware</a><a href="https://github.com/stacksjs/drone" class="hover:text-white">Source <span aria-hidden="true">↗</span></a></nav></header>
-      <main class="py-10 space-y-12 sm:py-14"><section class="max-w-3xl"><p class="mb-3 font-mono text-emerald-200 text-sm">COMPANION FLIGHT WORKSPACE</p><h1 class="font-semibold leading-tight text-3xl tracking-tight sm:text-5xl">Your aircraft.<br>Your flight logic.</h1><p class="mt-4 max-w-xl leading-relaxed text-neutral-400">Build and test custom follow behavior in TypeScript, then explore the Raspberry Pi integration path.</p></section><MissionControl /><FlightLimits /><HardwareChecklist /></main>
+      <header class="flex flex-wrap gap-4 items-center justify-between py-6 border-b border-neutral-700"><a href="/" class="font-semibold text-lg tracking-tight">stacks<span class="mx-2 text-neutral-500">/</span>drone</a><nav aria-label="Main navigation" class="flex flex-wrap gap-5 items-center text-neutral-300 text-sm"><a href="#simulation" class="hover:text-white">Simulator</a><a href="/camera" class="hover:text-white">Camera</a><a href="/missions" class="hover:text-white">Missions</a><a href="/docs" class="hover:text-white">Docs</a><a href="#hardware" class="hover:text-white">Hardware</a><a href="https://github.com/stacksjs/drone" class="hover:text-white">Source <span aria-hidden="true">↗</span></a></nav></header>
+      <main id="main" tabindex="-1" class="py-10 space-y-12 sm:py-14"><section class="max-w-3xl"><p class="mb-3 font-mono text-emerald-200 text-sm">OWNED VEHICLE AUTONOMY</p><h1 class="font-semibold leading-tight text-3xl tracking-tight sm:text-5xl">Your vehicle.<br>Your autonomy stack.</h1><p class="mt-4 max-w-xl leading-relaxed text-neutral-400">Build runtime, estimation, controls and missions with Stacks. Explore Pi AI Camera tracking and owned vehicle simulations.</p><p class="mt-4 max-w-xl text-emerald-200 text-sm">Experimental simulation and bench development. Physical telemetry is receive-only; physical flight commands are disabled.</p></section><MissionControl /><FlightLimits /><HardwareChecklist /></main>
       <footer class="flex flex-wrap gap-3 justify-between py-6 text-neutral-400 text-xs border-neutral-700 border-t"><span>Built with Stacks, stx, and Bun. <a href="/docs" class="underline hover:text-white">Documentation and implementation status</a></span><span>Simulation first. Physical flight requires separate validation.</span></footer>
     </div>
   </body>
@@ -16,5 +17,7 @@ button, input { font: inherit; }
 button { cursor: pointer; }
 button:disabled { cursor: default; }
 a, button, input { outline-offset: 4px; }
+.skip-link { position: absolute; top: 0; left: 1rem; padding: 0.75rem 1rem; background: #171717; color: #fff; transform: translateY(-150%); z-index: 10; }
+.skip-link:focus { transform: translateY(0); }
 @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; transition: none !important; } }
 </style>

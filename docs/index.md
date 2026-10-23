@@ -64,6 +64,12 @@ routes. The common `/missions` workspace selects the same named cases and displa
 observations and optional battery readings. Complete recovery/abort envelopes and measured hybrid
 energy qualification remain open.
 
+The published VTOL scenarios include bounded 2 m/s headwind and tailwind routes,
+plus east/west crosswind plans with explicit wind-facing back-hover headings.
+The original fixed north-facing crosswind plans remain limit cases with blocked
+envelope outcomes. These fictional plans do not establish arbitrary-wind support.
+See the [scenario commands and expected outcomes](vehicles-vtol.md) before comparing reports.
+
 ## Explore a workflow
 
 | Workflow | Current development surface | Guide |
