@@ -12,15 +12,22 @@ export function validateAirActuators(a: number[]) {
   if (!Array.isArray(a) || a.length !== 5 || !a.every(Number.isFinite) || a[0]! < 0 || a[0]! > 1 || a.slice(1, 4).some(n => Math.abs(n) > 0.4) || a[4]! < 0 || a[4]! > 1) throw new RangeError('Invalid fixed-wing throttle, aileron, elevator, rudder or wheel brake')
 }
 /** Quasi-steady lift/drag and rate-damped surface moments. Not firmware coefficients. */
-export function airAerodynamics(relativeBodyMps: SensorVector, rateRadS: SensorVector, actuators: number[]) {
+export function airAerodynamics(relativeBodyMps: SensorVector, rateRadS: SensorVector, actuators: number[], foldReverseFlow = false) {
+  if (typeof foldReverseFlow !== 'boolean') throw new TypeError('Invalid aerodynamic incidence model')
   if (!validVector(relativeBodyMps) || !validVector(rateRadS)) throw new RangeError('Invalid aerodynamic vector')
   validateAirActuators(actuators)
   const [u, v, w] = relativeBodyMps
   const speedMps = Math.hypot(u, v, w), alphaRad = Math.atan2(w, u), betaRad = Math.atan2(v, Math.hypot(u, w))
   const dynamicPressurePa = 0.5 * airModel.densityKgM3 * speedMps ** 2
-  const linearLift = 0.25 + 4.8 * alphaRad
+  // Explicit VTOL extension: fold the incidence and project stalled flow along
+  // the chord. Preserve the forward pre-stall curve; fade to zero at broadside
+  // and reverse the coefficient sign for flow over the trailing edge.
+  // Raw airflow angles remain unchanged for capture/envelope checks.
+  const coefficientAlphaRad = foldReverseFlow ? Math.atan2(w, Math.abs(u)) : alphaRad
+  const chordDirection = foldReverseFlow ? Math.sign(u) * Math.min(1, Math.abs(Math.cos(alphaRad)) / Math.cos(airModel.stallAlphaRad)) : 1
+  const linearLift = 0.25 + 4.8 * coefficientAlphaRad
   // Bounded post-stall loss, retaining drag. No claim of dynamic stall or spin modeling.
-  const liftCoefficient = clamp(linearLift, -1.1, 1.4) * Math.max(0.15, 1 - Math.max(0, Math.abs(alphaRad) - airModel.stallAlphaRad) * 2.5)
+  const liftCoefficient = chordDirection * clamp(linearLift, -1.1, 1.4) * Math.max(0.15, 1 - Math.max(0, Math.abs(coefficientAlphaRad) - airModel.stallAlphaRad) * 2.5)
   const dragCoefficient = 0.04 + 0.06 * liftCoefficient ** 2 + 0.8 * Math.sin(alphaRad) ** 2 + 0.2 * Math.sin(betaRad) ** 2
   const lift = dynamicPressurePa * airModel.areaM2 * liftCoefficient, drag = dynamicPressurePa * airModel.areaM2 * dragCoefficient
   const ca = Math.cos(alphaRad), sa = Math.sin(alphaRad)
@@ -28,7 +35,7 @@ export function airAerodynamics(relativeBodyMps: SensorVector, rateRadS: SensorV
   const rateScale = Math.max(1, speedMps)
   const torqueNm: SensorVector = [
     dynamicPressurePa * airModel.areaM2 * airModel.spanM * (0.12 * actuators[1]! - 0.3 * rateRadS[0] * airModel.spanM / (2 * rateScale)),
-    dynamicPressurePa * airModel.areaM2 * airModel.chordM * (0.8 * actuators[2]! - 0.15 * alphaRad - 2 * rateRadS[1] * airModel.chordM / (2 * rateScale)),
+    dynamicPressurePa * airModel.areaM2 * airModel.chordM * (0.8 * actuators[2]! - 0.15 * coefficientAlphaRad * chordDirection - 2 * rateRadS[1] * airModel.chordM / (2 * rateScale)),
     dynamicPressurePa * airModel.areaM2 * airModel.spanM * (0.08 * actuators[3]! + 0.12 * betaRad - 0.25 * rateRadS[2] * airModel.spanM / (2 * rateScale)),
   ]
   return { forceN, torqueNm, speedMps, alphaRad, betaRad, liftCoefficient, dragCoefficient, dynamicPressurePa, stalled: Math.abs(alphaRad) > airModel.stallAlphaRad }

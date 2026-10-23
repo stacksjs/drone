@@ -2,7 +2,7 @@ import { expect, test } from 'bun:test'
 import { createVtolTransitionProfile } from '../../resources/functions/drone/vehicles/vtol/transition-profile'
 import { runVehicleSimulation } from '../../resources/functions/drone/vehicles/runtime'
 import { createVtolFlightController } from '../../resources/functions/drone/vehicles/vtol/flight-controller'
-import { multiplyQuaternion, quaternionEuler } from '../../resources/functions/drone/estimation/frames'
+import { multiplyQuaternion, quaternionEuler, quaternionFromTilt } from '../../resources/functions/drone/estimation/frames'
 import { replayVehicleMission, validateVehicleMission } from '../../resources/functions/drone/missions/vehicle'
 import type { VehicleControllerContext, VehiclePlantState } from '../../resources/functions/drone/vehicles/types'
 
@@ -332,4 +332,63 @@ test('back hover cannot confirm while a near-stationary body remains away from t
     if (response.transition?.outcome === 'confirmed') qualifiedAt.push(c.nowMs)
   }
   expect(qualifiedAt).toEqual([settled.nowMs + 520])
+})
+
+function unachievableBrakeObservation(context: VehicleControllerContext) {
+  const input = structuredClone(context), pose = quaternionFromTilt(0, -0.4)
+  input.estimate.attitude!.quaternionWxyz = [...pose]
+  input.estimate.attitude!.eulerRad = [0, -0.4, 0]
+  input.measurementPose!.quaternionWxyz = [...pose]
+  input.controlRate!.angularRateRadS = [0, 0, 0]
+  Object.assign(input.measurement!.values, { airspeedMps: 13, differentialPressurePa: 103.5125, alphaRad: 0.1, betaRad: 0 })
+  return input
+}
+
+test('back braking refuses and latches when qualified airflow admits no pitch inside the declared bounds', () => {
+  const inputs = actualTransitionInputs(), index = inputs.findIndex(c => c.mission.transition?.taskId === 'back')
+  expect(index).toBeGreaterThan(0)
+  const controller = createVtolFlightController()
+  let warmed = true
+  for (const input of inputs.slice(0, index)) if (controller.step(input).inhibited) warmed = false
+  expect(warmed).toBe(true)
+  const refused = controller.step(unachievableBrakeObservation(inputs[index]!))
+  expect(refused.inhibited).toBe(true)
+  expect(refused.reason).toBe('vtol-braking-no-feasible-pitch')
+  expect(refused.actuators).toEqual([0, 0, 0, 0, 0, 0, 0, 0])
+  expect(refused.transition).toBeUndefined()
+  expect(controller.step(inputs[index + 1]!).inhibited).toBe(true)
+})
+
+function advanceControlEpoch(context: VehicleControllerContext) {
+  const input = structuredClone(context)
+  input.nowMs += 20; input.estimate.nowMs += 20; input.mission.elapsedMs += 20
+  input.estimate.attitude!.capturedAtMs! += 20
+  input.estimate.localPosition!.capturedAtMs! += 20
+  input.estimate.localPosition!.predictedToMs += 20
+  input.controlRate!.capturedAtMs += 20
+  input.measurement!.capturedAtMs += 20; input.measurement!.receivedAtMs += 20; input.measurement!.sequence++
+  for (const key of ['capturedAtMs', 'positionCapturedAtMs', 'positionPredictedToMs', 'attitudeCapturedAtMs', 'attitudePredictedToMs', 'gyroCapturedAtMs'] as const) input.measurementPose![key] += 20
+  return input
+}
+
+test('a later front recovery cannot inherit a previous back leg rotary-capture latch', () => {
+  const inputs = actualTransitionInputs(), index = inputs.findIndex(c => c.mission.taskId === 'land')
+  expect(index).toBeGreaterThan(0)
+  const controller = createVtolFlightController()
+  let warmed = true
+  for (const input of inputs.slice(0, index)) if (controller.step(input).inhibited) warmed = false
+  expect(warmed).toBe(true)
+  const front = advanceControlEpoch(inputs[index - 1]!), anchor = [...front.estimate.localPosition!.positionM] as [number, number, number]
+  front.mission.taskId = 'front-second'; front.mission.taskKind = 'vtol-mode'; front.mission.targetM = anchor
+  front.mission.transition = { eventId: 'front-second', taskId: 'front-second', mode: 'cruise', headingRad: 0, issuedAtMs: front.nowMs, expiresAtMs: front.nowMs + 15000, positionM: anchor, reference: front.measurement!.reference }
+  expect(controller.step(front).inhibited).toBe(false)
+  const recovery = unachievableBrakeObservation(advanceControlEpoch(front))
+  recovery.mission.taskId = 'recover-second'
+  recovery.mission.recovery = { failedEventId: 'front-second', failedTaskId: 'front-second', hoverTaskId: 'recover-second', triggeredAtMs: recovery.nowMs, cause: 'operator-recover' }
+  recovery.mission.transition = { eventId: 'recover-second', taskId: 'recover-second', mode: 'hover', headingRad: 0, issuedAtMs: recovery.nowMs, expiresAtMs: recovery.nowMs + 45000, positionM: anchor, reference: recovery.measurement!.reference, supersedesEventId: 'front-second' }
+  const refused = controller.step(recovery)
+  expect(refused.inhibited).toBe(true)
+  expect(refused.reason).toBe('vtol-braking-no-feasible-pitch')
+  expect(refused.actuators).toEqual([0, 0, 0, 0, 0, 0, 0, 0])
+  expect(refused.transition).toBeUndefined()
 })

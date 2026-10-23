@@ -176,7 +176,12 @@ test('an early resume and repeated recovery cannot skip observed hover or extend
   expect(new Set(requests.map(request => request.eventId)).size).toBe(1)
   expect(requests.every(request => request.issuedAtMs === 13000 && request.expiresAtMs === 58000)).toBe(true)
   expect(report.path.find(row => row.atMs === 13200)!.mission.state).toBe('running')
-  expect(report.path.find(row => row.atMs === 20000)!.mission.state).toBe('paused')
+  const observedHover = report.trace.rows.find(row => row.observation.transition?.taskId === 'recover-hover' && row.observation.transition.outcome === 'confirmed')
+  expect(observedHover).toBeDefined()
+  expect(observedHover!.observation.nowMs).toBeGreaterThan(13400)
+  expect(observedHover!.observation.nowMs).toBeLessThan(40000)
+  expect(observedHover!.result.state).toBe('paused')
+  expect(report.path.filter(row => row.atMs >= 13200 && row.atMs < observedHover!.observation.nowMs).every(row => row.mission.state === 'running' && row.mission.taskId === 'recover-hover')).toBe(true)
   expect(report.path.find(row => row.atMs === 39980)!.mission.state).toBe('paused')
   expect(report.mission.reason).toBe('vtol-recovery-landed')
   expect(replayVehicleMission(report.trace).snapshot()).toEqual(report.mission)
@@ -193,7 +198,11 @@ for (const abortAtMs of [15000, 20000]) test(`an abort at ${abortAtMs} upgrades 
   expect(replayVehicleMission(report.trace).snapshot()).toEqual(report.mission)
 })
 
-for (const [sourceTask, atMs] of [['initial-hover', 620], ['front', 11320], ['back', 27400]] as const) test(`a ${sourceTask} abort before its first command dispatch does not invent a cancelled event`, () => {
+for (const sourceTask of ['initial-hover', 'front', 'back'] as const) test(`a ${sourceTask} abort before its first command dispatch does not invent a cancelled event`, () => {
+  const baseline = runVehicleSimulation(declaredRecovery(sourceTask), { seconds: 160 })
+  const firstRequest = baseline.path.find(row => row.mission.transition?.taskId === sourceTask)
+  expect(firstRequest).toBeDefined()
+  const atMs = firstRequest!.atMs
   const report = runVehicleSimulation(declaredRecovery(sourceTask), { seconds: 180, missionActions: [{ atMs, action: 'abort' }] })
   expect(report.mission.reason).toBe('vtol-abort-landed')
   expect(report.mission.recovery?.failedEventId).toBeNull()
@@ -235,7 +244,7 @@ test('a declared front-transition failure route cancels failed wing support, obs
   expect(replayVehicleMission(report.trace).snapshot()).toEqual(report.mission)
 })
 
-for (const landingTimeoutMs of [25000, 35000]) test(`back-transition recovery retains the declared ${landingTimeoutMs} ms approach and landing budget`, () => {
+for (const [landingTimeoutMs, worstCaseMs, requiredWh] of [[20000, 141520, 47.17333333333333], [25000, 146520, 48.84], [35000, 156520, 52.17333333333333]] as const) test(`back-transition recovery retains the declared ${landingTimeoutMs} ms approach and landing budget`, () => {
   const profile = declaredRecovery('back'), back = profile.mission.tasks.find(task => task.id === 'back')!
   if (back.kind !== 'vtol-mode') throw new Error('Expected a VTOL mode task')
   back.timeoutMs = 15000
@@ -244,18 +253,22 @@ for (const landingTimeoutMs of [25000, 35000]) test(`back-transition recovery re
   hover.timeoutMs = 45000; land.timeoutMs = landingTimeoutMs
   const report = runVehicleSimulation(profile, { seconds: 160 })
   console.log('VTOL_BACK_TIMEOUT_RECOVERY', JSON.stringify({ landingTimeoutMs, status: report.status, fault: report.fault, mission: report.mission, budget: report.budget, finalPositionM: report.finalTruthPositionM, transitions: report.transitions }))
-  if (landingTimeoutMs === 25000) {
+  expect(report.budget.worstCaseMs).toBe(worstCaseMs)
+  expect(report.budget.requiredWh).toBeCloseTo(requiredWh, 8)
+  const landingStart = report.transitions.find(row => row.taskId === 'recover-land' && row.state === 'running')!.atMs
+  if (landingTimeoutMs === 20000) {
     expect(report.status).toBe('blocked')
     expect(report.mission.reason).toBe('task-timeout')
     expect(report.path.at(-1)!.measurement!.values.onSurface).toBe(false)
     expect(report.finalTruthPositionM[2]).toBeLessThan(-1)
     expect(report.board.actuators).toEqual([0, 0, 0, 0, 0, 0, 0, 0])
+    expect(report.board.expiresAtMs).toBeNull()
+    expect(report.path.at(-1)!.atMs - landingStart).toBe(landingTimeoutMs)
     expect(replayVehicleMission(report.trace).snapshot()).toEqual(report.mission)
     return
   }
   expect(report.status).toBe('completed')
-  expect(report.budget.worstCaseMs).toBe(156520)
-  expect(report.budget.requiredWh).toBeCloseTo(52.17333333333333, 8)
+  expect(report.path.at(-1)!.atMs - landingStart).toBeLessThan(landingTimeoutMs)
   expect(report.mission.reason).toBe('vtol-recovery-landed')
   expect(report.mission.recovery).toMatchObject({ failedTaskId: 'back', hoverTaskId: 'recover-hover', cause: 'timeout' })
   const original = report.path.find(row => row.mission.taskId === 'back' && row.mission.transition)!.mission.transition!

@@ -36,6 +36,44 @@ and a 120 N/s slew limit. An independent 14 N pusher and the owned trainer's aer
 share the rigid body. Rotor allocation preserves collective thrust first, then roll/pitch demand,
 then yaw. No coefficient is measured from a purchased airframe.
 
+The VTOL wing uses the fictional `folded-incidence-v2` extension. Its forward pre-stall curve
+matches the trainer. In reversed chordwise flow, incidence is folded and the coefficient changes
+sign, with a cosine fade toward broadside. This removes the force/moment jump at the raw angle's
+positive/negative pi boundary and restores the local vertical response in the tested head/tail flow.
+Raw airflow angles remain available to the capture and envelope guards. The fixed-wing profile keeps
+its original trainer model. Neither curve represents measured reverse-flow or post-stall data.
+
+Back-transition braking compares the linear pre-stall estimate with 41 pitch candidates in the
+existing -0.08 to 0.3 rad range. It evaluates the declared nonlinear wing/rotor force balance against
+qualified captured airflow and estimated ground motion. Candidates must admit 0 to 48 N of lift-rotor
+thrust while supporting the requested vertical force; high-speed candidate incidence remains within
+0.3 rad. The finite transition deadline, source guards, capture dwell and independent authority still
+apply. Replacing a correlated back request preserves rotary capture once reached, so recovery cannot
+restart forward-flight braking during a reverse position return.
+
+### Bounded library wind experiment
+
+The library campaign applies sustained 2 m/s headwind or tailwind to the actual world model from
+1000 ms, including takeoff, transitions, cruise and landing. Both routes complete within their
+original budgets using the raw sensor/estimator/controller runtime. This does not add wind selectors
+to the 14 named CLI/workspace cases below. A tailwind library run can be constructed explicitly:
+
+```ts
+import { createVtolTransitionProfile } from '../resources/functions/drone/vehicles/vtol/transition-profile'
+import { runVehicleSimulation } from '../resources/functions/drone/vehicles/runtime'
+
+const profile = createVtolTransitionProfile({ electrical: true })
+profile.faults = (_scenario, atMs) => ({ windMps: atMs >= 1000 ? [2, 0, 0] : [0, 0, 0] })
+const result = runVehicleSimulation(profile, { seconds: 160 })
+```
+
+The same `[0, 2, 0]` m/s crosswind experiment still reaches the back-transition envelope guard
+without confirmed hover or landing. Its yaw excursion and eventual pitch limit remain an unsupported
+case. Neutral outputs at that airborne failure do not establish a safe landing. Wider wind directions,
+onset phases, planning/heading feasibility and named native/workspace cases remain in
+[#87](https://github.com/stacksjs/drone/issues/87). No arbitrary-wind, measured-airframe or physical
+flight acceptance is claimed.
+
 The hover demonstration commands the pusher and three surfaces to zero. Calibrated modeled raw
 IMU/GNSS samples feed the owned estimator. The controller receives estimated pose, a current qualified
 raw gyro capture and delayed contact measurements. Plant truth is used for sensor synthesis and
@@ -262,9 +300,11 @@ route. A timeout/controller rejection that recovers to contact ends with `vtol-r
 
 Landing holds the captured estimated approach height until horizontal position and speed qualify
 descent to the selected site. Actual failed-pusher and expired-back campaigns retain rotor-supported
-hover and fresh contact. The original 25-second back-recovery approach/landing case still times out
-airborne. A separately declared 35-second allowance completes after about 26.94 seconds, charged to
-the complete 156,520 ms / 52.1733 Wh worst-case plan. A normal 45-second back plus 45-second recovery
+hover and fresh contact. With nonlinear braking, both the 25-second and 35-second back-recovery
+approach/landing cases reach contact within their declared allowances. They retain complete
+146,520 ms / 48.84 Wh and 156,520 ms / 52.1733 Wh worst-case plans, respectively. A stricter
+20-second landing case expires at its exact deadline while still airborne, with a complete
+141,520 ms / 47.1733 Wh plan. A normal 45-second back plus 45-second recovery
 hover and 35-second landing exceeds the unchanged 180-second graph cap and is rejected. The phase
 abort/pause/recover campaigns instead declare 40-second recovery hover and 30-second landing, fitting
 176,520 ms / 58.84 Wh. These remain conservative 1200 W planning charges, without identified electrical

@@ -5,11 +5,11 @@ import { createVehicleMeasurementQualifier, vehicleReference } from '../measurem
 import { quaternionEuler, quaternionFromTilt, multiplyQuaternion, normalizeQuaternion } from '../../estimation/frames'
 import { rotateBodyToNed, rotateNedToBody } from '../../controls/physics'
 import { createBoundedPid } from '../../controls/pid'
-import { airAerodynamics, airModel } from '../air/plant'
+import { airModel } from '../air/plant'
 import { createVtolVehicleHoverController } from './controller'
 import { numericPacket } from './packets'
 import { allocateVtolLift } from './allocation'
-import { vtolModel } from './plant'
+import { vtolAerodynamics, vtolModel } from './plant'
 
 const clamp = (n: number, low: number, high: number) => Math.max(low, Math.min(high, n))
 const wrap = (n: number) => Math.atan2(Math.sin(n), Math.cos(n))
@@ -89,7 +89,10 @@ export function createVtolFlightController(): VehicleController {
         }
         if (request?.eventId !== incoming.eventId && incoming.mode === 'hover' && hasWingControl) {
           if (phase !== 'cruise' && !superseding) return neutral(c, 'vtol-back-requires-observed-cruise')
-          request = structuredClone(incoming); signature = encoded; phase = 'back-transition'; backSlow = false; stableSource = null; stableDecision = null
+          // A correlated replacement keeps rotary capture once reached. Restarting
+          // wing braking here would assume forward flow during a position return.
+          backSlow = (phase === 'back-transition' || phase === 'hover') && backSlow
+          request = structuredClone(incoming); signature = encoded; phase = 'back-transition'; stableSource = null; stableDecision = null
           for (const pid of velocityPid) pid.reset()
         }
       }
@@ -131,15 +134,30 @@ export function createVtolFlightController(): VehicleController {
       let requiredUpN = vtolModel.massKg * (vtolModel.gravityMps2 - downAcceleration)
       const alphaTarget = clamp((requiredUpN / Math.max(1, pressureArea * Math.cos(bankTarget)) - 0.25) / 4.8, -0.08, 0.18)
       let pitchTarget = clamp(gamma + alphaTarget, -0.2, 0.25) * clamp((speed - 10) / 2, 0, 1)
-      const zero = airAerodynamics(relative, rates!, [0, 0, 0, 0, 0])
+      const zero = vtolAerodynamics(relative, rates!, [0, 0, 0, 0, 0])
       if (rotary) {
         backSlow ||= speed < 3
         if (!backSlow && phase === 'back-transition') {
-          // With the pusher off, high-speed braking is bounded by wing drag and the lift surplus.
-          // The linear pre-stall lift slope gives the pitch that maximizes supported rotor braking.
+          // The linear pre-stall estimate seeds a bounded search of the actual fictional
+          // wing/rotor force balance, including stalled drag. Keep the original pitch limits.
           const optimalAlpha = Math.max(0, (requiredUpN / Math.max(1, pressureArea) - 0.25) / (2 * 4.8))
           pitchTarget = clamp(gamma + optimalAlpha, -0.08, 0.3)
           bankTarget = 0
+          let bestBraking = -Infinity
+          const direction = groundSpeed > 0.2 ? [velocity![0] / groundSpeed, velocity![1] / groundSpeed] : [Math.cos(heading), Math.sin(heading)]
+          for (const candidate of [pitchTarget, ...Array.from({ length: 41 }, (_, i) => -0.08 + 0.38 * i / 40)]) {
+            const pose = multiplyQuaternion([Math.cos(heading / 2), 0, 0, Math.sin(heading / 2)], quaternionFromTilt(0, candidate))
+            const body = rotateNedToBody(pose, airNed)
+            const wing = vtolAerodynamics(body, [0, 0, 0], [0, 0, 0, 0, 0])
+            if (speed > 8 && Math.abs(wing.alphaRad) > 0.3) continue
+            const force = rotateBodyToNed(pose, wing.forceN)
+            const thrust = (requiredUpN + force[2]) / Math.cos(candidate)
+            if (thrust < 0 || thrust > 48) continue
+            const rotor = rotateBodyToNed(pose, [0, 0, -thrust])
+            const braking = -(direction[0]! * (force[0] + rotor[0]) + direction[1]! * (force[1] + rotor[1]))
+            if (braking > bestBraking) { bestBraking = braking; pitchTarget = candidate }
+          }
+          if (bestBraking === -Infinity) return neutral(c, 'vtol-braking-no-feasible-pitch')
         }
         else {
           const goal = [...target!] as SensorVector
@@ -176,7 +194,7 @@ export function createVtolFlightController(): VehicleController {
       const pusher = rotary ? 0 : clamp((-zero.forceN[0] + vtolModel.massKg * clamp((13 - speed) * 1.2, -2.5, 2.5)) / vtolModel.maxPusherThrustN, 0, 1)
       const coefficients = [pressureArea * airModel.spanM * 0.12, pressureArea * airModel.chordM * 0.8, pressureArea * airModel.spanM * 0.08]
       const surfaces = torque.map((n, i) => coefficients[i]! > 1e-6 ? clamp((n - zero.torqueNm[i]!) / coefficients[i]!, -0.4, 0.4) : 0)
-      const aero = airAerodynamics(relative, rates!, [pusher, ...surfaces, 0])
+      const aero = vtolAerodynamics(relative, rates!, [pusher, ...surfaces, 0])
       const aeroNed = rotateBodyToNed(q!, aero.forceN)
       const collective = clamp((requiredUpN + aeroNed[2]) / Math.max(0.7, Math.cos(roll) * Math.cos(pitch)), 0, 48)
       const allocation = allocateVtolLift({ thrustN: collective, torqueNm: torque.map((n, i) => n - aero.torqueNm[i]!) as SensorVector })

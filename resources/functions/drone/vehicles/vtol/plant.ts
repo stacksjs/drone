@@ -9,7 +9,12 @@ import { numericPacket } from './packets'
 import { vtolElectricalLoad, vtolElectricalMaximumW, vtolElectricalModel, vtolElectricalSupply } from './power'
 
 /** Fictional lift-and-cruise model. No measured hardware coefficients or flight qualification. */
-export const vtolModel = Object.freeze({ massKg: 2.5, surfaceFrictionCoefficient: 0.5, gravityMps2: 9.80665, maxRotorThrustN: 12, rotorTimeConstantS: 0.06, rotorSlewNPerS: 120, rotorArmProjectionM: 0.4, reactionTorqueM: 0.02, inertiaKgM2: Object.freeze([0.3, 0.4, 0.6] as const), maxPusherThrustN: airModel.maxThrustN, pusherTimeConstantS: 0.08, pusherSlewNPerS: 60, wing: airModel })
+export const vtolModel = Object.freeze({ aerodynamicsModel: 'folded-incidence-v2' as const, massKg: 2.5, surfaceFrictionCoefficient: 0.5, gravityMps2: 9.80665, maxRotorThrustN: 12, rotorTimeConstantS: 0.06, rotorSlewNPerS: 120, rotorArmProjectionM: 0.4, reactionTorqueM: 0.02, inertiaKgM2: Object.freeze([0.3, 0.4, 0.6] as const), maxPusherThrustN: airModel.maxThrustN, pusherTimeConstantS: 0.08, pusherSlewNPerS: 60, wing: airModel })
+
+/** Fictional continuous reverse-flow extension, not measured post-stall or reverse-flight data. */
+export function vtolAerodynamics(relativeBodyMps: SensorVector, rateRadS: SensorVector, actuators: number[]) {
+  return airAerodynamics(relativeBodyMps, rateRadS, actuators, true)
+}
 
 /** Independent lift rotors and the owned trainer wing/pusher share one rigid body. */
 export function createVtolPlant(initial: { positionM?: SensorVector, velocityMps?: SensorVector, quaternionWxyz?: Quaternion, rotorsN?: [number, number, number, number], pusherThrustN?: number, electricalCapacityWh?: number, energyUsedWh?: number } = {}): VehiclePlant {
@@ -54,7 +59,7 @@ export function createVtolPlant(initial: { positionM?: SensorVector, velocityMps
       const pusherChangeN = (actuators[4]! * vtolModel.maxPusherThrustN - pusherThrustN) * (1 - Math.exp(-dtS / vtolModel.pusherTimeConstantS))
       const pusherMaximumChangeN = vtolModel.pusherSlewNPerS * dtS
       const nextPusherThrustN = pusherThrustN + Math.max(-pusherMaximumChangeN, Math.min(pusherMaximumChangeN, pusherChangeN))
-      const aero = airAerodynamics(relative, angularRateRadS, [nextPusherThrustN / vtolModel.maxPusherThrustN, actuators[5]!, actuators[6]!, actuators[7]!, 0])
+      const aero = vtolAerodynamics(relative, angularRateRadS, [nextPusherThrustN / vtolModel.maxPusherThrustN, actuators[5]!, actuators[6]!, actuators[7]!, 0])
       // Front-left, front-right, rear-right, rear-left. Rotor reaction signs are +, -, +, - about BODY_FRD z.
       const torqueNm: SensorVector = [
         aero.torqueNm[0] + vtolModel.rotorArmProjectionM * (nextRotorsN[0]! - nextRotorsN[1]! - nextRotorsN[2]! + nextRotorsN[3]!),
