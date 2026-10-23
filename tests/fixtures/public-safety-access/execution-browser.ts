@@ -5,6 +5,7 @@ import { mkdir, writeFile } from 'node:fs/promises'
 import { join, resolve } from 'node:path'
 import { randomUUID } from 'node:crypto'
 import { setupHandoverFixture } from './handover-setup'
+import { createExecutionCallbackObserver } from '../../helpers/execution-worker-observation'
 
 // Real native setup owns the guarded disposable SQLite file before any application boot.
 const fixture = await setupHandoverFixture()
@@ -43,6 +44,14 @@ let nextOrdinal = 0
 const scalar = (value: unknown) => typeof value === 'number' && Number.isFinite(value) && Math.abs(value) <= Number.MAX_SAFE_INTEGER ? value : null
 const field = (value: unknown, name: string): unknown => value && typeof value === 'object' ? Object.getOwnPropertyDescriptor(value, name)?.value : undefined
 const choice = <T extends string>(value: unknown, values: readonly T[]): T | null => values.find(item => item === value) ?? null
+const callbackObserver = createExecutionCallbackObserver(value => console.log(JSON.stringify(value)))
+function observeAcceptedWorker(acceptedOrdinal: number) {
+  try {
+    const worker = field(executionOwner().slot, 'worker')
+    if (worker instanceof Worker) callbackObserver.observe(worker, acceptedOrdinal)
+  }
+  catch { /* Private observation must not change an accepted native response. */ }
+}
 const ordinal = (slot: object) => {
   const existing = ordinals.get(slot)
   if (existing !== undefined) return existing
@@ -61,7 +70,7 @@ function diagnosticSnapshot() {
     return typeof value === 'number' ? scalar(value - now) : null
   }
   return {
-    available: true, pendingChecks: scalar(owner.pendingChecks),
+    available: true, pendingChecks: scalar(owner.pendingChecks), workerCallbacks: callbackObserver.snapshot(),
     fixture: { startRequests, admissionRequests, streamStarts, holdArmed, held, holdUsed, holdWorkspace, workspaceHeld, preAdmissionRenewalArmed, preAdmissionRenewed, preAdmissionHeldReads: preAdmissionReads.size, preAdmissionHoldExpired }, lastStart, lastAdmission, responses: responses.slice(),
     slot: slot === null ? null : {
       ordinal: ordinal(slot),
@@ -123,6 +132,7 @@ const control = async (request: Request) => {
   if (request.headers.get('x-fixture-control') !== secret) return new Response(null, { status: 404 })
   const action = new URL(request.url).pathname.slice('/__fixture/'.length)
   if (action === 'status') return Response.json({ held, streamStarts, startRequests, startResponseReady: !!releaseStart, workspaceHeld, preAdmissionRenewed, preAdmissionHeldReads: preAdmissionReads.size, preAdmissionHoldExpired, admissionRequests })
+  if (action === 'worker-callback-timings') return Response.json(callbackObserver.snapshot())
   if (action === 'diagnostics') {
     try {
       const text = `${JSON.stringify(diagnosticSnapshot())}\n`
@@ -212,6 +222,9 @@ route.use(async (request: Request, next: () => Promise<Response | null> | Respon
     }
     const response = await next()
     status = response?.status ?? null
+    // The genuine core Worker is already constructed. No constructor or frame is replaced.
+    // Observation precedes the accepted response and the later native consumer attachment.
+    if (startOrdinal !== null && status === 202) observeAcceptedWorker(startOrdinal)
     if (delayStart && request.method === 'POST' && pathname.endsWith('/workspace/execution') && response?.ok) { delayStart = false; await new Promise<void>(resolve => { releaseStart = resolve }) }
     const executionEvents = /\/workspace\/execution\/[a-f0-9-]+\/events$/.test(pathname), workspaceEvents = pathname.endsWith('/workspace/events')
     if (request.method !== 'GET' || !(executionEvents || workspaceEvents) || !response?.ok || !response.body) return response
@@ -247,7 +260,7 @@ route.use(async (request: Request, next: () => Promise<Response | null> | Respon
 })
 const page = () => new Response(html, { headers: { 'content-type': 'text/html', 'cache-control': 'no-store' } })
 route.get('/incidents', page)
-for (const action of ['status', 'diagnostics', 'release-start', 'arm-before-return', 'before-return', 'release-and-renew', 'before-admission', 'hold-completion-read-renewal', 'arm-pre-admission-renewal', 'renew-pre-admission-held-read', 'verify-admitted', 'release-workspace', 'read-only', 'revoke']) route.get(`/__fixture/${action}`, control)
+for (const action of ['status', 'diagnostics', 'worker-callback-timings', 'release-start', 'arm-before-return', 'before-return', 'release-and-renew', 'before-admission', 'hold-completion-read-renewal', 'arm-pre-admission-renewal', 'renew-pre-admission-held-read', 'verify-admitted', 'release-workspace', 'read-only', 'revoke']) route.get(`/__fixture/${action}`, control)
 const server = await route.serve({ hostname: '127.0.0.1', port: 0, nativeRoutes: false })
 if (process.env.EXECUTION_BROWSER_EVIDENCE) { await mkdir(process.env.EXECUTION_BROWSER_EVIDENCE, { recursive: true }); await writeFile(join(process.env.EXECUTION_BROWSER_EVIDENCE, 'compiled.html'), html) }
 await writeFile(join(root, 'execution-credentials.json'), JSON.stringify({ url: `http://127.0.0.1:${server.port}`, key: seeded.key, sourceDigest: seeded.source.digest, token: fixture.senderToken, control: secret }), { mode: 0o600 })

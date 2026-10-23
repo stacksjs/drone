@@ -214,6 +214,28 @@ try {
   await control('revoke')
   await first.wait("document.querySelector('[data-workspace-status]')?.textContent.trim() === 'refused'", 'Revocation must clear private execution content', 16000)
   assert.equal(await first.evaluate("!!document.querySelector('[data-execution-id]') || document.body.textContent.includes(" + JSON.stringify(digest) + ")"), false)
+  const callbackTimings = await control('worker-callback-timings')
+  assert.equal(callbackTimings.overflow, false)
+  assert.equal(callbackTimings.unavailable, false)
+  assert.equal(callbackTimings.observations.length, 2, 'Both genuine core Workers must have bounded callback observations')
+  const nominalCallbacks = callbackTimings.observations[1]
+  assert.equal(nominalCallbacks.ordinal, 2)
+  assert.equal(nominalCallbacks.inCallback, false)
+  assert.equal(nominalCallbacks.capped, false)
+  assert(nominalCallbacks.costs.event.calls > 0)
+  assert.equal(nominalCallbacks.costs.result.calls, 1)
+  assert.equal(nominalCallbacks.costs.finished.calls, 1)
+  for (const observation of callbackTimings.observations) {
+    assert.equal(observation.inCallback, false)
+    assert.equal(observation.capped, false)
+    for (const kind of ['event', 'result', 'finished', 'other']) {
+      const bucket = observation.costs[kind]
+      assert(Number.isSafeInteger(bucket.calls) && bucket.calls >= 0 && bucket.calls <= 1000000)
+      assert(Number.isFinite(bucket.totalMs) && bucket.totalMs >= 0 && bucket.totalMs <= Number.MAX_SAFE_INTEGER)
+      assert(Number.isFinite(bucket.maxMs) && bucket.maxMs >= 0 && bucket.maxMs <= bucket.totalMs)
+    }
+  }
+  await writeFile(join(evidence, 'worker-callback-timings.json'), `${JSON.stringify(callbackTimings)}\n`, { mode: 0o600, flag: 'wx' })
   console.log('PASS actual execution browser: native live-before-return/GET renewal/stop/completion/explicit admission/read-only/revocation')
 }
 catch (error) {

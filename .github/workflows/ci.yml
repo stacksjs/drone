@@ -513,6 +513,7 @@ jobs:
             ${{ runner.temp }}/execution-browser-evidence/admission-renewal.json
             ${{ runner.temp }}/execution-browser-evidence/pre-admission-renewal.json
             ${{ runner.temp }}/execution-browser-evidence/completion-read-renewal.json
+            ${{ runner.temp }}/execution-browser-evidence/worker-callback-timings.json
             ${{ runner.temp }}/execution-browser-evidence/chrome-startup-stderr.log
   purge-namespace:
     runs-on: ubuntu-latest
