@@ -1,4 +1,4 @@
-import type { VehicleMissionAction, VehicleMissionObservation, VehicleMissionPlan, VehicleMissionSnapshot, VehicleMissionTask, VehiclePayloadAck, VehiclePayloadCommand } from '../vehicles/types'
+import type { VehicleMissionAction, VehicleMissionObservation, VehicleMissionPlan, VehicleMissionSnapshot, VehicleMissionTask, VehiclePayloadAck, VehiclePayloadCommand, VehicleVtolTransitionCommand, VehicleVtolTransitionObservation } from '../vehicles/types'
 import type { MissionState } from './engine'
 import { authorityStates } from '../authority/supervisor'
 import { validVector } from '../controls/model'
@@ -26,6 +26,11 @@ export function validateVehicleMission(input: unknown): { plan: VehicleMissionPl
     let fields = ['id', 'kind'], edges: string[] = [], durationMs = 20
     if (t.kind === 'start') { fields.push('next'); if (t.id !== p.start || !id(t.next)) invalid(); edges = [t.next] }
     else if (t.kind === 'abort') { /* Terminal release, never an emergency landing. */ }
+    else if (t.kind === 'vtol-mode') {
+      fields.push('mode', 'headingRad', 'timeoutMs', 'next')
+      if (p.vehicle !== 'vtol' || !['hover', 'cruise'].includes(t.mode) || !number(t.headingRad, -Math.PI, Math.PI) || !Number.isSafeInteger(t.timeoutMs) || !number(t.timeoutMs, 100, 15000) || !id(t.next)) invalid()
+      durationMs = t.timeoutMs; edges = [t.next]
+    }
     else if (t.kind === 'branch') {
       fields.push('batteryAtLeast', 'then', 'otherwise')
       if (!number(t.batteryAtLeast, p.power.reservePercent + 1, 100) || !id(t.then) || !id(t.otherwise)) invalid()
@@ -65,18 +70,29 @@ function validAck(value: unknown): value is VehiclePayloadAck {
   if (value.metadata !== undefined && (!object(value.metadata) || Object.keys(value.metadata).length > 32 || Object.entries(value.metadata).some(([key, item]) => !/^[a-zA-Z][a-zA-Z0-9_-]{0,39}$/.test(key) || !(typeof item === 'boolean' || (typeof item === 'number' && Number.isFinite(item)) || (typeof item === 'string' && item.length <= 160))))) return false
   return true
 }
+function validTransition(value: unknown): value is VehicleVtolTransitionObservation {
+  return object(value) && keys(value, ['evidence', 'eventId', 'taskId', 'mode', 'reference', 'capturedAtMs', 'measurementCapturedAtMs', 'phase', 'outcome', 'reason'])
+    && value.evidence === 'modeled-vtol-controller-observation' && typeof value.eventId === 'string' && value.eventId.length <= 256 && id(value.taskId) && ['hover', 'cruise'].includes(value.mode as string)
+    && typeof value.reference === 'string' && value.reference.length <= 120 && Number.isSafeInteger(value.capturedAtMs) && (value.capturedAtMs as number) >= 0
+    && Number.isSafeInteger(value.measurementCapturedAtMs) && (value.measurementCapturedAtMs as number) >= 0 && (value.measurementCapturedAtMs as number) <= (value.capturedAtMs as number)
+    && ['hover', 'front-transition', 'cruise', 'back-transition'].includes(value.phase as string) && ['progress', 'confirmed', 'aborted'].includes(value.outcome as string)
+    && typeof value.reason === 'string' && /^[a-z][a-z0-9-]{0,79}$/.test(value.reason)
+}
 /** V2 mission policy shared by all vehicle profiles. It has no transport or arming capability. */
 export function createVehicleMissionEngine(input: unknown) {
   const { plan, worstCaseMs } = validateVehicleMission(input)
   const tasks = new Map(plan.tasks.map(t => [t.id, t]))
+  const hasTransitions = plan.tasks.some(t => t.kind === 'vtol-mode')
   let state: MissionState = 'ready', taskId = plan.start, reason = 'awaiting-operator-start'
   let lastNow: number | null = null, startedAt: number | null = null, reference: string | null = null, taskElapsedMs = 0, settledMs = 0
   let targetM: VehicleMissionSnapshot['targetM'] = null, holdM: VehicleMissionSnapshot['targetM'] = null, pending: VehiclePayloadCommand | null = null
+  let transition: VehicleVtolTransitionCommand | null = null
+  let transitionObservation: { capturedAtMs: number, measurementCapturedAtMs: number, signature: string } | null = null
   const rows: VehicleMissionTrace['rows'] = []
-  function snapshot(): VehicleMissionSnapshot { return { version: 2, vehicle: plan.vehicle, evidence: 'owned-vehicle-mission-simulation', physicalFlightEnabled: false, state, taskId, taskKind: tasks.get(taskId)!.kind, targetM: targetM ? [...targetM] : null, payload: pending ? structuredClone(pending) : null, reason, elapsedMs: startedAt === null || lastNow === null ? 0 : lastNow - startedAt } }
-  function block(why: string) { state = 'blocked'; reason = why; targetM = null; pending = null }
+  function snapshot(): VehicleMissionSnapshot { return { version: 2, vehicle: plan.vehicle, evidence: 'owned-vehicle-mission-simulation', physicalFlightEnabled: false, state, taskId, taskKind: tasks.get(taskId)!.kind, targetM: targetM ? [...targetM] : null, payload: pending ? structuredClone(pending) : null, reason, elapsedMs: startedAt === null || lastNow === null ? 0 : lastNow - startedAt, ...(hasTransitions ? { transition: transition ? structuredClone(transition) : null } : {}) } }
+  function block(why: string) { state = 'blocked'; reason = why; targetM = null; pending = null; transition = null; transitionObservation = null }
   function advance(next: string) {
-    taskId = next; taskElapsedMs = 0; settledMs = 0; pending = null; reason = 'task-entered'
+    taskId = next; taskElapsedMs = 0; settledMs = 0; pending = null; transition = null; transitionObservation = null; reason = 'task-entered'
     const task = tasks.get(next)!
     const goal = vehicleTaskTarget(plan, task)
     if (goal) targetM = goal as VehicleMissionSnapshot['targetM']
@@ -90,7 +106,7 @@ export function createVehicleMissionEngine(input: unknown) {
       let o: VehicleMissionObservation
       try { o = structuredClone(inputObservation) }
       catch { block('invalid-observation-or-clock'); throw new TypeError('Invalid vehicle mission observation') }
-      if (!object(o) || !keys(o, ['kind', 'nowMs', 'reference', 'origin', 'healthy', 'positionM', 'velocityMps', 'authority', 'batteryPercent', 'onGround', 'payloadAck']) || Object.keys(o).length !== 11 || o.kind !== 'simulation' || !Number.isSafeInteger(o.nowMs) || o.nowMs < 0 || (lastNow !== null && o.nowMs <= lastNow) || typeof o.reference !== 'string' || o.reference.length > 120 || !/^[1-9][0-9]{0,19}:[0-9]+,[0-9]+,[0-9]+,[0-9]+,[0-9]+$/.test(o.reference) || !object(o.origin) || !keys(o.origin, ['latitudeDeg', 'longitudeDeg', 'ellipsoidHeightM']) || o.origin.latitudeDeg !== plan.origin.latitudeDeg || o.origin.longitudeDeg !== plan.origin.longitudeDeg || o.origin.ellipsoidHeightM !== plan.origin.ellipsoidHeightM || typeof o.healthy !== 'boolean' || typeof o.onGround !== 'boolean' || !validVector(o.positionM) || !validVector(o.velocityMps) || !authorityStates.includes(o.authority) || !number(o.batteryPercent, 0, 100) || (o.payloadAck !== null && !validAck(o.payloadAck)) || (action !== undefined && !['start', 'pause', 'resume', 'abort', 'recover'].includes(action))) { block('invalid-observation-or-clock'); throw new TypeError('Invalid vehicle mission observation') }
+      if (!object(o) || !keys(o, ['kind', 'nowMs', 'reference', 'origin', 'healthy', 'positionM', 'velocityMps', 'authority', 'batteryPercent', 'onGround', 'payloadAck', ...(hasTransitions ? ['transition'] : [])]) || Object.keys(o).length !== (hasTransitions ? 12 : 11) || o.kind !== 'simulation' || !Number.isSafeInteger(o.nowMs) || o.nowMs < 0 || (lastNow !== null && o.nowMs <= lastNow) || typeof o.reference !== 'string' || o.reference.length > 120 || !/^[1-9][0-9]{0,19}:[0-9]+,[0-9]+,[0-9]+,[0-9]+,[0-9]+$/.test(o.reference) || !object(o.origin) || !keys(o.origin, ['latitudeDeg', 'longitudeDeg', 'ellipsoidHeightM']) || o.origin.latitudeDeg !== plan.origin.latitudeDeg || o.origin.longitudeDeg !== plan.origin.longitudeDeg || o.origin.ellipsoidHeightM !== plan.origin.ellipsoidHeightM || typeof o.healthy !== 'boolean' || typeof o.onGround !== 'boolean' || !validVector(o.positionM) || !validVector(o.velocityMps) || !authorityStates.includes(o.authority) || !number(o.batteryPercent, 0, 100) || (o.payloadAck !== null && !validAck(o.payloadAck)) || (hasTransitions && o.transition !== null && !validTransition(o.transition)) || (action !== undefined && !['start', 'pause', 'resume', 'abort', 'recover'].includes(action))) { block('invalid-observation-or-clock'); throw new TypeError('Invalid vehicle mission observation') }
       const dt = lastNow === null ? 0 : o.nowMs - lastNow, previousState = state
       lastNow = o.nowMs
       if (active(state)) {
@@ -102,15 +118,17 @@ export function createVehicleMissionEngine(input: unknown) {
         else if (o.batteryPercent <= plan.power.reservePercent) block('mission-battery-reserve')
         else if (o.nowMs - startedAt! > worstCaseMs) block('mission-endurance-exhausted')
         else if (o.payloadAck !== null && pending === null) block('unsolicited-payload-ack')
+        else if (o.transition && transition === null) block('unsolicited-vtol-transition')
       }
-      if (action === 'abort' && (active(state) || state === 'ready')) { state = 'aborted'; reason = 'operator-abort'; targetM = null; pending = null }
+      if (action === 'abort' && (active(state) || state === 'ready')) { state = 'aborted'; reason = 'operator-abort'; targetM = null; pending = null; transition = null; transitionObservation = null }
       else if (action === 'start' && state === 'ready') {
         const needed = plan.power.reservePercent + 100 * plan.power.maxW * worstCaseMs / 3600000 / plan.power.availableWh
-        if (!o.healthy || o.authority !== 'autonomous' || !o.onGround || Math.hypot(...o.velocityMps) > 0.1 || !vehicleMissionContains(plan, o.positionM) || o.batteryPercent < needed || o.payloadAck !== null) block('mission-start-interlocks')
+        if (!o.healthy || o.authority !== 'autonomous' || !o.onGround || Math.hypot(...o.velocityMps) > 0.1 || !vehicleMissionContains(plan, o.positionM) || o.batteryPercent < needed || o.payloadAck !== null || o.transition) block('mission-start-interlocks')
         else { state = 'running'; startedAt = o.nowMs; reference = o.reference; holdM = [...o.positionM]; targetM = [...o.positionM]; reason = 'operator-start' }
       }
       else if ((action === 'pause' && state === 'running') || (action === 'recover' && active(state))) {
         if (pending) block('payload-recovery-uncertain')
+        else if (transition) block('vtol-transition-recovery-uncertain')
         else { state = 'paused'; holdM = [...o.positionM]; settledMs = 0; reason = action === 'recover' ? 'checkpoint-recovered-awaiting-resume' : 'operator-pause' }
       }
       else if (action === 'resume' && state === 'paused') { state = 'running'; settledMs = 0; reason = 'operator-resume' }
@@ -118,10 +136,36 @@ export function createVehicleMissionEngine(input: unknown) {
       if (state === 'running') {
         const t = tasks.get(taskId)!, executionDt = previousState === 'ready' || previousState === 'paused' ? 0 : dt
         taskElapsedMs += executionDt
-        if ('timeoutMs' in t && taskElapsedMs >= t.timeoutMs) block(t.kind === 'payload' ? 'payload-outcome-uncertain' : 'task-timeout')
+        if ('timeoutMs' in t && taskElapsedMs >= t.timeoutMs) block(t.kind === 'payload' ? 'payload-outcome-uncertain' : t.kind === 'vtol-mode' ? 'vtol-transition-outcome-uncertain' : 'task-timeout')
         else if (t.kind === 'abort') { state = 'aborted'; reason = 'mission-abort-task'; targetM = null }
         else if (t.kind === 'start') advance(t.next)
         else if (t.kind === 'branch') { advance(o.batteryPercent >= t.batteryAtLeast ? t.then : t.otherwise); reason = 'battery-branch' }
+        else if (t.kind === 'vtol-mode') {
+          if (!transition) {
+            transition = { eventId: `${plan.id}:${reference}:${t.id}`, taskId: t.id, mode: t.mode, headingRad: t.headingRad, issuedAtMs: o.nowMs, expiresAtMs: o.nowMs + t.timeoutMs - taskElapsedMs, positionM: [...o.positionM], reference: reference! }
+            reason = 'vtol-transition-requested'
+          }
+          targetM = [...transition.positionM]
+          const observed = o.transition
+          if (observed) {
+            const phases = transition.mode === 'hover' ? ['hover', 'back-transition'] : ['front-transition', 'cruise']
+            if (observed.eventId !== transition.eventId || observed.taskId !== transition.taskId || observed.mode !== transition.mode || observed.reference !== transition.reference
+              || observed.capturedAtMs < transition.issuedAtMs || observed.capturedAtMs >= transition.expiresAtMs || observed.capturedAtMs > o.nowMs || o.nowMs - observed.capturedAtMs > 120
+              || observed.measurementCapturedAtMs < transition.issuedAtMs || o.nowMs - observed.measurementCapturedAtMs > 120
+              || observed.outcome === 'confirmed' && observed.phase !== transition.mode || observed.outcome === 'progress' && !phases.includes(observed.phase)) block('vtol-transition-outcome-uncertain')
+            else {
+              // Wire object order is not evidence identity; all accepted fields are scalar and closed above.
+              const signature = JSON.stringify(Object.entries(observed).sort(([a], [b]) => a < b ? -1 : a > b ? 1 : 0))
+              if (transitionObservation && (observed.capturedAtMs < transitionObservation.capturedAtMs || observed.measurementCapturedAtMs < transitionObservation.measurementCapturedAtMs || observed.capturedAtMs === transitionObservation.capturedAtMs && signature !== transitionObservation.signature)) block('vtol-transition-observation-replayed')
+              else {
+                transitionObservation = { capturedAtMs: observed.capturedAtMs, measurementCapturedAtMs: observed.measurementCapturedAtMs, signature }
+                if (observed.outcome === 'aborted') block('vtol-transition-aborted')
+                else if (observed.outcome === 'confirmed') { advance(t.next); reason = 'vtol-transition-confirmed' }
+                else reason = 'vtol-transition-progress'
+              }
+            }
+          }
+        }
         else if (t.kind === 'payload') {
           pending ??= { eventId: `${plan.id}:${reference}:${t.id}`, taskId: t.id, operation: t.operation, containerId: t.containerId, issuedAtMs: o.nowMs, expiresAtMs: o.nowMs + t.timeoutMs - taskElapsedMs, positionM: [...o.positionM], reference: reference! }
           const ack = o.payloadAck
@@ -169,13 +213,13 @@ export function recoverVehicleMission(trace: VehicleMissionTrace, observation: V
   if (!active(engine.snapshot().state) || engine.step(observation, 'recover').state !== 'paused') throw new TypeError('Vehicle checkpoint cannot recover without supervised compatible authority')
   return engine
 }
-/** Verify the whole recording before selecting an exact active, settled-payload prefix. */
+/** Verify the whole recording before selecting an active prefix without pending payload or transition work. */
 export function checkpointVehicleMission(trace: VehicleMissionTrace, atMs: number): VehicleMissionTrace {
   const verified = replayVehicleMission(trace).trace()
   if (!Number.isSafeInteger(atMs) || atMs < 0 || !verified.rows.some(row => row.observation.nowMs === atMs)) throw new RangeError('Checkpoint epoch must match a recorded observation')
   verified.rows = verified.rows.filter(row => row.observation.nowMs <= atMs)
   const snapshot = replayVehicleMission(verified).snapshot()
-  if (!active(snapshot.state) || snapshot.payload !== null) throw new TypeError('Vehicle mission checkpoint is not resumable or has an uncertain payload')
+  if (!active(snapshot.state) || snapshot.payload !== null || snapshot.transition) throw new TypeError('Vehicle mission checkpoint is not resumable or has an uncertain payload')
   return verified
 }
 /** Operator resume never clears authority faults or retries a pending payload. */

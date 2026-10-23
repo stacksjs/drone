@@ -76,6 +76,7 @@
     "./unit/vtol-control.test.ts",
     "./unit/vtol-runtime.test.ts",
     "./unit/vtol-cli.test.ts",
+    "./unit/vtol-mode-mission.test.ts",
     "./unit/ground.test.ts",
     "./unit/surface.test.ts",
     "./unit/mission-workspace.test.ts",
