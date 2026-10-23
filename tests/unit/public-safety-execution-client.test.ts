@@ -197,3 +197,37 @@ test('uncertain admission checks its digest beyond the currently paged catalog w
   }
   finally { model.close() }
 })
+
+test('renewal during an admission authorization read cancels that decision before POST and requires a new explicit decision', async () => {
+  let intent = '', admissions = 0, refreshes = 0
+  const model = openIncidentExecution({ endpoint: () => '/execution', request: async (path, init) => {
+    if (init?.method !== 'POST') return Response.json(intent ? completed(intent) : null)
+    if (path.endsWith('/admission')) { admissions++; return Response.json({ admitted: true }) }
+    intent = JSON.parse(String(init.body)).intent
+    return Response.json(completed(intent))
+  }, stream: () => ({ close() {} }), refreshWorkspace: async () => {
+    refreshes++
+    if (refreshes === 1) {
+      model.sync({ ...context, available: false })
+      expect(model.get().execution).toBeNull()
+      expect(model.get().sourceExists).toBe(false)
+      model.sync(context)
+      await model.refresh()
+    }
+    else model.sync({ ...context, version: 19, catalogDigests: admissions ? ['b'.repeat(64)] : [] })
+  } })
+  try {
+    model.sync(context)
+    expect(await model.start('nominal', 100)).toBe(true)
+    expect(await model.admit()).toBe(false)
+    expect(admissions).toBe(0)
+    expect(model.get().execution?.phase).toBe('completed')
+    expect(model.get().execution?.admission).toBe('unsubmitted')
+    expect(model.get().busy).toBe(false)
+    expect(model.get().sourceExists).toBe(false)
+    expect(await model.admit()).toBe(true)
+    expect(admissions).toBe(1)
+    expect(model.get().sourceExists).toBe(true)
+  }
+  finally { model.close() }
+})

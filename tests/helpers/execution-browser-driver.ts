@@ -121,11 +121,25 @@ try {
   await first.fill('#execution-scenario', 'nominal'); await first.fill('#execution-seconds', '100')
   await first.click('Start synthetic run')
   mark('real nominal100 completion')
-  await first.wait("document.querySelector('[data-execution-phase]')?.textContent.trim() === 'completed' && !!document.querySelector('[data-execution-completion]')", 'Actual Worker recording must complete', 40000)
+  // Consume the completed fields from the same authorized DOM frame that satisfies readiness.
+  // A later evaluation could run after native renewal has correctly hidden private content.
+  const completedView = `(() => {
+    const status = document.querySelector('[data-workspace-status]')?.textContent.trim();
+    const phase = document.querySelector('[data-execution-phase]')?.textContent.trim();
+    const digest = document.querySelector('[data-execution-digest]')?.textContent.trim();
+    const execution = document.querySelector('[data-execution-id]')?.textContent.trim();
+    const originalSelected = document.querySelector('[data-workspace-source]')?.textContent.trim() === ${JSON.stringify(data.sourceDigest)};
+    return status === 'current' && phase === 'completed' && !!document.querySelector('[data-execution-completion]') && /^[a-f0-9]{64}$/.test(digest || '') && !!execution && originalSelected ? { digest, execution } : false;
+  })()`
+  const completed = await first.wait<{ digest: string, execution: string }>(completedView, 'Actual Worker recording must complete', 40000)
   await control('before-admission')
-  const digest = await first.evaluate<string>("document.querySelector('[data-execution-digest]')?.textContent.trim()")
-  assert(/^[a-f0-9]{64}$/.test(digest))
-  assert.equal(await first.evaluate("document.querySelector('[data-workspace-source]')?.textContent.trim()"), data.sourceDigest, 'Completion cannot change selected imagery')
+  await control('hold-completion-read-renewal')
+  await first.wait("!document.querySelector('[data-execution-completion]')", 'Native completion-read renewal clears private content')
+  await control('release-workspace')
+  const restored = await first.wait<typeof completed>(completedView, 'Fresh authorization must restore the same completed result')
+  assert.deepEqual(restored, completed)
+  const { digest } = completed
+  await writeFile(join(evidence, 'completion-read-renewal.json'), `${JSON.stringify({ privateContentCleared: true, sameCompletedResultRestored: true, readinessFieldsReadAtomically: true })}\n`, { mode: 0o600, flag: 'wx' })
   await first.evaluate("document.querySelector('[data-execution-panel]').scrollIntoView()")
   await first.screenshot(join(evidence, 'execution-completed-desktop.png'))
   await first.send('Emulation.setDeviceMetricsOverride', { width: 375, height: 900, deviceScaleFactor: 1, mobile: true })
@@ -146,8 +160,32 @@ try {
     observer.observe(document.body, { childList: true, characterData: true, subtree: true });
     sample(); globalThis.executionSourceProbe = { probe, stop: () => observer.disconnect() };
   })()`)
+  await control('arm-pre-admission-renewal')
+  // Force the ordinary refresh ordering that can also occur from the native poll.
+  // The held read must leave the admission action available until this explicit click.
+  await first.click('Refresh current records')
+  let preAdmissionHeld = false
+  for (let attempt = 0; attempt < 100 && !preAdmissionHeld; attempt++) { preAdmissionHeld = (await control('status')).preAdmissionHeldReads > 0; if (!preAdmissionHeld) await Bun.sleep(10) }
+  assert(preAdmissionHeld, 'An ordinary native refresh must reach the read barrier before admission')
+  assert.equal((await control('status')).preAdmissionRenewed, false, 'Holding an ordinary refresh never conceals authorization')
+  await first.click('Admit completed source')
+  await first.wait("document.querySelector('[data-workspace-status]')?.textContent.trim() === 'current' && document.querySelector('[data-execution-phase]')?.textContent.trim() === 'completed' && document.querySelector('[data-execution-admit]')?.disabled === true", 'The explicit admission decision must be pending while native reads are held')
+  await control('renew-pre-admission-held-read')
+  await first.wait("!document.querySelector('[data-workspace-source]') && !document.querySelector('[data-execution-completion]')", 'Native renewal clears private content during the admission read')
+  await control('release-workspace')
+  assert.deepEqual(await first.wait<typeof completed>(completedView, 'Fresh authorization restores completed execution after the canceled admission'), completed)
+  const canceledDecision = await control('status')
+  assert.equal(canceledDecision.preAdmissionRenewed, true)
+  assert.equal(canceledDecision.preAdmissionHoldExpired, false, 'The controlled native renewal must complete within the original read bound')
+  assert.equal(canceledDecision.admissionRequests, 0, 'Lost availability cancels the earlier decision before any admission POST')
+  assert.equal(await first.evaluate("!!document.querySelector('[data-execution-source-exists]')"), false)
+  await control('before-admission')
+  mark('explicit source admission after fresh authorization')
   await first.click('Admit completed source')
   await first.wait("!!document.querySelector('[data-execution-source-exists]')", 'Explicit admission must refresh actual source catalog', 15000)
+  const acceptedDecision = await control('status')
+  assert.equal(acceptedDecision.admissionRequests, 1, 'Only the new explicit decision submits one admission POST')
+  await writeFile(join(evidence, 'pre-admission-renewal.json'), `${JSON.stringify({ ordinaryRefreshHeldBeforeClick: preAdmissionHeld, pendingDecisionObservedBeforeRenewal: true, nativeRenewalObserved: canceledDecision.preAdmissionRenewed, postsAfterCanceledDecision: canceledDecision.admissionRequests, postsAfterFreshExplicitDecision: acceptedDecision.admissionRequests, originalSelectionRestored: true })}\n`, { mode: 0o600, flag: 'wx' })
   await control('verify-admitted')
   mark('fresh workspace after admission renewal')
   assert.equal(await first.evaluate("!!document.querySelector('[data-workspace-source]') || !!document.querySelector('[data-execution-completion]')"), false, 'Native renewal must clear private panes before fresh authorization')

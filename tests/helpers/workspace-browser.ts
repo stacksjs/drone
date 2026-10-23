@@ -79,10 +79,10 @@ export async function startWorkspaceBrowser(root: string) {
       }
       const page = {
         errors, requests, send, evaluate,
-        async wait(expression: string, message: string, timeout = 10000) {
+        async wait<T = boolean>(expression: string, message: string, timeout = 10000): Promise<T> {
           phase = message
           const end = Date.now() + timeout
-          while (Date.now() < end) { if (await evaluate(expression)) return; await Bun.sleep(50) }
+          while (Date.now() < end) { const value = await evaluate<T | false>(expression); if (value) return value; await Bun.sleep(50) }
           throw new Error(message)
         },
         async checkLiveness() { phase = 'post-renewal liveness'; assert.equal(await evaluate('1'), 1) },

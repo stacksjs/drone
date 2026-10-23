@@ -23,6 +23,15 @@ let delayStart = true, releaseStart: (() => void) | undefined
 let streamStarts = 0, startRequests = 0, admissionRequests = 0, closeStream: (() => Promise<void>) | undefined
 let closeWorkspaceStream: (() => Promise<void>) | undefined, releaseWorkspace: (() => void) | undefined
 let holdWorkspace = false, workspaceHeld = false
+let preAdmissionRenewalArmed = false, preAdmissionRenewed = false, preAdmissionHoldExpired = false
+const preAdmissionReads = new Set<() => void>()
+let preAdmissionTimeout: ReturnType<typeof setTimeout> | undefined
+function releasePreAdmissionReads() {
+  preAdmissionRenewalArmed = false
+  clearTimeout(preAdmissionTimeout)
+  for (const release of preAdmissionReads) release()
+  preAdmissionReads.clear()
+}
 
 // Diagnostic state belongs only to this disposable fixture, never the execution controller.
 type RouteClass = 'execution-start' | 'execution-close' | 'execution-admission' | 'execution-events' | 'execution-status' | 'workspace-read'
@@ -53,7 +62,7 @@ function diagnosticSnapshot() {
   }
   return {
     available: true, pendingChecks: scalar(owner.pendingChecks),
-    fixture: { startRequests, admissionRequests, streamStarts, holdArmed, held, holdUsed, holdWorkspace, workspaceHeld }, lastStart, lastAdmission, responses: responses.slice(),
+    fixture: { startRequests, admissionRequests, streamStarts, holdArmed, held, holdUsed, holdWorkspace, workspaceHeld, preAdmissionRenewalArmed, preAdmissionRenewed, preAdmissionHeldReads: preAdmissionReads.size, preAdmissionHoldExpired }, lastStart, lastAdmission, responses: responses.slice(),
     slot: slot === null ? null : {
       ordinal: ordinal(slot),
       phase: choice(field(slot, 'phase'), ['waiting-for-consumer', 'running', 'stopping', 'completed', 'canceled', 'failed', 'discarded'] satisfies ExecutionView['phase'][]),
@@ -102,10 +111,18 @@ assert(!html.includes('<IncidentWorkspace'))
 assert(!html.includes(fixture.senderToken))
 const secret = randomUUID()
 const sources = () => fixture.database.db.primary.selectFrom('public_safety_sources').selectAll().execute()
+async function holdWorkspaceRenewal() {
+  holdWorkspace = true
+  assert(closeWorkspaceStream, 'The real workspace stream must exist before renewal')
+  await closeWorkspaceStream()
+  const until = Date.now() + 5000
+  while (!workspaceHeld && Date.now() < until) await Bun.sleep(5)
+  assert(workspaceHeld, 'Native workspace renewal must request a fresh authorized snapshot')
+}
 const control = async (request: Request) => {
   if (request.headers.get('x-fixture-control') !== secret) return new Response(null, { status: 404 })
   const action = new URL(request.url).pathname.slice('/__fixture/'.length)
-  if (action === 'status') return Response.json({ held, streamStarts, startRequests, startResponseReady: !!releaseStart })
+  if (action === 'status') return Response.json({ held, streamStarts, startRequests, startResponseReady: !!releaseStart, workspaceHeld, preAdmissionRenewed, preAdmissionHeldReads: preAdmissionReads.size, preAdmissionHoldExpired, admissionRequests })
   if (action === 'diagnostics') {
     try {
       const text = `${JSON.stringify(diagnosticSnapshot())}\n`
@@ -134,21 +151,34 @@ const control = async (request: Request) => {
   }
   if (action === 'release-and-renew') { releaseCredit?.(); await closeStream?.(); return Response.json({ ok: true }) }
   if (action === 'before-admission') { assert.equal((await sources()).length, 1, 'Completion does not write a durable source'); return Response.json({ ok: true }) }
+  if (action === 'hold-completion-read-renewal') {
+    assert.equal(field(executionOwner().slot, 'phase'), 'completed')
+    assert.equal(admissionRequests, 0)
+    await holdWorkspaceRenewal()
+    return Response.json({ ok: true })
+  }
+  if (action === 'arm-pre-admission-renewal') {
+    assert(!preAdmissionRenewalArmed && !preAdmissionRenewed && admissionRequests === 0 && closeWorkspaceStream, 'Arm one renewal before any admission POST')
+    preAdmissionRenewalArmed = true
+    return Response.json({ ok: true })
+  }
+  if (action === 'renew-pre-admission-held-read') {
+    assert(preAdmissionRenewalArmed && !preAdmissionRenewed && !preAdmissionHoldExpired && preAdmissionReads.size > 0 && admissionRequests === 0, 'Renew only while an explicit decision is waiting on held native reads')
+    assert(closeWorkspaceStream, 'The real workspace stream must exist before admission')
+    preAdmissionRenewed = true
+    await closeWorkspaceStream()
+    return Response.json({ ok: true })
+  }
   if (action === 'verify-admitted') {
     const rows = await sources()
     assert.equal(rows.length, 2)
     assert(rows.some(row => row.digest !== seeded.source.digest))
     const committed = await fixture.snapshot(seeded.key)
     assert.equal(committed.audits.filter(audit => audit.action === 'source-registered').length, 2)
-    holdWorkspace = true
-    assert(closeWorkspaceStream, 'The real workspace stream must exist before renewal')
-    await closeWorkspaceStream()
-    const until = Date.now() + 5000
-    while (!workspaceHeld && Date.now() < until) await Bun.sleep(5)
-    assert(workspaceHeld, 'Native workspace renewal must request a fresh authorized snapshot')
+    await holdWorkspaceRenewal()
     return Response.json({ ok: true })
   }
-  if (action === 'release-workspace') { assert(workspaceHeld, 'Release only the held native renewal'); releaseWorkspace?.(); return Response.json({ ok: true }) }
+  if (action === 'release-workspace') { assert(workspaceHeld || preAdmissionReads.size > 0, 'Release only held native reads'); releaseWorkspace?.(); releasePreAdmissionReads(); return Response.json({ ok: true }) }
   if (action === 'read-only') return Response.json({ token: await fixture.credential(fixture.sender.id, ['public-safety:read']) })
   if (action === 'revoke') { await fixture.tokens.revokeToken(fixture.senderToken); return Response.json({ ok: true }) }
   return new Response(null, { status: 404 })
@@ -162,6 +192,16 @@ route.use(async (request: Request, next: () => Promise<Response | null> | Respon
   if (admissionOrdinal !== null) lastAdmission = { ordinal: admissionOrdinal, settled: false, status: null, elapsedMs: null }
   let status: number | null = null
   try {
+    if (kind === 'workspace-read' && preAdmissionRenewalArmed) {
+      // Ordinary polls may arrive first. Keep authorization visible until the driver
+      // observes a real pending admission decision, then explicitly renew the stream.
+      assert(preAdmissionReads.size < 8, 'The bounded native read barrier must not overflow')
+      await new Promise<void>(resolve => {
+        const release = () => { preAdmissionReads.delete(release); resolve() }
+        preAdmissionReads.add(release)
+        if (!preAdmissionTimeout) preAdmissionTimeout = setTimeout(() => { preAdmissionHoldExpired = true; releasePreAdmissionReads() }, 5000)
+      })
+    }
     if (kind === 'workspace-read' && holdWorkspace) {
       holdWorkspace = false; workspaceHeld = true
       await new Promise<void>(resolve => {
@@ -207,7 +247,7 @@ route.use(async (request: Request, next: () => Promise<Response | null> | Respon
 })
 const page = () => new Response(html, { headers: { 'content-type': 'text/html', 'cache-control': 'no-store' } })
 route.get('/incidents', page)
-for (const action of ['status', 'diagnostics', 'release-start', 'arm-before-return', 'before-return', 'release-and-renew', 'before-admission', 'verify-admitted', 'release-workspace', 'read-only', 'revoke']) route.get(`/__fixture/${action}`, control)
+for (const action of ['status', 'diagnostics', 'release-start', 'arm-before-return', 'before-return', 'release-and-renew', 'before-admission', 'hold-completion-read-renewal', 'arm-pre-admission-renewal', 'renew-pre-admission-held-read', 'verify-admitted', 'release-workspace', 'read-only', 'revoke']) route.get(`/__fixture/${action}`, control)
 const server = await route.serve({ hostname: '127.0.0.1', port: 0, nativeRoutes: false })
 if (process.env.EXECUTION_BROWSER_EVIDENCE) { await mkdir(process.env.EXECUTION_BROWSER_EVIDENCE, { recursive: true }); await writeFile(join(process.env.EXECUTION_BROWSER_EVIDENCE, 'compiled.html'), html) }
 await writeFile(join(root, 'execution-credentials.json'), JSON.stringify({ url: `http://127.0.0.1:${server.port}`, key: seeded.key, sourceDigest: seeded.source.digest, token: fixture.senderToken, control: secret }), { mode: 0o600 })
@@ -216,7 +256,7 @@ try {
   assert.equal(await child.exited, 0, 'Isolated real execution browser driver must pass')
 }
 finally {
-  releaseStart?.(); releaseCredit?.(); releaseWorkspace?.()
+  releaseStart?.(); releaseCredit?.(); releaseWorkspace?.(); releasePreAdmissionReads()
   await closeStream?.(); await closeWorkspaceStream?.(); await server.stop(true)
   const slot = executionOwner().slot as { execution: string, binding: { scope: string }, producer: string, worker: Worker | null } | null
   if (slot?.producer === 'pending') {
