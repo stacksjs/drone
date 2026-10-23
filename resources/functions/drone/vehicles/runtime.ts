@@ -9,7 +9,7 @@ import { createVehicleAuthoritySupervisor, createVehicleOutputWatchdog } from '.
 import { createVehicleMeasurementQualifier, predictVehicleMeasurementPose, vehicleReference } from './measurements'
 type ScheduledMissionAction = { atMs: number, action: Exclude<VehicleMissionAction, 'start'> }
 function captureMissionActions(input: unknown, maximumMs: number): ScheduledMissionAction[] {
-  const invalid = (): never => { throw new TypeError('Invalid vehicle mission action schedule') }
+  function invalid(): never { throw new TypeError('Invalid vehicle mission action schedule') }
   if (input === undefined) return []
   if (!Array.isArray(input) || input.length > 32 || Reflect.ownKeys(input).length !== input.length + 1) invalid()
   const result: ScheduledMissionAction[] = []
