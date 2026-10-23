@@ -193,9 +193,10 @@ try {
   }
   finally { restoreAudit() }
 
-  // The native actual COMMIT has completed before its hook delays response release.
-  // Refusal after this boundary cannot undo SQL or its content-free refresh hint.
-  for (const kind of ['result', 'token', 'incident'] as const) {
+  // Expiry can occur during native COMMIT or while its response is held. In both
+  // cases the expired result must be refused without pretending SQL rolled back.
+  let heldResponseCases = 0
+  for (const kind of ['result', 'token', 'incident', 'commit-crossing'] as const) {
     const committed = await create(`registration-commit-${kind}`)
     let token = f.senderToken, deadline = 0
     if (kind === 'token') {
@@ -210,20 +211,42 @@ try {
       writer.query('UPDATE public_safety_incidents SET config_json = ?, retain_until = ? WHERE incident_key = ?').run(publicSafetyRecordingData(committed.config), committed.config.retention.expiresAt, committed.config.id)
     }
     const before = await f.snapshot(committed.config.id), hintCount = hints.length
-    let actualCommits = 0
-    f.database.db.primary.setTransactionDefaults({ afterCommit: async () => {
+    let actualCommits = 0, crossingCallbacks = 0, nativeReturnMarginMs: number | null = null, refusalObserved = false
+    f.database.db.primary.setTransactionDefaults({ logger: event => {
+      // QB's "commit" logger is inside the transaction callback, before native
+      // begin() resolves. This real elapsed pause exercises expiry across COMMIT.
+      if (kind !== 'commit-crossing' || event.type !== 'commit') return
+      crossingCallbacks++
+      const waitMs = Math.max(1, deadline - Date.now() + 20)
+      assert(waitMs <= 600, 'Controlled commit crossing retains its bounded 500 ms lifetime')
+      Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, waitMs)
+      assert(Date.now() >= deadline, 'Controlled callback pause actually crosses expiry')
+    }, afterCommit: async () => {
       actualCommits++
-      assert(Date.now() < deadline, 'Actual SQL COMMIT precedes the scoped deadline')
+      // A separate native SQLite connection proves this writer's change is
+      // committed. Hook receipt time is an upper bound, not a SQL commit clock.
+      const persisted = writer.query('SELECT version, (SELECT COUNT(*) FROM public_safety_sources WHERE incident_id = public_safety_incidents.id) AS source_count FROM public_safety_incidents WHERE incident_key = ?').get(committed.config.id) as { version: number, source_count: number }
+      assert.deepEqual(persisted, { version: 2, source_count: 1 })
+      nativeReturnMarginMs = deadline - Date.now()
+      if (nativeReturnMarginMs > 0) heldResponseCases++
+      if (kind === 'commit-crossing') assert(nativeReturnMarginMs <= 0, 'Explicit crossing arrives after expiry')
       await Bun.sleep(Math.max(1, deadline - Date.now() + 20))
+      assert(Date.now() >= deadline, 'Response release actually follows the scoped expiry')
     } })
     try {
       await assert.rejects(() => f.as(token, () => f.records.registerPublicSafetySourceChecked(committed.config.id, { expectedVersion: 1, recording: committed.run }, async () => {
-        if (kind === 'result') { deadline = Date.now() + 500; return deadline }
+        if (kind === 'result' || kind === 'commit-crossing') { deadline = Date.now() + 500; return deadline }
         return Date.now() + 30000
       })), f.status(404))
+      refusalObserved = true
     }
-    finally { f.database.db.primary.setTransactionDefaults({ afterCommit: undefined }) }
+    finally {
+      f.database.db.primary.setTransactionDefaults({ afterCommit: undefined, logger: undefined })
+      const phase = nativeReturnMarginMs === null ? 'native-return-unobserved' : nativeReturnMarginMs > 0 ? 'held-after-native-return' : 'expired-at-native-return'
+      console.error(`REGISTRATION_COMMIT_BOUNDARY ${JSON.stringify({ kind, phase, actualCommits, crossingCallbacks, nativeReturnMarginMs, refusalObserved, refusalMarginMs: deadline - Date.now() })}`)
+    }
     assert.equal(actualCommits, 1)
+    assert.equal(crossingCallbacks, kind === 'commit-crossing' ? 1 : 0)
     const after = await f.snapshot(committed.config.id)
     assert.equal(after.incident!.version, 2)
     assert.equal(after.audits.length, before.audits.length + 1)
@@ -233,6 +256,7 @@ try {
     assert.equal((writer.query('SELECT COUNT(*) AS count FROM public_safety_sources WHERE incident_id = ?').get(after.incident!.id as number) as { count: number }).count, 1)
     if (kind !== 'incident') assert.equal((await sources(committed.config.id)).entries.length, 1)
   }
+  assert(heldResponseCases > 0, 'At least one actual native return precedes expiry and the held response crosses it')
   console.log('PASS native guarded source registration compatibility, authority, rollback and COMMIT deadlines')
 }
 finally { unhookHints(); setServer(null); writer.close(); await f.database.closeDatabaseConnection() }

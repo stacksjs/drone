@@ -14,7 +14,10 @@ test('native execution registration guard shares the sole mutation writer and de
     const timeout = setTimeout(() => { if (running.exitCode === null) running.kill('SIGKILL') }, 90000)
     try {
       const [code, stdout, stderr] = await Promise.all([running.exited, new Response(running.stdout).text(), new Response(running.stderr).text()])
+      const boundaries = stderr.split('\n').filter(line => line.startsWith('REGISTRATION_COMMIT_BOUNDARY '))
+      for (const boundary of boundaries) console.log(boundary)
       expect(code, `${stdout}\n${stderr}`).toBe(0)
+      expect(boundaries.length).toBe(4)
       expect(stdout).toContain('PASS native guarded source registration compatibility, authority, rollback and COMMIT deadlines')
     }
     finally { clearTimeout(timeout) }
