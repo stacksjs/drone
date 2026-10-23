@@ -1,6 +1,6 @@
 import type { EstimatorSnapshot } from '../estimation/estimator'
 import type { ImuMeasurement, SensorVector } from '../sensors/types'
-import type { VehicleControlOutput, VehicleControllerContext, VehicleMeasurement, VehicleMeasurementPose, VehicleProfile } from './types'
+import type { VehicleControlOutput, VehicleControllerContext, VehicleMeasurement, VehicleMeasurementPose, VehicleProfile, VehicleVtolTransitionObservation } from './types'
 import { createPhysicsSensorFeed } from '../controls/sensors'
 import { createEstimator } from '../estimation/estimator'
 import { observeMission } from '../missions/engine'
@@ -15,6 +15,8 @@ export function runVehicleSimulation(profileInput: VehicleProfile, options: { sc
   if (!Number.isInteger(seconds) || seconds < 2 || seconds > 180 || scenario !== profileInput.scenario || !profileInput.scenarios.includes(scenario) || profileInput.evidence !== 'modeled-vehicle-profile' || profileInput.physicalFlightEnabled !== false) throw new RangeError('Invalid vehicle simulation profile, scenario or duration')
   const { plan, worstCaseMs, requiredWh } = validateVehicleMission(profileInput.mission)
   if (profileInput.vehicle !== plan.vehicle || plan.origin.latitudeDeg !== 0 || plan.origin.longitudeDeg !== 0 || plan.origin.ellipsoidHeightM !== 100) throw new TypeError('Vehicle fixture requires its declared 0,0,100 WGS84 origin')
+  const hasTransitions = plan.tasks.some(task => task.kind === 'vtol-mode')
+  let transitionObservation: VehicleVtolTransitionObservation | null = null
   const actuators = structuredClone(profileInput.actuators), fence = structuredClone(profileInput.authorityFence)
   const session = profileInput.createSession(), navigation = session.createNavigation?.()
   if (profileInput.vehicle === 'subsea' && !navigation) throw new TypeError('Subsea profile requires owned pressure/DVL navigation')
@@ -30,7 +32,7 @@ export function runVehicleSimulation(profileInput: VehicleProfile, options: { sc
   const queue: { measurement: VehicleMeasurement, pose: VehicleMeasurementPose | null }[] = []
   const requested = new Set<string>()
   let status: 'completed' | 'blocked' | 'host-lost' | 'duration-exhausted' = 'duration-exhausted', fault: string | null = null, hostLostAt: number | null = null
-  const path: { atMs: number, positionM: SensorVector | null, truthPositionM: SensorVector, mission: typeof mission, measurement: VehicleMeasurement | null, measurementPose: VehicleMeasurementPose | null, actuators: number[] }[] = []
+  const path: { atMs: number, positionM: SensorVector | null, truthPositionM: SensorVector, mission: typeof mission, measurement: VehicleMeasurement | null, measurementPose: VehicleMeasurementPose | null, actuators: number[], transitionObservation?: VehicleVtolTransitionObservation | null }[] = []
   const transitions: { atMs: number, state: string, taskId: string, reason: string }[] = []
   let previousState = '', previousTask = ''
   const payload = session.createPayload?.()
@@ -89,7 +91,8 @@ export function runVehicleSimulation(profileInput: VehicleProfile, options: { sc
       }
       payload?.observe?.(structuredClone(context))
       const ack = payload?.poll(nowMs) ?? null
-      const missionObservation = { ...observeMission({ estimate, authority: supervisor.snapshot().state, batteryPercent, onGround: qualified?.values.onSurface === true }, profileInput.vehicle === 'subsea' ? 'LOCAL_WATER_SURFACE' : 'WGS84_ELLIPSOID'), payloadAck: ack }
+      const missionObservation = { ...observeMission({ estimate, authority: supervisor.snapshot().state, batteryPercent, onGround: qualified?.values.onSurface === true }, profileInput.vehicle === 'subsea' ? 'LOCAL_WATER_SURFACE' : 'WGS84_ELLIPSOID'), payloadAck: ack, ...(hasTransitions ? { transition: transitionObservation } : {}) }
+      transitionObservation = null
       mission = engine.step(missionObservation, nowMs === 600 ? 'start' : undefined)
       if (mission.payload && !requested.has(mission.payload.eventId)) {
         if (!payload) { fault ??= 'missing-vehicle-payload-port'; send('disarm') }
@@ -99,11 +102,12 @@ export function runVehicleSimulation(profileInput: VehicleProfile, options: { sc
       if (active && mission.targetM && !fault) send('renew')
       else { send('disarm'); board.revoke() }
       const output: VehicleControlOutput = controller.step({ ...context, enabled: supervisor.snapshot().state === 'autonomous', mission })
+      if (hasTransitions && active && !output.inhibited && supervisor.snapshot().state === 'autonomous') transitionObservation = output.transition ? structuredClone(output.transition) : null
       if (active && output.inhibited && supervisor.snapshot().state === 'autonomous') { fault ??= output.reason; send('disarm'); board.revoke() }
       const frame = supervisor.gate(output, nowMs)
       if (frame) board.accept(frame, nowMs)
       else board.revoke()
-      path.push({ atMs: nowMs, positionM: estimate.localPosition ? [...estimate.localPosition.positionM] as SensorVector : null, truthPositionM: [...truth.positionM], mission: structuredClone(mission), measurement: measurement ? structuredClone(measurement) : null, measurementPose: measurementPose ? structuredClone(measurementPose) : null, actuators: [...board.snapshot().actuators] })
+      path.push({ atMs: nowMs, positionM: estimate.localPosition ? [...estimate.localPosition.positionM] as SensorVector : null, truthPositionM: [...truth.positionM], mission: structuredClone(mission), measurement: measurement ? structuredClone(measurement) : null, measurementPose: measurementPose ? structuredClone(measurementPose) : null, actuators: [...board.snapshot().actuators], ...(hasTransitions ? { transitionObservation: transitionObservation ? structuredClone(transitionObservation) : null } : {}) })
       if (mission.state !== previousState || mission.taskId !== previousTask) { transitions.push({ atMs: nowMs, state: mission.state, taskId: mission.taskId, reason: mission.reason }); previousState = mission.state; previousTask = mission.taskId }
       if (!['ready', 'running', 'paused'].includes(mission.state)) { status = mission.state === 'completed' ? 'completed' : 'blocked'; fault ??= mission.state === 'completed' ? null : mission.reason; break }
     }

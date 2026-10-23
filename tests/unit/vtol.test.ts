@@ -171,3 +171,26 @@ test('inherited slots and custom iterators cannot disguise malformed lift torque
   for (const torqueNm of [sparse, rewritten]) expect(() => allocateVtolLift({ thrustN: 24, torqueNm } as never)).toThrow()
   expect(iteratorCalls).toBe(0)
 })
+
+
+test('declared skid friction stops residual ground motion gradually without braking an airborne body', () => {
+  const environment = { windMps: [0, 0, 0] as [number, number, number], currentMps: [0, 0, 0] as [number, number, number] }, neutral = [0, 0, 0, 0, 0, 0, 0, 0]
+  const ground = createVtolPlant({ velocityMps: [0.24, 0, 0] })
+  const first = ground.step(neutral, 0.004, environment)
+  expect(first.onSurface).toBe(true)
+  expect(first.velocityMps[0]).toBeGreaterThan(0.20)
+  expect(first.velocityMps[0]).toBeLessThan(0.23)
+  let stopped = first
+  for (let step = 1; step < 250; step++) stopped = ground.step(neutral, 0.004, environment)
+  expect(Math.hypot(...stopped.velocityMps)).toBeLessThan(1e-8)
+  expect(stopped.positionM[0]).toBeGreaterThan(0)
+  expect(stopped.positionM[0]).toBeLessThan(0.02)
+  const air = createVtolPlant({ positionM: [0, 0, -1], velocityMps: [0.24, 0, 0] })
+  const flying = air.step(neutral, 0.004, environment)
+  expect(flying.onSurface).toBe(false)
+  expect(flying.velocityMps[0]).toBeGreaterThan(0.239)
+  const liftSupported = createVtolPlant({ velocityMps: [0.24, 0, 0], rotorsN: [6.12915625, 6.12915625, 6.12915625, 6.12915625] })
+  const unloaded = liftSupported.step([6.12915625, 6.12915625, 6.12915625, 6.12915625, 0, 0, 0, 0], 0.004, environment)
+  expect(unloaded.velocityMps[0]).toBeGreaterThan(0.239)
+  expect(unloaded.positionM[2]).toBeLessThan(0)
+})

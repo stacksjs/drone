@@ -77,6 +77,8 @@ export interface VehicleMissionSnapshot {
 export type VehicleMissionAction = MissionAction
 export interface VehicleControlOutput {
   kind: 'simulated-vehicle-control'
+  /** One capture-bound response, consumed by the next mission evaluation for explicit mode plans. */
+  transition?: VehicleVtolTransitionObservation | null
   vehicle: VehicleKind
   atMs: number
   actuators: number[]

@@ -37,7 +37,9 @@ The hover demonstration commands the pusher and three surfaces to zero. Calibrat
 IMU/GNSS samples feed the owned estimator. The controller receives estimated pose, a current qualified
 raw gyro capture and delayed contact measurements. Plant truth is used for sensor synthesis and
 independent evaluation, never as controller input. Initial north heading and a flat contact plane
-are declared simulation assumptions. Landing uses a 0.1 m below-plane target to obtain finite
+are declared simulation assumptions. A fictional skid friction coefficient of 0.5 supplies bounded
+horizontal braking from normal support at contact. It does not model impact impulses, gear deformation,
+tipping, damage or uneven terrain. Airborne motion receives no contact friction. Landing uses a 0.1 m below-plane target to obtain finite
 contact; mission completion still requires estimated arrival, low speed, settling and fresh contact.
 
 Contact and paused-ground neutral decisions occur after estimator/rate validation. A stale gyro
@@ -51,10 +53,21 @@ fictional hover experiment. They are not identified electrical power, measured e
 complete hybrid energy model. Neutral outputs during an airborne fault do not establish a safe
 emergency landing. Physical flight commands remain disabled.
 
+## Explicit hover observation in library plans
+
+Library plans can declare a VTOL-only `vtol-mode` task with `mode: 'hover'`, an explicit heading
+and a finite timeout. The held position must equal the request position. The mission emits a task, reference and epoch-bound request. The hover adapter
+requires fresh post-request contact, estimated pose and raw gyro sources, with a 200 ms stability
+dwell on both the monotonic decision clock and source coverage. It reports the oldest source capture epoch. The shared runtime delivers each controller
+response once on the next mission tick and retains it for replay. Initial contact holds all outputs
+neutral until observation is qualified. Unobserved headings expire, and this hover adapter reports
+cruise requests as aborted. This is a library prerequisite, not front/back transition control or a
+new CLI scenario. Existing hover-only recordings keep their prior shapes.
+
 ## Remaining implementation
 
-[Issue #12](https://github.com/stacksjs/drone/issues/12) remains open for explicit correlated
-transition requests and observed outcomes, front/cruise/back control, airspeed and attitude
+[Issue #12](https://github.com/stacksjs/drone/issues/12) remains open for full correlated front/back
+transition control and observed outcomes, airspeed and attitude
 qualification, bounded transition abort/recovery, complete hybrid power/reserve accounting and
 the common mission workspace. Full TECS/soaring, tiltrotor/tailsitter mechanisms, helicopters and
 other airframe families remain separate work. Native board control, measured airframe identification,

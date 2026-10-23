@@ -8,7 +8,7 @@ import { airAerodynamics, airModel } from '../air/plant'
 import { numericPacket } from './packets'
 
 /** Fictional lift-and-cruise model. No measured hardware coefficients or flight qualification. */
-export const vtolModel = Object.freeze({ massKg: 2.5, gravityMps2: 9.80665, maxRotorThrustN: 12, rotorTimeConstantS: 0.06, rotorSlewNPerS: 120, rotorArmProjectionM: 0.4, reactionTorqueM: 0.02, inertiaKgM2: Object.freeze([0.3, 0.4, 0.6] as const), maxPusherThrustN: airModel.maxThrustN, pusherTimeConstantS: 0.08, pusherSlewNPerS: 60, wing: airModel })
+export const vtolModel = Object.freeze({ massKg: 2.5, surfaceFrictionCoefficient: 0.5, gravityMps2: 9.80665, maxRotorThrustN: 12, rotorTimeConstantS: 0.06, rotorSlewNPerS: 120, rotorArmProjectionM: 0.4, reactionTorqueM: 0.02, inertiaKgM2: Object.freeze([0.3, 0.4, 0.6] as const), maxPusherThrustN: airModel.maxThrustN, pusherTimeConstantS: 0.08, pusherSlewNPerS: 60, wing: airModel })
 
 /** Independent lift rotors and the owned trainer wing/pusher share one rigid body. */
 export function createVtolPlant(initial: { positionM?: SensorVector, velocityMps?: SensorVector, quaternionWxyz?: Quaternion, rotorsN?: [number, number, number, number], pusherThrustN?: number } = {}): VehiclePlant {
@@ -54,10 +54,21 @@ export function createVtolPlant(initial: { positionM?: SensorVector, velocityMps
       const forceN = rotateBodyToNed(nextQuaternionWxyz, [aero.forceN[0], aero.forceN[1], aero.forceN[2] - nextRotorsN.reduce((a, b) => a + b, 0)])
       const nextAccelerationMps2 = forceN.map((n, i) => n / vtolModel.massKg + (i === 2 ? vtolModel.gravityMps2 : 0)) as SensorVector
       const nextVelocityMps = velocityMps.map((n, i) => n + nextAccelerationMps2[i]! * dtS) as SensorVector
+      const nextOnSurface = positionM[2] + nextVelocityMps[2] * dtS >= 0
+      if (nextOnSurface) {
+        // Fictional flat skids: bounded Coulomb friction from the modeled normal support.
+        // No impact impulse, terrain, gear deformation, tipping or damage model is implied.
+        const speedMps = Math.hypot(nextVelocityMps[0], nextVelocityMps[1])
+        const brakingMps = Math.min(speedMps, vtolModel.surfaceFrictionCoefficient * Math.max(0, nextAccelerationMps2[2]) * dtS)
+        if (speedMps > 0) for (const i of [0, 1]) {
+          nextVelocityMps[i] = nextVelocityMps[i]! * (1 - brakingMps / speedMps)
+          nextAccelerationMps2[i] = (nextVelocityMps[i]! - velocityMps[i]!) / dtS
+        }
+        nextVelocityMps[2] = Math.min(0, nextVelocityMps[2]); nextAccelerationMps2[2] = 0
+      }
       const nextPositionM = positionM.map((n, i) => n + nextVelocityMps[i]! * dtS) as SensorVector
+      if (nextOnSurface) nextPositionM[2] = 0
       if (![...nextAccelerationMps2, ...nextVelocityMps, ...nextPositionM].every(Number.isFinite)) throw new RangeError('VTOL rotor model diverged')
-      const nextOnSurface = nextPositionM[2] >= 0
-      if (nextOnSurface) { nextPositionM[2] = 0; nextVelocityMps[2] = Math.min(0, nextVelocityMps[2]); nextAccelerationMps2[2] = 0 }
       // Reject the entire integration before committing any retained state.
       windMps = nextWindMps
       rotorsN = nextRotorsN
