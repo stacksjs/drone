@@ -74,8 +74,27 @@ new CLI scenario. Existing hover-only recordings keep their prior shapes.
 is a separate development experiment on the same owned runtime. Its nominal mission observes initial
 hover, takes off vertically to 15 m, requests a front transition, flies a cruise leg, requests back
 transition, returns to the back request's capture point, observes settled hover, and lands vertically.
-A turning leg also has an actual completed model campaign. This profile is not registered as a CLI
-scenario or selectable workspace profile.
+A turning leg also has an actual completed model campaign. The native `vtol:simulate` command runs
+the nominal route. This profile is not a selectable workspace profile.
+
+```sh
+./buddy vtol:simulate
+./buddy vtol:simulate --electrical
+./storage/runtime-build/cli/drone vtol:simulate --electrical
+```
+
+The command defaults to 160 virtual seconds and accepts an integer `--seconds` from 2 to 180.
+It reports the existing runtime's actual status and the three qualified initial-hover, cruise and
+back-hover observations, including their event, task, reference and capture epochs. Exit 0 requires
+those ordered confirmations, observed estimated flight, completed landing with qualified modeled
+contact, no runtime fault, neutral board outputs and no active output lease. An incomplete route
+retains its partial observations and status and exits 1. The condensed report omits the full path
+and trace. The library still exposes both for replay and evaluation.
+
+Buddy discovers the typed command natively; the standalone binary registers the same definition.
+This command currently exposes the nominal route only. Fault scenarios, operator schedules and
+recovery route selection remain library capabilities. Simulation completion does not qualify
+physical transitions, arbitrary flight envelopes or hardware landing.
 
 The controller receives measured relative airspeed, differential pressure, airflow angles and modeled
 rotor/pusher response, together with the qualified raw gyro and estimated navigation. Delayed airflow
@@ -150,7 +169,8 @@ and releases outputs. Neither result establishes an airborne landing.
 Task execution time stops during pause. Global endurance and the declared energy charge continue,
 so a later scheduled resume can be preempted by reserve, endurance, health or authority refusal.
 Operator actions never extend the original planning allowance or rearm revoked authority. The
-transition library and these actions remain separate from the hover-only CLI and common workspace.
+operator schedules remain library-only; neither CLI command exposes them, and the common workspace
+does not select this VTOL profile.
 
 ## Declared transition recovery routes
 
@@ -209,11 +229,11 @@ campaigns do not qualify arbitrary wind, failed lift rotors, every transition st
 
 ## Fictional electrical model
 
-Select `--electrical` in the hover command, or pass `{ electrical: true }` to
+Select `--electrical` in either VTOL command, or pass `{ electrical: true }` to
 `createVtolHoverProfile('hover', options)` or `createVtolTransitionProfile(options)` in TypeScript.
 The default/disabled profiles keep their prior reports and declared-ceiling energy accounting.
-The same hover option runs through Buddy and the copied standalone CLI. Full transition execution
-remains a library feature.
+Both commands run through Buddy and the copied standalone CLI. The nominal full-route command
+uses the same experimental transition library profile.
 
 Each session owns its electrical state. The plant uses actual lagged individual rotor and pusher
 thrust, with these declared coefficients:
@@ -272,7 +292,7 @@ it does not model a seized motor's electrical current.
 
 [Issue #12](https://github.com/stacksjs/drone/issues/12) remains open. The experimental nominal
 controller and opt-in recovery routes do not establish complete VTOL support. Complete recovery/abort
-envelopes, fresh-process restoration, identified hybrid power/voltage/cell behavior, native transition CLI and
+envelopes, fresh-process restoration, identified hybrid power/voltage/cell behavior, CLI fault/operator scenarios and
 the common mission workspace still require implementation and qualification. Wind campaigns and
 broader mission/envelope coverage remain necessary. Full TECS/soaring, tiltrotor/tailsitter mechanisms,
 helicopters and other airframe families remain separate work. Native board control, measured airframe

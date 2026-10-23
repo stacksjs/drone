@@ -56,7 +56,7 @@ surface and subsea profiles. [Optional external drivers](drivers.md) have
 [acknowledged protocol services](driver-protocols.md); scripted peers are distinct
 from [firmware SITL](sitl.md) and physical testing.
 
-The separate [VTOL development guide](vehicles-vtol.md) covers the hover-only command and an
+The separate [VTOL development guide](vehicles-vtol.md) covers the hover-only and nominal full-route commands, and an
 experimental TypeScript library profile for modeled front transition, cruise, back transition and
 vertical landing, with stable-phase pause/resume and explicitly declared hover-and-land recovery
 routes. Complete recovery/abort envelopes, hybrid energy qualification and the common VTOL mission
