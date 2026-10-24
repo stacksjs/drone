@@ -1,0 +1,42 @@
+<template>
+  <section id="workflows" aria-labelledby="workflows-title" class="pt-8 border-neutral-700 border-t">
+    <div class="max-w-2xl">
+      <h2 id="workflows-title" class="font-semibold text-xl">Explore the framework</h2>
+      <p class="mt-2 text-neutral-400 text-sm">Run a local workspace or read a development guide. Each guide records what works, its evidence and what remains open.</p>
+    </div>
+    <div class="grid gap-8 md:grid-cols-2 mt-7 text-sm">
+      <div>
+        <h3 class="font-medium">Local workspaces</h3>
+        <p class="mt-2 text-neutral-400">Synthetic workflows and explicit operator review. Camera hardware requires separate on-device validation.</p>
+        <nav aria-label="Local workspaces" class="grid gap-3 sm:grid-cols-2 mt-4 text-emerald-200">
+          <a href="/missions" class="underline underline-offset-4 hover:text-white">Vehicle missions</a>
+          <a href="/camera" class="underline underline-offset-4 hover:text-white">Camera tracking</a>
+          <a href="/vision" class="underline underline-offset-4 hover:text-white">Target fusion</a>
+          <a href="/diagnostics" class="underline underline-offset-4 hover:text-white">Diagnostics and replay</a>
+          <a href="/mapping" class="underline underline-offset-4 hover:text-white">Aerial survey collection</a>
+          <a href="/volumes" class="underline underline-offset-4 hover:text-white">Stockpile volumes</a>
+          <a href="/inspection" class="underline underline-offset-4 hover:text-white">Asset inspection</a>
+          <a href="/agriculture" class="underline underline-offset-4 hover:text-white">Crop and livestock observations</a>
+          <a href="/application" class="underline underline-offset-4 hover:text-white">Inert-material application</a>
+          <a href="/incidents" class="underline underline-offset-4 hover:text-white">Authorized incident workspace</a>
+        </nav>
+      </div>
+      <div>
+        <h3 class="font-medium">Development guides</h3>
+        <p class="mt-2 text-neutral-400">Build on the owned runtime, examine modeled operations and follow the remaining implementation work.</p>
+        <nav aria-label="Development guides" class="grid gap-3 sm:grid-cols-2 mt-4 text-emerald-200">
+          <a href="/docs/runtime" class="underline underline-offset-4 hover:text-white">Owned runtime bench</a>
+          <a href="/docs/vehicles" class="underline underline-offset-4 hover:text-white">Air, ground and marine profiles</a>
+          <a href="/docs/open-farming" class="underline underline-offset-4 hover:text-white">Open Farming integration</a>
+          <a href="/docs/patrol-cli" class="underline underline-offset-4 hover:text-white">Patrol and docking model</a>
+          <a href="/docs/cargo-delivery" class="underline underline-offset-4 hover:text-white">Cargo delivery model</a>
+          <a href="/docs/cinema" class="underline underline-offset-4 hover:text-white">Camera reframe model</a>
+          <a href="/docs/environment" class="underline underline-offset-4 hover:text-white">Environmental sampling</a>
+          <a href="/docs/antenna" class="underline underline-offset-4 hover:text-white">Antenna pointing model</a>
+          <a href="/docs/roadmap/feature-coverage" class="underline underline-offset-4 hover:text-white">Feature coverage and roadmap</a>
+          <a href="/docs/validation" class="underline underline-offset-4 hover:text-white">Validation evidence</a>
+        </nav>
+      </div>
+    </div>
+  </section>
+</template>
