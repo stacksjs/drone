@@ -10,10 +10,10 @@ const result = state<VolumeReport | null>(null)
 const busy = state(false)
 const error = state('')
 const page = state(0)
-const report = derived(() => resultScenario() === scenario() ? result() : null)
-const source = derived(() => report() ? request() : null)
-const pages = derived(() => Math.max(1, Math.ceil((report()?.integrationPieces.length ?? 0) / 12)))
-const pieces = derived(() => report()?.integrationPieces.slice(page() * 12, page() * 12 + 12) ?? [])
+const volumeReport = derived(() => resultScenario() === scenario() ? result() : null)
+const source = derived(() => volumeReport() ? request() : null)
+const pages = derived(() => Math.max(1, Math.ceil((volumeReport()?.integrationPieces.length ?? 0) / 12)))
+const pieces = derived(() => volumeReport()?.integrationPieces.slice(page() * 12, page() * 12 + 12) ?? [])
 const extent = derived(() => {
   const points = source()?.boundary.outer ?? [[0, 0], [1, 1]]
   const east = points.map(point => point[0]), north = points.map(point => point[1])
@@ -94,27 +94,27 @@ function execute() { clear(); busy.set(true); computation.start() }
     </div>
     <p :if="busy()" role="status" class="mt-5 text-emerald-200 text-sm">Clipping the known surface and integrating above and below the declared base.</p>
     <p :if="error()" role="alert" class="mt-5 p-4 break-words text-red-200 border border-red-400 rounded">{{ error() }}</p>
-    <p :if="!report() && !busy() && !error()" class="mt-7 py-5 text-neutral-400 border-neutral-700 border-t">No analysis yet. Choose an example to inspect exact surface integration and its evidence limits.</p>
-    <div :if="report()" class="mt-9">
+    <p :if="!volumeReport() && !busy() && !error()" class="mt-7 py-5 text-neutral-400 border-neutral-700 border-t">No analysis yet. Choose an example to inspect exact surface integration and its evidence limits.</p>
+    <div :if="volumeReport()" class="mt-9">
       <div class="grid gap-8 lg:grid-cols-[1fr_1.3fr]">
         <aside class="min-w-0">
           <h2 class="font-semibold text-lg">Covered-domain result</h2>
-          <p class="mt-3 break-words font-mono text-emerald-200 text-sm" data-volume-status>{{ report()?.status }} / {{ report()?.evidence }}</p>
+          <p class="mt-3 break-words font-mono text-emerald-200 text-sm" data-volume-status>{{ volumeReport()?.status }} / {{ volumeReport()?.evidence }}</p>
           <dl class="grid gap-5 grid-cols-2 mt-5 text-sm">
-            <div><dt class="text-neutral-400">Above base</dt><dd class="mt-2 font-mono" data-volume-above>{{ quantity(report()?.aboveBaseM3) }}</dd></div>
-            <div><dt class="text-neutral-400">Below base</dt><dd class="mt-2 font-mono" data-volume-below>{{ quantity(report()?.belowBaseM3) }}</dd></div>
-            <div><dt class="text-neutral-400">Signed top minus base</dt><dd class="mt-2 font-mono" data-volume-signed>{{ quantity(report()?.signedTopMinusBaseM3) }}</dd></div>
-            <div><dt class="text-neutral-400">Full boundary signed</dt><dd class="mt-2 font-mono" data-volume-full>{{ quantity(report()?.fullBoundarySignedM3) }}</dd></div>
+            <div><dt class="text-neutral-400">Above base</dt><dd class="mt-2 font-mono" data-volume-above>{{ quantity(volumeReport()?.aboveBaseM3) }}</dd></div>
+            <div><dt class="text-neutral-400">Below base</dt><dd class="mt-2 font-mono" data-volume-below>{{ quantity(volumeReport()?.belowBaseM3) }}</dd></div>
+            <div><dt class="text-neutral-400">Signed top minus base</dt><dd class="mt-2 font-mono" data-volume-signed>{{ quantity(volumeReport()?.signedTopMinusBaseM3) }}</dd></div>
+            <div><dt class="text-neutral-400">Full boundary signed</dt><dd class="mt-2 font-mono" data-volume-full>{{ quantity(volumeReport()?.fullBoundarySignedM3) }}</dd></div>
           </dl>
           <p class="mt-4 leading-relaxed text-neutral-400 text-xs">Above and below are positive magnitudes. Signed volume equals above minus below. Partial coverage does not establish the volume of the whole boundary.</p>
           <h3 class="mt-7 font-semibold text-sm">Boundary and domain</h3>
           <dl class="grid gap-4 grid-cols-2 mt-4 text-sm">
-            <div><dt class="text-neutral-400">Boundary area</dt><dd class="mt-1">{{ quantity(report()?.boundaryAreaM2, 'm²') }}</dd></div>
-            <div><dt class="text-neutral-400">Covered area</dt><dd class="mt-1">{{ quantity(report()?.coveredAreaM2, 'm²') }}</dd></div>
-            <div><dt class="text-neutral-400">Uncovered area</dt><dd class="mt-1" data-volume-gap>{{ quantity(report()?.uncoveredAreaM2, 'm²') }}</dd></div>
-            <div><dt class="text-neutral-400">Coverage</dt><dd class="mt-1">{{ ((report()?.coverageFraction ?? 0) * 100).toFixed(2) }}%</dd></div>
+            <div><dt class="text-neutral-400">Boundary area</dt><dd class="mt-1">{{ quantity(volumeReport()?.boundaryAreaM2, 'm²') }}</dd></div>
+            <div><dt class="text-neutral-400">Covered area</dt><dd class="mt-1">{{ quantity(volumeReport()?.coveredAreaM2, 'm²') }}</dd></div>
+            <div><dt class="text-neutral-400">Uncovered area</dt><dd class="mt-1" data-volume-gap>{{ quantity(volumeReport()?.uncoveredAreaM2, 'm²') }}</dd></div>
+            <div><dt class="text-neutral-400">Coverage</dt><dd class="mt-1">{{ ((volumeReport()?.coverageFraction ?? 0) * 100).toFixed(2) }}%</dd></div>
             <div><dt class="text-neutral-400">Boundary vertices / holes</dt><dd class="mt-1">{{ source()?.boundary.outer.length }} / {{ source()?.boundary.holes.length }}</dd></div>
-            <div><dt class="text-neutral-400">Excluded nodata cells</dt><dd class="mt-1">{{ report()?.excludedGridCells.length }}</dd></div>
+            <div><dt class="text-neutral-400">Excluded nodata cells</dt><dd class="mt-1">{{ volumeReport()?.excludedGridCells.length }}</dd></div>
           </dl>
           <h3 class="mt-7 font-semibold text-sm">Explicit base plane</h3>
           <p class="mt-3 leading-relaxed text-neutral-400 text-sm">{{ source()?.base.assumption }}</p>
@@ -136,20 +136,20 @@ function execute() { clear(); busy.set(true); computation.start() }
           <p class="mt-3 text-neutral-400 text-xs">Colour intensity spans 0 to {{ colorScale().toFixed(3) }} m in absolute mean height difference. Exact volume integration splits every contribution at the base crossing. Holes are excluded from the domain.</p>
           <h3 class="mt-7 font-semibold text-sm">Uncertainty and reference</h3>
           <dl class="grid gap-5 grid-cols-2 mt-4 text-sm">
-            <div><dt class="text-neutral-400">Conditional vertical bound</dt><dd class="mt-1 font-mono" data-volume-conditional>{{ quantity(report()?.uncertainty.conditionalVerticalBoundM3) }}</dd></div>
+            <div><dt class="text-neutral-400">Conditional vertical bound</dt><dd class="mt-1 font-mono" data-volume-conditional>{{ quantity(volumeReport()?.uncertainty.conditionalVerticalBoundM3) }}</dd></div>
             <div><dt class="text-neutral-400">Overall accuracy bound</dt><dd class="mt-1 font-mono">unavailable</dd></div>
-            <div><dt class="text-neutral-400">Declared horizontal bound</dt><dd class="mt-1">{{ quantity(report()?.uncertainty.horizontalBoundM, 'm') }}</dd></div>
-            <div><dt class="text-neutral-400">Reference comparison</dt><dd class="mt-1 break-words" data-volume-reference>{{ report()?.comparison.status }}</dd></div>
+            <div><dt class="text-neutral-400">Declared horizontal bound</dt><dd class="mt-1">{{ quantity(volumeReport()?.uncertainty.horizontalBoundM, 'm') }}</dd></div>
+            <div><dt class="text-neutral-400">Reference comparison</dt><dd class="mt-1 break-words" data-volume-reference>{{ volumeReport()?.comparison.status }}</dd></div>
           </dl>
           <p class="mt-4 leading-relaxed text-neutral-400 text-xs">A conditional bound adds the declared top and base vertical errors over covered area. It excludes boundary, horizontal, classification and field calibration errors. Unknown inputs remain unavailable.</p>
           <div :if="source()?.reference" class="mt-4 pl-4 border-l border-neutral-600">
             <p class="break-words text-sm">{{ source()?.reference?.id }} / {{ source()?.reference?.independence }}</p>
             <p class="mt-2 break-words text-neutral-400 text-xs">{{ source()?.reference?.method }} / {{ source()?.reference?.surveyedAt }}</p>
             <p class="mt-2 text-neutral-400 text-xs">Reference evidence: {{ source()?.reference?.evidence }}. Operator declarations are not authenticated survey validation.</p>
-            <p class="mt-3 text-sm">Computed minus reference: {{ quantity(report()?.comparison.signedDifferenceM3) }}</p>
-            <p class="mt-2 text-neutral-400 text-xs">Relative signed difference: {{ report()?.comparison.relativeSignedDifference === null ? 'unavailable' : ((report()?.comparison.relativeSignedDifference ?? 0) * 100).toFixed(2) + '%' }}</p>
-            <p class="mt-2 text-neutral-400 text-xs">Combined declared bound: {{ quantity(report()?.comparison.combinedDeclaredBoundM3) }}</p>
-            <p class="mt-2 text-neutral-400 text-xs">Within combined declared bound: {{ report()?.comparison.withinCombinedDeclaredBound === null ? 'unavailable' : report()?.comparison.withinCombinedDeclaredBound ? 'yes' : 'no' }}. This comparison does not establish overall accuracy.</p>
+            <p class="mt-3 text-sm">Computed minus reference: {{ quantity(volumeReport()?.comparison.signedDifferenceM3) }}</p>
+            <p class="mt-2 text-neutral-400 text-xs">Relative signed difference: {{ volumeReport()?.comparison.relativeSignedDifference === null ? 'unavailable' : ((volumeReport()?.comparison.relativeSignedDifference ?? 0) * 100).toFixed(2) + '%' }}</p>
+            <p class="mt-2 text-neutral-400 text-xs">Combined declared bound: {{ quantity(volumeReport()?.comparison.combinedDeclaredBoundM3) }}</p>
+            <p class="mt-2 text-neutral-400 text-xs">Within combined declared bound: {{ volumeReport()?.comparison.withinCombinedDeclaredBound === null ? 'unavailable' : volumeReport()?.comparison.withinCombinedDeclaredBound ? 'yes' : 'no' }}. This comparison does not establish overall accuracy.</p>
           </div>
         </div>
       </div>
@@ -158,9 +158,9 @@ function execute() { clear(); busy.set(true); computation.start() }
         <dl class="grid gap-5 sm:grid-cols-2 mt-5 text-sm">
           <div class="min-w-0"><dt class="text-neutral-400">Source identity / geometry</dt><dd class="mt-1 break-words">{{ source()?.surface.metadata.id }} / {{ source()?.surface.geometry.kind }}</dd></div>
           <div class="min-w-0"><dt class="text-neutral-400">Evidence / source kind</dt><dd class="mt-1 break-words">{{ source()?.surface.metadata.provenance.evidence }} / {{ source()?.surface.metadata.provenance.sourceKind }}</dd></div>
-          <div class="min-w-0"><dt class="text-neutral-400">Horizontal reference</dt><dd class="mt-1 break-words">{{ report()?.reference.horizontalCrs.id }} / {{ report()?.reference.horizontalCrs.definition }}</dd></div>
-          <div class="min-w-0"><dt class="text-neutral-400">Vertical datum</dt><dd class="mt-1 break-words">{{ report()?.reference.verticalDatum.id }} / {{ report()?.reference.verticalDatum.definition }}</dd></div>
-          <div><dt class="text-neutral-400">Coordinate epoch</dt><dd class="mt-1">{{ report()?.reference.horizontalCrs.coordinateEpoch ?? 'not declared' }}</dd></div>
+          <div class="min-w-0"><dt class="text-neutral-400">Horizontal reference</dt><dd class="mt-1 break-words">{{ volumeReport()?.reference.horizontalCrs.id }} / {{ volumeReport()?.reference.horizontalCrs.definition }}</dd></div>
+          <div class="min-w-0"><dt class="text-neutral-400">Vertical datum</dt><dd class="mt-1 break-words">{{ volumeReport()?.reference.verticalDatum.id }} / {{ volumeReport()?.reference.verticalDatum.definition }}</dd></div>
+          <div><dt class="text-neutral-400">Coordinate epoch</dt><dd class="mt-1">{{ volumeReport()?.reference.horizontalCrs.coordinateEpoch ?? 'not declared' }}</dd></div>
           <div><dt class="text-neutral-400">Axes and units</dt><dd class="mt-1">Easting / northing / elevation up, metres</dd></div>
           <div><dt class="text-neutral-400">Acquisition / meshing status</dt><dd class="mt-1">{{ source()?.surface.metadata.provenance.acquisition.status }} / {{ source()?.surface.metadata.provenance.reconstructionOrMeshing.status }}</dd></div>
           <div><dt class="text-neutral-400">Boresight / time calibration</dt><dd class="mt-1">{{ source()?.surface.metadata.provenance.boresightCalibration.status }} / {{ source()?.surface.metadata.provenance.timeCalibration.status }}</dd></div>
@@ -175,10 +175,10 @@ function execute() { clear(); busy.set(true); computation.start() }
         <div class="overflow-x-auto mt-5 max-w-full border border-neutral-700 rounded" tabindex="0" role="region" aria-label="Scrollable contribution audit table">
           <table class="w-full text-left text-xs whitespace-nowrap"><caption class="sr-only">Clipped surface contributions, unweighted area and volumes, with signed boundary weights</caption><thead class="text-neutral-300 bg-neutral-900"><tr><th scope="col" class="p-3">Source / part</th><th scope="col" class="p-3">Weight</th><th scope="col" class="p-3">Area m²</th><th scope="col" class="p-3">Above m³</th><th scope="col" class="p-3">Below m³</th><th scope="col" class="p-3">Signed m³</th></tr></thead><tbody><tr :for="piece in pieces()" class="border-neutral-800 border-t"><th scope="row" class="p-3 font-normal"><span class="block">{{ piece.sourceId }}</span><span class="block mt-1 text-neutral-400">{{ piece.boundaryPart }}</span></th><td class="p-3 font-mono">{{ piece.weight }}</td><td class="p-3 font-mono">{{ piece.areaM2.toFixed(3) }}</td><td class="p-3 font-mono">{{ piece.aboveBaseM3.toFixed(3) }}</td><td class="p-3 font-mono">{{ piece.belowBaseM3.toFixed(3) }}</td><td class="p-3 font-mono">{{ piece.signedTopMinusBaseM3.toFixed(3) }}</td></tr></tbody></table>
         </div>
-        <p :if="!report()?.integrationPieces.length" class="mt-4 text-neutral-400 text-sm">No covered surface contributions intersect this boundary.</p>
-        <div class="flex flex-wrap gap-3 items-center mt-4 text-sm"><button type="button" @click="page.update(value => Math.max(0, value - 1))" :disabled="page() === 0" class="px-3 py-2 border border-neutral-600 rounded focus-visible:outline-emerald-200 disabled:opacity-40">Previous pieces</button><span role="status">Page {{ page() + 1 }} / {{ pages() }}. {{ report()?.integrationPieces.length }} pieces.</span><button type="button" @click="page.update(value => Math.min(pages() - 1, value + 1))" :disabled="page() >= pages() - 1" class="px-3 py-2 border border-neutral-600 rounded focus-visible:outline-emerald-200 disabled:opacity-40">Next pieces</button></div>
+        <p :if="!volumeReport()?.integrationPieces.length" class="mt-4 text-neutral-400 text-sm">No covered surface contributions intersect this boundary.</p>
+        <div class="flex flex-wrap gap-3 items-center mt-4 text-sm"><button type="button" @click="page.update(value => Math.max(0, value - 1))" :disabled="page() === 0" class="px-3 py-2 border border-neutral-600 rounded focus-visible:outline-emerald-200 disabled:opacity-40">Previous pieces</button><span role="status">Page {{ page() + 1 }} / {{ pages() }}. {{ volumeReport()?.integrationPieces.length }} pieces.</span><button type="button" @click="page.update(value => Math.min(pages() - 1, value + 1))" :disabled="page() >= pages() - 1" class="px-3 py-2 border border-neutral-600 rounded focus-visible:outline-emerald-200 disabled:opacity-40">Next pieces</button></div>
       </section>
-      <details class="mt-8 pt-5 border-neutral-700 border-t"><summary class="text-sm focus-visible:outline-emerald-200 cursor-pointer">Warnings, uncertainty assumptions and evidence limits</summary><ul class="mt-4 space-y-3 text-neutral-400 text-sm"><li :for="warning in report()?.warnings ?? []" class="break-words text-amber-200">{{ warning }}</li><li :for="assumption in report()?.uncertainty.assumptions ?? []" class="break-words">{{ assumption }}</li><li :for="limitation in report()?.limitations ?? []" class="break-words">{{ limitation }}</li></ul></details>
+      <details class="mt-8 pt-5 border-neutral-700 border-t"><summary class="text-sm focus-visible:outline-emerald-200 cursor-pointer">Warnings, uncertainty assumptions and evidence limits</summary><ul class="mt-4 space-y-3 text-neutral-400 text-sm"><li :for="warning in volumeReport()?.warnings ?? []" class="break-words text-amber-200">{{ warning }}</li><li :for="assumption in volumeReport()?.uncertainty.assumptions ?? []" class="break-words">{{ assumption }}</li><li :for="limitation in volumeReport()?.limitations ?? []" class="break-words">{{ limitation }}</li></ul></details>
       <p class="mt-6 text-neutral-400 text-xs">For known-surface import and auditable dataset export, use the native Stacks volume commands. Binary LiDAR, raw-point meshing and surveyed field validation remain separate work.</p>
       <a href="https://github.com/stacksjs/drone/issues/19" class="inline-block mt-4 text-emerald-200 text-sm underline underline-offset-4">Volume processing scope and remaining evidence</a>
     </div>

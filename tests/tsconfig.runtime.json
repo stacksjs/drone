@@ -1,6 +1,7 @@
 {
   "extends": "../tsconfig.json",
   "include": [
+    "./unit/workspace-server-render.test.ts",
     "../storage/framework/types/env.d.ts",
     "../bin/drone.ts",
     "../resources/functions/drone/drivers/**/*.ts",
