@@ -1,8 +1,9 @@
 import type { EstimatorSnapshot } from '../estimation/estimator'
 import type { ImuMeasurement, SensorVector } from '../sensors/types'
-import type { VehicleBatteryObservation, VehicleControlOutput, VehicleControllerContext, VehicleMeasurement, VehicleMeasurementPose, VehicleMissionAction, VehicleProfile, VehicleVtolTransitionObservation } from './types'
+import type { VehicleBatteryObservation, VehicleControlOutput, VehicleControllerContext, VehicleMeasurement, VehicleMeasurementPose, VehicleMissionAction, VehicleProfile, VehicleVtolBackCaptureForecast, VehicleVtolTransitionObservation } from './types'
 import { createPhysicsSensorFeed } from '../controls/sensors'
 import { createEstimator } from '../estimation/estimator'
+import { fixtureInertialModel } from '../estimation/fixture-inertial'
 import { observeMission } from '../missions/engine'
 import { createVehicleMissionEngine, validateVehicleMission } from '../missions/vehicle'
 import { createVehicleAuthoritySupervisor, createVehicleOutputWatchdog } from '../authority/vehicle'
@@ -34,6 +35,8 @@ function captureLinkObservation(input: unknown, nowMs: number): { capturedAtMs: 
 export function runVehicleSimulation(profileInput: VehicleProfile, options: { scenario?: string, seconds?: number, neutralTailMs?: number, missionActions?: readonly ScheduledMissionAction[] } = {}) {
   const scenario = options.scenario ?? profileInput.scenario, seconds = options.seconds ?? 120
   const neutralTailMs = options.neutralTailMs ?? 0
+  const positionPrediction = profileInput.positionPrediction
+  if (positionPrediction !== undefined && positionPrediction !== 'fixture-imu') throw new TypeError('Invalid vehicle position prediction')
   let missionActionIndex = 0
   if (!Number.isSafeInteger(neutralTailMs) || neutralTailMs < 0 || neutralTailMs > 15000 || neutralTailMs % 4 !== 0) throw new RangeError('Invalid independent vehicle neutral tail')
   if (!Number.isInteger(seconds) || seconds < 2 || seconds > 180 || scenario !== profileInput.scenario || !profileInput.scenarios.includes(scenario) || profileInput.evidence !== 'modeled-vehicle-profile' || profileInput.physicalFlightEnabled !== false) throw new RangeError('Invalid vehicle simulation profile, scenario or duration')
@@ -42,6 +45,7 @@ export function runVehicleSimulation(profileInput: VehicleProfile, options: { sc
   const batteryModel = captureVehicleBatteryModel(profileInput.batteryModel, plan.power)
   if (profileInput.vehicle !== plan.vehicle || plan.origin.latitudeDeg !== 0 || plan.origin.longitudeDeg !== 0 || plan.origin.ellipsoidHeightM !== 100) throw new TypeError('Vehicle fixture requires its declared 0,0,100 WGS84 origin')
   const hasTransitions = plan.tasks.some(task => task.kind === 'vtol-mode')
+  const captureMotion = plan.tasks.some(task => task.kind === 'vtol-mode' && task.approach === 'bounded-approach-v1')
   let transitionObservation: VehicleVtolTransitionObservation | null = null
   const actuators = structuredClone(profileInput.actuators), fence = structuredClone(profileInput.authorityFence)
   const session = profileInput.createSession(), navigation = session.createNavigation?.()
@@ -50,7 +54,7 @@ export function runVehicleSimulation(profileInput: VehicleProfile, options: { sc
   const engine = createVehicleMissionEngine(plan), plant = session.createPlant(), controller = session.createController()
   const supervisor = createVehicleAuthoritySupervisor({ bootId: 55n, sessionId: 123n, vehicle: profileInput.vehicle, actuators, fence })
   const board = createVehicleOutputWatchdog({ bootId: 55n, sessionId: 123n, vehicle: profileInput.vehicle, actuators })
-  const feed = createPhysicsSensorFeed(0), estimator = createEstimator({ origin: plan.origin, gravityCorrection: 'initialization-only' })
+  const feed = createPhysicsSensorFeed(0), estimator = createEstimator({ origin: plan.origin, gravityCorrection: 'initialization-only', positionPrediction })
   const qualifier = createVehicleMeasurementQualifier(profileInput.vehicle, batteryModel ?? undefined)
   const observedSensors = { imu: 0, gnss: 0 }, sensorSequences = { imu: 0, gnss: 0 }
   let truth = plant.snapshot(), mission = engine.snapshot()
@@ -60,7 +64,7 @@ export function runVehicleSimulation(profileInput: VehicleProfile, options: { sc
   const queue: { measurement: VehicleMeasurement, pose: VehicleMeasurementPose | null }[] = []
   const requested = new Set<string>()
   let status: 'completed' | 'blocked' | 'host-lost' | 'duration-exhausted' = 'duration-exhausted', fault: string | null = null, hostLostAt: number | null = null
-  const path: { atMs: number, positionM: SensorVector | null, truthPositionM: SensorVector, mission: typeof mission, measurement: VehicleMeasurement | null, measurementPose: VehicleMeasurementPose | null, actuators: number[], transitionObservation?: VehicleVtolTransitionObservation | null }[] = []
+  const path: { atMs: number, positionM: SensorVector | null, truthPositionM: SensorVector, mission: typeof mission, measurement: VehicleMeasurement | null, measurementPose: VehicleMeasurementPose | null, actuators: number[], transitionObservation?: VehicleVtolTransitionObservation | null, backCapture?: VehicleVtolBackCaptureForecast }[] = []
   const transitions: { atMs: number, state: string, taskId: string, reason: string }[] = []
   let previousState = '', previousTask = ''
   const payload = session.createPayload?.()
@@ -87,7 +91,7 @@ export function runVehicleSimulation(profileInput: VehicleProfile, options: { sc
       if (nowMs % 20 !== 0) continue
       const reference = vehicleReference(estimate)
       const imuObservation = sensors.sensors.find(s => s.kind === 'imu')?.observation
-      const capturePose = predictVehicleMeasurementPose(estimate, imuObservation, nowMs)
+      const capturePose = predictVehicleMeasurementPose(estimate, imuObservation, nowMs, { includeMotion: captureMotion })
       if ((capturePose || profileInput.vehicle === 'subsea') && !faults.dropVehicleSensor) {
         if (queue.length >= 8) throw new RangeError('Vehicle sensor queue exhausted')
         const packet = structuredClone(session.renderMeasurement(truth, nowMs, reference))
@@ -130,7 +134,7 @@ export function runVehicleSimulation(profileInput: VehicleProfile, options: { sc
       }
       payload?.observe?.(structuredClone(context))
       const ack = payload?.poll(nowMs) ?? null
-      const missionObservation = { ...observeMission({ estimate, authority: supervisor.snapshot().state, batteryPercent, onGround: qualified?.values.onSurface === true }, profileInput.vehicle === 'subsea' ? 'LOCAL_WATER_SURFACE' : 'WGS84_ELLIPSOID'), payloadAck: ack, ...(hasTransitions ? { transition: transitionObservation } : {}) }
+      const missionObservation = { ...observeMission({ estimate, authority: supervisor.snapshot().state, batteryPercent, onGround: qualified?.values.onSurface === true }, profileInput.vehicle === 'subsea' ? 'LOCAL_WATER_SURFACE' : 'WGS84_ELLIPSOID'), ...(!estimate.localPosition ? { origin: structuredClone(plan.origin), positionM: null, velocityMps: null } : {}), payloadAck: ack, ...(hasTransitions ? { transition: transitionObservation } : {}) }
       transitionObservation = null
       let action: VehicleMissionAction | undefined = nowMs === 600 ? 'start' : undefined
       const scheduled = missionActions[missionActionIndex]
@@ -150,7 +154,7 @@ export function runVehicleSimulation(profileInput: VehicleProfile, options: { sc
       const frame = supervisor.gate(output, nowMs)
       if (frame) board.accept(frame, nowMs)
       else board.revoke()
-      path.push({ atMs: nowMs, positionM: estimate.localPosition ? [...estimate.localPosition.positionM] as SensorVector : null, truthPositionM: [...truth.positionM], mission: structuredClone(mission), measurement: measurement ? structuredClone(measurement) : null, measurementPose: measurementPose ? structuredClone(measurementPose) : null, actuators: [...board.snapshot().actuators], ...(hasTransitions ? { transitionObservation: transitionObservation ? structuredClone(transitionObservation) : null } : {}) })
+      path.push({ atMs: nowMs, positionM: estimate.localPosition ? [...estimate.localPosition.positionM] as SensorVector : null, truthPositionM: [...truth.positionM], mission: structuredClone(mission), measurement: measurement ? structuredClone(measurement) : null, measurementPose: measurementPose ? structuredClone(measurementPose) : null, actuators: [...board.snapshot().actuators], ...(hasTransitions ? { transitionObservation: transitionObservation ? structuredClone(transitionObservation) : null } : {}), ...(output.backCapture ? { backCapture: structuredClone(output.backCapture) } : {}) })
       if (mission.state !== previousState || mission.taskId !== previousTask) { transitions.push({ atMs: nowMs, state: mission.state, taskId: mission.taskId, reason: mission.reason }); previousState = mission.state; previousTask = mission.taskId }
       if (!['ready', 'running', 'paused'].includes(mission.state)) { status = mission.state === 'completed' ? 'completed' : 'blocked'; fault ??= mission.state === 'completed' ? null : mission.reason; break }
     }
@@ -164,5 +168,5 @@ export function runVehicleSimulation(profileInput: VehicleProfile, options: { sc
     session.observeIndependent?.(structuredClone(truth), nowMs, [...boardState.actuators], false)
     finalAtMs = nowMs
   }
-  return { version: 1, evidence: 'owned-vehicle-physics-simulation' as const, physicalFlightEnabled: false as const, boardOutputsInhibited: true as const, vehicle: profileInput.vehicle, scenario, status, fault, navigationEvidence: { observedSensors, datum: estimate.localPosition?.altitudeDatum ?? null, quality: [...estimate.quality], localPositionHealthy: estimate.health.localPosition }, mission, trace: engine.trace(), path, transitions, budget: { worstCaseMs, requiredWh }, authority: supervisor.snapshot(), board: board.snapshot(), finalTruthPositionM: [...truth.positionM] as SensorVector, ...(batteryModel ? { energy: { evidence: 'modeled-vehicle-battery-v1' as const, model: batteryModel, lastObservation: batteryObservation } } : {}) }
+  return { version: 1, evidence: 'owned-vehicle-physics-simulation' as const, physicalFlightEnabled: false as const, boardOutputsInhibited: true as const, vehicle: profileInput.vehicle, scenario, status, fault, navigationEvidence: { ...(positionPrediction ? { positionPrediction: { ...fixtureInertialModel } } : {}), observedSensors, datum: estimate.localPosition?.altitudeDatum ?? null, quality: [...estimate.quality], localPositionHealthy: estimate.health.localPosition }, mission, trace: engine.trace(), path, transitions, budget: { worstCaseMs, requiredWh }, authority: supervisor.snapshot(), board: board.snapshot(), finalTruthPositionM: [...truth.positionM] as SensorVector, ...(batteryModel ? { energy: { evidence: 'modeled-vehicle-battery-v1' as const, model: batteryModel, lastObservation: batteryObservation } } : {}) }
 }

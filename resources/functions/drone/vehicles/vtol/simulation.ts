@@ -1,4 +1,5 @@
 import { createVtolTransitionProfile } from './transition-profile'
+import { createVtolBackCaptureProfile } from './back-capture-profile'
 import { vtolModel } from './plant'
 import { runVehicleSimulation } from '../runtime'
 import type { VehicleMissionAction } from '../types'
@@ -24,7 +25,7 @@ const windCases = {
   'west-crosswind-2mps': { windMps: [0, -2, 0], expectedOutcome: 'completed-route', backHeadingRad: Math.PI / 2 },
 } as const
 const windExposure = () => ({ calmSteps: 0, appliedSteps: 0, mismatchSteps: 0, firstAppliedAtMs: null as number | null, lastAppliedAtMs: null as number | null })
-export const vtolSimulationScenarios = Object.freeze(['nominal', ...Object.keys(faults), ...Object.keys(operatorCases), ...Object.keys(windCases)])
+export const vtolSimulationScenarios = Object.freeze(['nominal', ...Object.keys(faults), ...Object.keys(operatorCases), ...Object.keys(windCases), 'planned-back-capture', ...Object.keys(windCases).map(name => `planned-${name}`)])
 export const vtolSimulationPhases = Object.freeze(['front', 'cruise', 'back', 'landing'] as const)
 export const vtolSimulationWindPhases = Object.freeze(['startup', ...vtolSimulationPhases])
 const phases = [
@@ -41,14 +42,17 @@ export interface VtolSimulationOptions { seconds?: number, electrical?: boolean,
 export function createVtolSimulationCase(scenario = 'nominal', options: VtolSimulationOptions = {}) {
   if (!(vtolSimulationScenarios as readonly string[]).includes(scenario)) throw new RangeError('Unknown VTOL simulation scenario')
   const faultCase = Object.hasOwn(faults, scenario)
-  const windCase = Object.hasOwn(windCases, scenario) ? windCases[scenario as keyof typeof windCases] : null
+  const windName = scenario.startsWith('planned-') ? scenario.slice('planned-'.length) : scenario
+  const windCase = Object.hasOwn(windCases, windName) ? windCases[windName as keyof typeof windCases] : null
   const availablePhases: readonly string[] = windCase ? vtolSimulationWindPhases : faultCase ? vtolSimulationPhases : []
   if (options.phase !== undefined && !faultCase && !windCase) throw new RangeError('VTOL phase selection requires a fault or wind scenario')
   if (options.phase !== undefined && !availablePhases.includes(options.phase)) throw new RangeError('Unknown VTOL simulation phase')
   const phase = faultCase ? phases.find(row => row.phase === (options.phase ?? 'front')) : null
   if (phase === undefined) throw new RangeError('Unknown VTOL simulation phase')
   const windPhase = windCase && options.phase !== undefined && options.phase !== 'startup' ? phases.find(row => row.phase === options.phase)! : null
-  const profile = createVtolTransitionProfile({ electrical: options.electrical })
+  const plannedCapture = scenario === 'planned-back-capture' || scenario.startsWith('planned-') && windCase !== null
+  const profile = plannedCapture ? createVtolBackCaptureProfile() : createVtolTransitionProfile({ electrical: options.electrical })
+  let captureWorld = { evaluatedSteps: 0, mismatchSteps: 0 }
   const operator: OperatorCase | undefined = Object.hasOwn(operatorCases, scenario) ? operatorCases[scenario as keyof typeof operatorCases] : undefined
   const backHeadingRad = windCase && 'backHeadingRad' in windCase ? windCase.backHeadingRad : null
   if (backHeadingRad !== null) {
@@ -57,8 +61,10 @@ export function createVtolSimulationCase(scenario = 'nominal', options: VtolSimu
     back.headingRad = backHeadingRad
     profile.mission.id = `vtol-${scenario}`
   }
+  const captureDeclaration = plannedCapture ? JSON.stringify({ mission: profile.mission, positionPrediction: profile.positionPrediction ?? null }) : null
   const declaredHeading = backHeadingRad ?? 0
-  const wind = windCase ? { frame: 'LOCAL_NED' as const, windMps: [...windCase.windMps] as SensorVector, beginsAtMs: windPhase ? null : 1000, expectedOutcome: windPhase?.phase === 'landing' ? 'completed-route' as const : windCase.expectedOutcome, ...(backHeadingRad === null && !windPhase ? {} : { backHeadingRad: declaredHeading }), ...(windPhase ? { phase: windPhase.phase } : {}) } : null
+  const plannedWindOutcome = windPhase?.phase === 'landing' && backHeadingRad !== null ? 'planning-limit-before-onset' : windPhase?.phase !== 'landing' && windCase && windCase.windMps[1] !== 0 ? 'planning-limit' : 'completed-route'
+  const wind = windCase ? { frame: 'LOCAL_NED' as const, windMps: [...windCase.windMps] as SensorVector, beginsAtMs: windPhase ? null : 1000, expectedOutcome: plannedCapture ? plannedWindOutcome : windPhase?.phase === 'landing' ? 'completed-route' as const : windCase.expectedOutcome, ...(backHeadingRad === null && !windPhase ? {} : { backHeadingRad: declaredHeading }), ...(windPhase ? { phase: windPhase.phase } : {}) } : null
   let exposure = windExposure()
   let phaseEnteredAtMs: number | null = null, windBeginsAtMs: number | null = wind?.beginsAtMs ?? null
   const actions = operator?.actions
@@ -135,12 +141,28 @@ export function createVtolSimulationCase(scenario = 'nominal', options: VtolSimu
       } }
     }
   }
+  if (plannedCapture) {
+    const factory = profile.createSession
+    profile.createSession = () => {
+      const session = factory()
+      return { ...session, createPlant() {
+        const plant = session.createPlant()
+        return { snapshot: () => plant.snapshot(), step(actuators, dtS, world) {
+          const state = plant.step(actuators, dtS, world)
+          captureWorld.evaluatedSteps++
+          if (!windCase && world.windMps.some(n => n !== 0) || world.currentMps.some(n => n !== 0)) captureWorld.mismatchSteps++
+          return state
+        } }
+      } }
+    }
+  }
   const seconds = options.seconds ?? operator?.seconds ?? 160
-  return { profile, seconds, phase: phase?.phase ?? windPhase?.phase ?? null, phases: [...availablePhases], electrical: options.electrical ?? false, wind: wind ? structuredClone(wind) : null, run() {
+  return { profile, seconds, phase: phase?.phase ?? windPhase?.phase ?? null, phases: [...availablePhases], electrical: !!profile.batteryModel, plannedCapture, wind: wind ? structuredClone(wind) : null, run() {
     sources.last = null
     exposure = windExposure()
     phaseEnteredAtMs = null
     windBeginsAtMs = wind?.beginsAtMs ?? null
+    captureWorld = { evaluatedSteps: 0, mismatchSteps: 0 }
     const result = runVehicleSimulation(profile, { seconds, missionActions: actions })
     const { trace, path, ...report } = result
     const transitionEvidence = trace.rows.flatMap(row => row.observation.transition?.outcome === 'confirmed' ? [row.observation.transition] : [])
@@ -188,9 +210,17 @@ export function createVtolSimulationCase(scenario = 'nominal', options: VtolSimu
     const worldMatched = !!wind && phaseMatched && exposure.calmSteps > 0 && exposure.appliedSteps > 0 && exposure.firstAppliedAtMs === windBeginsAtMs && exposure.lastAppliedAtMs === lastAtMs && exposure.mismatchSteps === 0
     const backTask = trace.plan.tasks.find(task => task.id === 'back')
     const backHeadingMatched = backTask?.kind === 'vtol-mode' && backTask.mode === 'hover' && backTask.headingRad === declaredHeading
-    const windOutcomeMatched = !!wind && (wind.expectedOutcome === 'completed-route' ? completedRoute : result.status === 'blocked' && result.fault === 'vtol-transition-envelope' && result.mission.taskId === 'back' && result.mission.state === 'blocked' && result.mission.targetM === null && result.mission.transition === null && confirmed(['initial-hover', 'front']) && observedFlight && !landingContact && boardNeutral)
-    const demonstrationMatched = wind ? worldMatched && windOutcomeMatched && backHeadingMatched : scenario === 'nominal' ? completedRoute : actions ? operatorMatched : faultObserved && observedFlight && !landingContact && result.mission.state !== 'completed' && boardNeutral
+    const stoppedCapture = result.status === 'blocked' && result.fault === 'vtol-transition-aborted' && result.mission.taskId === 'back' && result.mission.state === 'blocked' && result.mission.targetM === null && result.mission.transition === null && confirmed(['initial-hover', 'front']) && observedFlight && !landingContact && boardNeutral
+    const windOutcomeMatched = !!wind && (wind.expectedOutcome === 'completed-route' ? completedRoute : wind.expectedOutcome === 'planning-limit' || wind.expectedOutcome === 'planning-limit-before-onset' ? stoppedCapture && (wind.expectedOutcome !== 'planning-limit-before-onset' || phaseEnteredAtMs === null && exposure.appliedSteps === 0) : result.status === 'blocked' && result.fault === 'vtol-transition-envelope' && result.mission.taskId === 'back' && result.mission.state === 'blocked' && result.mission.targetM === null && result.mission.transition === null && confirmed(['initial-hover', 'front']) && observedFlight && !landingContact && boardNeutral)
+    const backCaptureEvidence = path.flatMap(row => row.backCapture ? [structuredClone(row.backCapture)] : [])
+    const captureDeclarationMatched = plannedCapture && JSON.stringify({ mission: trace.plan, positionPrediction: result.navigationEvidence.positionPrediction?.mode ?? null }) === captureDeclaration
+    const captureWorldMatched = plannedCapture && captureWorld.evaluatedSteps > 0 && captureWorld.mismatchSteps === 0 && (!windCase || worldMatched)
+    const captureForecastMatched = wind?.expectedOutcome === 'planning-limit' || wind?.expectedOutcome === 'planning-limit-before-onset' ? backCaptureEvidence.length === 1 && backCaptureEvidence[0]!.status === 'limit' : backCaptureEvidence.length === 1 && backCaptureEvidence[0]!.status === 'predicted'
+    const plannedCaptureMatched = !plannedCapture || captureDeclarationMatched && captureWorldMatched && captureForecastMatched && backCaptureEvidence.every(row => row.anchorM.every((n, i) => n === [330, 0, -15][i]))
+    const demonstrationMatched = wind ? worldMatched && windOutcomeMatched && backHeadingMatched && plannedCaptureMatched : scenario === 'nominal' || plannedCapture ? completedRoute && plannedCaptureMatched : actions ? operatorMatched : faultObserved && observedFlight && !landingContact && result.mission.state !== 'completed' && boardNeutral
     const summary = { ...report, scope: 'development-lift-and-cruise' as const, aerodynamicsModel: vtolModel.aerodynamicsModel, transitionEvidence, completeTransitions, observedFlight, landingContact, boardNeutral, demonstrationMatched, recordedMissionRows: trace.rows.length, evaluatedPathRows: path.length,
+      ...(backCaptureEvidence.length ? { backCaptureEvidence } : {}),
+      ...(plannedCapture ? { backCaptureCase: { positionPrediction: result.navigationEvidence.positionPrediction, declarationMatched: captureDeclarationMatched, worldMatched: captureWorldMatched, ...captureWorld, matched: plannedCaptureMatched } } : {}),
       ...(phase ? { scenarioEvidence: { phase: phase.phase, injectedAtMs: phase.atMs, taskId: before?.mission.taskId ?? null, faultObserved, sources: capturedSources } } : {}),
       ...(wind ? { windEvidence: { ...structuredClone(wind), beginsAtMs: windBeginsAtMs, ...exposure, worldMatched, outcomeMatched: windOutcomeMatched, ...(backHeadingRad === null && !windPhase ? {} : { backHeadingMatched }), ...(windPhase ? { phaseEnteredAtMs, phaseMatched } : {}) } } : {}),
       ...(actions ? { operatorEvidence: { actions: actualActions, tasksBeforeActions, phaseMatched: operatorPhaseMatched, observedPaused, matched: operatorMatched, ...(operator?.recovery ? { recoveryCorrelated } : {}), ...(operator?.openCircuit ? { pusherOpenCircuitObserved } : {}), ...(operator?.outcome === 'hold-expiry' ? { globalEnduranceExpired, landingStarted } : {}) } } : {}) }

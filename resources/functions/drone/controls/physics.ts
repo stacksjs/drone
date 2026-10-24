@@ -1,15 +1,10 @@
 import type { SensorVector } from '../sensors/types'
 import type { Quaternion } from '../estimation/frames'
 import type { Motors } from './model'
-import { multiplyQuaternion, normalizeQuaternion } from '../estimation/frames'
+import { multiplyQuaternion, normalizeQuaternion, rotateBodyToNed, rotateNedToBody } from '../estimation/frames'
 import { multirotorModel as model, validVector } from './model'
 import { quadXWrench } from './allocation'
-export function rotateBodyToNed(q: Quaternion, v: SensorVector): SensorVector {
-  const [w, x, y, z] = q
-  const t = [2 * (y * v[2] - z * v[1]), 2 * (z * v[0] - x * v[2]), 2 * (x * v[1] - y * v[0])]
-  return [v[0] + w * t[0]! + y * t[2]! - z * t[1]!, v[1] + w * t[1]! + z * t[0]! - x * t[2]!, v[2] + w * t[2]! + x * t[1]! - y * t[0]!]
-}
-export const rotateNedToBody = (q: Quaternion, v: SensorVector) => rotateBodyToNed([q[0], -q[1], -q[2], -q[3]], v)
+export { rotateBodyToNed, rotateNedToBody } from '../estimation/frames'
 interface RigidBodyInput { positionM?: SensorVector, motorsN?: Motors, groundDownM?: number, groundGradient?: [number, number] }
 interface CarriedPointLoad { id: string, massKg: number, forwardM: number }
 interface BodySnapshot { positionM: SensorVector, velocityMps: SensorVector, angularRateRadS: SensorVector, accelerationMps2: SensorVector, quaternionWxyz: Quaternion, motorsN: Motors, groundContact: boolean }

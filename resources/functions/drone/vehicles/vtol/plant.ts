@@ -17,7 +17,7 @@ export function vtolAerodynamics(relativeBodyMps: SensorVector, rateRadS: Sensor
 }
 
 /** Independent lift rotors and the owned trainer wing/pusher share one rigid body. */
-export function createVtolPlant(initial: { positionM?: SensorVector, velocityMps?: SensorVector, quaternionWxyz?: Quaternion, rotorsN?: [number, number, number, number], pusherThrustN?: number, electricalCapacityWh?: number, energyUsedWh?: number } = {}): VehiclePlant {
+export function createVtolPlant(initial: { positionM?: SensorVector, velocityMps?: SensorVector, quaternionWxyz?: Quaternion, angularRateRadS?: SensorVector, rotorsN?: [number, number, number, number], pusherThrustN?: number, electricalCapacityWh?: number, energyUsedWh?: number } = {}): VehiclePlant {
   const capacityWh = initial.electricalCapacityWh
   let energyUsedWh = initial.energyUsedWh === undefined ? 0 : initial.energyUsedWh
   if (capacityWh === undefined && initial.energyUsedWh !== undefined || capacityWh !== undefined && (!Number.isFinite(capacityWh) || capacityWh <= 0 || capacityWh > 10000 || !Number.isFinite(energyUsedWh) || energyUsedWh < 0 || energyUsedWh > capacityWh)) throw new RangeError('Invalid initial VTOL electrical state')
@@ -28,8 +28,8 @@ export function createVtolPlant(initial: { positionM?: SensorVector, velocityMps
   let pusherThrustN = initial.pusherThrustN === undefined ? 0 : initial.pusherThrustN
   let velocityMps = numericPacket(initial.velocityMps === undefined ? [0, 0, 0] : initial.velocityMps, 3) as SensorVector, accelerationMps2: SensorVector = [0, 0, 0]
   let windMps: SensorVector = [0, 0, 0]
-  let quaternionWxyz = normalizeQuaternion(numericPacket(initial.quaternionWxyz === undefined ? [1, 0, 0, 0] : initial.quaternionWxyz, 4) as Quaternion), angularRateRadS: SensorVector = [0, 0, 0]
-  if (!validVector(positionM) || !validVector(velocityMps) || positionM[2] > 0 || rotorsN.length !== 4 || rotorsN.some(n => !Number.isFinite(n) || n < 0 || n > vtolModel.maxRotorThrustN) || !Number.isFinite(pusherThrustN) || pusherThrustN < 0 || pusherThrustN > vtolModel.maxPusherThrustN) throw new RangeError('Invalid initial VTOL model')
+  let quaternionWxyz = normalizeQuaternion(numericPacket(initial.quaternionWxyz === undefined ? [1, 0, 0, 0] : initial.quaternionWxyz, 4) as Quaternion), angularRateRadS = numericPacket(initial.angularRateRadS === undefined ? [0, 0, 0] : initial.angularRateRadS, 3) as SensorVector
+  if (!validVector(positionM) || !validVector(velocityMps) || Math.hypot(...angularRateRadS) > 35 || positionM[2] > 0 || rotorsN.length !== 4 || rotorsN.some(n => !Number.isFinite(n) || n < 0 || n > vtolModel.maxRotorThrustN) || !Number.isFinite(pusherThrustN) || pusherThrustN < 0 || pusherThrustN > vtolModel.maxPusherThrustN) throw new RangeError('Invalid initial VTOL model')
   let onSurface = positionM[2] === 0
   function electricalDetails(): VehiclePlantState['details'] {
     if (capacityWh === undefined) return {}

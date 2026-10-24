@@ -4,7 +4,7 @@ export interface SurfacePing {
   twoWayTravelS: number, soundSpeedMps: number, draftM: number, waterLevelAboveDatumM: number, datum: string
   timeSigmaS: number, soundSpeedSigmaMps: number, draftSigmaM: number, waterLevelSigmaM: number, motionSigmaM: number
 }
-export interface SurfaceSurveyPose { reference: string, atMs: number, positionM: SensorVector, rollRad: number, pitchRad: number, yawRad: number, attitudeSigmaRad: number, positionSigmaM: number, timeSigmaMs: number, speedMps: number, provenance?: Omit<VehicleMeasurementPose, 'positionM' | 'quaternionWxyz'> }
+export interface SurfaceSurveyPose { reference: string, atMs: number, positionM: SensorVector, rollRad: number, pitchRad: number, yawRad: number, attitudeSigmaRad: number, positionSigmaM: number, timeSigmaMs: number, speedMps: number, provenance?: Pick<VehicleMeasurementPose, 'capturedAtMs' | 'reference' | 'positionCapturedAtMs' | 'positionPredictedToMs' | 'attitudeCapturedAtMs' | 'attitudePredictedToMs' | 'gyroCapturedAtMs' | 'attitudePrediction'> }
 export interface SurfaceSounding { id: string, reference: string, capturedAtMs: number, receivedAtMs: number, positionM: SensorVector, depthBelowDatumM: number, verticalSigmaM: number, horizontalSigmaM: number, raw: SurfacePing, pose: SurfaceSurveyPose }
 /** Flat, homogeneous water column; vertical single beam. No refraction or multibeam model. */
 export function correctSurfaceSounding(pingInput: SurfacePing, poseInput: SurfaceSurveyPose): SurfaceSounding {

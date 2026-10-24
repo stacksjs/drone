@@ -194,3 +194,12 @@ test('declared skid friction stops residual ground motion gradually without brak
   expect(unloaded.velocityMps[0]).toBeGreaterThan(0.239)
   expect(unloaded.positionM[2]).toBeLessThan(0)
 })
+
+// Public model seam: a forecast starts from the observed angular rate, not a fictitious rest state.
+test('a VTOL forecast model retains and owns a bounded initial angular rate', () => {
+  const rates: [number, number, number] = [0.1, -0.2, 0.3]
+  const plant = createVtolPlant({ positionM: [0, 0, -15], angularRateRadS: rates })
+  rates[0] = 9
+  expect(plant.snapshot().angularRateRadS).toEqual([0.1, -0.2, 0.3])
+  for (const angularRateRadS of [null, [0, 0, Infinity], [0, 0, 36], [0, 0, 0, 0]]) expect(() => createVtolPlant({ angularRateRadS } as never)).toThrow()
+})

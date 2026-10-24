@@ -84,13 +84,25 @@ mode observations. Named scenarios expose phase-bound sensor/manual/host loss, c
 declared front/back abort and recovery, pusher open-circuit timeout and global endurance expiry.
 Add `--electrical` to either command for fictional propulsion/battery load and delayed energy measurements.
 Plans can explicitly declare bounded hover-and-land transition recovery. Complete recovery/abort envelopes
-and measured hybrid energy qualification remain open. The VTOL workspace selects the same 20 named
+and measured hybrid energy qualification remain open. The VTOL workspace selects the same 27 named
 cases, fault phases and optional electrical model, with captured mode and battery playback.
 The 2 m/s headwind and tailwind cases complete their routes. Separate east/west crosswind plans
 complete with explicitly wind-facing back-hover headings. Their original fixed north-facing limit
 cases retain blocked envelope outcomes, without confirmed hover or landing. Reports and playback
 show the requested heading and distinguish declared world wind from observed exposure checks;
 controller inputs contain no wind oracle. These are bounded fictional plans, not arbitrary-wind support.
+
+The bounded back-capture planner is still in development. Its declared fixture-IMU estimator,
+conservative uncertainty checks and landing flare complete the calm 330 m example in focused
+modeled tests. Its wind and anchor declarations retain distinct supported and limited outcomes.
+
+`./buddy vtol:simulate --scenario planned-back-capture` retains the cruise leg and explicitly
+requests a 330 m hover anchor. It includes the fictional electrical model, forecasts a bounded
+wing-borne approach before braking and retains its sampled model traces separately from actual
+captured hover/contact evidence. Source, wind and resource changes invalidate the accepted forecast.
+The six `planned-` wind cases also expose startup and observed phase onset, with distinct
+completed routes, planning limits and unreached wind exposure.
+Read the [planner assumptions, remaining DAG budget and limits](docs/vehicles-vtol.md#bounded-back-capture-planning).
 
 ## Simulated carried load
 

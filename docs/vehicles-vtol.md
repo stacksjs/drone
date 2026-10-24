@@ -160,7 +160,7 @@ a different heading remains unmatched. The plan retains its declared final headi
 The original `*-limit-2mps` cases keep their prior plans and blocked outcomes.
 
 Wider wind directions and arbitrary onset times, a general feasibility planner and measured full-angle model qualification
-remain in [#87](https://github.com/stacksjs/drone/issues/87). No arbitrary-wind, measured-airframe or
+remain in [#12](https://github.com/stacksjs/drone/issues/12). No arbitrary-wind, measured-airframe or
 physical flight acceptance is claimed.
 
 The hover demonstration commands the pusher and three surfaces to zero. Calibrated modeled raw
@@ -467,11 +467,125 @@ ratio, voltage-dependent thrust, cell temperature/degradation, current-sensor ca
 capacity remain unmodeled or unqualified. The open-circuit fixture removes pusher demand and thrust;
 it does not model a seized motor's electrical current.
 
+## Bounded back-capture planning
+
+The explicit `planned-back-capture` example keeps the normal 180 m cruise waypoint,
+then declares a hover anchor at `[330, 0, -15]` and landing at `[330, 0, 0]` in LOCAL_NED.
+The original 45-second back request and 25-second landing task remain in force. This case
+includes the fictional 100 Wh battery even when the optional electrical flag is absent.
+
+```sh
+./buddy vtol:simulate --scenario planned-back-capture
+drone vtol:simulate --scenario planned-back-capture
+```
+
+The shared case factory serves both commands and `/missions`. It checks the original plan
+declaration and actual calm world inputs separately from the route outcome. Changed plans or
+undeclared wind cannot qualify this named example, even when their actual routes complete.
+This development case completes in focused owned-runtime tests with fresh hover confirmation
+and landing contact. It uses the explicitly
+assumed initial north heading and [fixture IMU-aided estimator](estimation.md#fixture-imu-aided-prediction).
+The report retains that estimator's model constants. This is simulation evidence, not aircraft
+or firmware SITL acceptance. Earlier failed uncertainty and contact campaigns remain retained;
+they do not become passing evidence when the implementation changes.
+
+Six additional `planned-` wind names use that same 330 m plan, estimator and electrical model.
+They are separate declarations from the original transition cases. Every name accepts
+`--phase startup|front|cruise|back|landing`. Startup applies wind at 1,000 ms; other choices
+start it on the next 4 ms integration step after actual mission entry.
+
+| Planned case | Startup, front, cruise or back onset | Landing onset |
+|---|---|---|
+| `planned-headwind-2mps` | Completed route | Completed route |
+| `planned-tailwind-2mps` | Completed route | Completed route |
+| `planned-east-crosswind-limit-2mps` | Capture planning limit | Completed route |
+| `planned-west-crosswind-limit-2mps` | Capture planning limit | Completed route |
+| `planned-east-crosswind-2mps` | Capture planning limit, -pi/2 hover | Planning limit before onset |
+| `planned-west-crosswind-2mps` | Capture planning limit, +pi/2 hover | Planning limit before onset |
+
+```sh
+./buddy vtol:simulate --scenario planned-tailwind-2mps --phase back
+drone vtol:simulate --scenario planned-east-crosswind-limit-2mps --phase landing
+```
+
+The wind-facing headings are -pi/2 for eastward wind and +pi/2 for westward wind, as
+in the original explicit plans. A matched `planning-limit` stops without hover confirmation
+or contact. For the wind-facing landing-onset selections, the calm approach itself reaches
+a planning limit before landing. `planning-limit-before-onset` retains zero applied wind
+steps, no exposure match and `demonstrationMatched: false`; the CLI exits 1. It cannot
+qualify a wind case that never occurred. A requested phase that is not reached during
+a short run likewise remains unqualified. Headwind and tailwind beginning at back entry
+are observed before the first qualified forecast; a separate actual post-admission wind
+change regression verifies forecast invalidation.
+
+For a custom library plan, a hover `vtol-mode` task can pair an explicit `anchorM` with
+`approach: 'bounded-approach-v1'`. Both fields are required together, the anchor must be inside
+the declared fence, and the controller requires a previously observed wing-borne phase.
+Other mode tasks keep their existing current-position contract. Automatic retries and
+implicit heading changes are not part of this planner.
+
+The command copies the plan's power/fence declarations and the longest reachable remaining
+DAG budget, including the declared failure branch. It does not replace the normal mission,
+authority, source, clock or output-watchdog checks. The planner has these declared limits:
+
+- Navigation velocity and covariance are retained with the airflow capture pose. Wind is
+  inferred by subtracting air-relative motion from ground motion at matching source epochs.
+  Controller inputs receive neither plant position nor declared world wind.
+- The fictional forecast starts from qualified estimated position, velocity, gyro-held attitude,
+  measured thrust and battery evidence. Its copied PID state is independent of live control.
+  Private forecasts use ideal model navigation with delayed airflow; they do not run a second
+  raw GNSS estimator and are not received flight observations.
+- The model samples nominal wind plus six axis offsets. Its radius combines three times the
+  largest retained velocity standard deviation, 0.02 m/s airflow quantization and an assumed
+  0.03 rad attitude contribution evaluated at the full admitted 22 m/s airspeed ceiling.
+  The report retains the `model-scenarios-v2` constants. These are declared fictional
+  assumptions, not measured uncertainty bounds. Seven sampled traces are not an interval
+  reachability proof.
+- The inferred wind norm plus sample radius must be at most 3 m/s. That admission ceiling does
+  not establish that every wind, heading or anchor inside it is feasible. A bounded search uses
+  at most 28 private traces and at most 24 seconds of approach. Every selected trace must confirm
+  hover before the original request deadline minus 1.5 seconds.
+- Planned low-speed braking can use the existing 0.4 rad rotor-position tilt range. The
+  original 0.5 rad attitude guard and high-speed airflow guards remain active. The landing
+  flare uses a critically damped vertical position target with the existing velocity gain,
+  descent cap and task deadline. Correlated recovery retains that flare instead of reverting
+  to a ground-clamped fast touchdown.
+- Source power is bounded by the declared mission ceiling. Initial admission and continuous
+  monitoring charge worst-case power over capture age, the whole remaining original back
+  deadline and the longest remaining DAG branch, then retain the declared reserve. Predicted
+  early completion cannot grant extra energy. Capacity changes, regressing consumption,
+  inconsistent electrical observations, supply cutoff or inadequate reserve invalidate the plan.
+- Dense finite velocity and all three finite positive-semidefinite covariance axes are
+  required. Missing slots and sparse arrays remain unqualified. Each later wind center and
+  uncertainty radius must fit entirely inside the radius evaluated by the accepted forecast.
+  Expanded uncertainty or a shifted center cannot pass merely because the ranges overlap.
+- Lost motion/covariance, source regression, expired motion continuity, model-exceeding
+  uncertainty or inconsistent wind also invalidate the forecast. Fresh correlated evidence can
+  report a controller abort. Lost source continuity instead inhibits output immediately; it
+  cannot fabricate a fresh acknowledgement. Neither path claims a safe airborne landing.
+
+`backCaptureEvidence` in the command report retains actual emitted forecast updates, including
+all private trace outcomes and any later invalidation monitor. `result.path[].backCapture`
+retains those updates at their emitted epochs. Actual mission completion still requires the
+separate captured mode observations and contact interlocks. The existing mission replay checks
+the recorded policy inputs; it does not reconstruct private forecast physics from a mission
+trace alone.
+
+The current development campaign completes calm, 2 m/s headwind and 2 m/s tailwind plans.
+The wind-facing crosswind plans and the 390 m anchor remain planning limits under the larger
+conservative uncertainty samples. Fixed north-facing crosswinds and alternate unsupported
+headings also remain limits. An actual wind change after admission invalidates the plan.
+The original published transition wind cases remain separate cases with their original
+outcomes. A declared nearby recovery landing site is checked separately from a distant site
+whose finite landing budget expires. No timeout is extended to turn that failure into a pass.
+These finite sampled cases do not prove arbitrary-wind feasibility. Measured hybrid energy qualification remains open under
+[#12](https://github.com/stacksjs/drone/issues/12).
+
 ## Mission workspace
 
-Open `/missions`, choose `vtol` and select one of the same 20 named cases as `vtol:simulate`.
+Open `/missions`, choose `vtol` and select one of the same 27 named cases as `vtol:simulate`.
 The six source/manual/host faults expose `front`, `cruise`, `back` and `landing` injection
-phases. All six wind cases expose startup or observed front/cruise/back/landing onset. The optional electrical checkbox selects the fictional 100 Wh model. Changing the vehicle,
+phases. The six original wind cases and six planned-capture wind cases expose startup or observed front/cruise/back/landing onset. The optional electrical checkbox selects the fictional 100 Wh model; all planned capture cases include it as part of their declarations. Changing the vehicle,
 scenario, fault phase or electrical selection clears the previous recording.
 
 The workspace shows the validated worst-case time and energy allowance, requested modes and counted
@@ -481,8 +595,7 @@ table retains changes and confirmations. The last mode observation includes its 
 it does not assert a continuously measured current phase.
 
 Task playback shows each requested VTOL heading in radians from north. Wind playback shows
-the declared vector/onset, the actual world exposure check and the expected completed-route or
-envelope-stop outcome. The explicit wind-facing plans also show their back heading and recorded-plan
+the declared vector/onset, the actual world exposure check and the expected completed route, envelope stop or bounded planning limit. The explicit wind-facing plans also show their back heading and recorded-plan
 binding. The wind is a fixture input, not a measured wind estimate. With startup, front, cruise
 or back onset, fixed-heading crosswind limit recordings remain blocked and show the unsupported-envelope
 disclosure. Landing-only onset completes through contact and displays the recorded phase binding
@@ -496,6 +609,10 @@ Host loss freezes host readings while the independent modeled board expires its 
 The final outcome and mission state retain their actual meanings. A matched abort case remains
 `blocked` / `aborted`, and the held recovery remains `blocked` by global endurance without a landing
 contact. A named outcome match only checks the modeled demonstration. It does not authorize flight.
+
+Planned-capture playback shows only forecast updates already emitted by the cursor time, with
+their source epoch, inferred wind/sample radius, chosen braking epoch and invalidation reason.
+It keeps those model predictions separate from captured mode and contact observations.
 
 Both callers construct the case through `createVtolSimulationCase()` in
 `resources/functions/drone/vehicles/vtol/simulation.ts`. Its `run()` returns the recording and the

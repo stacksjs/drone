@@ -42,3 +42,7 @@ delay compensation, full-rate IMU propagation, VIO/optical flow/RTK and redundan
 reference campaigns and numerical work in the [estimator guide](../estimation.md). Porting a
 validated algorithm into the allocation-free board scheduler is separate from this Pi-side replay
 implementation and requires issue #2's measured runtime budgets.
+
+The fixture-only extension in [ADR 33](0033-fixture-inertial-capture-planning.md) adds
+IMU-aided translational prediction with an explicit synthetic initial-north assumption.
+It preserves this default and does not qualify physical inertial navigation.

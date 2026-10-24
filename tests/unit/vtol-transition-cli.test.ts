@@ -21,8 +21,32 @@ test('CI qualifies nominal and failure full-route commands outside the checkout'
     { command: '$GITHUB_WORKSPACE/storage/runtime-build/cli/drone vtol:simulate --scenario west-crosswind-2mps --electrical', directory: '${{ runner.temp }}' },
     { command: '$GITHUB_WORKSPACE/storage/runtime-build/cli/drone vtol:simulate --scenario east-crosswind-limit-2mps --phase back --electrical', directory: '${{ runner.temp }}' },
     { command: '$GITHUB_WORKSPACE/storage/runtime-build/cli/drone vtol:simulate --scenario east-crosswind-limit-2mps --phase landing --electrical', directory: '${{ runner.temp }}' },
+    { command: '$GITHUB_WORKSPACE/storage/runtime-build/cli/drone vtol:simulate --scenario planned-back-capture', directory: '${{ runner.temp }}' },
+    { command: '$GITHUB_WORKSPACE/storage/runtime-build/cli/drone vtol:simulate --scenario planned-headwind-2mps', directory: '${{ runner.temp }}' },
+    { command: '$GITHUB_WORKSPACE/storage/runtime-build/cli/drone vtol:simulate --scenario planned-tailwind-2mps', directory: '${{ runner.temp }}' },
+    { command: '$GITHUB_WORKSPACE/storage/runtime-build/cli/drone vtol:simulate --scenario planned-east-crosswind-limit-2mps', directory: '${{ runner.temp }}' },
+    { command: '$GITHUB_WORKSPACE/storage/runtime-build/cli/drone vtol:simulate --scenario planned-west-crosswind-limit-2mps', directory: '${{ runner.temp }}' },
+    { command: '$GITHUB_WORKSPACE/storage/runtime-build/cli/drone vtol:simulate --scenario planned-east-crosswind-2mps', directory: '${{ runner.temp }}' },
+    { command: '$GITHUB_WORKSPACE/storage/runtime-build/cli/drone vtol:simulate --scenario planned-west-crosswind-2mps', directory: '${{ runner.temp }}' },
+    { command: '$GITHUB_WORKSPACE/storage/runtime-build/cli/drone vtol:simulate --scenario planned-tailwind-2mps --phase back', directory: '${{ runner.temp }}' },
+    { command: '$GITHUB_WORKSPACE/storage/runtime-build/cli/drone vtol:simulate --scenario planned-east-crosswind-limit-2mps --phase landing', directory: '${{ runner.temp }}' },
   ])
 })
+
+test('native planned capture delivers the complete forecast report and actual hover confirmation', async () => {
+  const result = await command(['vtol:simulate', '--scenario', 'planned-back-capture']).withTimeout(60000)
+  expect(result.exitCode).toBe(0)
+  const report = JSON.parse(result.stdout)
+  expect(report.status).toBe('completed')
+  expect(report.demonstrationMatched).toBe(true)
+  expect(report.landingContact).toBe(true)
+  expect(report.backCaptureEvidence).toHaveLength(1)
+  expect(report.backCaptureEvidence[0]).toMatchObject({ anchorM: [330, 0, -15], status: 'predicted', physicalFlightEnabled: false })
+  expect(report.backCaptureEvidence[0].predictions.length).toBeLessThanOrEqual(28)
+  expect(report.transitionEvidence.map((row: { taskId: string }) => row.taskId)).toEqual(['initial-hover', 'front', 'back'])
+  expect(report.energy.lastObservation.cutoff).toBe(false)
+  expect(report.boardNeutral).toBe(true)
+}, 90000)
 
 test('native VTOL full-route command reports qualified initial hover, cruise, back hover and landing', async () => {
   const result = await command(['vtol:simulate']).withTimeout(60000)
@@ -182,3 +206,22 @@ test('native wind-aligned plans retain their explicit headings, fresh hover and 
     expect(report.board.physicalActuationEnabled).toBe(false)
   }
 }, 90000)
+
+
+test('native planned wind commands retain completion, capture limits and unreached exposure', async () => {
+  for (const declaration of [
+    { name: 'planned-tailwind-2mps', phase: 'back', status: 'completed', outcome: 'completed-route', exposed: true, exit: 0 },
+    { name: 'planned-east-crosswind-limit-2mps', phase: 'startup', status: 'blocked', outcome: 'planning-limit', exposed: true, exit: 0 },
+    { name: 'planned-east-crosswind-2mps', phase: 'landing', status: 'blocked', outcome: 'planning-limit-before-onset', exposed: false, exit: 1 },
+  ]) {
+    const result = await command(['vtol:simulate', '--scenario', declaration.name, '--phase', declaration.phase]).withTimeout(60000)
+    expect(result.exitCode).toBe(declaration.exit)
+    const report = JSON.parse(result.stdout)
+    expect(report.status).toBe(declaration.status)
+    expect(report.demonstrationMatched).toBe(declaration.exposed)
+    expect(report.windEvidence).toMatchObject({ expectedOutcome: declaration.outcome, worldMatched: declaration.exposed, outcomeMatched: true })
+    expect(report.backCaptureCase.positionPrediction.mode).toBe('fixture-imu')
+    expect(report.boardNeutral).toBe(true)
+    if (!declaration.exposed) expect(report.windEvidence.appliedSteps).toBe(0)
+  }
+}, 180000)

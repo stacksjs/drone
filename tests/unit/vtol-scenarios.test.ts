@@ -119,7 +119,7 @@ test('unresumed recovery reaches the global endurance limit without a landing cl
   expect(short.status).toBe('duration-exhausted')
   expect(short.demonstrationMatched).toBe(false)
   expect(short.operatorEvidence!.globalEnduranceExpired).toBe(false)
-})
+}, 30000) // Wall budget for two complete virtual runs; modeled deadlines stay unchanged.
 
 for (const electrical of [false, true]) for (const [scenario, reason] of [
   ['cruise-pause-resume', 'landed'], ['front-abort', 'vtol-abort-landed'], ['back-abort', 'vtol-abort-landed'],
