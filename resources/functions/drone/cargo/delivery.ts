@@ -1,29 +1,18 @@
 import type { SensorVector } from '../sensors/types'
 import type { CargoBodySeparation, CargoLoadSnapshot } from './types'
-import type { VehicleControllerContext, VehicleMissionPlan, VehiclePayloadAck, VehiclePayloadCommand, VehiclePlant, VehicleSession } from '../vehicles/types'
+import type { VehicleControllerContext, VehicleMissionPlan, VehiclePayloadCommand, VehiclePlant, VehicleSession } from '../vehicles/types'
 import { createRigidBody } from '../controls/physics'
 import { multirotorModel } from '../controls/model'
 import { createMultirotorPlant, createMultirotorProfile } from '../vehicles/multirotor/profile'
 import { runVehicleSimulation } from '../vehicles/runtime'
-import { vehicleReference } from '../vehicles/measurements'
 import { createRedundantVehicleLinks } from '../vehicles/links'
+import type { CargoDeliveryCustody } from './coordinator'
+import { createCargoDeliveryCoordinator } from './coordinator'
 
 const flightFaults = ['position-loss', 'imu-loss', 'vehicle-sensor-loss', 'rc-override', 'kill', 'host-loss'] as const
 export const cargoDeliveryScenarios = ['nominal', 'recipient-absent', 'site-blocked', 'mechanism-jam', 'receipt-loss', 'foreign-receipt', 'primary-link-loss', 'both-links-loss', 'authority-containment', 'diversion-position-loss', 'diversion-kill', ...flightFaults] as const
 type CargoDeliveryScenario = typeof cargoDeliveryScenarios[number]
 interface Parcel { massKg: number, positionM: SensorVector, velocityMps: SensorVector, onSurface: boolean, capturedAtMs: number }
-interface Delivery {
-  outcome: 'not-released' | 'in-transit' | 'received' | 'uncertain'
-  containerId: string
-  siteId: string
-  recipientId: string
-  requestedAtMs: number | null
-  mechanismCapturedAtMs: number | null
-  receiptCapturedAtMs: number | null
-  acknowledgedAtMs: number | null
-  reason: string | null
-  mechanismOutcome: 'not-requested' | 'requested' | 'open' | 'jammed'
-}
 type DeliveryRelease = CargoBodySeparation & { atMs: number, eventId: string }
 type DeliveryLinkSnapshot = ReturnType<ReturnType<typeof createRedundantVehicleLinks>['snapshot']>
 export interface CargoDeliveryResult {
@@ -34,7 +23,7 @@ export interface CargoDeliveryResult {
   physicalFlightEnabled: false
   boardOutputsInhibited: true
   identityAuthenticated: false
-  delivery: Delivery
+  delivery: CargoDeliveryCustody
   initialLoad: CargoLoadSnapshot
   finalLoad: CargoLoadSnapshot
   release: DeliveryRelease | null
@@ -85,11 +74,14 @@ export function simulateCargoDelivery(input: unknown = {}): CargoDeliveryResult 
   const body = createRigidBody({ positionM: [0, 0, -.1], groundDownM: -.1, carriedPointLoad: { id: site.containerId, massKg: .1, forwardM: .08 } })
   const initialLoad = body.loadSnapshot(), adapted = createMultirotorPlant(body)
   let physicalAtMs = 600, parcel: Parcel | null = null, release: DeliveryRelease | null = null
-  let pending: VehiclePayloadCommand | null = null, armed: VehiclePayloadCommand | null = null, observed: VehicleControllerContext | null = null
-  let closed = false, requested = false, lastPollMs = -1, lastSequence = -1, readyCount = 0, readyStartMs: number | null = null, readyReference: string | null = null
-  let refused: string | null = null, receiptAtMs: number | null = null
+  let armed: VehiclePayloadCommand | null = null, observed: VehicleControllerContext | null = null
+  let receiptAtMs: number | null = null
   let mechanismAttempt: { eventId: string, atMs: number, jammed: boolean } | null = null
-  const delivery: Delivery = { outcome: 'not-released', containerId: site.containerId, siteId: site.id, recipientId: site.recipientId, requestedAtMs: null, mechanismCapturedAtMs: null, receiptCapturedAtMs: null, acknowledgedAtMs: null, reason: null, mechanismOutcome: 'not-requested' }
+  const coordinator = createCargoDeliveryCoordinator({ origin: profile.mission.origin, site: { id: site.id, recipientId: site.recipientId, containerId: site.containerId, positionM: [site.northM, site.eastM, site.downM], radiusM: site.radiusM }, releaseHeightM: 1 }, {
+    evidence: 'modeled-cargo-mechanism',
+    request(command) { armed = structuredClone(command) },
+    cancel(eventId) { if (armed?.eventId === eventId) armed = null },
+  })
   const linkScope = { vehicleId: 'carrier-a', bootId: 55, sessionId: 123 }, linkMonitor = createRedundantVehicleLinks(linkScope)
   const linkQueue: { sourceId: 'primary' | 'backup', sequence: number, capturedAtMs: number, receivedAtMs: number }[] = [], linkEvents: DeliveryLinkSnapshot[] = []
   let links = linkMonitor.snapshot(0), linkSequence = 0
@@ -111,28 +103,17 @@ export function simulateCargoDelivery(input: unknown = {}): CargoDeliveryResult 
       }
     }
     if (armed && mechanismAttempt === null && physicalAtMs > armed.issuedAtMs) {
-      if (physicalAtMs >= armed.expiresAtMs) { delivery.outcome = 'uncertain'; delivery.reason = 'mechanism-command-expired'; armed = null }
+      if (physicalAtMs >= armed.expiresAtMs) { armed = null }
       else {
         mechanismAttempt = { eventId: armed.eventId, atMs: physicalAtMs, jammed: scenario === 'mechanism-jam' }
         if (mechanismAttempt.jammed) { armed = null; return snapshot() }
         const event = body.separateCarriedLoad()
         release = { ...event, atMs: physicalAtMs, eventId: armed.eventId }; armed = null
-        if (event.outcome === 'separated') { parcel = { ...event.parcel, onSurface: false, capturedAtMs: physicalAtMs }; delivery.outcome = 'in-transit' }
-        else { refused = event.reason; delivery.reason = event.reason }
+        if (event.outcome === 'separated') parcel = { ...event.parcel, onSurface: false, capturedAtMs: physicalAtMs }
       }
     }
     return snapshot()
   } }
-  function ready(context: VehicleControllerContext) {
-    const m = context.measurement, p = context.estimate.localPosition, q = context.estimate.attitude?.quaternionWxyz, rate = context.controlRate
-    if (!context.enabled || context.estimate.evidence !== 'fixture' || !context.estimate.health.localPosition || !context.estimate.health.tilt || !m || !p || !q || !rate
-      || m.reference !== vehicleReference(context.estimate) || m.capturedAtMs > context.nowMs || context.nowMs - m.capturedAtMs > 80 || m.receivedAtMs > context.nowMs
-      || m.values.siteId !== site.id || m.values.recipientId !== site.recipientId || m.values.siteClear !== true || m.values.recipientPresent !== true || m.values.loadAttached !== true) return false
-    const speed = Math.hypot(...p.velocityMps), sigma = Math.sqrt(Math.max(...p.covarianceBlocks.map(block => block.positionM2)))
-    const horizontal = Math.hypot(p.positionM[0]! - site.northM, p.positionM[1]! - site.eastM)
-    return speed <= .18 && horizontal + 3 * sigma + speed * .08 <= site.radiusM && p.positionM[2]! >= -1.2 && p.positionM[2]! <= -.8
-      && Math.acos(Math.max(-1, Math.min(1, 1 - 2 * (q[1] ** 2 + q[2] ** 2)))) <= .2 && Math.hypot(...rate.angularRateRadS) <= .5
-  }
   profile.createSession = (): VehicleSession => {
     const base = baseSession()
     return { ...base, createPlant: () => plant,
@@ -166,55 +147,11 @@ export function simulateCargoDelivery(input: unknown = {}): CargoDeliveryResult 
           siteClear: scenario !== 'site-blocked', recipientPresent: scenario !== 'recipient-absent' && !scenario.startsWith('diversion-'), mechanismOpen: release?.outcome === 'separated', mechanismJammed: mechanismAttempt?.jammed ?? false, mechanismEventId: mechanismAttempt?.eventId ?? '',
           receiptEventId: receiptCaptured && scenario !== 'receipt-loss' ? release?.eventId ?? '' : '', receiptContainerId: site.containerId } }
       },
-      createPayload: () => ({
-        observe(context) {
-          observed = structuredClone(context)
-          if (pending && context.mission.payloadFailure?.eventId === pending.eventId) {
-            pending = null; armed = null
-            delivery.outcome = delivery.mechanismOutcome === 'open' ? 'uncertain' : 'not-released'; delivery.reason ??= 'receipt-not-confirmed'
-          }
-          const sequence = context.measurement?.sequence ?? -1, reference = context.measurement?.reference ?? null
-          if (sequence === lastSequence && reference === readyReference) return
-          const qualified = ready(context) && (readyReference === null || reference === readyReference)
-          if (qualified && (lastSequence < 0 || sequence > lastSequence)) { readyCount++; readyStartMs ??= context.nowMs }
-          else { readyCount = 0; readyStartMs = null }
-          lastSequence = sequence; readyReference = reference
-        },
-        request(command) {
-          if (closed || requested || pending !== null) throw new TypeError('cargo-delivery-command-replayed')
-          requested = true; pending = structuredClone(command); delivery.requestedAtMs = command.issuedAtMs; delivery.mechanismOutcome = 'requested'
-          const c = observed, scoped = c?.mission.payload
-          if (!c || !scoped || c.mission.state !== 'running' || c.mission.taskKind !== 'payload' || command.operation !== 'material-drop' || command.containerId !== site.containerId
-            || JSON.stringify(scoped) !== JSON.stringify(command) || command.reference !== vehicleReference(c.estimate) || command.issuedAtMs !== c.nowMs || command.expiresAtMs <= c.nowMs
-            || !ready(c) || readyCount < 26 || readyStartMs === null || c.nowMs - readyStartMs < 500) { refused = 'release-evidence-unqualified'; delivery.reason = refused }
-          else armed = structuredClone(command)
-        },
-        poll(nowMs): VehiclePayloadAck | null {
-          if (!Number.isSafeInteger(nowMs) || nowMs < lastPollMs) throw new RangeError('cargo-delivery-clock')
-          lastPollMs = nowMs
-          const c = observed, m = c?.measurement, pose = c?.measurementPose
-          if (!pending || closed || !c?.enabled || c.nowMs !== nowMs || !m || m.reference !== pending.reference || m.capturedAtMs < pending.issuedAtMs || m.capturedAtMs >= pending.expiresAtMs
-            || nowMs >= pending.expiresAtMs || nowMs - m.capturedAtMs > 80 || m.receivedAtMs > nowMs || !pose || pose.reference !== m.reference || pose.capturedAtMs !== m.capturedAtMs || pose.positionPredictedToMs !== m.capturedAtMs) return null
-          if (m.values.mechanismEventId === pending.eventId && m.values.mechanismJammed === true && m.values.loadAttached === true) {
-            delivery.mechanismCapturedAtMs ??= m.capturedAtMs; delivery.mechanismOutcome = 'jammed'; refused = 'mechanism-jammed'; delivery.reason = refused
-          }
-          if (m.values.mechanismEventId === pending.eventId && m.values.mechanismOpen === true && m.values.loadAttached === false) { delivery.mechanismCapturedAtMs ??= m.capturedAtMs; delivery.mechanismOutcome = 'open' }
-          const received = delivery.mechanismCapturedAtMs !== null && m.values.receiptEventId === pending.eventId && m.values.receiptContainerId === pending.containerId
-            && m.values.recipientId === site.recipientId && m.values.siteId === site.id && m.values.recipientPresent === true && m.values.siteClear === true
-          if (m.values.receiptEventId !== '' && !received) { refused = 'receipt-scope-mismatch'; delivery.reason = refused; delivery.outcome = 'uncertain' }
-          if (!refused && !received) return null
-          const command = pending; pending = null; delivery.acknowledgedAtMs = nowMs
-          if (received) { delivery.receiptCapturedAtMs = m.capturedAtMs; delivery.outcome = 'received' }
-          return { eventId: command.eventId, taskId: command.taskId, operation: command.operation, containerId: command.containerId, reference: command.reference, capturedAtMs: m.capturedAtMs,
-            positionM: [...pose.positionM], outcome: refused ? delivery.mechanismOutcome === 'open' ? 'uncertain' : 'rejected' : 'confirmed',
-            metadata: { modeledOnly: true, expectedSiteId: site.id, expectedRecipientId: site.recipientId, observedSiteId: typeof m.values.siteId === 'string' ? m.values.siteId : 'unqualified', observedRecipientId: typeof m.values.recipientId === 'string' ? m.values.recipientId : 'unqualified' } }
-        },
-        close() { closed = true; armed = null; observed = null },
-      }),
+      createPayload: () => ({ ...coordinator.port, observe(context) { observed = structuredClone(context); coordinator.port.observe!(context) } }),
     }
   }
   const runtime = runVehicleSimulation(profile, { seconds: 100 })
-  if (delivery.outcome === 'in-transit') { delivery.outcome = 'uncertain'; delivery.reason ??= 'receipt-not-confirmed' }
+  const delivery = coordinator.snapshot().delivery
   return structuredClone({ version: 1, evidence: 'owned-cargo-delivery-simulation' as const, scenario, status: runtime.status === 'completed' && runtime.mission.payloadFailure ? 'diverted' as const : runtime.status, physicalFlightEnabled: false as const, boardOutputsInhibited: true as const, identityAuthenticated: false as const,
     delivery, initialLoad, finalLoad: body.loadSnapshot(), release, parcel, links, linkEvents, runtime })
 }
