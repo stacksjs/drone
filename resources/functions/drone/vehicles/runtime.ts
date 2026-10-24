@@ -31,8 +31,24 @@ function captureLinkObservation(input: unknown, nowMs: number): { capturedAtMs: 
   if (!time?.enumerable || !Object.hasOwn(time, 'value') || !Number.isSafeInteger(time.value) || time.value < 0 || time.value > nowMs || !connected?.enumerable || !Object.hasOwn(connected, 'value') || typeof connected.value !== 'boolean') throw new TypeError('Unqualified vehicle link observation')
   return { capturedAtMs: time.value, connected: connected.value }
 }
-/** Owned raw sensor -> estimator -> mission -> vehicle policy -> authority -> independent board loop. */
-export function runVehicleSimulation(profileInput: VehicleProfile, options: { scenario?: string, seconds?: number, neutralTailMs?: number, missionActions?: readonly ScheduledMissionAction[] } = {}) {
+export interface VehicleSimulationOptions {
+  scenario?: string
+  seconds?: number
+  neutralTailMs?: number
+  missionActions?: readonly ScheduledMissionAction[]
+  scope?: { bootId: bigint, sessionId: bigint }
+}
+function captureSimulationScope(input: unknown) {
+  if (input === undefined) return { bootId: 55n, sessionId: 123n }
+  if (!input || typeof input !== 'object' || ![Object.prototype, null].includes(Object.getPrototypeOf(input)) || Reflect.ownKeys(input).length !== 2) throw new TypeError('Invalid vehicle simulation scope')
+  const boot = Object.getOwnPropertyDescriptor(input, 'bootId'), session = Object.getOwnPropertyDescriptor(input, 'sessionId')
+  if (!boot?.enumerable || !Object.hasOwn(boot, 'value') || !session?.enumerable || !Object.hasOwn(session, 'value') || [boot.value, session.value].some(value => typeof value !== 'bigint' || value < 1n || value > 0xffffffffffffffffn)) throw new TypeError('Invalid vehicle simulation scope')
+  return { bootId: boot.value as bigint, sessionId: session.value as bigint }
+}
+/** Retained owned loop, advanced at exactly 4 ms epochs from zero by its caller. */
+export function createVehicleSimulationSession(profileInput: VehicleProfile, options: VehicleSimulationOptions = {}) {
+  const scope = captureSimulationScope(options.scope), vehicle = profileInput.vehicle
+  const runtimeFaults = profileInput.faults.bind(profileInput)
   const scenario = options.scenario ?? profileInput.scenario, seconds = options.seconds ?? 120
   const neutralTailMs = options.neutralTailMs ?? 0
   const positionPrediction = profileInput.positionPrediction
@@ -43,21 +59,23 @@ export function runVehicleSimulation(profileInput: VehicleProfile, options: { sc
   const missionActions = captureMissionActions(options.missionActions, seconds * 1000)
   const { plan, worstCaseMs, requiredWh } = validateVehicleMission(profileInput.mission)
   const batteryModel = captureVehicleBatteryModel(profileInput.batteryModel, plan.power)
-  if (profileInput.vehicle !== plan.vehicle || plan.origin.latitudeDeg !== 0 || plan.origin.longitudeDeg !== 0 || plan.origin.ellipsoidHeightM !== 100) throw new TypeError('Vehicle fixture requires its declared 0,0,100 WGS84 origin')
+  if (vehicle !== plan.vehicle || plan.origin.latitudeDeg !== 0 || plan.origin.longitudeDeg !== 0 || plan.origin.ellipsoidHeightM !== 100) throw new TypeError('Vehicle fixture requires its declared 0,0,100 WGS84 origin')
   const hasTransitions = plan.tasks.some(task => task.kind === 'vtol-mode')
   const captureMotion = plan.tasks.some(task => task.kind === 'vtol-mode' && task.approach === 'bounded-approach-v1')
   let transitionObservation: VehicleVtolTransitionObservation | null = null
   const actuators = structuredClone(profileInput.actuators), fence = structuredClone(profileInput.authorityFence)
   const session = profileInput.createSession(), navigation = session.createNavigation?.()
-  const linkProvider = session.linkObservation
-  if (profileInput.vehicle === 'subsea' && !navigation) throw new TypeError('Subsea profile requires owned pressure/DVL navigation')
+  const linkProvider = session.linkObservation, renderMeasurement = session.renderMeasurement.bind(session)
+  const observeIndependent = session.observeIndependent?.bind(session), updateNavigation = navigation?.update.bind(navigation)
+  if (vehicle === 'subsea' && !navigation) throw new TypeError('Subsea profile requires owned pressure/DVL navigation')
   const engine = createVehicleMissionEngine(plan), plant = session.createPlant(), controller = session.createController()
-  const supervisor = createVehicleAuthoritySupervisor({ bootId: 55n, sessionId: 123n, vehicle: profileInput.vehicle, actuators, fence })
-  const board = createVehicleOutputWatchdog({ bootId: 55n, sessionId: 123n, vehicle: profileInput.vehicle, actuators })
-  const feed = createPhysicsSensorFeed(0), estimator = createEstimator({ origin: plan.origin, gravityCorrection: 'initialization-only', positionPrediction })
-  const qualifier = createVehicleMeasurementQualifier(profileInput.vehicle, batteryModel ?? undefined)
+  const plantSnapshot = plant.snapshot.bind(plant), stepPlant = plant.step.bind(plant), stepController = controller.step.bind(controller)
+  const supervisor = createVehicleAuthoritySupervisor({ ...scope, vehicle: vehicle, actuators, fence })
+  const board = createVehicleOutputWatchdog({ ...scope, vehicle: vehicle, actuators })
+  const feed = createPhysicsSensorFeed(0, scope.bootId), estimator = createEstimator({ origin: plan.origin, gravityCorrection: 'initialization-only', positionPrediction })
+  const qualifier = createVehicleMeasurementQualifier(vehicle, batteryModel ?? undefined)
   const observedSensors = { imu: 0, gnss: 0 }, sensorSequences = { imu: 0, gnss: 0 }
-  let truth = plant.snapshot(), mission = engine.snapshot()
+  let truth = structuredClone(plantSnapshot()), mission = engine.snapshot()
   let estimate: EstimatorSnapshot = estimator.snapshot(0)
   let measurement: VehicleMeasurement | null = null, measurementPose: VehicleMeasurementPose | null = null
   let batteryObservation: VehicleBatteryObservation | null = null
@@ -68,105 +86,165 @@ export function runVehicleSimulation(profileInput: VehicleProfile, options: { sc
   const transitions: { atMs: number, state: string, taskId: string, reason: string }[] = []
   let previousState = '', previousTask = ''
   const payload = session.createPayload?.()
-  let finalAtMs = 0
-  try {
-    for (let nowMs = 0; nowMs <= seconds * 1000; nowMs += 4) {
-      finalAtMs = nowMs
-      const faults = profileInput.faults(scenario, nowMs, 'host'), boardState = board.tick(nowMs)
-      if (nowMs > 600) truth = plant.step(boardState.actuators, 0.004, { windMps: faults.windMps ?? [0, 0, 0], currentMps: faults.currentMps ?? [0, 0, 0] })
-      if (faults.hostLost) hostLostAt ??= nowMs
-      if (nowMs >= 600) session.observeIndependent?.(structuredClone(truth), nowMs, [...boardState.actuators], hostLostAt === null)
-      if (hostLostAt !== null) {
-        if (nowMs - hostLostAt >= 100) { status = 'host-lost'; fault = board.snapshot().fault ?? 'host-lost'; break }
-        continue
-      }
-      feed.capture(truth, nowMs, faults.dropImu, profileInput.vehicle === 'subsea' || faults.dropPosition)
-      const sensors = feed.advanceTo(nowMs)
-      for (const kind of ['imu', 'gnss'] as const) {
-        const sequence = sensors.sensors.find(sensor => sensor.kind === kind)?.observation?.sequence ?? 0
-        if (sequence > sensorSequences[kind]) { observedSensors[kind]++; sensorSequences[kind] = sequence }
-      }
-      const baseEstimate = estimator.update(sensors)
-      estimate = navigation ? navigation.update(baseEstimate, measurement, nowMs) : baseEstimate
-      if (nowMs % 20 !== 0) continue
-      const reference = vehicleReference(estimate)
-      const imuObservation = sensors.sensors.find(s => s.kind === 'imu')?.observation
-      const capturePose = predictVehicleMeasurementPose(estimate, imuObservation, nowMs, { includeMotion: captureMotion })
-      if ((capturePose || profileInput.vehicle === 'subsea') && !faults.dropVehicleSensor) {
-        if (queue.length >= 8) throw new RangeError('Vehicle sensor queue exhausted')
-        const packet = structuredClone(session.renderMeasurement(truth, nowMs, reference))
-        if (packet.capturedAtMs !== nowMs || !Number.isSafeInteger(packet.receivedAtMs) || packet.receivedAtMs < nowMs + 20 || packet.receivedAtMs > nowMs + 100) throw new TypeError('Vehicle renderer must declare capture and bounded receipt epochs')
-        queue.push({ measurement: packet, pose: capturePose })
-        queue.sort((a, b) => a.measurement.receivedAtMs - b.measurement.receivedAtMs || a.measurement.sequence - b.measurement.sequence)
-      }
-      while (queue[0] && queue[0].measurement.receivedAtMs <= nowMs) { const entry = queue.shift()!; measurement = entry.measurement; measurementPose = entry.pose }
-      let qualified: VehicleMeasurement | null = null
-      try { qualified = qualifier.qualify(measurement, nowMs, reference) }
-      catch (error) { fault ??= error instanceof Error ? error.message : 'vehicle-sensor-envelope'; measurementPose = null }
-      measurement = qualified
-      if (batteryModel && qualified) {
-        batteryObservation = observeVehicleBattery(qualified, batteryModel, nowMs)
-        if (batteryObservation.cutoff) fault ??= 'modeled-battery-supply-cutoff'
-      }
-      if (navigation) estimate = navigation.update(baseEstimate, qualified, nowMs)
-      let link = linkProvider === undefined ? { capturedAtMs: nowMs, connected: !faults.linkLost } : { capturedAtMs: 0, connected: false }
-      if (typeof linkProvider === 'function') {
-        try { link = captureLinkObservation(linkProvider.call(session, nowMs), nowMs) }
-        catch { /* An installed adapter failure is disconnected, never a replacement fixture. */ }
-      }
-      if (faults.linkLost) link.connected = false
-      if (nowMs < 600) continue
-      const b = board.snapshot()
-      const batteryPercent = batteryModel ? qualified && batteryObservation && !batteryObservation.cutoff ? batteryObservation.remainingPercentLowerBound : 0 : 100 - plan.power.maxW * Math.max(0, nowMs - 600) / 3600000 / plan.power.availableWh * 100
-      const observation = { kind: 'simulation' as const, nowMs, estimate,
-        runtime: { bootId: b.bootId, capturedAtMs: nowMs, watchdogHealthy: b.fault === null },
-        rc: { capturedAtMs: nowMs, connected: true, armSwitch: true, override: faults.rcOverride ?? false },
-        interlocks: { capturedAtMs: qualified?.capturedAtMs ?? nowMs - 1000, killActive: faults.kill ?? false, onGround: qualified?.values.onSurface === true, motorsStopped: qualified?.values.stopped === true },
-        battery: { capturedAtMs: batteryModel ? qualified?.capturedAtMs ?? nowMs - 1000 : nowMs, remainingPercent: batteryPercent }, link }
-      const send = (action: 'arm' | 'engage' | 'renew' | 'disarm', targetM = mission.targetM) => {
-        const s = supervisor.snapshot()
-        return supervisor.update(observation, { version: 1, sessionId: s.sessionId, bootId: s.bootId, epoch: s.epoch, sequence: s.sequence + 1, issuedAtMs: nowMs, action, mode: 'position', leaseMs: 100, target: { positionM: targetM ?? [0, 0, 0], yawRad: 0 } })
-      }
-      supervisor.update(observation)
-      if (nowMs === 600) { send('arm'); send('engage', [0, 0, 0]) }
-      const context: VehicleControllerContext = { nowMs, enabled: supervisor.snapshot().state === 'autonomous', estimate, measurement, measurementPose, mission,
-        ...(profileInput.vehicle === 'vtol' || profileInput.vehicle === 'quadcopter' ? { controlRate: capturePose ? { evidence: 'modeled-qualified-imu' as const, reference: capturePose.reference, capturedAtMs: capturePose.gyroCapturedAtMs, angularRateRadS: [...(imuObservation!.value as ImuMeasurement).angularRateRadS] as SensorVector } : null } : {}),
-      }
-      payload?.observe?.(structuredClone(context))
-      const ack = payload?.poll(nowMs) ?? null
-      const missionObservation = { ...observeMission({ estimate, authority: supervisor.snapshot().state, batteryPercent, onGround: qualified?.values.onSurface === true }, profileInput.vehicle === 'subsea' ? 'LOCAL_WATER_SURFACE' : 'WGS84_ELLIPSOID'), ...(!estimate.localPosition ? { origin: structuredClone(plan.origin), positionM: null, velocityMps: null } : {}), payloadAck: ack, ...(hasTransitions ? { transition: transitionObservation } : {}) }
-      transitionObservation = null
-      let action: VehicleMissionAction | undefined = nowMs === 600 ? 'start' : undefined
-      const scheduled = missionActions[missionActionIndex]
-      if (scheduled?.atMs === nowMs) { action = scheduled.action; missionActionIndex++ }
-      mission = engine.step(missionObservation, action)
-      if (mission.payloadFailure?.triggeredAtMs === nowMs) payload?.observe?.(structuredClone({ ...context, mission }))
-      if (mission.payload && !requested.has(mission.payload.eventId)) {
-        if (!payload) { fault ??= 'missing-vehicle-payload-port'; send('disarm') }
-        else { payload.observe?.(structuredClone({ ...context, mission })); payload.request(structuredClone(mission.payload)); requested.add(mission.payload.eventId) }
-      }
-      const active = mission.state === 'running' || mission.state === 'paused'
-      if (active && mission.targetM && !fault) send('renew')
-      else { send('disarm'); board.revoke() }
-      const output: VehicleControlOutput = controller.step({ ...context, enabled: supervisor.snapshot().state === 'autonomous', mission })
-      if (hasTransitions && active && !output.inhibited && supervisor.snapshot().state === 'autonomous') transitionObservation = output.transition ? structuredClone(output.transition) : null
-      if (active && output.inhibited && supervisor.snapshot().state === 'autonomous') { fault ??= output.reason; send('disarm'); board.revoke() }
-      const frame = supervisor.gate(output, nowMs)
-      if (frame) board.accept(frame, nowMs)
-      else board.revoke()
-      path.push({ atMs: nowMs, positionM: estimate.localPosition ? [...estimate.localPosition.positionM] as SensorVector : null, truthPositionM: [...truth.positionM], mission: structuredClone(mission), measurement: measurement ? structuredClone(measurement) : null, measurementPose: measurementPose ? structuredClone(measurementPose) : null, actuators: [...board.snapshot().actuators], ...(hasTransitions ? { transitionObservation: transitionObservation ? structuredClone(transitionObservation) : null } : {}), ...(output.backCapture ? { backCapture: structuredClone(output.backCapture) } : {}) })
-      if (mission.state !== previousState || mission.taskId !== previousTask) { transitions.push({ atMs: nowMs, state: mission.state, taskId: mission.taskId, reason: mission.reason }); previousState = mission.state; previousTask = mission.taskId }
-      if (!['ready', 'running', 'paused'].includes(mission.state)) { status = mission.state === 'completed' ? 'completed' : 'blocked'; fault ??= mission.state === 'completed' ? null : mission.reason; break }
+  const observePayload = payload?.observe?.bind(payload), pollPayload = payload?.poll.bind(payload), requestPayload = payload?.request.bind(payload), closePayload = payload?.close.bind(payload)
+  let finalAtMs = 0, nextAtMs = 0, policyAtMs: number | null = null, hostEndAtMs: number | null = null
+  let terminal = false, stepping = false
+  const interrupted = Symbol('vehicle-session-closed')
+  function owned<T>(work: () => T): T {
+    if (terminal) throw interrupted
+    const value = work()
+    if (terminal) throw interrupted
+    return value
+  }
+  function captured<T>(work: () => T): T { return owned(() => structuredClone(work())) }
+  function stepHost(nowMs: number) {
+    const faults = captured(() => runtimeFaults(scenario, nowMs, 'host')), boardState = board.tick(nowMs)
+    if (nowMs > 600) truth = captured(() => stepPlant(boardState.actuators, 0.004, { windMps: faults.windMps ?? [0, 0, 0], currentMps: faults.currentMps ?? [0, 0, 0] }))
+    if (faults.hostLost) hostLostAt ??= nowMs
+    if (nowMs >= 600) owned(() => observeIndependent?.(structuredClone(truth), nowMs, [...boardState.actuators], hostLostAt === null))
+    if (hostLostAt !== null) {
+      if (nowMs - hostLostAt >= 100) { status = 'host-lost'; fault = board.snapshot().fault ?? 'host-lost'; return false }
+      return true
     }
+    feed.capture(truth, nowMs, faults.dropImu, vehicle === 'subsea' || faults.dropPosition)
+    const sensors = feed.advanceTo(nowMs)
+    for (const kind of ['imu', 'gnss'] as const) {
+      const sequence = sensors.sensors.find(sensor => sensor.kind === kind)?.observation?.sequence ?? 0
+      if (sequence > sensorSequences[kind]) { observedSensors[kind]++; sensorSequences[kind] = sequence }
+    }
+    const baseEstimate = estimator.update(sensors)
+    estimate = updateNavigation ? captured(() => updateNavigation(baseEstimate, measurement, nowMs)) : baseEstimate
+    if (nowMs % 20 !== 0) return true
+    const reference = vehicleReference(estimate)
+    const imuObservation = sensors.sensors.find(s => s.kind === 'imu')?.observation
+    const capturePose = predictVehicleMeasurementPose(estimate, imuObservation, nowMs, { includeMotion: captureMotion })
+    if ((capturePose || vehicle === 'subsea') && !faults.dropVehicleSensor) {
+      if (queue.length >= 8) throw new RangeError('Vehicle sensor queue exhausted')
+      const packet = captured(() => renderMeasurement(truth, nowMs, reference))
+      if (packet.capturedAtMs !== nowMs || !Number.isSafeInteger(packet.receivedAtMs) || packet.receivedAtMs < nowMs + 20 || packet.receivedAtMs > nowMs + 100) throw new TypeError('Vehicle renderer must declare capture and bounded receipt epochs')
+      queue.push({ measurement: packet, pose: capturePose })
+      queue.sort((a, b) => a.measurement.receivedAtMs - b.measurement.receivedAtMs || a.measurement.sequence - b.measurement.sequence)
+    }
+    while (queue[0] && queue[0].measurement.receivedAtMs <= nowMs) { const entry = queue.shift()!; measurement = entry.measurement; measurementPose = entry.pose }
+    let qualified: VehicleMeasurement | null = null
+    try { qualified = qualifier.qualify(measurement, nowMs, reference) }
+    catch (error) { fault ??= error instanceof Error ? error.message : 'vehicle-sensor-envelope'; measurementPose = null }
+    measurement = qualified
+    if (batteryModel && qualified) {
+      batteryObservation = observeVehicleBattery(qualified, batteryModel, nowMs)
+      if (batteryObservation.cutoff) fault ??= 'modeled-battery-supply-cutoff'
+    }
+    if (updateNavigation) estimate = captured(() => updateNavigation(baseEstimate, qualified, nowMs))
+    let link = linkProvider === undefined ? { capturedAtMs: nowMs, connected: !faults.linkLost } : { capturedAtMs: 0, connected: false }
+    if (typeof linkProvider === 'function') {
+      try { link = captured(() => captureLinkObservation(linkProvider.call(session, nowMs), nowMs)) }
+      catch (error) { if (error === interrupted || terminal) throw error; /* An installed adapter failure is disconnected, never a replacement fixture. */ }
+    }
+    if (faults.linkLost) link.connected = false
+    if (nowMs < 600) return true
+    const b = board.snapshot()
+    const batteryPercent = batteryModel ? qualified && batteryObservation && !batteryObservation.cutoff ? batteryObservation.remainingPercentLowerBound : 0 : 100 - plan.power.maxW * Math.max(0, nowMs - 600) / 3600000 / plan.power.availableWh * 100
+    const observation = { kind: 'simulation' as const, nowMs, estimate,
+      runtime: { bootId: b.bootId, capturedAtMs: nowMs, watchdogHealthy: b.fault === null },
+      rc: { capturedAtMs: nowMs, connected: true, armSwitch: true, override: faults.rcOverride ?? false },
+      interlocks: { capturedAtMs: qualified?.capturedAtMs ?? nowMs - 1000, killActive: faults.kill ?? false, onGround: qualified?.values.onSurface === true, motorsStopped: qualified?.values.stopped === true },
+      battery: { capturedAtMs: batteryModel ? qualified?.capturedAtMs ?? nowMs - 1000 : nowMs, remainingPercent: batteryPercent }, link }
+    const send = (action: 'arm' | 'engage' | 'renew' | 'disarm', targetM = mission.targetM) => {
+      const s = supervisor.snapshot()
+      return supervisor.update(observation, { version: 1, sessionId: s.sessionId, bootId: s.bootId, epoch: s.epoch, sequence: s.sequence + 1, issuedAtMs: nowMs, action, mode: 'position', leaseMs: 100, target: { positionM: targetM ?? [0, 0, 0], yawRad: 0 } })
+    }
+    supervisor.update(observation)
+    if (nowMs === 600) { send('arm'); send('engage', [0, 0, 0]) }
+    const context: VehicleControllerContext = { nowMs, enabled: supervisor.snapshot().state === 'autonomous', estimate, measurement, measurementPose, mission,
+      ...(vehicle === 'vtol' || vehicle === 'quadcopter' ? { controlRate: capturePose ? { evidence: 'modeled-qualified-imu' as const, reference: capturePose.reference, capturedAtMs: capturePose.gyroCapturedAtMs, angularRateRadS: [...(imuObservation!.value as ImuMeasurement).angularRateRadS] as SensorVector } : null } : {}),
+    }
+    owned(() => observePayload?.(structuredClone(context)))
+    const ack = captured(() => pollPayload?.(nowMs)) ?? null
+    const missionObservation = { ...observeMission({ estimate, authority: supervisor.snapshot().state, batteryPercent, onGround: qualified?.values.onSurface === true }, vehicle === 'subsea' ? 'LOCAL_WATER_SURFACE' : 'WGS84_ELLIPSOID'), ...(!estimate.localPosition ? { origin: structuredClone(plan.origin), positionM: null, velocityMps: null } : {}), payloadAck: ack, ...(hasTransitions ? { transition: transitionObservation } : {}) }
+    transitionObservation = null
+    let action: VehicleMissionAction | undefined = nowMs === 600 ? 'start' : undefined
+    const scheduled = missionActions[missionActionIndex]
+    if (scheduled?.atMs === nowMs) { action = scheduled.action; missionActionIndex++ }
+    mission = engine.step(missionObservation, action)
+    if (mission.payloadFailure?.triggeredAtMs === nowMs) owned(() => observePayload?.(structuredClone({ ...context, mission })))
+    if (mission.payload && !requested.has(mission.payload.eventId)) {
+      if (!payload) { fault ??= 'missing-vehicle-payload-port'; send('disarm') }
+      else { owned(() => observePayload?.(structuredClone({ ...context, mission }))); owned(() => requestPayload!(structuredClone(mission.payload!))); requested.add(mission.payload.eventId) }
+    }
+    const active = mission.state === 'running' || mission.state === 'paused'
+    if (active && mission.targetM && !fault) send('renew')
+    else { send('disarm'); board.revoke() }
+    const output: VehicleControlOutput = captured(() => stepController({ ...context, enabled: supervisor.snapshot().state === 'autonomous', mission }))
+    if (hasTransitions && active && !output.inhibited && supervisor.snapshot().state === 'autonomous') transitionObservation = output.transition ? structuredClone(output.transition) : null
+    if (active && output.inhibited && supervisor.snapshot().state === 'autonomous') { fault ??= output.reason; send('disarm'); board.revoke() }
+    const frame = supervisor.gate(output, nowMs)
+    if (frame && !terminal) board.accept(frame, nowMs)
+    else board.revoke()
+    policyAtMs = nowMs
+    path.push({ atMs: nowMs, positionM: estimate.localPosition ? [...estimate.localPosition.positionM] as SensorVector : null, truthPositionM: [...truth.positionM], mission: structuredClone(mission), measurement: measurement ? structuredClone(measurement) : null, measurementPose: measurementPose ? structuredClone(measurementPose) : null, actuators: [...board.snapshot().actuators], ...(hasTransitions ? { transitionObservation: transitionObservation ? structuredClone(transitionObservation) : null } : {}), ...(output.backCapture ? { backCapture: structuredClone(output.backCapture) } : {}) })
+    if (mission.state !== previousState || mission.taskId !== previousTask) { transitions.push({ atMs: nowMs, state: mission.state, taskId: mission.taskId, reason: mission.reason }); previousState = mission.state; previousTask = mission.taskId }
+    if (!['ready', 'running', 'paused'].includes(mission.state)) { status = mission.state === 'completed' ? 'completed' : 'blocked'; fault ??= mission.state === 'completed' ? null : mission.reason; return false }
+    return true
   }
-  finally { payload?.close(); if (status !== 'host-lost') board.revoke() }
-  // Opt-in material/actuator settling has no host sensor, estimation, mission or control work.
-  const hostEndAtMs = finalAtMs
-  for (let elapsed = 4; elapsed <= neutralTailMs; elapsed += 4) {
-    const nowMs = hostEndAtMs + elapsed, faults = profileInput.faults(scenario, nowMs, 'independent-tail'), boardState = board.tick(nowMs)
-    truth = plant.step(boardState.actuators, .004, { windMps: faults.windMps ?? [0, 0, 0], currentMps: faults.currentMps ?? [0, 0, 0] })
-    session.observeIndependent?.(structuredClone(truth), nowMs, [...boardState.actuators], false)
-    finalAtMs = nowMs
+  function finishHost() {
+    if (hostEndAtMs !== null) return
+    hostEndAtMs = finalAtMs
+    try { closePayload?.() }
+    finally { if (status !== 'host-lost') board.revoke() }
   }
-  return { version: 1, evidence: 'owned-vehicle-physics-simulation' as const, physicalFlightEnabled: false as const, boardOutputsInhibited: true as const, vehicle: profileInput.vehicle, scenario, status, fault, navigationEvidence: { ...(positionPrediction ? { positionPrediction: { ...fixtureInertialModel } } : {}), observedSensors, datum: estimate.localPosition?.altitudeDatum ?? null, quality: [...estimate.quality], localPositionHealthy: estimate.health.localPosition }, mission, trace: engine.trace(), path, transitions, budget: { worstCaseMs, requiredWh }, authority: supervisor.snapshot(), board: board.snapshot(), finalTruthPositionM: [...truth.positionM] as SensorVector, ...(batteryModel ? { energy: { evidence: 'modeled-vehicle-battery-v1' as const, model: batteryModel, lastObservation: batteryObservation } } : {}) }
+  function close() {
+    if (terminal) return
+    terminal = true
+    status = 'blocked'; fault ??= 'simulation-session-closed'
+    try { finishHost() }
+    finally { board.revoke() }
+  }
+  function progress(nowMs: number, phase: 'host' | 'independent-tail') {
+    return { atMs: nowMs, phase, hostAvailable: phase === 'host' && hostLostAt === null && !terminal, terminal, policyAtMs, reference: vehicleReference(estimate), mission: structuredClone(mission), authority: supervisor.snapshot(), board: board.snapshot() }
+  }
+  function step(nowMs: number) {
+    if (terminal) throw new Error('Vehicle simulation session is closed')
+    if (stepping) throw new Error('Vehicle simulation session is already stepping')
+    if (!Number.isSafeInteger(nowMs) || nowMs !== nextAtMs) throw new RangeError('Vehicle simulation requires its next 4 ms epoch')
+    const phase = hostEndAtMs === null ? 'host' as const : 'independent-tail' as const
+    stepping = true
+    try {
+      finalAtMs = nowMs
+      if (phase === 'host') {
+        if (!stepHost(nowMs) || nowMs === seconds * 1000) finishHost()
+        if (hostEndAtMs !== null && neutralTailMs === 0) terminal = true
+      }
+      else {
+        // No host sensor, estimation, mission or control work runs in this phase.
+        const faults = captured(() => runtimeFaults(scenario, nowMs, 'independent-tail')), boardState = board.tick(nowMs)
+        truth = captured(() => stepPlant(boardState.actuators, .004, { windMps: faults.windMps ?? [0, 0, 0], currentMps: faults.currentMps ?? [0, 0, 0] }))
+        owned(() => observeIndependent?.(structuredClone(truth), nowMs, [...boardState.actuators], false))
+        if (nowMs === hostEndAtMs! + neutralTailMs) terminal = true
+      }
+      nextAtMs += 4
+      return progress(nowMs, phase)
+    }
+    catch (error) {
+      if (error === interrupted) return progress(nowMs, phase)
+      terminal = true; status = 'blocked'; fault ??= 'simulation-step-failed'
+      try { finishHost() }
+      catch (cleanupError) { throw new AggregateError([error, cleanupError], 'Vehicle simulation step and cleanup failed') }
+      finally { board.revoke() }
+      throw error
+    }
+    finally { stepping = false }
+  }
+  function result() {
+    if (!terminal) throw new Error('Vehicle simulation session is still active')
+    return structuredClone({ version: 1, evidence: 'owned-vehicle-physics-simulation' as const, physicalFlightEnabled: false as const, boardOutputsInhibited: true as const, vehicle: vehicle, scenario, status, fault, navigationEvidence: { ...(positionPrediction ? { positionPrediction: { ...fixtureInertialModel } } : {}), observedSensors, datum: estimate.localPosition?.altitudeDatum ?? null, quality: [...estimate.quality], localPositionHealthy: estimate.health.localPosition }, mission, trace: engine.trace(), path, transitions, budget: { worstCaseMs, requiredWh }, authority: supervisor.snapshot(), board: board.snapshot(), finalTruthPositionM: [...truth.positionM] as SensorVector, ...(batteryModel ? { energy: { evidence: 'modeled-vehicle-battery-v1' as const, model: batteryModel, lastObservation: batteryObservation } } : {}) })
+  }
+  return { step, result, close }
+}
+/** Run the same retained session synchronously to its natural terminal result. */
+export function runVehicleSimulation(profileInput: VehicleProfile, options: VehicleSimulationOptions = {}) {
+  const session = createVehicleSimulationSession(profileInput, options)
+  try {
+    for (let nowMs = 0; ; nowMs += 4) { if (session.step(nowMs).terminal) return session.result() }
+  }
+  finally { session.close() }
 }

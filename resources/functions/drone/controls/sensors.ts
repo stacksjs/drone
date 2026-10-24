@@ -3,9 +3,10 @@ import { rotateNedToBody } from './physics'
 import { createSensorPipeline } from '../sensors/pipeline'
 import { runtimeCrc32 } from '../runtime/protocol'
 import { multirotorModel } from './model'
-const bootId = 55n, boardOrigin = 1000000n
+const boardOrigin = 1000000n
 /** Modeled raw IMU/GNSS only. Measurement epoch is known because this is a synthetic source. */
-export function createPhysicsSensorFeed(additionalDelayMs: number) {
+export function createPhysicsSensorFeed(additionalDelayMs: number, bootId = 55n) {
+  if (typeof bootId !== 'bigint' || bootId < 1n || bootId > 0xffffffffffffffffn) throw new TypeError('Invalid synthetic sensor boot scope')
   if (!Number.isFinite(additionalDelayMs) || additionalDelayMs < 0 || additionalDelayMs > 200) throw new RangeError('Sensor delay must be 0..200 ms')
   const pipeline = createSensorPipeline({ anchor: { bootId, boardUs: boardOrigin, localMs: 0, uncertaintyUs: 0, driftPpm: 0, source: 'fixture' }, calibrations: { imu: {
     id: 'physics-frd-synthetic', provenance: 'fixture', axes: [1, 2, 3], referenceC: 25, minC: -20, maxC: 60, accelBias: [0, 0, 0], gyroBias: [0, 0, 0], accelScale: [1, 1, 1], gyroScale: [1, 1, 1], accelTempSlope: [0, 0, 0], gyroTempSlope: [0, 0, 0], accelNoiseStd: [0.005, 0.005, 0.005], gyroNoiseStd: [0.001, 0.001, 0.001],

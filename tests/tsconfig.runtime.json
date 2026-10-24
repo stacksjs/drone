@@ -80,6 +80,7 @@
     "./unit/vehicle-mission-checkpoints.test.ts",
     "./unit/vehicle-authority.test.ts",
     "./unit/vehicle-runtime.test.ts",
+    "./unit/vehicle-sessions.test.ts",
     "./unit/multirotor-vehicle.test.ts",
     "./unit/vehicle-links.test.ts",
     "./unit/air.test.ts",
