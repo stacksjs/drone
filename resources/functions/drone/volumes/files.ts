@@ -2,7 +2,7 @@ import { constants } from 'node:fs'
 import { open } from 'node:fs/promises'
 
 /** Bounded local bytes. Parent paths remain caller-owned; concurrent writes are not atomic. */
-export async function readGeoTiffFile(path: string): Promise<Uint8Array> {
+async function readBinarySurfaceFile(path: string): Promise<Uint8Array> {
   try {
     if (typeof path !== 'string' || !Number.isSafeInteger(constants.O_NOFOLLOW) || constants.O_NOFOLLOW <= 0 || !Number.isSafeInteger(constants.O_NONBLOCK) || constants.O_NONBLOCK <= 0) throw new Error()
     const file = await open(path, constants.O_RDONLY | constants.O_NOFOLLOW | constants.O_NONBLOCK)
@@ -21,5 +21,15 @@ export async function readGeoTiffFile(path: string): Promise<Uint8Array> {
     }
     finally { await file.close() }
   }
+  catch { throw new Error('binary-surface-file-unavailable') }
+}
+
+export async function readGeoTiffFile(path: string): Promise<Uint8Array> {
+  try { return await readBinarySurfaceFile(path) }
   catch { throw new Error('geotiff-file-unavailable') }
+}
+
+export async function readLasFile(path: string): Promise<Uint8Array> {
+  try { return await readBinarySurfaceFile(path) }
+  catch { throw new Error('las-file-unavailable') }
 }

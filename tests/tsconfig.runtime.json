@@ -120,6 +120,7 @@
     "./unit/mapping-*.test.ts",
     "./unit/survey-observations.test.ts",
     "../resources/functions/drone/volumes/**/*.ts",
+    "../scripts/qualify-las-cli.ts",
     "../resources/functions/artifacts/**/*.ts",
     "./unit/volumes-*.test.ts",
     "./unit/completed-artifact.test.ts",

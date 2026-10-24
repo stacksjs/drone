@@ -102,6 +102,7 @@ const config: BunPressOptions = {
           items: [
             { text: 'Aerial survey collection', link: '/mapping' },
             { text: 'Known-surface stockpile volumes', link: '/volumes' },
+            { text: 'LAS point-grid processing', link: '/volumes-las' },
             { text: 'Owned asset inspection', link: '/inspection' },
             { text: 'Owned agriculture sensing', link: '/agriculture' },
             { text: 'Open Farming integration', link: '/open-farming' },

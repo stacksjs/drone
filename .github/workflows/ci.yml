@@ -389,6 +389,18 @@ jobs:
         working-directory: ${{ runner.temp }}
       - run: $GITHUB_WORKSPACE/storage/runtime-build/cli/drone volumes:import "$GITHUB_WORKSPACE/examples/stockpile/surface.asc" --format asc --metadata "$GITHUB_WORKSPACE/examples/stockpile/metadata.json" --measurement "$GITHUB_WORKSPACE/examples/stockpile/measurement.json" --output "$RUNNER_TEMP/volume-grid"
         working-directory: ${{ runner.temp }}
+      - name: Qualify copied LAS point-grid source and volume evidence
+        run: bun scripts/qualify-las-cli.ts "$GITHUB_WORKSPACE/storage/runtime-build/cli/drone" "$RUNNER_TEMP/las-stockpile-cli"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: las-stockpile-cli-evidence
+          if-no-files-found: ignore
+          path: |
+            ${{ runner.temp }}/las-stockpile-cli/*.stdout
+            ${{ runner.temp }}/las-stockpile-cli/*.stderr
+            ${{ runner.temp }}/las-stockpile-cli/receipt.json
+            ${{ runner.temp }}/las-stockpile-cli/dataset/**
       - run: $GITHUB_WORKSPACE/storage/runtime-build/cli/drone inspection:plan "$GITHUB_WORKSPACE/examples/inspection.json"
         working-directory: ${{ runner.temp }}
       - run: $GITHUB_WORKSPACE/storage/runtime-build/cli/drone inspection:simulate --visit before --output "$RUNNER_TEMP/inspection-before"

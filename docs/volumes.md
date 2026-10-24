@@ -2,7 +2,9 @@
 
 The owned volume engine processes an existing georeferenced surface. Acquisition, reconstruction
 and volume measurement are separate stages. Survey PNG imagery is not a numerical elevation
-surface. This engine neither reconstructs it nor invents terrain from unordered points.
+surface. The engine integrates declared surfaces. A separate [LAS point-grid adapter](volumes-las.md)
+can construct explicit cell means from selected georeferenced points, with representation
+error left unknown; it does not infer a continuous terrain mesh.
 
 ```sh
 ./buddy volumes:demo --scenario pyramid --output /tmp/new-pyramid-volume
@@ -42,7 +44,7 @@ base TIN overlays and inferred toe/base fitting remain future work and are rejec
 `volumes:import` requires a source file, its metadata JSON and a measurement JSON containing exactly
 `version`, `id`, `boundary`, `base`, `reference`. For ASC/PLY, the metadata SHA256 must match the exact
 original UTF-8 bytes, including line endings. UTF-8 decoding preserves a BOM so the ASCII parser
-rejects it. GeoTIFF uses the separate wrapped declaration below and hashes the original binary bytes.
+rejects it. GeoTIFF and LAS use separate wrapped declarations and hash original binary bytes.
 
 - AAIGrid `.asc`: square, corner-origin cells (`xllcorner`, `yllcorner`, `cellsize`), north-first
   rows, finite decimal heights and optional finite `NODATA_value`. Each cell is an explicitly
@@ -55,13 +57,16 @@ rejects it. GeoTIFF uses the separate wrapped declaration below and hashes the o
 - Numeric GeoTIFF: the restrictive `classic-le-f32-utm-area-v1` profile below produces the same
   constant-cell geometry, with the original binary digest retained. This is explicit
   `--format geotiff`; neither file extension nor TIFF magic chooses a format automatically.
+- LAS 1.2: the explicit [UTM point-grid profile](volumes-las.md) decodes uncompressed formats
+  0-3, selects declared classes/returns and constructs cell means. Counts/spread rejection
+  preserve missing cells. Original point bytes, declaration and per-cell evidence can be retained.
 - Typed JSON retains either numerical representation directly. Imports are bounded at 8 MiB for
   ASC/PLY; library JSON parsing allows 16 MiB, while the current CLI regular-file reader allows
   8 MiB. Caps include 32,768 vertices/cells, 16,384 triangles, 64 boundary vertices, eight holes,
   and separate candidate/intersection/contribution budgets. Over-budget work fails explicitly.
 
 Numeric ASC/PLY exports include a matching regenerated sidecar. The original source hash remains
-in the retained request and manifest. LAS/LAZ, broader GeoTIFF profiles, raw-point meshing,
+in the retained request and manifest. Broader LAS/LAZ, GeoTIFF profiles, raw-point triangulation,
 classification and photogrammetric reconstruction require separately qualified adapters. File extensions do not
 establish CRS, vertical datum, ground classification or accuracy.
 

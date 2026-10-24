@@ -618,6 +618,28 @@
     "nativeDependencies": [
       18,
       8
+    ],
+    "implementationStatus": "processing-implemented-validation-pending",
+    "implemented": [
+      "Known-TIN and constant-cell numerical integration with explicit CRS/datum/base, cut/fill, coverage gaps, conditional uncertainty and declared-reference comparison",
+      "Bounded ASC/indexed PLY and declared numeric GeoTIFF imports with private completion-marked audit datasets",
+      "Declared LAS1.2 UTM formats0-3 to selected-point cell means, count/spread gaps and retained original source/declaration/gridding audit through native CLI"
+    ],
+    "evidence": [
+      "docs/volumes.md",
+      "docs/volumes-las.md",
+      "tests/unit/volumes-engine.test.ts",
+      "tests/unit/volumes-import.test.ts",
+      "tests/unit/volumes-export.test.ts",
+      "tests/unit/volumes-geotiff.test.ts",
+      "tests/unit/volumes-las.test.ts",
+      "tests/unit/volumes-las-cli.test.ts",
+      "scripts/qualify-las-cli.ts"
+    ],
+    "remaining": [
+      "Independent physical survey/classification/calibration and external-reader comparison campaigns",
+      "Broader LAS/LAZ/VLR and GeoTIFF profiles, raw-point triangulation, richer base surfaces and tiled/streaming processing",
+      "Measured representation/georeferencing uncertainty, acquisition/reconstruction and hardware/storage qualification"
     ]
   },
   {

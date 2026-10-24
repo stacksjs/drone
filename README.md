@@ -243,6 +243,10 @@ it keeps acquisition, reconstruction and measurement separate.
 ./buddy volumes:import examples/stockpile/surface.asc --format asc --metadata examples/stockpile/metadata.json --measurement examples/stockpile/measurement.json
 ```
 
+A separate [LAS point-grid adapter](docs/volumes-las.md) constructs declared cell means
+from selected LAS1.2 UTM points and retains the original file and gridding evidence.
+Missing cells and unknown representation error remain explicit.
+
 Read the [numeric import, integration and audit contract](docs/volumes.md). Examples are synthetic;
 physical surveyed accuracy, raw-point meshing and richer format adapters remain unverified.
 

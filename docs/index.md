@@ -78,7 +78,7 @@ See the [scenario commands and expected outcomes](vehicles-vtol.md) before compa
 |---|---|---|
 | Camera tracking and follow | Explicit target selection, image-space loss handling and synthetic calibrated fusion | [Tracking](camera-tracking.md), [fusion](vision.md) |
 | Aerial mapping | Survey planning, synthetic acknowledged capture and dataset export; reconstruction remains open | [Survey collection](mapping.md) |
-| Stockpile volumes | Numeric grids/TINs, declared base surfaces, cut/fill and uncertainty; acquisition accuracy is separate | [Volume processing](volumes.md) |
+| Stockpile volumes | Numeric grids/TINs and explicit LAS cell means, declared base surfaces, cut/fill and uncertainty; acquisition accuracy is separate | [Volume processing](volumes.md) |
 | Infrastructure inspection | Asset-relative modeled capture, explicit observations and repeat-visit comparison | [Inspection](inspection.md) |
 | Farming | Synthetic crop sensing and declared planning previews; agronomy and authenticated app integration remain separate | [Agriculture](agriculture.md), [Open Farming](open-farming.md) |
 | Prescribed application | Owned ground simulation for inert water or granules, with explicit implement authority | [Application](application.md) |

@@ -78,6 +78,12 @@ transport cancellation/recovery cases. The [operator contract](cargo-fleet.md#re
 retains current authority, a single physical point, original receive deadlines and
 attempted-intake uncertainty. It does not restore a failed vehicle session.
 
+`importLasSurface(bytes, declarationJson)` in `volumes/las.ts` produces a declared
+cell-mean surface and separate point-selection/gridding audit. The [LAS contract](volumes-las.md)
+describes profile limits, missing cells and unknown representation error. The server-only
+`writeVolumeDataset(directory, request, { format: 'las', bytes, declarationJson })` verifies
+that the retained original bytes/declaration reproduce the requested surface before publishing.
+
 ## Target sources
 
 `createGpsTargetSource({ targetId, origin, maxSpeedMps?, now? })` converts trusted phone or GNSS fixes
