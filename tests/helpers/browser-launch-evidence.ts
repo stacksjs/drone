@@ -2,12 +2,14 @@ import { Buffer } from 'node:buffer'
 import { writeSync } from 'node:fs'
 import { mkdir, open, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
+import type { BrowserStartupEvidence } from './browser-startup-process'
 
 export interface BrowserLaunchObservation {
   phase: 'startup-unavailable' | 'discovery-failed' | 'closed'
   elapsedMs: number
   launch: { pid: number, exitObserved: boolean, settledExitCode: number | null, signalCode: string | number | null, exitObservedBeforeCleanup: boolean, cleanupRequested: boolean, exitElapsedMs: number | null }
   portProbe: { attempts: number, successfulReads: number, failedReads: number, lastReadError: string | null, discovered: boolean }
+  startup?: BrowserStartupEvidence
 }
 export function browserFileErrorCode(error: unknown): string {
   const code = (error as NodeJS.ErrnoException | null)?.code

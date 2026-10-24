@@ -51,6 +51,7 @@ const config: BunPressOptions = {
             { text: 'Raspberry Pi setup', link: '/raspberry-pi' },
             { text: 'Library API', link: '/api' },
             { text: 'Validation evidence', link: '/validation' },
+            { text: 'Browser qualification evidence', link: '/browser-qualification' },
             { text: 'Flight-development gates', link: '/flight-development' },
           ],
         },

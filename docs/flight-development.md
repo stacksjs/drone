@@ -23,3 +23,6 @@ The owned runtime follows the dependency-linked [roadmap](roadmap/README.md). Th
 support comparison and development while native board controls are implemented and validated.
 
 Until those milestones are complete, the code here should be used for simulation and bench development.
+
+Rendered application checks have a separate [browser qualification contract](browser-qualification.md).
+A browser-startup failure does not establish a vehicle, estimator or physical flight failure.

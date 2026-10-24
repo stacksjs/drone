@@ -30,6 +30,22 @@ jobs:
       - run: bun run parity:check
       - run: python3 -m py_compile resources/functions/drone/camera/imx500_worker.py
       - run: python3 -m unittest discover -s tests/hardware
+      - name: Qualify startup observations with actual exited and live native processes
+        env:
+          BROWSER_LAUNCH_EVIDENCE: ${{ runner.temp }}/browser-launch-exited
+          BROWSER_LAUNCH_LIVE_EVIDENCE: ${{ runner.temp }}/browser-launch-live
+        run: bun test tests/unit/public-safety-browser-launch.test.ts tests/unit/public-safety-browser-launch-evidence.test.ts tests/unit/public-safety-browser-startup-process.test.ts
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: browser-launch-native-evidence
+          if-no-files-found: ignore
+          retention-days: 7
+          path: |
+            ${{ runner.temp }}/browser-launch-exited/browser-launch.json
+            ${{ runner.temp }}/browser-launch-exited/chrome-startup-stderr.log
+            ${{ runner.temp }}/browser-launch-live/browser-launch.json
+            ${{ runner.temp }}/browser-launch-live/chrome-startup-stderr.log
       - name: Qualify cold build setup across the former hook deadline
         run: bun scripts/qualify-runtime-cold-build.ts "$RUNNER_TEMP/runtime-cold-build"
       - uses: actions/upload-artifact@v4
