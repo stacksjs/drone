@@ -18,6 +18,11 @@ The [single-carrier guide](cargo-delivery.md) retains the wider operations evide
 ./buddy cargo:fleet --scenario receiver-host-loss-before-intake
 ./buddy cargo:fleet --scenario intake-receipt-loss
 ./buddy cargo:fleet --scenario receiver-joint-shift-before-intake
+./buddy cargo:fleet --scenario receiver-navigation-loss-during-rail
+./buddy cargo:fleet --scenario source-kill-after-station-receipt
+./buddy cargo:fleet --scenario receiver-kill-after-intake
+./buddy cargo:fleet --scenario receiver-pad-motion-during-rail
+./buddy cargo:fleet --scenario receiver-containment-breach-after-intake-receipt
 ```
 
 The command emits one JSON line, at most 16 KiB. Exit 0 means the modeled routes and
@@ -92,6 +97,21 @@ station reports mechanical work; each vehicle's reserve remains the shared longe
 | `receiver-host-loss-before-intake` | Incomplete | Host stops 4 ms after the actual grant; no physical intake, independent board expiry and station retention |
 | `receiver-joint-shift-before-intake` | Incomplete | A 0.4 N force for one 4 ms step shifts the actual joint before intake; strict coincidence refuses it, the loose point falls, and B lands its counted alternate empty |
 | `intake-receipt-loss` | Incomplete | Actual intake occurs but its receipt fields are withheld; B retains the mass and lands its counted alternate without claiming custody or making a second delivery |
+| `receiver-navigation-loss-during-rail` | Incomplete | GNSS capture stops 4 ms after actual rail start; receiver navigation expires, station brakes and retains the point, and A continues |
+| `source-kill-after-station-receipt` | Incomplete | Source kill follows its captured station receipt; A inhibits while B completes intake, final delivery and return. B's success does not make the whole fleet complete |
+| `receiver-kill-after-intake` | Incomplete | Kill follows actual intake by 4 ms, before receipt capture; B retains the attached mass with uncertain custody and no final release |
+| `receiver-pad-motion-during-rail` | Incomplete | A declared constant 4 N northward force moves B; native receiving interlocks stop its mission before fence breach or intake, and the station brakes |
+| `receiver-containment-breach-after-intake-receipt` | Incomplete | After captured intake, an 8 N northward force ramps over 2 s. B's qualified estimated position breaches its 12 m fence; authority fails and outputs neutral while attached mass and received custody remain |
+
+The loaded containment case explicitly opts into the existing `fixture-imu` position
+prediction model, including its assumed initial north heading and synthetic uncertainty.
+It uses the actual raw IMU/GNSS feed and the native estimator/fence checks, with no
+substitution of plant position into policy. The receiver force is a declared world-NED
+model input, retained as `forceN` and `forceRampMs` in the fault report. It continues
+through the independent neutral tail. A neutral command cannot stop momentum or an
+ongoing external force; this case demonstrates fence-breach detection and inhibition,
+not guaranteed physical containment. The pad-motion case uses the same real body-force
+path and is stopped earlier by receiving contact/speed/anchor interlocks.
 
 Radio observations retain capture, receipt, sequence and scope, with 1 ms clock uncertainty
 and 20/40 ms primary/backup delays. Failure stops new packets rather than restamping a
@@ -106,12 +126,12 @@ native finite graph/reserve budget; the world is bounded by the 180 s host limit
 source/receiver scopes, same-epoch admission, captured receipt ordering, retained mass,
 backup continuation, both-link braking, the host/grant gap and uncertain loaded diversion.
 `tests/unit/cargo-fleet-cli.test.ts` executes the native Buddy command and its bounded wire.
-`scripts/qualify-cargo-fleet-cli.ts` exercises all six cases through a copied standalone
+`scripts/qualify-cargo-fleet-cli.ts` exercises all eleven cases through a copied standalone
 binary outside the checkout and retains output hashes and factual outcomes.
 
 These cases do not cover a complete fleet fault envelope. Receiver/source kill or manual
-intervention at every phase, navigation degradation and containment across the transfer,
-late/foreign/replayed receipt campaigns, explicit operator cancellation/recovery, durable
+intervention at every phase, broader navigation degradation and containment campaigns,
+wider late/foreign/replayed receipt campaigns, explicit operator cancellation/recovery, durable
 whole-world checkpoints, general rendezvous, collision avoidance and richer fleet planning
 remain open under [#25](https://github.com/stacksjs/drone/issues/25) and its dependencies.
 The wider measured hardware, endurance and operational evidence requirements remain open.

@@ -216,7 +216,7 @@ receiving body in its own raw-sensor, estimator and authority runtime. With ACK 
 it stays at the declared pad with zero actual motor thrust and no phantom parcel mass.
 A caller-invented ACK is not proof of mechanical transfer. The
 [two-carrier model](cargo-fleet.md) now binds its receipt port to actual intake, same-epoch
-receiver authority and six bounded fleet cases through `cargo:fleet`. Its broader
+receiver authority and eleven bounded fleet cases through `cargo:fleet`. Its broader
 cancellation, fault/recovery and operational matrix remains open under #25.
 
 ## BVLOS operations evidence

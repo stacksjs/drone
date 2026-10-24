@@ -48,3 +48,18 @@ test('native fleet failures exit incomplete while retaining the actual parcel ow
   expect(invalid.stderr).toContain('Cargo fleet simulation unavailable')
   expect(invalid.stderr).not.toContain('unknown-private-marker')
 }, 100000)
+
+test('a receiver delivery cannot hide a source kill behind a successful fleet exit', async () => {
+  const result = await command(['cargo:fleet', '--scenario', 'source-kill-after-station-receipt']).withTimeout(30000)
+  expect(result.timedOut).toBe(false)
+  expect(result.exitCode).toBe(2)
+  const report = JSON.parse(result.stdout)
+  expect(report.status).toBe('unqualified')
+  expect(report.source.status).toBe('blocked')
+  expect(report.receiver.status).toBe('completed')
+  expect(report.receiver.delivery.outcome).toBe('received')
+  expect(report.ownership.owner).toBe('final-parcel-actor')
+  expect(report.ownership.finalMassKg).toBe(3.1)
+  expect(report.source.board.actuators).toEqual([0, 0, 0, 0])
+  expect(result.stderr).toBe('')
+}, 40000)

@@ -127,7 +127,8 @@ and power declarations, captured release/custody, redundant links and post-relea
 Exit 2 retains a configured mission that did not complete a matched delivery and carrier landing.
 The [two-carrier model](docs/cargo-fleet.md) and `./buddy cargo:fleet` now execute actual
 finite station handover and the receiver's second delivery under separate sensor/authority
-scopes. Six bounded cases retain radio/host loss and uncertain receipt. General fleet
+scopes. Eleven bounded cases include radio/host loss, uncertain receipt, phase-bound kill,
+GNSS loss, pad-motion interlocks and modeled fence-breach supervision. General fleet
 fault/recovery, electrical/measured endurance and physical/operational qualification remain open in [#25](https://github.com/stacksjs/drone/issues/25).
 
 ## Agriculture sensing

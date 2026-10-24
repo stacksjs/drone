@@ -17,7 +17,7 @@ type Station = ReturnType<typeof createCargoStationHandler>
 type Release = ReturnType<ReturnType<typeof createReceivingRigidBody>['separateCarriedLoad']>
 type Departure = Extract<ReturnType<Station['takeReadyParcel']>, { outcome: 'departed' }>
 type Owner = 'source-body' | 'station-actor' | 'receiver-body' | 'final-parcel-actor' | 'loose-parcel'
-export const cargoFleetScenarios = ['nominal', 'receiver-host-loss-before-intake', 'intake-receipt-loss', 'receiver-primary-link-loss', 'receiver-both-links-loss', 'receiver-joint-shift-before-intake'] as const
+export const cargoFleetScenarios = ['nominal', 'receiver-host-loss-before-intake', 'intake-receipt-loss', 'receiver-primary-link-loss', 'receiver-both-links-loss', 'receiver-joint-shift-before-intake', 'receiver-navigation-loss-during-rail', 'source-kill-after-station-receipt', 'receiver-kill-after-intake', 'receiver-pad-motion-during-rail', 'receiver-containment-breach-after-intake-receipt'] as const
 export type CargoFleetScenario = typeof cargoFleetScenarios[number]
 function captureScenario(input: unknown): CargoFleetScenario {
   try {
@@ -58,7 +58,7 @@ function hasAuthority(p: Progress | null, command: VehiclePayloadCommand, nowMs:
 export function simulateCargoFleet(input: unknown = {}, ...extra: unknown[]) {
   if (extra.length) throw new TypeError('cargo-fleet-arguments')
   const scenario = captureScenario(input)
-  const faultInjection: { scenario: Exclude<CargoFleetScenario, 'nominal'>, anchoredAtMs: number | null, triggeredAtMs: number | null } | null = scenario === 'nominal' ? null : { scenario, anchoredAtMs: null, triggeredAtMs: null }
+  const faultInjection: { scenario: Exclude<CargoFleetScenario, 'nominal'>, anchoredAtMs: number | null, triggeredAtMs: number | null, forceN?: SensorVector, forceRampMs?: number } | null = scenario === 'nominal' ? null : { scenario, anchoredAtMs: null, triggeredAtMs: null, ...(['receiver-pad-motion-during-rail', 'receiver-containment-breach-after-intake-receipt'].includes(scenario) ? { forceN: [scenario === 'receiver-pad-motion-during-rail' ? 4 : 8, 0, 0] as SensorVector, ...(scenario === 'receiver-containment-breach-after-intake-receipt' ? { forceRampMs: 2000 } : {}) } : {}) }
   const bodyA = createRigidBody({ positionM: [0, 0, -.1], groundDownM: -.1, carriedPointLoad: point })
   const bodyB = createReceivingRigidBody({ positionM: [...receiverPadM], groundDownM: -.1, expectedPointLoad: point })
   const initialA = bodyA.loadSnapshot(), initialB = bodyB.loadSnapshot()
@@ -115,13 +115,28 @@ export function simulateCargoFleet(input: unknown = {}, ...extra: unknown[]) {
   const profileA = createMultirotorProfile(), profileB = createMultirotorProfile(), createA = profileA.createSession, createB = profileB.createSession
   profileA.mission = planCargoDelivery({ version: 1, id: 'cargo-fleet-source', delivery: { origin, site: stationSite, releaseHeightM: 1 }, load: { massKg: point.massKg, forwardM: point.forwardM }, alternateM: [1.5, -2, 0], power: { availableWh: 40, maxW: 600, reservePercent: 30 } }).mission
   profileB.mission = receiverMission()
+  if (scenario === 'receiver-containment-breach-after-intake-receipt') profileB.positionPrediction = 'fixture-imu'
+  const baseFaultsA = profileA.faults
+  if (scenario === 'source-kill-after-station-receipt') {
+    profileA.scenario = scenario; profileA.scenarios = [scenario]
+    profileA.faults = (selected, atMs, phase) => {
+      if (selected !== scenario) throw new TypeError('cargo-fleet-scenario-changed')
+      const killed = faultInjection!.anchoredAtMs !== null && atMs > faultInjection!.anchoredAtMs
+      if (killed && phase === 'host') faultInjection!.triggeredAtMs ??= atMs
+      return { ...baseFaultsA('nominal', atMs, phase), kill: killed }
+    }
+  }
   const baseFaultsB = profileB.faults
   profileB.scenario = scenario; profileB.scenarios = [scenario]
   profileB.faults = (selected, atMs, phase) => {
     if (selected !== scenario) throw new TypeError('cargo-fleet-scenario-changed')
     const active = faultInjection?.scenario === 'receiver-host-loss-before-intake' && faultInjection.anchoredAtMs !== null && atMs >= faultInjection.anchoredAtMs + 4
     if (active && phase === 'host') faultInjection!.triggeredAtMs ??= atMs
-    return { ...baseFaultsB('nominal', atMs, phase), hostLost: active }
+    const navigationLost = faultInjection?.scenario === 'receiver-navigation-loss-during-rail' && faultInjection.anchoredAtMs !== null && atMs > faultInjection.anchoredAtMs
+    if (navigationLost && phase === 'host') faultInjection!.triggeredAtMs ??= atMs
+    const killed = faultInjection?.scenario === 'receiver-kill-after-intake' && faultInjection.anchoredAtMs !== null && atMs > faultInjection.anchoredAtMs
+    if (killed && phase === 'host') faultInjection!.triggeredAtMs ??= atMs
+    return { ...baseFaultsB('nominal', atMs, phase), hostLost: active, dropPosition: navigationLost, kill: killed }
   }
   const plantA = createMultirotorPlant(bodyA), adaptedB = createMultirotorPlant(bodyB)
   let receiverPhysicalAtMs = 600
@@ -130,7 +145,9 @@ export function simulateCargoFleet(input: unknown = {}, ...extra: unknown[]) {
     receiverPhysicalAtMs += 4
     const shift = faultInjection?.scenario === 'receiver-joint-shift-before-intake' && faultInjection.anchoredAtMs !== null && receiverPhysicalAtMs === faultInjection.anchoredAtMs + 4
     if (shift) faultInjection!.triggeredAtMs = receiverPhysicalAtMs
-    bodyB.step(actuators as [number, number, number, number], dtS, { windMps: environment.windMps, ...(shift ? { forceN: [.4, 0, 0] as SensorVector } : {}) })
+    const containment = faultInjection && ['receiver-pad-motion-during-rail', 'receiver-containment-breach-after-intake-receipt'].includes(faultInjection.scenario) && faultInjection.anchoredAtMs !== null && receiverPhysicalAtMs > faultInjection.anchoredAtMs
+    if (containment) faultInjection!.triggeredAtMs ??= receiverPhysicalAtMs
+    bodyB.step(actuators as [number, number, number, number], dtS, { windMps: environment.windMps, ...(shift || containment ? { forceN: shift ? [.4, 0, 0] as SensorVector : faultInjection!.forceN!.map(n => n * Math.min(1, (receiverPhysicalAtMs - faultInjection!.anchoredAtMs!) / (faultInjection!.forceRampMs ?? 4))) as SensorVector } : {}) })
     return adaptedB.snapshot()
   } }
   function releaseValues(which: 'source' | 'receiver') {
@@ -164,6 +181,14 @@ export function simulateCargoFleet(input: unknown = {}, ...extra: unknown[]) {
     for (let nowMs = 0; nowMs <= 181000; nowMs += 4) {
       if (!progressA?.terminal) progressA = a.step(nowMs)
       if (!progressB?.terminal) progressB = b.step(nowMs)
+      if (faultInjection?.scenario === 'source-kill-after-station-receipt' && faultInjection.anchoredAtMs === null) {
+        const receipt = sourceCoordinator.snapshot().delivery
+        if (receipt.outcome === 'received') faultInjection.anchoredAtMs = receipt.acknowledgedAtMs
+      }
+      if (faultInjection?.scenario === 'receiver-containment-breach-after-intake-receipt' && faultInjection.anchoredAtMs === null) {
+        const receipt = intakeCoordinator.snapshot().custody
+        if (receipt.outcome === 'received') faultInjection.anchoredAtMs = receipt.acknowledgedAtMs
+      }
       if (station && station.snapshot().atMs < nowMs) station.step(nowMs)
       if (recipient && recipient.snapshot().atMs < nowMs) recipient.step(nowMs)
       if (loose && loose.snapshot().atMs < nowMs) loose.step(nowMs)
@@ -177,7 +202,10 @@ export function simulateCargoFleet(input: unknown = {}, ...extra: unknown[]) {
           }
         }
       }
-      if (station?.snapshot().phase === 'held' && sourceCoordinator.snapshot().delivery.outcome === 'received' && progressB?.mission.payload?.operation === 'material-receive' && hasAuthority(progressB, progressB.mission.payload, nowMs, 102n, 202n)) station.start()
+      if (station?.snapshot().phase === 'held' && sourceCoordinator.snapshot().delivery.outcome === 'received' && progressB?.mission.payload?.operation === 'material-receive' && hasAuthority(progressB, progressB.mission.payload, nowMs, 102n, 202n)) {
+        station.start()
+        if (faultInjection && ['receiver-navigation-loss-during-rail', 'receiver-pad-motion-during-rail'].includes(faultInjection.scenario)) faultInjection.anchoredAtMs ??= nowMs
+      }
       if (station && ['falling', 'held', 'moving', 'ready'].includes(station.snapshot().phase) && progressB && (!progressB.hostAvailable || progressB.authority.state !== 'autonomous')) station.cancel()
       if (commands.intake && nowMs > commands.intake.issuedAtMs) {
         const grant = commands.intake; commands.intake = null
@@ -189,7 +217,7 @@ export function simulateCargoFleet(input: unknown = {}, ...extra: unknown[]) {
             const attachment = bodyB.attachParcel(departure.parcel)
             intake = { atMs: nowMs, grant, attachment, source: structuredClone(progressA!), receiver: structuredClone(progressB!) }
             intakeEvidence = { atMs: nowMs, eventId: grant.command.eventId, sourceEventId: grant.sourceEventId, outcome: attachment.outcome, massKg: attachment.outcome === 'attached' ? attachment.parcel.massKg : 0 }
-            if (attachment.outcome === 'attached') { loose = null; changeOwner('receiver-body', nowMs); if (faultInjection?.scenario === 'intake-receipt-loss') faultInjection.anchoredAtMs = nowMs }
+            if (attachment.outcome === 'attached') { loose = null; changeOwner('receiver-body', nowMs); if (faultInjection && ['intake-receipt-loss', 'receiver-kill-after-intake'].includes(faultInjection.scenario)) faultInjection.anchoredAtMs = nowMs }
             else { loose = createCargoStationHandler({ atMs: nowMs, parcel: departure.parcel, pickup: { centerM: [3, 2, 0], radiusM: 2 }, destinationM: [3, 2, 0], maxSpeedMps: .5, maxAccelerationMps2: 1 }); changeOwner('loose-parcel', nowMs) }
             sampleMass()
           }
