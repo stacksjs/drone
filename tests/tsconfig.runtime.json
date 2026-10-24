@@ -24,6 +24,7 @@
     "../resources/functions/drone/cargo/**/*.ts",
     "./unit/cargo-load.test.ts",
     "./unit/cargo-intake.test.ts",
+    "./unit/cargo-station.test.ts",
     "./unit/cargo-delivery.test.ts",
     "./unit/cargo-delivery-config.test.ts",
     "./unit/cargo-delivery-phase-faults.test.ts",

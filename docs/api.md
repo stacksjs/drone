@@ -62,6 +62,11 @@ provides the separate [point-load intake prerequisite](cargo-delivery.md#point-l
 It integrates real modeled mass/CG changes after one coincident inelastic point capture.
 The caller still owns the parcel, finite station handling and captured fleet custody protocol.
 
+`createCargoStationHandler(declaration)` in `cargo/station.ts` owns one existing point
+through ballistic capture, finite rail transport, cancellation braking and a single
+departure. See the [station model and integration limits](cargo-station.md). It does not
+grant vehicle authority or confirm custody.
+
 ## Target sources
 
 `createGpsTargetSource({ targetId, origin, maxSpeedMps?, now? })` converts trusted phone or GNSS fixes

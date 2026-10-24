@@ -109,6 +109,7 @@ const config: BunPressOptions = {
             { text: 'Synthetic airborne environmental sampling', link: '/environment' },
             { text: 'Simulated carried-load characterization', link: '/cargo-load' },
             { text: 'Modeled cargo delivery and custody', link: '/cargo-delivery' },
+            { text: 'Modeled cargo station handling', link: '/cargo-station' },
             { text: 'Simulated POI camera reframe', link: '/cinema' },
           ],
         },

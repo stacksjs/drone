@@ -179,6 +179,15 @@ and limits. This primitive supplies no finite-duration contact forces or impact 
 release/intake acknowledgement, station handling, authorization or fleet custody handover.
 Those integrations remain open under issue #25.
 
+## Finite station handling prerequisite
+
+The separate [station actor](cargo-station.md) now retains one released point through
+ballistic surface capture, finite powered motion, cancellation braking and one departure
+to a declared receiving joint. Its public integration test uses actual source separation
+and actual receiving-body intake. The world coordinator must still consume the one parcel,
+check the receiver's current authority and produce correlated custody acknowledgement.
+This model alone does not implement a fleet mission or qualify electrical endurance.
+
 ## BVLOS operations evidence
 
 
