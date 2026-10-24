@@ -33,3 +33,23 @@ carry a patch onto another version.
 
 See `docs/runtime-updates.md` for the trust and clock limits. The extensions are
 maintained here and are not claimed to be unmodified upstream options.
+
+## BunPress 0.2.22
+
+`@stacksjs%2Fbunpress@0.2.22.patch` keeps generated local search results under
+BunPress's configured deployment path. The native page renderer already uses
+`/docs`, but 0.2.22's search index contained origin-root paths, so selecting a
+result navigated to a 404. The patch applies the same base-path resolution after
+locale translation and fallback selection, preserving anchors and root-hosted
+sites. A real source directory named `docs` still receives the deployment prefix.
+
+The patch changes the native index builder and adds a small helper matching the renderer's path resolution;
+it adds no browser redirect or application search implementation. The installed
+package retains BunPress's MIT license. Regression coverage lives in
+`tests/unit/docs-search.test.ts`. Rebuild native docs and verify an actual search
+selection after upgrading or removing this patch. Prepare installed changes with
+`bun patch @stacksjs/bunpress@0.2.22` and retain the generated Bun patch and lockfile.
+
+The shared engine fix is [BunPress PR 91](https://github.com/stacksjs/bunpress/pull/91),
+source commit `096004cc6e7b4800bfd1e90993866c9011ca706d`. Remove the compatibility
+patch only after upgrading to a release that includes it and repeating the checks.

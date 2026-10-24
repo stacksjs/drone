@@ -84,6 +84,7 @@
     "@stacksjs/bunpress": "0.2.22"
   },
   "patchedDependencies": {
-    "tuf-js@6.0.0": "patches/tuf-js@6.0.0.patch"
+    "tuf-js@6.0.0": "patches/tuf-js@6.0.0.patch",
+    "@stacksjs/bunpress@0.2.22": "patches/@stacksjs%2Fbunpress@0.2.22.patch"
   }
 }
