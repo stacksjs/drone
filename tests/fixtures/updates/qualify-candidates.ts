@@ -7,7 +7,7 @@ import { platform, repository, target } from './repository'
 
 async function hash(path: string) { return createHash('sha256').update(await readFile(path)).digest('hex') }
 
-/** Real copied commands, signed synthetic bytes and optional retained older binary. Never executes a candidate. */
+/** Real copied commands, signed synthetic bytes and optional retained format-1-only binary. Never executes a candidate. */
 export async function qualifyPortableCandidates(directory: string, source: string, olderBinary?: string) {
   await mkdir(directory, { mode: 0o700 })
   const binary = join(directory, 'drone'), sourceSha256 = await hash(source)
@@ -38,7 +38,13 @@ export async function qualifyPortableCandidates(directory: string, source: strin
     const empty = await run(['updates:candidates', store, ...pinned])
     assert.equal(empty.stateFormat, 1); assert.equal(empty.candidate, null)
     assert.equal(await hash(join(store, 'state.sqlite')), initialHash)
-    if (olderBinary) assert.deepEqual(await run(['updates:store', store, ...pinned], 0, olderBinary), created)
+    if (olderBinary) {
+      // A format-1 predecessor cannot emit the later, empty maintenance status field.
+      const { maintenanceHandoffs, ...format1Status } = created
+      assert.deepEqual(maintenanceHandoffs, [])
+      assert.deepEqual(await run(['updates:store', store, ...pinned], 0, olderBinary), format1Status)
+      assert.equal(await hash(join(store, 'state.sqlite')), initialHash)
+    }
     await run(['updates:reserve', store, ...pinned, '--repository', repo], 1)
     const prepared = await run(['updates:reserve', store, ...pinned, ...repositoryFlags])
     assert.equal(prepared.stateFormat, 2); assert.equal(prepared.store.releaseFloor, 9)
@@ -85,6 +91,6 @@ export async function qualifyPortableCandidates(directory: string, source: strin
   return { evidence: 'copied-standalone-owned-candidates-v1', operations: results.length, sourceSha256, olderSha256, physicalDeploymentAllowed: false }
 }
 if (import.meta.main) {
-  if (process.argv.length !== 4 && process.argv.length !== 5) throw new Error('Use qualify-candidates.ts NEW_DIRECTORY COMPILED_BINARY [OLDER_BINARY]')
+  if (process.argv.length !== 4 && process.argv.length !== 5) throw new Error('Use qualify-candidates.ts NEW_DIRECTORY COMPILED_BINARY [FORMAT1_BINARY]')
   console.log(JSON.stringify(await qualifyPortableCandidates(resolve(process.argv[2]!), resolve(process.argv[3]!), process.argv[4] ? resolve(process.argv[4]) : undefined)))
 }

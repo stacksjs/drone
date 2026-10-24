@@ -18,6 +18,8 @@ This is the `stacksjs/drone` Stacks application. Read `README.md` for implemente
 - Imported TypeScript modules explicitly import their dependencies. Browser entry bindings do not leak into modules.
 - `better-dx` supplies shared dev tooling; do not redeclare its tools. Keep Bun's hoisted linker.
 - No `catalog:` dependency ranges. Dependency updates belong to buddy-bot.
+- Dependency fixes and upgrades: read `docs/dependency-source-releases.md`.
+  Fix the owning source and consume its qualified release; dependency patches are prohibited.
 - No em-dash or separator en-dash in newly authored visible copy.
 - Before finishing run `./buddy lint`, `./buddy typecheck`, `./buddy test` and relevant browser scenarios.
 - Test behavioral seams: decision input/output, controller lifecycle, real local UDP and protocol fixtures.

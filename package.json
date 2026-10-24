@@ -50,7 +50,7 @@
     "@stacksjs/validation": "^0.75.221",
     "stacks": "^0.75.221",
     "ts-images": "0.2.31",
-    "tuf-js": "6.0.0",
+    "tuf-js": "https://github.com/stacksjs/tuf-js/releases/download/sdk-v6.0.1/stacksjs-tuf-js-6.0.1.tgz",
     "@tufjs/canonical-json": "2.0.0"
   },
   "workspaces": [
@@ -81,10 +81,6 @@
     "url": "https://github.com/stacksjs/drone/issues"
   },
   "overrides": {
-    "@stacksjs/bunpress": "0.2.22"
-  },
-  "patchedDependencies": {
-    "tuf-js@6.0.0": "patches/tuf-js@6.0.0.patch",
-    "@stacksjs/bunpress@0.2.22": "patches/@stacksjs%2Fbunpress@0.2.22.patch"
+    "@stacksjs/bunpress": "0.2.25"
   }
 }

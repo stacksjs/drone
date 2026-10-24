@@ -480,7 +480,7 @@ See the [host slot decision](adr/0029-host-slot-health.md).
 
 Use a standard TUF repository with `metadata/` and `targets/` directories,
 including consistent-snapshot names when enabled. Verification uses the pinned
-[`tuf-js` 6.0.0 client](https://github.com/theupdateframework/tuf-js) for root
+[maintained `@stacksjs/tuf-js` 6.0.1 client](https://github.com/stacksjs/tuf-js/releases/tag/sdk-v6.0.1) for root
 rotation, signature thresholds, expiration, inter-role versions/hashes and
 target length/hashes. Standalone staging/inspection use a private, randomly
 addressed loopback server supplying bounded local files to the public HTTP
@@ -496,10 +496,12 @@ expiry comparisons; malformed or automatically normalized dates are rejected.
 
 ### Maintained SDK persistence seam
 
-This repository applies `patches/tuf-js@6.0.0.patch` through Bun's root
-`patchedDependencies`. It extends the pinned MIT-licensed client; these are
-repository-maintained options, not options supplied by unmodified upstream 6.0.0.
-The patch retains upstream signature, role and target verification.
+This repository consumes the immutable maintained source release through the
+`tuf-js` dependency key, with no distribution patches. These are maintained fork
+options, not options supplied by unmodified upstream 6.0.0. The source client
+retains upstream signature, role and target verification. See the
+[source release policy](dependency-source-releases.md) for source identity,
+original MIT attribution, release integrity and upgrade qualification.
 
 `onVerifiedMetadata(role, bytes)` receives an owned byte copy after the SDK
 accepts remote metadata. The SDK awaits it before writing that cache file or
