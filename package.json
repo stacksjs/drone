@@ -31,25 +31,25 @@
     "parity:refresh": "bun scripts/parity-refresh.ts"
   },
   "dependencies": {
-    "@stacksjs/actions": "^0.75.221",
-    "@stacksjs/auth": "^0.75.221",
+    "@stacksjs/actions": "^0.75.290",
+    "@stacksjs/auth": "^0.75.290",
     "@stacksjs/cli": "^0.75.221",
-    "@stacksjs/cron": "0.75.221",
+    "@stacksjs/cron": "0.75.290",
     "@stacksjs/database": "^0.75.221",
     "@stacksjs/env": "^0.75.221",
     "@stacksjs/error-handling": "^0.75.221",
-    "@stacksjs/orm": "^0.75.221",
+    "@stacksjs/orm": "^0.75.290",
     "@stacksjs/path": "^0.75.221",
     "@stacksjs/queue": "^0.75.221",
-    "@stacksjs/realtime": "0.75.221",
+    "@stacksjs/realtime": "0.75.290",
     "@stacksjs/router": "^0.75.221",
-    "@stacksjs/security": "^0.75.221",
+    "@stacksjs/security": "^0.75.290",
     "@stacksjs/storage": "^0.75.221",
-    "@stacksjs/stx": "0.2.564",
-    "@stacksjs/testing": "^0.75.221",
+    "@stacksjs/stx": "0.2.683",
+    "@stacksjs/testing": "^0.75.290",
     "@stacksjs/validation": "^0.75.221",
     "stacks": "^0.75.221",
-    "ts-images": "0.2.31",
+    "ts-images": "0.2.32",
     "tuf-js": "6.0.0",
     "@tufjs/canonical-json": "2.0.0"
   },
@@ -67,7 +67,7 @@
     "commit-msg": "bun x gitlint --edit \"$1\""
   },
   "devDependencies": {
-    "@stacksjs/query-builder": "0.75.221",
+    "@stacksjs/query-builder": "0.75.290",
     "better-dx": "^0.2.37",
     "@tufjs/models": "5.0.0"
   },
