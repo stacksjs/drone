@@ -72,6 +72,13 @@ A falling parcel continues under gravity until plane contact. These requests ret
 epoch, current phase and fractional stop epoch. Cancellation retains the parcel and
 prevents transfer; it does not restore an aircraft's authority or land a vehicle.
 
+`resume()` accepts only a fully stopped cancelled parcel. It starts a fresh bounded
+quintic rail from the retained position, preserving mechanical work and the original
+180 s lifetime. A missed pickup cannot be resumed into a successful pickup. Snapshots
+retain the previous start, cancellation and stop epochs plus the new position/duration.
+The detached history contains at most eight resumptions. Further requests are refused;
+this primitive does not itself restore vehicle authority or reconcile uncertain custody.
+
 `takeReadyParcel()` accepts only `ready`, returns a detached parcel and clears the
 station's owned mass. Further departure attempts are refused. The receiving body's
 `attachParcel()` still independently checks its actual current joint. A stale destination
@@ -105,5 +112,6 @@ ACK or coordinate two live vehicle mission engines. Those operations must use ea
 vehicle's own sensor, estimator and current authority scope on the common clock. The
 [receiving mission task](cargo-delivery.md#receiving-mission-task-prerequisite) now holds
 a declared pad under the shared engine. The [two-carrier world and CLI](cargo-fleet.md) now connect physical intake, current
-authority and captured acknowledgement for six bounded cases. A complete cancellation,
+authority and captured acknowledgement for eleven bounded fault cases and explicit
+transport cancellation/recovery. A complete cancellation,
 fault/recovery and general fleet matrix remains open under [#25](https://github.com/stacksjs/drone/issues/25).

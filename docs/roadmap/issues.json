@@ -766,20 +766,33 @@
     "implementation": {
       "status": "partial",
       "implemented": [
-        "Owned carried-point-mass/CG physics through the existing multirotor loop",
-        "Centered/forward carriage, prescribed zero-ejection separation and native link-loss characterization",
-        "Strict typed library, bounded native CLI summary and exact legacy-output compatibility"
+        "Owned carried-point-mass/CG dynamics, actual modeled release/intake, captured mechanism/site custody and counted return or alternate landing",
+        "Configured delivery missions, declared power/reserve margins, scoped primary/backup links and observed release/receipt phase failures",
+        "Two retained raw-sensor/estimator/authority carriers on one clock with finite station handling, globally single-parcel ownership, captured intake and a second delivery",
+        "Eleven bounded fleet cases including link, host, navigation, kill, pad-motion and containment failures, with independent output expiry and retained uncertainty",
+        "Explicit scoped station cancellation and stopped-point recovery before attempted intake, same-session receive deadlines and bounded decision/history admission",
+        "Native Buddy and copied standalone commands, bounded reports, actual output compatibility and separate BVLOS evidence requirements"
       ],
       "remaining": [
-        "Delivery mission, site and recipient confirmation, release mechanism/ACK and custody",
-        "Endurance reserves, alternates, redundant links, degraded navigation, containment, diversion and fleet handover",
-        "Separate operational authorization/detect-and-avoid and physical/HIL qualification"
+        "General fleet fault/recovery and vehicle abort/replan, uncertain-intake reconciliation, durable whole-world recovery and richer rendezvous/collision planning",
+        "Electrical/measured endurance and physical release/intake/recipient qualification",
+        "Operational authorization, detect-and-avoid and hardware/HIL qualification separate from software capability"
       ],
       "evidence": [
         "docs/cargo-load.md",
-        "tests/unit/controls.test.ts",
+        "docs/cargo-delivery.md",
+        "docs/cargo-station.md",
+        "docs/cargo-fleet.md",
         "tests/unit/cargo-load.test.ts",
-        "tests/unit/cargo-load-cli.test.ts"
+        "tests/unit/cargo-delivery.test.ts",
+        "tests/unit/cargo-delivery-phase-faults.test.ts",
+        "tests/unit/cargo-intake-coordinator.test.ts",
+        "tests/unit/cargo-station.test.ts",
+        "tests/unit/cargo-fleet.test.ts",
+        "tests/unit/cargo-fleet-operator.test.ts",
+        "tests/unit/cargo-fleet-control-cli.test.ts",
+        "scripts/qualify-cargo-cli.ts",
+        "scripts/qualify-cargo-fleet-cli.ts"
       ]
     }
   },

@@ -47,4 +47,33 @@ for (const [scenario, status, owner, massKg, custody] of [
   rows.push({ scenario, exit: r.exitCode, status, owner, receiverMassKg: massKg, custody, stdoutBytes: bytes.length, stdoutSha256: hash(bytes) })
   console.log(scenario + ' PASS')
 }
-await Bun.write(join(output, 'receipt.json'), JSON.stringify({ evidence: 'copied-cargo-fleet-cli-consistency', binarySha256: hash(new Uint8Array(await Bun.file(binary).arrayBuffer())), physicalFlightEnabled: false, identityAuthenticated: false, rows }, null, 2))
+const operatorRows: Record<string, unknown>[] = []
+for (const name of ['cancel', 'cancel-resume', 'cancel-after-grant', 'resume-after-navigation-loss']) {
+  const r = await runBoundedHostProcess([binary, 'cargo:fleet-control', '--case', name], { cwd: output, timeoutMs: 30000, stdoutBytes: 16384, stderrBytes: 1024, strictUtf8: true, label: 'Compiled cargo fleet control ' + name })
+  const bytes = Buffer.from(r.stdout, 'utf8')
+  await Bun.write(join(output, 'operator-' + name + '.stdout'), bytes); await Bun.write(join(output, 'operator-' + name + '.stderr'), r.stderr)
+  const completed = name === 'cancel-resume', s = JSON.parse(r.stdout)
+  if (r.exitCode !== (completed ? 0 : 2) || r.stderr !== '' || !r.stdout.endsWith('\n') || r.stdout.split('\n').length !== 2
+    || s.evidence !== 'owned-cargo-fleet-simulation' || s.operatorCase !== name || s.status !== (completed ? 'completed' : 'unqualified') || s.physicalFlightEnabled !== false || s.boardOutputsInhibited !== true || s.identityAuthenticated !== false
+    || s.operator.identityAuthenticated !== false || !s.operator.contextId || s.operator.events[0]?.action !== 'cancel' || s.operator.events[0]?.outcome !== 'accepted' || s.operator.events[0]?.sequence !== 1
+    || s.ownership.finalMassKg !== 3.1 || s.ownership.maximumMassErrorKg > 1e-12 || s.receiver.scope.bootId !== '102' || s.receiver.scope.sessionId !== '202') throw new Error('Unqualified copied operator report: ' + name)
+  for (const v of [s.source, s.receiver]) if (v.board.physicalActuationEnabled !== false || JSON.stringify(v.board.actuators) !== '[0,0,0,0]' || v.board.expiresAtMs !== null) throw new Error('Unqualified copied operator output inhibition: ' + name)
+  if (completed) {
+    const resume = s.station.resumptions?.[0]
+    if (s.operator.events.length !== 2 || s.operator.events[1].action !== 'resume' || s.operator.events[1].outcome !== 'accepted' || s.operator.events[1].sequence !== 2 || !resume || s.station.resumptions.length !== 1
+      || resume.atMs - resume.stoppedAtMs < 1000 || s.operator.events[1].atMs !== resume.atMs || resume.cancelRequestedAtMs !== s.operator.events[0].atMs
+      || s.ownership.owner !== 'final-parcel-actor' || s.receiver.intake.outcome !== 'received' || s.receiver.delivery.outcome !== 'received' || s.transfer.intake.massBeforeKg !== 1.5 || s.transfer.intake.massAfterKg !== 1.6
+      || s.transfer.intake.atMs <= resume.atMs || s.transfer.intake.atMs >= s.receiver.intake.acknowledgedAtMs || s.recipient.ownedMassKg !== .1 || s.ownership.transitions.length !== 3) throw new Error('Unqualified copied operator recovery: ' + name)
+  }
+  else {
+    if (s.ownership.owner !== 'station-actor' || s.station.phase !== 'cancelled' || s.station.ownedMassKg !== .1 || s.station.resumptions !== undefined || s.transfer.intake !== null || s.transfer.finalRelease !== null || s.receiver.finalLoad.totalMassKg !== 1.5) throw new Error('Unqualified copied operator retention: ' + name)
+    if (name === 'cancel' && s.operator.events.length !== 1) throw new Error('Unexpected copied recovery')
+    if (name !== 'cancel' && (s.operator.events.length !== 2 || s.operator.events[1].action !== 'resume' || s.operator.events[1].outcome !== 'refused' || s.operator.events[1].sequence !== 2
+      || s.operator.events[1].reason !== (name === 'cancel-after-grant' ? 'intake-already-attempted' : 'recovery-authority-unavailable'))) throw new Error('Unqualified copied refused recovery: ' + name)
+    if (name === 'cancel-after-grant' && s.receiver.intake.outcome !== 'uncertain') throw new Error('Lost attempted intake uncertainty')
+    if (name === 'resume-after-navigation-loss' && s.receiver.fault !== 'estimator-loss') throw new Error('Lost operator authority failure')
+  }
+  operatorRows.push({ case: name, exit: r.exitCode, status: s.status, owner: s.ownership.owner, stdoutBytes: bytes.length, stdoutSha256: hash(bytes) })
+  console.log('operator-' + name + ' PASS')
+}
+await Bun.write(join(output, 'receipt.json'), JSON.stringify({ evidence: 'copied-cargo-fleet-cli-consistency', binarySha256: hash(new Uint8Array(await Bun.file(binary).arrayBuffer())), physicalFlightEnabled: false, identityAuthenticated: false, rows, operatorRows }, null, 2))

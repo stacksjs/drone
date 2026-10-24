@@ -190,5 +190,60 @@ test('invalid and exhausted clocks cannot change the parcel, and delayed starts 
   expect(() => station.step(180004)).toThrow('cargo-station-clock')
   expect(station.snapshot()).toEqual(end)
   expect(station.cancel()).toEqual({ outcome: 'cancelled', atMs: 180000 })
+  expect(station.resume()).toEqual({ outcome: 'refused', reason: 'deadline' })
   expect(station.takeReadyParcel().outcome).toBe('refused')
+})
+
+test('an explicit station recovery preserves the braked parcel and bounded work before its single departure', () => {
+  const station = createCargoStationHandler({ atMs: 0, parcel: { id: 'parcel-a', massKg: .1, positionM: [0, 0, 0], velocityMps: [0, 0, 0] }, pickup: { centerM: [0, 0, 0], radiusM: .1 }, destinationM: [1, 0, 0], maxSpeedMps: .5, maxAccelerationMps2: 1 })
+  station.start()
+  for (let atMs = 4; atMs <= 1000; atMs += 4) station.step(atMs)
+  station.cancel()
+  let nowMs = 1000
+  while (station.snapshot().phase === 'braking') { nowMs += 4; station.step(nowMs) }
+  const stopped = station.snapshot()
+  expect(stopped.phase).toBe('cancelled')
+  expect(stopped.parcel!.positionM[0]).toBeGreaterThan(0)
+  expect(stopped.parcel!.positionM[0]).toBeLessThan(1)
+  expect(stopped.parcel!.velocityMps).toEqual([0, 0, 0])
+  expect(station.resume().outcome).toBe('resumed')
+  const resumed = station.snapshot()
+  expect(resumed.parcel).toEqual(stopped.parcel)
+  expect(resumed.energy).toEqual(stopped.energy)
+  expect(resumed.resumptions).toEqual([{ atMs: nowMs, previousStartedAtMs: 0, cancelRequestedAtMs: 1000, stoppedAtMs: stopped.stoppedAtMs!, positionM: stopped.parcel!.positionM, durationMs: resumed.durationMs! }])
+  while (station.snapshot().phase === 'moving') {
+    nowMs += 4
+    const state = station.step(nowMs)
+    expect(Math.hypot(...state.parcel!.velocityMps)).toBeLessThanOrEqual(.5 + 1e-12)
+    expect(Math.hypot(state.forceN[0] / .1, state.forceN[1] / .1, state.forceN[2] / .1 + 9.80665)).toBeLessThanOrEqual(1 + 1e-12)
+    expect(Math.abs(state.energy.residualJ)).toBeLessThan(1e-12)
+    expect(nowMs).toBeLessThan(10000)
+  }
+  expect(station.snapshot().parcel!.positionM).toEqual([1, 0, 0])
+  expect(station.takeReadyParcel().outcome).toBe('departed')
+  expect(station.resume().outcome).toBe('refused')
+  expect(station.takeReadyParcel().outcome).toBe('refused')
+  expect(station.snapshot().ownedMassKg).toBe(0)
+})
+
+
+test('station recovery refuses missed pickup, motion, extra arguments and a ninth recovery without changing parcel ownership', () => {
+  const declaration = { atMs: 0, parcel: { id: 'parcel-a', massKg: .1, positionM: [0, 0, 0], velocityMps: [0, 0, 0] }, pickup: { centerM: [0, 0, 0], radiusM: .1 }, destinationM: [1, 0, 0], maxSpeedMps: .5, maxAccelerationMps2: 1 }
+  const station = createCargoStationHandler(declaration)
+  expect(station.resume()).toEqual({ outcome: 'refused', reason: 'not-stopped' })
+  expect(() => station.resume('extra')).toThrow('cargo-station-arguments')
+  station.start()
+  for (let i = 0; i < 8; i++) { station.cancel(); expect(station.resume().outcome).toBe('resumed') }
+  station.cancel()
+  const stopped = station.snapshot()
+  expect(station.resume()).toEqual({ outcome: 'refused', reason: 'recovery-limit' })
+  expect(station.snapshot()).toEqual(stopped)
+  expect(station.snapshot().ownedMassKg).toBe(.1)
+  expect(station.snapshot().resumptions).toHaveLength(8)
+  const detached = station.snapshot(); detached.resumptions![0]!.positionM[0] = 77
+  expect(station.snapshot()).toEqual(stopped)
+  const missed = createCargoStationHandler({ ...declaration, parcel: { ...declaration.parcel, positionM: [.2, 0, 0] } })
+  missed.cancel()
+  expect(missed.resume()).toEqual({ outcome: 'refused', reason: 'pickup-missed' })
+  expect(missed.snapshot().parcel!.positionM).toEqual([.2, 0, 0])
 })
