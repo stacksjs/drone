@@ -214,10 +214,10 @@ blocks rather than reviving the original command.
 `tests/unit/cargo-receive-mission.test.ts` covers the native task and an actually empty
 receiving body in its own raw-sensor, estimator and authority runtime. With ACK withheld,
 it stays at the declared pad with zero actual motor thrust and no phantom parcel mass.
-The port that verifies an actual point intake and emits captured custody evidence is
-still unimplemented. A caller-invented ACK is not proof of mechanical transfer. The
-two-vehicle coordinator, fresh mechanism authority, cancellation/uncertainty matrix and
-bounded fleet CLI remain open under #25.
+A caller-invented ACK is not proof of mechanical transfer. The
+[two-carrier model](cargo-fleet.md) now binds its receipt port to actual intake, same-epoch
+receiver authority and six bounded fleet cases through `cargo:fleet`. Its broader
+cancellation, fault/recovery and operational matrix remains open under #25.
 
 ## BVLOS operations evidence
 

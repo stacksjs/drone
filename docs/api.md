@@ -67,6 +67,11 @@ through ballistic capture, finite rail transport, cancellation braking and a sin
 departure. See the [station model and integration limits](cargo-station.md). It does not
 grant vehicle authority or confirm custody.
 
+`simulateCargoFleet({ scenario? })` and `cargoFleetSummary(run)` in `cargo/fleet.ts`
+execute [two-carrier handover](cargo-fleet.md) through actual retained source and receiver
+runtimes, a consumed station parcel, current-authority intake and captured custody. The
+six bounded cases retain incomplete outcomes and actual mass separately from receipts.
+
 ## Target sources
 
 `createGpsTargetSource({ targetId, origin, maxSpeedMps?, now? })` converts trusted phone or GNSS fixes

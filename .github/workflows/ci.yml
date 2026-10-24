@@ -304,6 +304,18 @@ jobs:
             ${{ runner.temp }}/cargo-delivery-cli/*.stderr
             ${{ runner.temp }}/cargo-delivery-cli/receipt.json
             ${{ runner.temp }}/cargo-delivery-cli/request.json
+      - name: Qualify copied two-carrier fleet custody and failure outcomes
+        run: bun scripts/qualify-cargo-fleet-cli.ts "$GITHUB_WORKSPACE/storage/runtime-build/cli/drone" "$RUNNER_TEMP/cargo-fleet-cli"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: cargo-fleet-cli-evidence
+          if-no-files-found: ignore
+          path: |
+            ${{ runner.temp }}/cargo-fleet-cli/*.stdout
+            ${{ runner.temp }}/cargo-fleet-cli/*.stderr
+            ${{ runner.temp }}/cargo-fleet-cli/receipt.json
+
       - name: Qualify compiled environmental datasets outside the checkout
         working-directory: ${{ runner.temp }}
         shell: bash

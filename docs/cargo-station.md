@@ -104,5 +104,6 @@ This actor does not grant a mechanism lease, authenticate a recipient, produce a
 ACK or coordinate two live vehicle mission engines. Those operations must use each
 vehicle's own sensor, estimator and current authority scope on the common clock. The
 [receiving mission task](cargo-delivery.md#receiving-mission-task-prerequisite) now holds
-a declared pad under the shared engine. Its physical-intake acknowledgement port, the
-two-vehicle custody protocol, cancellation/uncertainty matrix and bounded fleet CLI remain open under [#25](https://github.com/stacksjs/drone/issues/25).
+a declared pad under the shared engine. The [two-carrier world and CLI](cargo-fleet.md) now connect physical intake, current
+authority and captured acknowledgement for six bounded cases. A complete cancellation,
+fault/recovery and general fleet matrix remains open under [#25](https://github.com/stacksjs/drone/issues/25).
