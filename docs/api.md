@@ -57,6 +57,11 @@ The [cargo guide](cargo-delivery.md) defines the flat synthetic origin, finite l
 one-release and receipt semantics, phase-bound faults, native CLI exit codes and remaining
 fleet/physical/BVLOS work. Budgets are declared power ceilings, not electrical measurements.
 
+`createReceivingRigidBody({ expectedPointLoad, ...bodyOptions })` in `controls/physics.ts`
+provides the separate [point-load intake prerequisite](cargo-delivery.md#point-load-intake-prerequisite).
+It integrates real modeled mass/CG changes after one coincident inelastic point capture.
+The caller still owns the parcel, finite station handling and captured fleet custody protocol.
+
 ## Target sources
 
 `createGpsTargetSource({ targetId, origin, maxSpeedMps?, now? })` converts trusted phone or GNSS fixes

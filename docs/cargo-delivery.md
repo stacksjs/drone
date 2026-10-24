@@ -149,7 +149,38 @@ temperature limit, voltage-sag prediction or Pi performance result. Changing mas
 the actual modeled dynamics; it does not identify an electrical load law. A successful
 budget is conditional on that ceiling and is not measured endurance qualification.
 
+## Point-load intake prerequisite
+
+`createReceivingRigidBody` in `controls/physics.ts` adds an empty declared joint for a
+future parcel. Supply `expectedPointLoad: { id, massKg, forwardM }`; the mass and offset
+bounds match the carried-load model. Its `awaiting` phase has the base body's actual
+mass/inertia. `intakePoint()` returns only joint position and velocity, not a parcel or
+custody evidence.
+
+`attachParcel({ id, massKg, positionM, velocityMps })` accepts an existing modeled point
+parcel only at the current joint position, equal component by component. Identity and
+mass must match the declaration. The caller must move its one physical-world parcel
+there; this primitive does not transport, copy or globally own it. Malformed own-data
+records throw without changing the body. Valid foreign or noncoincident parcels are
+refused without consuming the joint.
+
+Capture conserves total linear/angular momentum and applies a perfectly inelastic point
+joint. Structural position, orientation and actual motors remain continuous; a non-co-moving
+parcel can impart a genuine velocity/angular-rate impulse. Captured mass changes the actual
+subsequent dynamics, CG and inertia. The event retains detached before/after state, incoming
+parcel and raw kinetic/potential energy accounting. Dissipation is mechanical energy,
+not battery Wh or an identified mechanism efficiency. Tiny binary64 negative loss within
+the reported numerical tolerance is retained rather than clamped.
+
+The joint accepts once, can later separate through the existing zero-ejection model and
+cannot refill after separation. The legacy `createRigidBody` carried-load interface keeps
+its original phase/method contract. [ADR 0036](adr/0036-point-load-intake.md) gives the model
+and limits. This primitive supplies no finite-duration contact forces or impact IMU sample,
+release/intake acknowledgement, station handling, authorization or fleet custody handover.
+Those integrations remain open under issue #25.
+
 ## BVLOS operations evidence
+
 
 Country and intended operation must be established separately from library support.
 Sources below were checked October 24, 2026; inspect their current requirements for the
