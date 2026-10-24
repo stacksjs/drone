@@ -17,6 +17,18 @@ type Station = ReturnType<typeof createCargoStationHandler>
 type Release = ReturnType<ReturnType<typeof createReceivingRigidBody>['separateCarriedLoad']>
 type Departure = Extract<ReturnType<Station['takeReadyParcel']>, { outcome: 'departed' }>
 type Owner = 'source-body' | 'station-actor' | 'receiver-body' | 'final-parcel-actor' | 'loose-parcel'
+export interface CargoFleetOperatorDecision {
+  version: 1
+  evidence: 'modeled-cargo-transport-decision-v1'
+  contextId: string
+  bootId: bigint
+  sessionId: bigint
+  sequence: number
+  issuedAtMs: number
+  reference: string
+  sourceEventId: string
+  action: 'cancel' | 'resume'
+}
 export const cargoFleetScenarios = ['nominal', 'receiver-host-loss-before-intake', 'intake-receipt-loss', 'receiver-primary-link-loss', 'receiver-both-links-loss', 'receiver-joint-shift-before-intake', 'receiver-navigation-loss-during-rail', 'source-kill-after-station-receipt', 'receiver-kill-after-intake', 'receiver-pad-motion-during-rail', 'receiver-containment-breach-after-intake-receipt'] as const
 export type CargoFleetScenario = typeof cargoFleetScenarios[number]
 function captureScenario(input: unknown): CargoFleetScenario {
@@ -55,7 +67,7 @@ function hasAuthority(p: Progress | null, command: VehiclePayloadCommand, nowMs:
 }
 
 /** One modeled parcel, two retained raw-sensor/estimator/authority runtimes, and finite station physics. */
-export function simulateCargoFleet(input: unknown = {}, ...extra: unknown[]) {
+export function createCargoFleetSession(input: unknown = {}, ...extra: unknown[]) {
   if (extra.length) throw new TypeError('cargo-fleet-arguments')
   const scenario = captureScenario(input)
   const faultInjection: { scenario: Exclude<CargoFleetScenario, 'nominal'>, anchoredAtMs: number | null, triggeredAtMs: number | null, forceN?: SensorVector, forceRampMs?: number } | null = scenario === 'nominal' ? null : { scenario, anchoredAtMs: null, triggeredAtMs: null, ...(['receiver-pad-motion-during-rail', 'receiver-containment-breach-after-intake-receipt'].includes(scenario) ? { forceN: [scenario === 'receiver-pad-motion-during-rail' ? 4 : 8, 0, 0] as SensorVector, ...(scenario === 'receiver-containment-breach-after-intake-receipt' ? { forceRampMs: 2000 } : {}) } : {}) }
@@ -64,6 +76,9 @@ export function simulateCargoFleet(input: unknown = {}, ...extra: unknown[]) {
   const initialA = bodyA.loadSnapshot(), initialB = bodyB.loadSnapshot()
   let station: Station | null = null, recipient: Station | null = null, loose: Station | null = null
   const physical: { owner: Owner } = { owner: 'source-body' }
+  const operatorContextId = crypto.randomUUID()
+  const operatorEvents: { atMs: number, sequence: number, action: 'cancel' | 'resume', outcome: 'accepted' | 'refused', reason: string }[] = []
+  let operatorSequence = 0, operatorHold = false, currentAtMs: number | null = null, nextAtMs = 0, terminal = false, closed = false, stepping = false
   let maximumMassErrorKg = 0, massSamples = 0
   const transitions: { atMs: number, from: Owner, to: Owner }[] = []
   let sourceRelease: { atMs: number, eventId: string, event: Release } | null = null, finalRelease: { atMs: number, eventId: string, event: Release } | null = null
@@ -177,72 +192,153 @@ export function simulateCargoFleet(input: unknown = {}, ...extra: unknown[]) {
   function totalMass() { return bodyA.loadSnapshot().properties.totalMassKg + bodyB.loadSnapshot().properties.totalMassKg + (station?.snapshot().ownedMassKg ?? 0) + (recipient?.snapshot().ownedMassKg ?? 0) + (loose?.snapshot().ownedMassKg ?? 0) }
   function sampleMass() { maximumMassErrorKg = Math.max(maximumMassErrorKg, Math.abs(totalMass() - 3.1)); massSamples++ }
   sampleMass()
-  try {
-    for (let nowMs = 0; nowMs <= 181000; nowMs += 4) {
-      if (!progressA?.terminal) progressA = a.step(nowMs)
-      if (!progressB?.terminal) progressB = b.step(nowMs)
-      if (faultInjection?.scenario === 'source-kill-after-station-receipt' && faultInjection.anchoredAtMs === null) {
-        const receipt = sourceCoordinator.snapshot().delivery
-        if (receipt.outcome === 'received') faultInjection.anchoredAtMs = receipt.acknowledgedAtMs
-      }
-      if (faultInjection?.scenario === 'receiver-containment-breach-after-intake-receipt' && faultInjection.anchoredAtMs === null) {
-        const receipt = intakeCoordinator.snapshot().custody
-        if (receipt.outcome === 'received') faultInjection.anchoredAtMs = receipt.acknowledgedAtMs
-      }
-      if (station && station.snapshot().atMs < nowMs) station.step(nowMs)
-      if (recipient && recipient.snapshot().atMs < nowMs) recipient.step(nowMs)
-      if (loose && loose.snapshot().atMs < nowMs) loose.step(nowMs)
-      if (commands.source && nowMs > commands.source.issuedAtMs) {
-        const command = commands.source; commands.source = null
-        if (physical.owner === 'source-body' && hasAuthority(progressA, command, nowMs, 101n, 201n)) {
-          const event = bodyA.separateCarriedLoad(); sourceRelease = { atMs: nowMs, eventId: command.eventId, event }
-          if (event.outcome === 'separated') {
-            station = createCargoStationHandler({ atMs: nowMs, parcel: { id: point.id, ...event.parcel }, pickup: { centerM: stationSite.positionM, radiusM: stationSite.radiusM }, destinationM: bodyB.intakePoint().positionM, maxSpeedMps: .5, maxAccelerationMps2: 1 })
-            changeOwner('station-actor', nowMs); sampleMass()
-          }
-        }
-      }
-      if (station?.snapshot().phase === 'held' && sourceCoordinator.snapshot().delivery.outcome === 'received' && progressB?.mission.payload?.operation === 'material-receive' && hasAuthority(progressB, progressB.mission.payload, nowMs, 102n, 202n)) {
-        station.start()
-        if (faultInjection && ['receiver-navigation-loss-during-rail', 'receiver-pad-motion-during-rail'].includes(faultInjection.scenario)) faultInjection.anchoredAtMs ??= nowMs
-      }
-      if (station && ['falling', 'held', 'moving', 'ready'].includes(station.snapshot().phase) && progressB && (!progressB.hostAvailable || progressB.authority.state !== 'autonomous')) station.cancel()
-      if (commands.intake && nowMs > commands.intake.issuedAtMs) {
-        const grant = commands.intake; commands.intake = null
-        if (physical.owner === 'station-actor' && station?.snapshot().phase === 'ready' && sourceRelease?.eventId === grant.sourceEventId && grant.receiverId === 'carrier-b' && grant.bootId === 102n && grant.sessionId === 202n && nowMs < grant.expiresAtMs
-          && hasAuthority(progressB, grant.command, nowMs, grant.bootId, grant.sessionId) && progressB!.board.actuators.every(n => n === 0) && bodyB.snapshot().motorsN.every(n => n < .01)) {
-          const departure = station.takeReadyParcel()
-          if (departure.outcome === 'departed') {
-            stationDeparture = departure
-            const attachment = bodyB.attachParcel(departure.parcel)
-            intake = { atMs: nowMs, grant, attachment, source: structuredClone(progressA!), receiver: structuredClone(progressB!) }
-            intakeEvidence = { atMs: nowMs, eventId: grant.command.eventId, sourceEventId: grant.sourceEventId, outcome: attachment.outcome, massKg: attachment.outcome === 'attached' ? attachment.parcel.massKg : 0 }
-            if (attachment.outcome === 'attached') { loose = null; changeOwner('receiver-body', nowMs); if (faultInjection && ['intake-receipt-loss', 'receiver-kill-after-intake'].includes(faultInjection.scenario)) faultInjection.anchoredAtMs = nowMs }
-            else { loose = createCargoStationHandler({ atMs: nowMs, parcel: departure.parcel, pickup: { centerM: [3, 2, 0], radiusM: 2 }, destinationM: [3, 2, 0], maxSpeedMps: .5, maxAccelerationMps2: 1 }); changeOwner('loose-parcel', nowMs) }
-            sampleMass()
-          }
-        }
-      }
-      if (commands.receiver && nowMs > commands.receiver.issuedAtMs) {
-        const command = commands.receiver; commands.receiver = null
-        if (physical.owner === 'receiver-body' && hasAuthority(progressB, command, nowMs, 102n, 202n)) {
-          const event = bodyB.separateCarriedLoad(); finalRelease = { atMs: nowMs, eventId: command.eventId, event }
-          if (event.outcome === 'separated') {
-            recipient = createCargoStationHandler({ atMs: nowMs, parcel: { id: point.id, ...event.parcel }, pickup: { centerM: finalSite.positionM, radiusM: finalSite.radiusM }, destinationM: finalSite.positionM, maxSpeedMps: .5, maxAccelerationMps2: 1 })
-            changeOwner('final-parcel-actor', nowMs); sampleMass()
-          }
-        }
-      }
-      if (nowMs % 20 === 0) sampleMass()
-      if (progressA?.terminal && progressB?.terminal) break
+  function advance(nowMs: number) {
+    if (!progressA?.terminal) progressA = a.step(nowMs)
+    if (!progressB?.terminal) progressB = b.step(nowMs)
+    if (faultInjection?.scenario === 'source-kill-after-station-receipt' && faultInjection.anchoredAtMs === null) {
+      const receipt = sourceCoordinator.snapshot().delivery
+      if (receipt.outcome === 'received') faultInjection.anchoredAtMs = receipt.acknowledgedAtMs
     }
+    if (faultInjection?.scenario === 'receiver-containment-breach-after-intake-receipt' && faultInjection.anchoredAtMs === null) {
+      const receipt = intakeCoordinator.snapshot().custody
+      if (receipt.outcome === 'received') faultInjection.anchoredAtMs = receipt.acknowledgedAtMs
+    }
+    if (station && station.snapshot().atMs < nowMs) station.step(nowMs)
+    if (recipient && recipient.snapshot().atMs < nowMs) recipient.step(nowMs)
+    if (loose && loose.snapshot().atMs < nowMs) loose.step(nowMs)
+    if (commands.source && nowMs > commands.source.issuedAtMs) {
+      const command = commands.source; commands.source = null
+      if (physical.owner === 'source-body' && hasAuthority(progressA, command, nowMs, 101n, 201n)) {
+        const event = bodyA.separateCarriedLoad(); sourceRelease = { atMs: nowMs, eventId: command.eventId, event }
+        if (event.outcome === 'separated') {
+          station = createCargoStationHandler({ atMs: nowMs, parcel: { id: point.id, ...event.parcel }, pickup: { centerM: stationSite.positionM, radiusM: stationSite.radiusM }, destinationM: bodyB.intakePoint().positionM, maxSpeedMps: .5, maxAccelerationMps2: 1 })
+          changeOwner('station-actor', nowMs); sampleMass()
+        }
+      }
+    }
+    if (!operatorHold && station?.snapshot().phase === 'held' && sourceCoordinator.snapshot().delivery.outcome === 'received' && progressB?.mission.payload?.operation === 'material-receive' && hasAuthority(progressB, progressB.mission.payload, nowMs, 102n, 202n)) {
+      station.start()
+      if (faultInjection && ['receiver-navigation-loss-during-rail', 'receiver-pad-motion-during-rail'].includes(faultInjection.scenario)) faultInjection.anchoredAtMs ??= nowMs
+    }
+    if (station && ['falling', 'held', 'moving', 'ready'].includes(station.snapshot().phase) && progressB && (!progressB.hostAvailable || progressB.authority.state !== 'autonomous')) station.cancel()
+    if (commands.intake && nowMs > commands.intake.issuedAtMs) {
+      const grant = commands.intake; commands.intake = null
+      if (physical.owner === 'station-actor' && station?.snapshot().phase === 'ready' && sourceRelease?.eventId === grant.sourceEventId && grant.receiverId === 'carrier-b' && grant.bootId === 102n && grant.sessionId === 202n && nowMs < grant.expiresAtMs
+        && hasAuthority(progressB, grant.command, nowMs, grant.bootId, grant.sessionId) && progressB!.board.actuators.every(n => n === 0) && bodyB.snapshot().motorsN.every(n => n < .01)) {
+        const departure = station.takeReadyParcel()
+        if (departure.outcome === 'departed') {
+          stationDeparture = departure
+          const attachment = bodyB.attachParcel(departure.parcel)
+          intake = { atMs: nowMs, grant, attachment, source: structuredClone(progressA!), receiver: structuredClone(progressB!) }
+          intakeEvidence = { atMs: nowMs, eventId: grant.command.eventId, sourceEventId: grant.sourceEventId, outcome: attachment.outcome, massKg: attachment.outcome === 'attached' ? attachment.parcel.massKg : 0 }
+          if (attachment.outcome === 'attached') { loose = null; changeOwner('receiver-body', nowMs); if (faultInjection && ['intake-receipt-loss', 'receiver-kill-after-intake'].includes(faultInjection.scenario)) faultInjection.anchoredAtMs = nowMs }
+          else { loose = createCargoStationHandler({ atMs: nowMs, parcel: departure.parcel, pickup: { centerM: [3, 2, 0], radiusM: 2 }, destinationM: [3, 2, 0], maxSpeedMps: .5, maxAccelerationMps2: 1 }); changeOwner('loose-parcel', nowMs) }
+          sampleMass()
+        }
+      }
+    }
+    if (commands.receiver && nowMs > commands.receiver.issuedAtMs) {
+      const command = commands.receiver; commands.receiver = null
+      if (physical.owner === 'receiver-body' && hasAuthority(progressB, command, nowMs, 102n, 202n)) {
+        const event = bodyB.separateCarriedLoad(); finalRelease = { atMs: nowMs, eventId: command.eventId, event }
+        if (event.outcome === 'separated') {
+          recipient = createCargoStationHandler({ atMs: nowMs, parcel: { id: point.id, ...event.parcel }, pickup: { centerM: finalSite.positionM, radiusM: finalSite.radiusM }, destinationM: finalSite.positionM, maxSpeedMps: .5, maxAccelerationMps2: 1 })
+          changeOwner('final-parcel-actor', nowMs); sampleMass()
+        }
+      }
+    }
+    if (nowMs % 20 === 0) sampleMass()
+  }
+  function close() {
+    if (closed) return
+    const interrupted = !terminal
+    closed = true
+    if (interrupted) { terminal = true; station?.cancel(); commands.intake = null }
+    try { a.close() }
+    finally {
+      try { b.close() }
+      finally {
+        // Closing revokes the boards now. Keep the last observation/policy clocks
+        // and physical point, but do not expose their previously powered output.
+        if (interrupted) {
+          const source = a.result(), receiver = b.result()
+          if (progressA) progressA = { ...progressA, hostAvailable: false, terminal: true, board: source.board, authority: source.authority, mission: source.mission }
+          if (progressB) progressB = { ...progressB, hostAvailable: false, terminal: true, board: receiver.board, authority: receiver.authority, mission: receiver.mission }
+        }
+      }
+    }
+  }
+  function step(nowMs: number, ...extra: unknown[]) {
+    if (closed || terminal) throw new Error('Cargo fleet session is closed')
+    if (stepping) throw new Error('Cargo fleet session is already stepping')
+    if (extra.length || !Number.isSafeInteger(nowMs) || nowMs !== nextAtMs || nowMs > 181000) throw new RangeError('cargo-fleet-clock')
+    stepping = true
+    try {
+      currentAtMs = nowMs; advance(nowMs); nextAtMs += 4
+      terminal = !!progressA?.terminal && !!progressB?.terminal
+      return { atMs: nowMs, terminal }
+    }
+    catch (error) { close(); throw error }
+    finally { stepping = false }
+  }
+  function snapshot() {
+    return structuredClone({ atMs: currentAtMs, terminal, closed, source: progressA, receiver: progressB, station: station?.snapshot() ?? null, stationSourceEventId: sourceRelease?.eventId ?? null, intake: intakeCoordinator.snapshot(),
+      ownership: { owner: physical.owner, totalMassKg: totalMass() }, operator: { contextId: operatorContextId, identityAuthenticated: false as const, lastSequence: operatorSequence, hold: operatorHold, events: operatorEvents } })
+  }
+  function decide(input: unknown, ...extra: unknown[]): { outcome: 'accepted' | 'refused', reason: string } {
+    if (closed || terminal || stepping) return { outcome: 'refused', reason: 'session-unavailable' }
+    let decision: Record<string, unknown>
+    try {
+      const fields = ['version', 'evidence', 'contextId', 'bootId', 'sessionId', 'sequence', 'issuedAtMs', 'reference', 'sourceEventId', 'action']
+      if (extra.length || !input || typeof input !== 'object' || Object.getPrototypeOf(input) !== Object.prototype || Reflect.ownKeys(input).length !== fields.length) throw new TypeError()
+      decision = {}
+      for (const key of fields) { const d = Object.getOwnPropertyDescriptor(input, key); if (!d?.enumerable || !Object.hasOwn(d, 'value')) throw new TypeError(); decision[key] = d.value }
+      if (decision.version !== 1 || decision.evidence !== 'modeled-cargo-transport-decision-v1' || typeof decision.contextId !== 'string' || decision.contextId.length > 80
+        || typeof decision.bootId !== 'bigint' || typeof decision.sessionId !== 'bigint' || !Number.isSafeInteger(decision.sequence) || (decision.sequence as number) < 1 || (decision.sequence as number) > 32
+        || !Number.isSafeInteger(decision.issuedAtMs) || (decision.issuedAtMs as number) < 0 || typeof decision.reference !== 'string' || decision.reference.length > 120
+        || typeof decision.sourceEventId !== 'string' || decision.sourceEventId.length > 160 || !['cancel', 'resume'].includes(decision.action as string)) throw new TypeError()
+    }
+    catch { throw new TypeError('cargo-fleet-operator-declaration') }
+    if (closed || terminal || stepping) return { outcome: 'refused', reason: 'session-unavailable' }
+    if (decision.contextId !== operatorContextId || decision.bootId !== 102n || decision.sessionId !== 202n || decision.reference !== progressB?.reference || decision.sourceEventId !== sourceRelease?.eventId) return { outcome: 'refused', reason: 'operator-scope' }
+    if (decision.issuedAtMs !== currentAtMs) return { outcome: 'refused', reason: 'operator-clock' }
+    if (decision.sequence !== operatorSequence + 1 || operatorEvents.length >= 32) return { outcome: 'refused', reason: 'operator-sequence' }
+    operatorSequence = decision.sequence as number
+    const action = decision.action as 'cancel' | 'resume'
+    const record = (outcome: 'accepted' | 'refused', reason: string) => { operatorEvents.push({ atMs: currentAtMs!, sequence: operatorSequence, action, outcome, reason }); return { outcome, reason } }
+    if (physical.owner !== 'station-actor' || !station) return record('refused', 'parcel-not-at-station')
+    if (action === 'cancel') {
+      const result = station.cancel()
+      if (result.outcome === 'refused') return record('refused', 'station-' + result.reason)
+      commands.intake = null; operatorHold = true
+      return record('accepted', 'transport-cancellation-requested')
+    }
+    const command = progressB?.mission.payload
+    if (!operatorHold || !command || command.operation !== 'material-receive' || !hasAuthority(progressB, command, currentAtMs!, 102n, 202n) || sourceCoordinator.snapshot().delivery.outcome !== 'received') return record('refused', 'recovery-authority-unavailable')
+    if (intakeCoordinator.snapshot().custody.grantedAtMs !== null) return record('refused', 'intake-already-attempted')
+    const result = station.resume()
+    if (result.outcome === 'refused') return record('refused', 'station-' + result.reason)
+    operatorHold = false
+    return record('accepted', 'transport-resumed')
+  }
+  function result() {
+    if (!terminal) throw new Error('Cargo fleet session is still active')
     const sourceRun = a.result(), receiverRun = b.result(), sourceDelivery = sourceCoordinator.snapshot().delivery, receiverDelivery = deliveryCoordinator.snapshot().delivery, receiverIntake = intakeCoordinator.snapshot()
     const completed = sourceRun.status === 'completed' && receiverRun.status === 'completed' && sourceDelivery.outcome === 'received' && receiverIntake.custody.outcome === 'received' && receiverDelivery.outcome === 'received' && physical.owner === 'final-parcel-actor' && recipient?.snapshot().phase === 'held' && maximumMassErrorKg < 1e-12
-    return { version: 1, evidence: 'owned-cargo-fleet-simulation' as const, scenario, faultInjection, physicalFlightEnabled: false as const, boardOutputsInhibited: true as const, identityAuthenticated: false as const, status: completed ? 'completed' as const : 'unqualified' as const,
+    return structuredClone({ version: 1, evidence: 'owned-cargo-fleet-simulation' as const, scenario, faultInjection, physicalFlightEnabled: false as const, boardOutputsInhibited: true as const, identityAuthenticated: false as const, status: completed ? 'completed' as const : 'unqualified' as const,
       source: { links: linksA.snapshot(), linkEvents: linksA.events(), initialLoad: initialA, finalLoad: bodyA.loadSnapshot(), runtime: sourceRun, delivery: sourceDelivery }, receiver: { links: linksB.snapshot(), linkEvents: linksB.events(), initialLoad: initialB, finalLoad: bodyB.loadSnapshot(), runtime: receiverRun, intake: receiverIntake, delivery: receiverDelivery },
-      transfer: { sourceRelease, stationDeparture, intake, finalRelease }, station: station?.snapshot() ?? null, recipient: recipient?.snapshot() ?? null, loose: loose?.snapshot() ?? null, ownership: { owner: physical.owner, initialMassKg: 3.1, finalMassKg: totalMass(), maximumMassErrorKg, samples: massSamples, transitions } }
+      transfer: { sourceRelease, stationDeparture, intake, finalRelease }, station: station?.snapshot() ?? null, recipient: recipient?.snapshot() ?? null, loose: loose?.snapshot() ?? null, ownership: { owner: physical.owner, initialMassKg: 3.1, finalMassKg: totalMass(), maximumMassErrorKg, samples: massSamples, transitions }, ...(operatorEvents.length ? { operator: { contextId: operatorContextId, identityAuthenticated: false as const, events: operatorEvents } } : {}) })
   }
-  finally { a.close(); b.close() }
+  return { step, snapshot, decide, result, close }
+}
+
+/** Finite one-shot facade over the same retained shared world. */
+export function simulateCargoFleet(input: unknown = {}, ...extra: unknown[]) {
+  const world = createCargoFleetSession(input, ...extra)
+  try {
+    for (let nowMs = 0; ; nowMs += 4) if (world.step(nowMs).terminal) return world.result()
+  }
+  finally { world.close() }
 }
 
 /** Compact actual observations for Buddy/standalone output; never serialize the full runtime journal. */
@@ -261,5 +357,5 @@ export function cargoFleetSummary(run: ReturnType<typeof simulateCargoFleet>) {
     transfer: { sourceRelease: release(run.transfer.sourceRelease), stationDeparture: run.transfer.stationDeparture, intake: capturedIntake ? { atMs: capturedIntake.atMs, outcome: attachment!.outcome, eventId: capturedIntake.grant.command.eventId, sourceEventId: capturedIntake.grant.sourceEventId,
       receiverScope: { bootId: String(capturedIntake.receiver.authority.bootId), sessionId: String(capturedIntake.receiver.authority.sessionId), epoch: capturedIntake.receiver.authority.epoch, reference: capturedIntake.receiver.reference, policyAtMs: capturedIntake.receiver.policyAtMs },
       massBeforeKg: attachment!.outcome === 'attached' ? attachment!.before.properties.totalMassKg : null, massAfterKg: attachment!.outcome === 'attached' ? attachment!.after.properties.totalMassKg : null } : null, finalRelease: release(run.transfer.finalRelease) },
-    station: run.station, recipient: run.recipient, loose: run.loose, ownership: run.ownership }
+    station: run.station, recipient: run.recipient, loose: run.loose, ownership: run.ownership, ...(run.operator ? { operator: run.operator } : {}) }
 }

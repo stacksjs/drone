@@ -120,18 +120,99 @@ Vehicle host termination retains a 1,000 ms independent board/plant tail. The ot
 continues its own mission. Both routes and their failure alternatives count toward the
 native finite graph/reserve budget; the world is bounded by the 180 s host limit and tails.
 
+## Retained world and explicit transport decisions
+
+`createCargoFleetSession()` exposes `step`, `snapshot`, `decide`, `result` and
+idempotent `close`. The one-shot `simulateCargoFleet()` uses that same world. Each
+step requires exactly the next 4 ms epoch, starting at zero. Both retained vehicle
+sessions, station and single physical point advance together. Snapshots are detached;
+`result()` requires a terminal world and returns a detached complete report, including
+initial loads, fault anchors and transfer history. Mutating a returned report cannot
+rewrite later reads. Closing early revokes both actual board models
+and reports their current neutral outputs without advancing the plant, changing the
+last policy/measurement epochs or claiming that the moving parcel instantly stopped.
+A closed world cannot resume. Closing is not a durable checkpoint or physical settling
+procedure.
+
+The exported `CargoFleetOperatorDecision` is a strict, data-only declaration:
+
+```ts
+const state = world.snapshot()
+if (state.atMs === null || !state.receiver || !state.stationSourceEventId)
+  throw new Error('Wait for an active receiver and station event')
+const outcome = world.decide({
+  version: 1,
+  evidence: 'modeled-cargo-transport-decision-v1',
+  contextId: state.operator.contextId,
+  bootId: 102n,
+  sessionId: 202n,
+  sequence: 1,
+  issuedAtMs: state.atMs,
+  reference: state.receiver.reference,
+  sourceEventId: state.stationSourceEventId,
+  action: 'cancel',
+})
+```
+
+Call after observing an active receiving task and the actual station source event.
+The fresh context UUID separates two otherwise identical worlds; it does not
+authenticate an operator. Admission requires the exact world epoch, receiving
+boot/session/reference and source event, and the next sequence from 1 through 32.
+Accessors, extra fields and extra arguments are rejected. Wrong scope, old clock or
+replayed sequence cannot touch the parcel or consume a sequence. A valid scoped
+operational refusal does consume its sequence and records its reason. Closure during
+declaration capture cannot admit later work. Decision history is bounded to 32 events.
+
+`cancel` consumes any queued physical intake request and asks the station to stop.
+Actual finite braking retains position, velocity, mass and work. The receiving mission
+keeps its existing task/event deadline; the other carrier continues independently.
+Cancellation does not reset an estimator, replace a body or renew a failed lease.
+
+A later fresh `resume` needs the same pending receive task, current native authority,
+captured source custody, a fully stopped station and no prior intake grant. The same
+point resumes from its actual stopped position, with a new bounded rail duration and
+cumulative mechanical accounting. At most eight station resumptions fit within the
+original 180 s lifetime. An attempted intake remains uncertain even if cancellation
+prevents its queued mechanism from executing; `intake-already-attempted` prevents a
+second attempt. No inferred custody repair is performed.
+
+Native Buddy and the copied standalone CLI expose four explicit fictional decision cases:
+
+```sh
+./buddy cargo:fleet-control --case cancel
+./buddy cargo:fleet-control --case cancel-resume
+./buddy cargo:fleet-control --case cancel-after-grant
+./buddy cargo:fleet-control --case resume-after-navigation-loss
+```
+
+The default `cancel-resume` waits for actual moving transport, cancels it, waits at
+least 1 s after its physical stop, then resumes the same receiver session and parcel.
+It completes captured intake, final delivery and return. `cancel` retains the parcel
+and lets the original receive deadline lead to an alternate. `cancel-after-grant`
+withholds physical intake but retains attempted-intake uncertainty and refuses recovery.
+`resume-after-navigation-loss` refuses recovery after native navigation authority fails.
+These three cases exit 2. The completed case exits 0; invalid input, execution and output
+failures exit 1. Each emits one JSON line within 16 KiB, including explicit decision
+outcomes, source/receiver scopes and physical ownership. Identity authentication and
+physical outputs remain disabled. These are fixed simulation declarations, not an
+interactive control server or an arbitrary fleet mission interface.
+
 ## Evidence and remaining work
 
 `tests/unit/cargo-fleet.test.ts` exercises actual two-session physics, intake mass changes,
 source/receiver scopes, same-epoch admission, captured receipt ordering, retained mass,
 backup continuation, both-link braking, the host/grant gap and uncertain loaded diversion.
 `tests/unit/cargo-fleet-cli.test.ts` executes the native Buddy command and its bounded wire.
-`scripts/qualify-cargo-fleet-cli.ts` exercises all eleven cases through a copied standalone
-binary outside the checkout and retains output hashes and factual outcomes.
+`tests/unit/cargo-fleet-operator.test.ts` exercises same-session recovery, braking,
+foreign/stale/replayed decisions, close reentry, retained output observations and the
+grant/execution gap. `tests/unit/cargo-fleet-control-cli.test.ts` exercises native command
+exits and bounded reports. `scripts/qualify-cargo-fleet-cli.ts` exercises all eleven
+fault cases and four operator cases through a copied standalone binary outside the
+checkout and retains output hashes and factual outcomes.
 
 These cases do not cover a complete fleet fault envelope. Receiver/source kill or manual
 intervention at every phase, broader navigation degradation and containment campaigns,
-wider late/foreign/replayed receipt campaigns, explicit operator cancellation/recovery, durable
-whole-world checkpoints, general rendezvous, collision avoidance and richer fleet planning
+wider late/foreign/replayed receipt campaigns, general vehicle abort/replan and
+uncertain-intake reconciliation, durable whole-world checkpoints, general rendezvous, collision avoidance and richer fleet planning
 remain open under [#25](https://github.com/stacksjs/drone/issues/25) and its dependencies.
 The wider measured hardware, endurance and operational evidence requirements remain open.

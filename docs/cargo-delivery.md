@@ -216,8 +216,10 @@ receiving body in its own raw-sensor, estimator and authority runtime. With ACK 
 it stays at the declared pad with zero actual motor thrust and no phantom parcel mass.
 A caller-invented ACK is not proof of mechanical transfer. The
 [two-carrier model](cargo-fleet.md) now binds its receipt port to actual intake, same-epoch
-receiver authority and eleven bounded fleet cases through `cargo:fleet`. Its broader
-cancellation, fault/recovery and operational matrix remains open under #25.
+receiver authority and eleven bounded fleet cases through `cargo:fleet`. The retained
+world and `cargo:fleet-control` add same-session station cancellation and bounded
+recovery before intake is attempted. General vehicle abort/replan, uncertain-intake
+reconciliation and the wider fault/recovery and operational matrix remain open under #25.
 
 ## BVLOS operations evidence
 
@@ -249,7 +251,8 @@ establish an airspace detect-and-avoid system.
 
 ## Remaining issue scope
 
-[#25](https://github.com/stacksjs/drone/issues/25) remains open for actual distinct-vehicle
-fleet handover, richer endurance models/measurements, durable cargo/runtime reconciliation,
+[#25](https://github.com/stacksjs/drone/issues/25) remains open for general fleet
+handover/recovery beyond the bounded two-carrier model, richer endurance
+models/measurements, durable cargo/runtime reconciliation,
 physical release/recipient validation and the separate operational evidence case.
 The original acceptance scope is not reduced to passing named demonstrations.

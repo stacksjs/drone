@@ -1,0 +1,47 @@
+import { expect, test } from 'bun:test'
+import { command } from '@stacksjs/testing'
+
+test('native fleet operator command resumes the same retained parcel and reports bounded decision evidence', async () => {
+  const result = await command(['cargo:fleet-control', '--case', 'cancel-resume']).withTimeout(30000)
+  expect(result.exitCode).toBe(0)
+  const report = JSON.parse(result.stdout)
+  expect(report.status).toBe('completed')
+  expect(report.operator.identityAuthenticated).toBe(false)
+  expect(report.operator.events.map((e: { action: string, outcome: string }) => [e.action, e.outcome])).toEqual([['cancel', 'accepted'], ['resume', 'accepted']])
+  expect(report.station.resumptions).toHaveLength(1)
+  expect(report.station.resumptions[0].atMs - report.station.resumptions[0].stoppedAtMs).toBeGreaterThanOrEqual(1000)
+  expect(report.receiver.scope).toEqual({ bootId: '102', sessionId: '202' })
+  expect(report.receiver.intake.outcome).toBe('received')
+  expect(report.receiver.delivery.outcome).toBe('received')
+  expect(report.ownership.finalMassKg).toBe(3.1)
+  expect(report.physicalFlightEnabled).toBe(false)
+  expect(report.source.board.actuators).toEqual([0, 0, 0, 0])
+  expect(report.receiver.board.actuators).toEqual([0, 0, 0, 0])
+  expect(Buffer.byteLength(result.stdout)).toBeLessThanOrEqual(16384)
+  expect(result.stdout.split('\n')).toHaveLength(2)
+}, 40000)
+
+test('operator CLI preserves cancellation, attempted-intake uncertainty and failed authority as incomplete', async () => {
+  for (const name of ['cancel', 'cancel-after-grant', 'resume-after-navigation-loss']) {
+    const result = await command(['cargo:fleet-control', '--case', name]).withTimeout(30000)
+    expect(result.exitCode).toBe(2)
+    const report = JSON.parse(result.stdout)
+    expect(report.status).toBe('unqualified')
+    expect(report.ownership.owner).toBe('station-actor')
+    expect(report.station.ownedMassKg).toBe(.1)
+    expect(report.station.phase).toBe('cancelled')
+    expect(report.station.resumptions).toBeUndefined()
+    expect(report.transfer.intake).toBeNull()
+    expect(report.ownership.finalMassKg).toBe(3.1)
+    expect(report.receiver.finalLoad.totalMassKg).toBe(1.5)
+    if (name === 'cancel-after-grant') expect(report.operator.events[1].reason).toBe('intake-already-attempted')
+    if (name === 'resume-after-navigation-loss') expect(report.operator.events[1].reason).toBe('recovery-authority-unavailable')
+    expect(result.stderr).toBe('')
+    expect(Buffer.byteLength(result.stdout)).toBeLessThanOrEqual(16384)
+  }
+  const bad = await command(['cargo:fleet-control', '--case', 'private-invalid-marker']).withTimeout(30000)
+  expect(bad.exitCode).toBe(1)
+  expect(bad.stdout).toBe('')
+  expect(bad.stderr).toContain('Cargo fleet control unavailable')
+  expect(bad.stderr).not.toContain('private-invalid-marker')
+}, 130000)

@@ -29,6 +29,8 @@
     "./unit/cargo-receive-mission.test.ts",
     "./unit/cargo-fleet.test.ts",
     "./unit/cargo-fleet-cli.test.ts",
+    "./unit/cargo-fleet-operator.test.ts",
+    "./unit/cargo-fleet-control-cli.test.ts",
     "./unit/cargo-delivery.test.ts",
     "./unit/cargo-delivery-config.test.ts",
     "./unit/cargo-delivery-phase-faults.test.ts",

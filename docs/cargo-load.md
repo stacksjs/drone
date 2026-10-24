@@ -38,8 +38,10 @@ The retained source qualification passed 38 tests and 5,553 assertions across co
 Issue #25 remains open. The separate [modeled cargo mission](cargo-delivery.md) now implements
 configured delivery, captured mechanism/receiver evidence and custody, declared reserve budgets,
 alternates, two modeled links and phase-bound fault cases. Those capabilities do not change this
-bench's characterization result or flags. Distinct-vehicle fleet handover, measured/electrical
-endurance, release hardware, operational authorization, detect-and-avoid and physical/HIL
+bench's characterization result or flags. The separate [two-carrier model](cargo-fleet.md)
+connects actual finite station transport, intake and captured custody, including bounded
+transport cancellation/recovery. General fleet recovery, measured/electrical endurance,
+release hardware, operational authorization, detect-and-avoid and physical/HIL
 qualification remain open.
 
 The result keeps `physicalFlightEnabled` and `identityAuthenticated` false, with physical board outputs inhibited. Its six delivery, mechanism verification, custody, recipient, mission and energy-margin capability flags remain false. This characterization does not authorize physical operation or long-range transport.

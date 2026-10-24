@@ -24,8 +24,12 @@ companion application and simulator, not a native board autopilot.
   evidence remain open in [#10](https://github.com/stacksjs/drone/issues/10).
 - Configured modeled cargo delivery uses captured release/receiver custody, finite alternate landing,
   declared reserves, scoped redundant links and post-release failures on the shared runtime.
-  Distinct-vehicle fleet handover and physical/electrical/operational qualification remain in
-  [#25](https://github.com/stacksjs/drone/issues/25). See [cargo contracts](../cargo-delivery.md).
+  The [two-carrier model](../cargo-fleet.md) connects finite station transport, actual intake,
+  captured custody and a second delivery under separate retained sensor/authority sessions.
+  Eleven fault cases and explicit station cancel/resume retain physical ownership and uncertainty.
+  General fleet recovery, durable world reconciliation and physical/electrical/operational
+  qualification remain in [#25](https://github.com/stacksjs/drone/issues/25). See
+  [cargo contracts](../cargo-delivery.md).
 - TypeScript follow/behavior library, kinematic simulator, controller leases and envelope checks.
 - Pi AI Camera acquisition bridge and explicit image-space target selection/loss policy, pending Pi hardware validation.
 - An optional visual guard that holds metric follow logic on lost, unconfirmed, stale or changed visual selection.

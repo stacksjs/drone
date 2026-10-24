@@ -23,6 +23,7 @@ export interface CargoStationSnapshot {
   parcel: IntakeParcel | null
   forceN: SensorVector
   impact: { atMs: number, positionM: SensorVector, velocityBeforeMps: SensorVector, impulseNs: SensorVector, dissipationJ: number } | null
+  resumptions?: { atMs: number, previousStartedAtMs: number | null, cancelRequestedAtMs: number, stoppedAtMs: number, positionM: SensorVector, durationMs: number }[]
   energy: { initialJ: number, currentJ: number, departedJ: number, stationNetWorkJ: number, positiveWorkJ: number, negativeWorkJ: number, planeDissipationJ: number, residualJ: number }
 }
 function record(input: unknown, names: string[]) {
@@ -77,6 +78,7 @@ export function createCargoStationHandler(input: unknown) {
   let forceN: SensorVector = [0, 0, 0], impact: CargoStationSnapshot['impact'] = null
   const mechanical = (p: IntakeParcel) => .5 * p.massKg * p.velocityMps.reduce((sum, n) => sum + n * n, 0) - p.massKg * gravity * p.positionM[2]
   const initialJ = mechanical(parcel)
+  const resumptions: NonNullable<CargoStationSnapshot['resumptions']> = []
   let departedJ = 0, stationNetWorkJ = 0, positiveWorkJ = 0, negativeWorkJ = 0, planeDissipationJ = 0
   function capturePlane(atMs: number) {
     const p = parcel!, before = [...p.velocityMps] as SensorVector
@@ -96,7 +98,7 @@ export function createCargoStationHandler(input: unknown) {
   function snapshot(): CargoStationSnapshot {
     const currentJ = parcel ? mechanical(parcel) : 0
     return structuredClone({ evidence: 'modeled-cargo-station-v1', physicalActuationEnabled: false, phase, atMs: nowMs, startedAtMs, durationMs: motionMs, cancelRequestedAtMs, stoppedAtMs, parcel,
-      ownedMassKg: parcel?.massKg ?? 0, forceN, impact, energy: { initialJ, currentJ, departedJ, stationNetWorkJ, positiveWorkJ, negativeWorkJ, planeDissipationJ, residualJ: currentJ + departedJ + planeDissipationJ - initialJ - stationNetWorkJ } })
+      ownedMassKg: parcel?.massKg ?? 0, forceN, impact, energy: { initialJ, currentJ, departedJ, stationNetWorkJ, positiveWorkJ, negativeWorkJ, planeDissipationJ, residualJ: currentJ + departedJ + planeDissipationJ - initialJ - stationNetWorkJ }, ...(resumptions.length ? { resumptions } : {}) })
   }
   return {
     snapshot,
@@ -107,6 +109,17 @@ export function createCargoStationHandler(input: unknown) {
       if (nowMs - config.atMs + duration > 180000) return { outcome: 'refused', reason: 'deadline' }
       fromM = [...parcel!.positionM]; motionMs = duration; startedAtMs = nowMs; phase = 'moving'
       return { outcome: 'started', atMs: nowMs, durationMs: duration }
+    },
+    resume(...args: unknown[]): { outcome: 'resumed', atMs: number, durationMs: number } | { outcome: 'refused', reason: 'not-stopped' | 'pickup-missed' | 'recovery-limit' | 'deadline' } {
+      if (args.length) throw new TypeError('cargo-station-arguments')
+      if (phase !== 'cancelled' || !parcel || cancelRequestedAtMs === null || stoppedAtMs === null || nowMs < stoppedAtMs || Math.hypot(...parcel.velocityMps) !== 0) return { outcome: 'refused', reason: 'not-stopped' }
+      if (startedAtMs === null && (!impact || Math.hypot(impact.positionM[0] - config.pickup.centerM[0], impact.positionM[1] - config.pickup.centerM[1]) > config.pickup.radiusM)) return { outcome: 'refused', reason: 'pickup-missed' }
+      if (resumptions.length >= 8) return { outcome: 'refused', reason: 'recovery-limit' }
+      const duration = durationMs(distance(parcel.positionM, config.destinationM), config.maxSpeedMps, config.maxAccelerationMps2)
+      if (nowMs - config.atMs + duration > 180000) return { outcome: 'refused', reason: 'deadline' }
+      resumptions.push({ atMs: nowMs, previousStartedAtMs: startedAtMs, cancelRequestedAtMs, stoppedAtMs, positionM: [...parcel.positionM], durationMs: duration })
+      fromM = [...parcel.positionM]; motionMs = duration; startedAtMs = nowMs; cancelRequestedAtMs = null; stoppedAtMs = null; brake = null; phase = 'moving'
+      return { outcome: 'resumed', atMs: nowMs, durationMs: duration }
     },
     cancel(...args: unknown[]): { outcome: 'cancelling' | 'cancelled', atMs: number } | { outcome: 'refused', reason: 'already-cancelled' | 'departed' } {
       if (args.length) throw new TypeError('cargo-station-arguments')

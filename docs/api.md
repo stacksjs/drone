@@ -70,7 +70,13 @@ grant vehicle authority or confirm custody.
 `simulateCargoFleet({ scenario? })` and `cargoFleetSummary(run)` in `cargo/fleet.ts`
 execute [two-carrier handover](cargo-fleet.md) through actual retained source and receiver
 runtimes, a consumed station parcel, current-authority intake and captured custody. The
-six bounded cases retain incomplete outcomes and actual mass separately from receipts.
+eleven bounded fault cases retain incomplete outcomes and actual mass separately from receipts.
+`createCargoFleetSession()` exposes exact-epoch `step`, detached `snapshot`/terminal `result`,
+scoped `decide` and idempotent `close`, with the exported `CargoFleetOperatorDecision` type.
+`simulateCargoFleetControl({ case? })` in `cargo/fleet-control.ts` supports four explicit
+transport cancellation/recovery cases. The [operator contract](cargo-fleet.md#retained-world-and-explicit-transport-decisions)
+retains current authority, a single physical point, original receive deadlines and
+attempted-intake uncertainty. It does not restore a failed vehicle session.
 
 ## Target sources
 
