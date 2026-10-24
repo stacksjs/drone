@@ -3,7 +3,8 @@ import type { GeodeticOrigin, Quaternion } from '../estimation/frames'
 import type { SensorVector } from '../sensors/types'
 import type { MissionAction, MissionObservation, MissionState } from '../missions/engine'
 
-export type VehicleKind = 'fixed-wing' | 'vtol' | 'ground' | 'surface' | 'subsea'
+export const vehicleKinds = ['quadcopter', 'fixed-wing', 'vtol', 'ground', 'surface', 'subsea'] as const
+export type VehicleKind = typeof vehicleKinds[number]
 export interface VehicleActuator { name: string, unit: 'normalized' | 'newton' | 'radian' | 'metres-per-second', min: number, max: number, neutral: number }
 export interface VehiclePlantState {
   positionM: SensorVector
@@ -56,7 +57,7 @@ export type VehicleMissionTask =
   | { id: string, kind: 'takeoff' | 'waypoint' | 'land' | 'stop', positionM: SensorVector, acceptanceM: number, maxArrivalSpeedMps: number, settleMs: number, timeoutMs: number, next?: string }
   | { id: string, kind: 'return', acceptanceM: number, maxArrivalSpeedMps: number, settleMs: number, timeoutMs: number, next: string }
   | { id: string, kind: 'loiter', positionM: SensorVector, acceptanceM: number, maxArrivalSpeedMps: number, settleMs: number, timeoutMs: number, next: string }
-  | { id: string, kind: 'payload', operation: VehiclePayloadOperation, containerId: string | null, timeoutMs: number, next: string }
+  | { id: string, kind: 'payload', operation: VehiclePayloadOperation, containerId: string | null, timeoutMs: number, next: string, onFailure?: string }
   | { id: string, kind: 'branch', batteryAtLeast: number, then: string, otherwise: string }
   | { id: string, kind: 'abort' }
 /** Explicit v2 profile; v1 quadcopter plans and traces retain their original contract. */
@@ -89,6 +90,8 @@ export interface VehicleMissionSnapshot {
   transition?: VehicleVtolTransitionCommand | null
   /** Present after entering an explicitly planned transition-failure hover/landing route. */
   recovery?: { failedEventId: string | null, failedTaskId: string, hoverTaskId: string, triggeredAtMs: number, cause: 'timeout' | 'controller-aborted' | 'operator-abort' | 'operator-pause' | 'operator-recover', abortRequestedAtMs?: number }
+  /** A declared one-way payload failure route. Landing it does not confirm delivery. */
+  payloadFailure?: { eventId: string, taskId: string, operation: VehiclePayloadOperation, containerId: string | null, reason: 'timeout' | 'rejected' | 'uncertain' | 'scope-mismatch', triggeredAtMs: number, approachTaskId: string, landingTaskId: string }
   reason: string
   elapsedMs: number
 }
@@ -124,6 +127,8 @@ export interface VehicleFaults {
 /** One execution owns its plant, controller, payload and measurement sequence. */
 export interface VehicleNavigation { update(base: EstimatorSnapshot, measurement: VehicleMeasurement | null, nowMs: number): EstimatorSnapshot }
 export interface VehicleSession {
+  /** Optional received link evidence on the runtime's monotonic clock, without receipt-time restamping. */
+  linkObservation?(nowMs: number): { capturedAtMs: number, connected: boolean }
   createNavigation?(): VehicleNavigation
   createPlant(): VehiclePlant
   createController(): VehicleController

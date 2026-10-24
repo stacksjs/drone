@@ -11,6 +11,7 @@ import DriversBench from '../app/Commands/DriversBench'
 import AuthoritySimulate from '../app/Commands/AuthoritySimulate'
 import ControlsSimulate from '../app/Commands/ControlsSimulate'
 import CargoLoadBench from '../app/Commands/CargoLoadBench'
+import CargoDeliver from '../app/Commands/CargoDeliver'
 
 import PayloadsBench from '../app/Commands/PayloadsBench'
 import PayloadsCapture from '../app/Commands/PayloadsCapture'
@@ -92,6 +93,7 @@ SensorsInspect(app)
 EstimatorReplay(app)
 ControlsSimulate(app)
 CargoLoadBench(app)
+CargoDeliver(app)
 AuthoritySimulate(app)
 DriversBench(app)
 PayloadsBench(app)

@@ -101,6 +101,19 @@ test('kill wins over invalid time, cannot be cleared by release or disarm and ne
   reset.interlocks.motorsStopped = true
   expect(s.update(reset, command(s, 'reset')).state).toBe('disarmed')
 })
+
+test('a kill event records its valid observation time and retains the prior epoch for invalid clocks', () => {
+  for (const nowMs of [1020, NaN, 999]) {
+    const s = engaged(), kill = observation(nowMs)
+    kill.interlocks.killActive = true
+    const result = s.update(kill)
+    expect(result.state).toBe('killed')
+    expect(result.events.at(-1)!.reason).toBe('kill-input')
+    expect(result.events.at(-1)!.atMs).toBe(nowMs === 1020 ? 1020 : 1000)
+    expect(result.lastCheckedAtMs).toBe(nowMs === 1020 ? 1020 : 1000)
+    expect(s.gate(output(1020), 1020)).toBeNull()
+  }
+})
 test('RC override revokes autonomous outputs and stays manual after override is released', () => {
   const s = engaged(), o = observation(1020); o.rc.override = true
   expect(s.update(o).state).toBe('manual')

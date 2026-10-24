@@ -24,6 +24,12 @@ function captureMissionActions(input: unknown, maximumMs: number): ScheduledMiss
   }
   return result
 }
+function captureLinkObservation(input: unknown, nowMs: number): { capturedAtMs: number, connected: boolean } {
+  if (!input || typeof input !== 'object' || Object.getPrototypeOf(input) !== Object.prototype || Reflect.ownKeys(input).length !== 2) throw new TypeError('Unqualified vehicle link observation')
+  const time = Object.getOwnPropertyDescriptor(input, 'capturedAtMs'), connected = Object.getOwnPropertyDescriptor(input, 'connected')
+  if (!time?.enumerable || !Object.hasOwn(time, 'value') || !Number.isSafeInteger(time.value) || time.value < 0 || time.value > nowMs || !connected?.enumerable || !Object.hasOwn(connected, 'value') || typeof connected.value !== 'boolean') throw new TypeError('Unqualified vehicle link observation')
+  return { capturedAtMs: time.value, connected: connected.value }
+}
 /** Owned raw sensor -> estimator -> mission -> vehicle policy -> authority -> independent board loop. */
 export function runVehicleSimulation(profileInput: VehicleProfile, options: { scenario?: string, seconds?: number, neutralTailMs?: number, missionActions?: readonly ScheduledMissionAction[] } = {}) {
   const scenario = options.scenario ?? profileInput.scenario, seconds = options.seconds ?? 120
@@ -39,6 +45,7 @@ export function runVehicleSimulation(profileInput: VehicleProfile, options: { sc
   let transitionObservation: VehicleVtolTransitionObservation | null = null
   const actuators = structuredClone(profileInput.actuators), fence = structuredClone(profileInput.authorityFence)
   const session = profileInput.createSession(), navigation = session.createNavigation?.()
+  const linkProvider = session.linkObservation
   if (profileInput.vehicle === 'subsea' && !navigation) throw new TypeError('Subsea profile requires owned pressure/DVL navigation')
   const engine = createVehicleMissionEngine(plan), plant = session.createPlant(), controller = session.createController()
   const supervisor = createVehicleAuthoritySupervisor({ bootId: 55n, sessionId: 123n, vehicle: profileInput.vehicle, actuators, fence })
@@ -98,6 +105,12 @@ export function runVehicleSimulation(profileInput: VehicleProfile, options: { sc
         if (batteryObservation.cutoff) fault ??= 'modeled-battery-supply-cutoff'
       }
       if (navigation) estimate = navigation.update(baseEstimate, qualified, nowMs)
+      let link = linkProvider === undefined ? { capturedAtMs: nowMs, connected: !faults.linkLost } : { capturedAtMs: 0, connected: false }
+      if (typeof linkProvider === 'function') {
+        try { link = captureLinkObservation(linkProvider.call(session, nowMs), nowMs) }
+        catch { /* An installed adapter failure is disconnected, never a replacement fixture. */ }
+      }
+      if (faults.linkLost) link.connected = false
       if (nowMs < 600) continue
       const b = board.snapshot()
       const batteryPercent = batteryModel ? qualified && batteryObservation && !batteryObservation.cutoff ? batteryObservation.remainingPercentLowerBound : 0 : 100 - plan.power.maxW * Math.max(0, nowMs - 600) / 3600000 / plan.power.availableWh * 100
@@ -105,7 +118,7 @@ export function runVehicleSimulation(profileInput: VehicleProfile, options: { sc
         runtime: { bootId: b.bootId, capturedAtMs: nowMs, watchdogHealthy: b.fault === null },
         rc: { capturedAtMs: nowMs, connected: true, armSwitch: true, override: faults.rcOverride ?? false },
         interlocks: { capturedAtMs: qualified?.capturedAtMs ?? nowMs - 1000, killActive: faults.kill ?? false, onGround: qualified?.values.onSurface === true, motorsStopped: qualified?.values.stopped === true },
-        battery: { capturedAtMs: batteryModel ? qualified?.capturedAtMs ?? nowMs - 1000 : nowMs, remainingPercent: batteryPercent }, link: { capturedAtMs: nowMs, connected: !faults.linkLost } }
+        battery: { capturedAtMs: batteryModel ? qualified?.capturedAtMs ?? nowMs - 1000 : nowMs, remainingPercent: batteryPercent }, link }
       const send = (action: 'arm' | 'engage' | 'renew' | 'disarm', targetM = mission.targetM) => {
         const s = supervisor.snapshot()
         return supervisor.update(observation, { version: 1, sessionId: s.sessionId, bootId: s.bootId, epoch: s.epoch, sequence: s.sequence + 1, issuedAtMs: nowMs, action, mode: 'position', leaseMs: 100, target: { positionM: targetM ?? [0, 0, 0], yawRad: 0 } })
@@ -113,7 +126,7 @@ export function runVehicleSimulation(profileInput: VehicleProfile, options: { sc
       supervisor.update(observation)
       if (nowMs === 600) { send('arm'); send('engage', [0, 0, 0]) }
       const context: VehicleControllerContext = { nowMs, enabled: supervisor.snapshot().state === 'autonomous', estimate, measurement, measurementPose, mission,
-        ...(profileInput.vehicle === 'vtol' ? { controlRate: capturePose ? { evidence: 'modeled-qualified-imu' as const, reference: capturePose.reference, capturedAtMs: capturePose.gyroCapturedAtMs, angularRateRadS: [...(imuObservation!.value as ImuMeasurement).angularRateRadS] as SensorVector } : null } : {}),
+        ...(profileInput.vehicle === 'vtol' || profileInput.vehicle === 'quadcopter' ? { controlRate: capturePose ? { evidence: 'modeled-qualified-imu' as const, reference: capturePose.reference, capturedAtMs: capturePose.gyroCapturedAtMs, angularRateRadS: [...(imuObservation!.value as ImuMeasurement).angularRateRadS] as SensorVector } : null } : {}),
       }
       payload?.observe?.(structuredClone(context))
       const ack = payload?.poll(nowMs) ?? null
@@ -123,6 +136,7 @@ export function runVehicleSimulation(profileInput: VehicleProfile, options: { sc
       const scheduled = missionActions[missionActionIndex]
       if (scheduled?.atMs === nowMs) { action = scheduled.action; missionActionIndex++ }
       mission = engine.step(missionObservation, action)
+      if (mission.payloadFailure?.triggeredAtMs === nowMs) payload?.observe?.(structuredClone({ ...context, mission }))
       if (mission.payload && !requested.has(mission.payload.eventId)) {
         if (!payload) { fault ??= 'missing-vehicle-payload-port'; send('disarm') }
         else { payload.observe?.(structuredClone({ ...context, mission })); payload.request(structuredClone(mission.payload)); requested.add(mission.payload.eventId) }

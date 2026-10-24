@@ -1,5 +1,6 @@
 import type { VehicleMissionAction, VehicleMissionObservation, VehicleMissionPlan, VehicleMissionSnapshot, VehicleMissionTask, VehiclePayloadAck, VehiclePayloadCommand, VehicleVtolTransitionCommand, VehicleVtolTransitionObservation } from '../vehicles/types'
 import type { MissionState } from './engine'
+import { vehicleKinds } from '../vehicles/types'
 import { authorityStates } from '../authority/supervisor'
 import { validVector } from '../controls/model'
 import { missionGraphBudget } from './graph'
@@ -15,7 +16,7 @@ export function vehicleMissionContains(plan: VehicleMissionPlan, p: unknown) {
 export function vehicleTaskTarget(plan: VehicleMissionPlan, task: VehicleMissionTask) { return task.kind === 'return' ? [...plan.rallyM] : 'positionM' in task ? [...task.positionM] : null }
 export function validateVehicleMission(input: unknown): { plan: VehicleMissionPlan, worstCaseMs: number, requiredWh: number } {
   function invalid(): never { throw new TypeError('Invalid vehicle mission or unsupported profile') }
-  if (!object(input) || !keys(input, ['version', 'vehicle', 'id', 'frame', 'altitude', 'terrain', 'origin', 'fence', 'rallyM', 'power', 'start', 'tasks']) || input.version !== 2 || !['fixed-wing', 'vtol', 'ground', 'surface', 'subsea'].includes(input.vehicle as string) || !id(input.id) || input.frame !== 'LOCAL_NED' || input.altitude !== 'ORIGIN_RELATIVE_DOWN' || input.terrain !== 'DECLARED_MODEL_SURFACE' || !id(input.start)) invalid()
+  if (!object(input) || !keys(input, ['version', 'vehicle', 'id', 'frame', 'altitude', 'terrain', 'origin', 'fence', 'rallyM', 'power', 'start', 'tasks']) || input.version !== 2 || !vehicleKinds.some(kind => kind === input.vehicle) || !id(input.id) || input.frame !== 'LOCAL_NED' || input.altitude !== 'ORIGIN_RELATIVE_DOWN' || input.terrain !== 'DECLARED_MODEL_SURFACE' || !id(input.start)) invalid()
   const p = input as unknown as VehicleMissionPlan
   if (!object(p.origin) || !keys(p.origin, ['latitudeDeg', 'longitudeDeg', 'ellipsoidHeightM']) || !number(p.origin.latitudeDeg, -90, 90) || !number(p.origin.longitudeDeg, -180, 180) || !number(p.origin.ellipsoidHeightM, -500, 10000)
     || !object(p.fence) || !keys(p.fence, ['radiusM', 'minDownM', 'maxDownM']) || !number(p.fence.radiusM, 1, 5000) || !number(p.fence.minDownM, -1000, 0) || !number(p.fence.maxDownM, 0, 10) || p.fence.minDownM >= p.fence.maxDownM || !vehicleMissionContains(p, p.rallyM)
@@ -38,17 +39,19 @@ export function validateVehicleMission(input: unknown): { plan: VehicleMissionPl
       edges = [t.then, t.otherwise]
     }
     else if (t.kind === 'payload') {
-      fields.push('operation', 'containerId', 'timeoutMs', 'next')
-      const supported = p.vehicle === 'fixed-wing' || p.vehicle === 'vtol' ? ['camera-still'] : p.vehicle === 'ground' ? ['camera-still', 'material-drop', 'mower-enable', 'mower-disable'] : p.vehicle === 'surface' ? ['camera-still', 'water-sample'] : ['camera-still', 'inspection-capture']
+      fields.push('operation', 'containerId', 'timeoutMs', 'next', 'onFailure')
+      const supported = p.vehicle === 'quadcopter' ? ['camera-still', 'material-drop'] : p.vehicle === 'fixed-wing' || p.vehicle === 'vtol' ? ['camera-still'] : p.vehicle === 'ground' ? ['camera-still', 'material-drop', 'mower-enable', 'mower-disable'] : p.vehicle === 'surface' ? ['camera-still', 'water-sample'] : ['camera-still', 'inspection-capture']
       if (!supported.includes(t.operation) || (t.containerId !== null && !id(t.containerId)) || (t.operation === 'water-sample' && !id(t.containerId)) || !number(t.timeoutMs, 100, 10000) || !id(t.next)) invalid()
-      durationMs = t.timeoutMs; edges = [t.next]
+      if (p.vehicle === 'quadcopter' && t.operation === 'material-drop' && !id(t.containerId)) invalid()
+      if (t.onFailure !== undefined && (p.vehicle !== 'quadcopter' || t.operation !== 'material-drop' || !id(t.onFailure))) invalid()
+      durationMs = t.timeoutMs; edges = t.onFailure === undefined ? [t.next] : [t.next, t.onFailure]
     }
     else if (['takeoff', 'waypoint', 'land', 'stop', 'loiter', 'return'].includes(t.kind)) {
       fields = [...fields, 'acceptanceM', 'maxArrivalSpeedMps', 'settleMs', 'timeoutMs', 'next']
       if (t.kind !== 'return') { fields.push('positionM'); if (!vehicleMissionContains(p, (t as { positionM?: unknown }).positionM)) invalid() }
       if (!('acceptanceM' in t) || !number(t.acceptanceM, 0.05, 150) || !number(t.maxArrivalSpeedMps, 0.05, 50) || !number(t.settleMs, 0, 10000) || !number(t.timeoutMs, 1000, 60000) || t.settleMs >= t.timeoutMs) invalid()
-      if ((t.kind === 'takeoff' || t.kind === 'land') && p.vehicle !== 'fixed-wing' && p.vehicle !== 'vtol') invalid()
-      if (t.kind === 'stop' && (p.vehicle === 'fixed-wing' || p.vehicle === 'vtol' || t.maxArrivalSpeedMps > 0.5)) invalid()
+      if ((t.kind === 'takeoff' || t.kind === 'land') && !['quadcopter', 'fixed-wing', 'vtol'].includes(p.vehicle)) invalid()
+      if (t.kind === 'stop' && (['quadcopter', 'fixed-wing', 'vtol'].includes(p.vehicle) || t.maxArrivalSpeedMps > 0.5)) invalid()
       if (t.kind === 'land' && t.maxArrivalSpeedMps > 2) invalid()
       const terminal = t.kind === 'land' || t.kind === 'stop'
       if (!terminal && !id(t.next)) invalid()
@@ -60,6 +63,13 @@ export function validateVehicleMission(input: unknown): { plan: VehicleMissionPl
     nodes.push({ id: t.id, durationMs, edges })
   }
   for (const task of p.tasks) {
+    if (task.kind === 'payload' && task.onFailure !== undefined) {
+      const approach = p.tasks.find(candidate => candidate.id === task.onFailure)
+      if (!approach || approach.kind !== 'waypoint' || !approach.next || approach.positionM[2] >= 0) invalid()
+      const land = p.tasks.find(candidate => candidate.id === approach.next)
+      if (!land || land.kind !== 'land' || land.next !== undefined || land.positionM[2] !== 0 || land.positionM[0] !== approach.positionM[0] || land.positionM[1] !== approach.positionM[1]) invalid()
+      if (p.tasks.some(candidate => 'next' in candidate && candidate.next === approach.id || candidate.kind === 'branch' && [candidate.then, candidate.otherwise].includes(approach.id))) invalid()
+    }
     if (task.kind !== 'vtol-mode' || task.onFailure === undefined) continue
     const hover = p.tasks.find(candidate => candidate.id === task.onFailure)
     if (!hover || hover.kind !== 'vtol-mode' || hover.mode !== 'hover' || hover.onFailure !== undefined) invalid()
@@ -98,9 +108,10 @@ export function createVehicleMissionEngine(input: unknown) {
   let targetM: VehicleMissionSnapshot['targetM'] = null, holdM: VehicleMissionSnapshot['targetM'] = null, pending: VehiclePayloadCommand | null = null
   let transition: VehicleVtolTransitionCommand | null = null
   let recovery: VehicleMissionSnapshot['recovery']
+  let payloadFailure: VehicleMissionSnapshot['payloadFailure']
   let transitionObservation: { capturedAtMs: number, measurementCapturedAtMs: number, signature: string } | null = null
   const rows: VehicleMissionTrace['rows'] = []
-  function snapshot(): VehicleMissionSnapshot { return { version: 2, vehicle: plan.vehicle, evidence: 'owned-vehicle-mission-simulation', physicalFlightEnabled: false, state, taskId, taskKind: tasks.get(taskId)!.kind, targetM: targetM ? [...targetM] : null, payload: pending ? structuredClone(pending) : null, reason, elapsedMs: startedAt === null || lastNow === null ? 0 : lastNow - startedAt, ...(hasTransitions ? { transition: transition ? structuredClone(transition) : null } : {}), ...(recovery ? { recovery: { ...recovery } } : {}) } }
+  function snapshot(): VehicleMissionSnapshot { return { version: 2, vehicle: plan.vehicle, evidence: 'owned-vehicle-mission-simulation', physicalFlightEnabled: false, state, taskId, taskKind: tasks.get(taskId)!.kind, targetM: targetM ? [...targetM] : null, payload: pending ? structuredClone(pending) : null, reason, elapsedMs: startedAt === null || lastNow === null ? 0 : lastNow - startedAt, ...(hasTransitions ? { transition: transition ? structuredClone(transition) : null } : {}), ...(recovery ? { recovery: { ...recovery } } : {}), ...(payloadFailure ? { payloadFailure: { ...payloadFailure } } : {}) } }
   function block(why: string) { state = 'blocked'; reason = why; targetM = null; pending = null; transition = null; transitionObservation = null }
   function advance(next: string) {
     taskId = next; taskElapsedMs = 0; settledMs = 0; pending = null; transition = null; transitionObservation = null; reason = 'task-entered'
@@ -131,6 +142,14 @@ export function createVehicleMissionEngine(input: unknown) {
     recovery = { failedEventId, failedTaskId: task.id, hoverTaskId: hover.id, triggeredAtMs: o.nowMs, cause, ...(cause === 'operator-abort' ? { abortRequestedAtMs: o.nowMs } : {}) }
     transition = { eventId: `${plan.id}:${reference}:${hover.id}`, taskId: hover.id, mode: 'hover', headingRad: hover.headingRad, issuedAtMs: o.nowMs, expiresAtMs: o.nowMs + hover.timeoutMs, positionM: [...o.positionM], reference: reference!, ...(failedEventId ? { supersedesEventId: failedEventId } : {}) }
     targetM = [...transition.positionM]; reason = 'vtol-transition-recovery-requested'
+    return true
+  }
+  function divertPayload(task: Extract<VehicleMissionTask, { kind: 'payload' }>, o: VehicleMissionObservation, cause: NonNullable<VehicleMissionSnapshot['payloadFailure']>['reason']) {
+    if (!task.onFailure || payloadFailure || !pending || !o.healthy || !o.positionM || !o.velocityMps || pending.reference !== o.reference) return false
+    const approach = tasks.get(task.onFailure)!
+    if (approach.kind !== 'waypoint' || !approach.next) return false
+    payloadFailure = { eventId: pending.eventId, taskId: task.id, operation: task.operation, containerId: task.containerId, reason: cause, triggeredAtMs: o.nowMs, approachTaskId: approach.id, landingTaskId: approach.next }
+    advance(approach.id); reason = 'payload-failure-diversion'
     return true
   }
   return {
@@ -189,7 +208,8 @@ export function createVehicleMissionEngine(input: unknown) {
         const t = tasks.get(taskId)!, executionDt = previousState === 'ready' || previousState === 'paused' ? 0 : dt
         taskElapsedMs += executionDt
         if ('timeoutMs' in t && taskElapsedMs >= t.timeoutMs) {
-          if (t.kind === 'vtol-mode' && transition && t.onFailure) {
+          if (t.kind === 'payload' && t.onFailure) { if (!divertPayload(t, o, 'timeout')) block('payload-outcome-uncertain') }
+          else if (t.kind === 'vtol-mode' && transition && t.onFailure) {
             readTransitionObservation(o)
             if (active(state) && !beginRecovery(t, o, 'timeout')) block('vtol-transition-outcome-uncertain')
           }
@@ -219,7 +239,8 @@ export function createVehicleMissionEngine(input: unknown) {
           pending ??= { eventId: `${plan.id}:${reference}:${t.id}`, taskId: t.id, operation: t.operation, containerId: t.containerId, issuedAtMs: o.nowMs, expiresAtMs: o.nowMs + t.timeoutMs - taskElapsedMs, positionM: [...o.positionM], reference: reference! }
           const ack = o.payloadAck
           if (ack) {
-            if (ack.eventId !== pending.eventId || ack.taskId !== pending.taskId || ack.operation !== pending.operation || ack.containerId !== pending.containerId || ack.reference !== pending.reference || ack.capturedAtMs < pending.issuedAtMs || ack.capturedAtMs >= pending.expiresAtMs || ack.capturedAtMs > o.nowMs || o.nowMs - ack.capturedAtMs > 200 || Math.hypot(...ack.positionM.map((n, i) => n - pending!.positionM[i]!)) > 1 || ack.outcome !== 'confirmed') block('payload-outcome-uncertain')
+            const scopeMismatch = ack.eventId !== pending.eventId || ack.taskId !== pending.taskId || ack.operation !== pending.operation || ack.containerId !== pending.containerId || ack.reference !== pending.reference || ack.capturedAtMs < pending.issuedAtMs || ack.capturedAtMs >= pending.expiresAtMs || ack.capturedAtMs > o.nowMs || o.nowMs - ack.capturedAtMs > 200 || Math.hypot(...ack.positionM.map((n, i) => n - pending!.positionM[i]!)) > 1
+            if (scopeMismatch || ack.outcome !== 'confirmed') { if (!divertPayload(t, o, scopeMismatch ? 'scope-mismatch' : ack.outcome === 'rejected' ? 'rejected' : 'uncertain')) block('payload-outcome-uncertain') }
             else { advance(t.next); reason = 'payload-confirmed' }
           }
         }
@@ -233,7 +254,7 @@ export function createVehicleMissionEngine(input: unknown) {
             if (t.next) advance(t.next)
             else {
               const abortLanded = t.kind === 'land' && recovery?.abortRequestedAtMs !== undefined
-              state = abortLanded ? 'aborted' : 'completed'; reason = t.kind === 'land' ? abortLanded ? 'vtol-abort-landed' : recovery ? 'vtol-recovery-landed' : 'landed' : 'stopped'; targetM = null
+              state = abortLanded ? 'aborted' : 'completed'; reason = t.kind === 'land' ? payloadFailure ? 'payload-diversion-landed' : abortLanded ? 'vtol-abort-landed' : recovery ? 'vtol-recovery-landed' : 'landed' : 'stopped'; targetM = null
             }
           }
         }

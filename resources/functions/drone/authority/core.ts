@@ -18,14 +18,14 @@ export function createAuthorityKernel<Output, Frame>(options: { sessionId: bigin
   let lastNow: number | null = null, lastGatedAt: number | null = null, leaseUntilMs: number | null = null, target: PositionTarget | null = null, reference: string | null = null
   let reason = 'startup', commandAccepted = false
   const events: { atMs: number | null, from: AuthorityState, to: AuthorityState, reason: string, epoch: number }[] = []
-  function transition(to: AuthorityState, why: string) {
+  function transition(to: AuthorityState, why: string, eventAtMs: number | null = lastNow) {
     reason = why
     if (to === state) return
     const from = state
     state = to
     epoch = Math.min(0xFFFFFFFF, epoch + 1)
     leaseUntilMs = null; target = null
-    events.push({ atMs: lastNow, from, to, reason: why, epoch })
+    events.push({ atMs: eventAtMs, from, to, reason: why, epoch })
     if (events.length > 64) events.shift()
   }
   function fault(why: string) { if (state !== 'killed') transition('failsafe', why) }
@@ -54,9 +54,10 @@ export function createAuthorityKernel<Output, Frame>(options: { sessionId: bigin
     update(o: AuthorityObservation, command?: AuthorityCommand) {
       commandAccepted = false
       const observedEpoch = epoch
+      const validNow = Number.isFinite(o.nowMs) && o.nowMs >= 0 && (lastNow === null || o.nowMs >= lastNow)
       // A modeled independent kill input always wins, including over malformed clocks.
-      if (o.interlocks.killActive === true) transition('killed', 'kill-input')
-      if (!Number.isFinite(o.nowMs) || o.nowMs < 0 || (lastNow !== null && o.nowMs < lastNow)) { if (active(state)) fault('clock-discontinuity'); reason = state === 'killed' ? reason : 'clock-discontinuity'; return snapshot() }
+      if (o.interlocks.killActive === true) transition('killed', 'kill-input', validNow ? o.nowMs : lastNow)
+      if (!validNow) { if (active(state)) fault('clock-discontinuity'); reason = state === 'killed' ? reason : 'clock-discontinuity'; return snapshot() }
       const gap = lastNow !== null && o.nowMs - lastNow > authorityPolicy.schedulerGapMs
       lastNow = o.nowMs
       if (active(state) && gap) fault('supervisor-schedule-gap')
