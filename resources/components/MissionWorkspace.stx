@@ -28,7 +28,9 @@ const playbackTime = derived(() => validTime() ? offset() : recording()?.minimum
 const rows = derived(() => recording()?.rows.filter(row => row.atMs <= playbackTime()) ?? [])
 const current = derived(() => rows().at(-1) ?? null)
 const modeObservation = derived(() => rows().findLast(row => row.vtol?.observation)?.vtol?.observation ?? null)
-const modeEvents = derived(() => rows().filter((row, index, all) => {
+const backCapture = derived(() => rows().findLast(row => row.vtol?.backCapture)?.vtol?.backCapture ?? null)
+const capturePredictions = derived(() => backCapture()?.predictions.filter(row => row.waitMs === backCapture()?.waitMs) ?? [])
+const modeEvents = derived(() => rows().filter(row => row.vtol?.observation).filter((row, index, all) => {
   const current = row.vtol?.observation, previous = all[index - 1]?.vtol?.observation
   return current && (!previous || current.eventId !== previous.eventId || current.phase !== previous.phase || current.outcome !== previous.outcome)
 }).map(row => ({ atMs: row.atMs, observation: row.vtol!.observation! })))
@@ -62,6 +64,12 @@ effect(() => {
 })
 function execute() { error.set(''); result.set(null); offset.set(600); busy.set(true); computation.start() }
 function reset() { computation.stop(); result.set(null); error.set(''); offset.set(600); busy.set(false) }
+function windOutcomeLabel(value: string | undefined) {
+  if (value === 'completed-route') return 'completed route'
+  if (value === 'planning-limit') return 'bounded capture planning limit'
+  if (value === 'planning-limit-before-onset') return 'planning limit before wind onset'
+  return 'back-transition envelope stop'
+}
 function vectorLabel(value: number[] | null | undefined) { return value ? value.map(n => n.toFixed(2)).join(', ') : 'released' }
 </script>
 <template>
@@ -70,10 +78,11 @@ function vectorLabel(value: number[] | null | undefined) { return value ? value.
     <p class="mt-3 max-w-3xl leading-relaxed text-neutral-400">Choose a vehicle, record its modeled mission and inspect the same decision timeline. Recorded vehicle positions come from the owned estimator.</p>
     <p class="mt-3 text-emerald-200 text-sm">Simulation only. Physical outputs remain inhibited.</p>
     <div class="flex flex-wrap gap-4 items-end mt-8">
-      <div><label for="mission-profile" class="block mb-2 text-sm">Vehicle profile</label><select id="mission-profile" x-model="profile" class="px-3 py-3 max-w-full text-neutral-100 bg-neutral-900 border border-neutral-600 rounded focus-visible:outline-emerald-200"><option :for="name in missionWorkspaceProfiles" :value="name">{{ name }}</option></select></div>
-      <div><label for="mission-scenario" class="block mb-2 text-sm">Operator scenario</label><select id="mission-scenario" x-model="scenario" class="px-3 py-3 max-w-full text-neutral-100 bg-neutral-900 border border-neutral-600 rounded focus-visible:outline-emerald-200"><option :for="name in definition().scenarios" :value="name">{{ name }}</option></select></div>
-      <div :if="vtolDefinition()?.phases.length"><label for="mission-vtol-phase" class="block mb-2 text-sm">{{ vtolDefinition()?.wind ? 'Wind onset' : 'Fault injection phase' }}</label><select id="mission-vtol-phase" x-model="phase" class="px-3 py-3 max-w-full text-neutral-100 bg-neutral-900 border border-neutral-600 rounded focus-visible:outline-emerald-200"><option :for="name in vtolDefinition()?.phases || []" :value="name">{{ name === 'startup' ? 'startup (1000 ms)' : name }}</option></select></div>
-      <label :if="profile() === 'vtol'" for="mission-vtol-electrical" class="flex gap-3 items-center py-3 text-sm"><input id="mission-vtol-electrical" type="checkbox" x-model="electrical" class="accent-emerald-200">Modeled electrical load</label>
+      <div class="min-w-0 max-w-full"><label for="mission-profile" class="block mb-2 text-sm">Vehicle profile</label><select id="mission-profile" x-model="profile" class="px-3 py-3 max-w-full text-neutral-100 bg-neutral-900 border border-neutral-600 rounded focus-visible:outline-emerald-200"><option :for="name in missionWorkspaceProfiles" :value="name">{{ name }}</option></select></div>
+      <div class="min-w-0 max-w-full"><label for="mission-scenario" class="block mb-2 text-sm">Operator scenario</label><select id="mission-scenario" x-model="scenario" class="px-3 py-3 max-w-full text-neutral-100 bg-neutral-900 border border-neutral-600 rounded focus-visible:outline-emerald-200"><option :for="name in definition().scenarios" :value="name">{{ name }}</option></select></div>
+      <div :if="vtolDefinition()?.phases.length" class="min-w-0 max-w-full"><label for="mission-vtol-phase" class="block mb-2 text-sm">{{ vtolDefinition()?.wind ? 'Wind onset' : 'Fault injection phase' }}</label><select id="mission-vtol-phase" x-model="phase" class="px-3 py-3 max-w-full text-neutral-100 bg-neutral-900 border border-neutral-600 rounded focus-visible:outline-emerald-200"><option :for="name in vtolDefinition()?.phases || []" :value="name">{{ name === 'startup' ? 'startup (1000 ms)' : name }}</option></select></div>
+      <label :if="profile() === 'vtol' && !vtolDefinition()?.plannedCapture" for="mission-vtol-electrical" class="flex gap-3 items-center py-3 text-sm"><input id="mission-vtol-electrical" type="checkbox" x-model="electrical" class="accent-emerald-200">Modeled electrical load</label>
+      <p :if="vtolDefinition()?.plannedCapture" class="py-3 text-neutral-400 text-sm">This plan includes a modeled 100 Wh battery.</p>
       <button type="button" @click="execute()" :disabled="busy()" class="px-4 py-3 font-medium text-neutral-950 whitespace-nowrap bg-emerald-200 rounded focus-visible:outline-emerald-200 focus-visible:outline-offset-4 disabled:opacity-60">{{ busy() ? 'Recording…' : 'Run scenario' }}</button>
       <button type="button" @click="reset()" class="px-4 py-3 text-sm whitespace-nowrap border border-neutral-600 rounded focus-visible:outline-emerald-200 focus-visible:outline-offset-4">Clear recording</button>
     </div>
@@ -120,7 +129,7 @@ function vectorLabel(value: number[] | null | undefined) { return value ? value.
           <input id="mission-time" type="range" :min="recording()?.minimumTimeMs || 600" :max="recording()?.maximumTimeMs || 600" step="20" x-model.number="offset" class="mt-3 w-full accent-emerald-200">
           <div class="flex flex-wrap gap-3 items-end mt-3"><div><label for="mission-time-number" class="block mb-1 text-neutral-400 text-xs">Recorded time / ms</label><input id="mission-time-number" type="number" :min="recording()?.minimumTimeMs || 600" :max="recording()?.maximumTimeMs || 600" step="20" x-model.number="offset" class="px-3 py-2 w-36 bg-neutral-900 border border-neutral-600 rounded focus-visible:outline-emerald-200"></div><button type="button" @click="offset.set(recording()?.minimumTimeMs || 600)" class="px-3 py-2 text-sm border border-neutral-600 rounded focus-visible:outline-emerald-200">Beginning</button><button type="button" @click="offset.set(recording()?.maximumTimeMs || 600)" class="px-3 py-2 text-sm border border-neutral-600 rounded focus-visible:outline-emerald-200">End of recording</button></div>
           <p :if="!validTime()" role="alert" class="mt-3 text-amber-200 text-sm">Enter a recorded time from {{ recording()?.minimumTimeMs }} to {{ recording()?.maximumTimeMs }} ms in 20 ms steps. Showing the beginning until the time is valid.</p>
-          <p class="mt-5 break-words font-mono text-neutral-400 text-xs">Estimated N/E/D: {{ vectorLabel(current()?.positionM) }} m</p><p class="mt-2 break-words font-mono text-neutral-400 text-xs">Estimated velocity N/E/D: {{ vectorLabel(current()?.velocityMps) }} m/s</p><p class="mt-2 break-words font-mono text-neutral-400 text-xs">Target N/E/D: {{ vectorLabel(current()?.targetM) }}</p>
+          <p class="mt-5 break-words font-mono text-neutral-400 text-xs">Estimated N/E/D: {{ current()?.positionM ? vectorLabel(current()?.positionM) : 'unavailable' }} m</p><p class="mt-2 break-words font-mono text-neutral-400 text-xs">Estimated velocity N/E/D: {{ current()?.velocityMps ? vectorLabel(current()?.velocityMps) : 'unavailable' }} m/s</p><p class="mt-2 break-words font-mono text-neutral-400 text-xs">Target N/E/D: {{ vectorLabel(current()?.targetM) }}</p>
           <section :if="profile() === 'vtol'" aria-labelledby="vtol-evidence-title" class="mt-7 pt-5 border-neutral-700 border-t">
             <h3 id="vtol-evidence-title" class="font-semibold text-sm">Recorded VTOL evidence</h3>
             <p class="mt-2 text-neutral-400 text-xs" data-vtol-demonstration>Named outcome check: {{ vtolResult()?.demonstrationMatched ? 'matched' : 'unmatched' }}. Final qualified landing contact: {{ vtolResult()?.landingContact ? 'observed' : 'not observed' }}.</p>
@@ -128,16 +137,28 @@ function vectorLabel(value: number[] | null | undefined) { return value ? value.
             <div :if="vtolResult()?.windEvidence" class="mt-5" data-vtol-wind>
               <h4 class="font-semibold text-sm">Declared world wind</h4>
               <p class="mt-2 break-words font-mono text-neutral-400 text-xs">LOCAL_NED {{ vectorLabel(vtolResult()?.windEvidence?.windMps) }} m/s, from {{ vtolResult()?.windEvidence?.beginsAtMs === null ? 'unobserved onset' : vtolResult()?.windEvidence?.beginsAtMs + ' ms' }}.</p>
-              <p :if="vtolResult()?.windEvidence?.phase" class="mt-2 text-neutral-400 text-xs" data-vtol-wind-phase>Observed {{ vtolResult()?.windEvidence?.phase }} entry: {{ vtolResult()?.windEvidence?.phaseEnteredAtMs }} ms. Phase binding: {{ vtolResult()?.windEvidence?.phaseMatched ? 'matched' : 'unmatched' }}. Wind starts on the next 4 ms integration step.</p>
-              <p class="mt-2 text-neutral-400 text-xs">World exposure check: {{ vtolResult()?.windEvidence?.worldMatched ? 'matched' : 'unmatched' }}. Expected result: {{ vtolResult()?.windEvidence?.expectedOutcome === 'completed-route' ? 'completed route' : 'back-transition envelope stop' }}.</p>
+              <p :if="vtolResult()?.windEvidence?.phase" class="mt-2 text-neutral-400 text-xs" data-vtol-wind-phase>Observed {{ vtolResult()?.windEvidence?.phase }} entry: {{ vtolResult()?.windEvidence?.phaseEnteredAtMs == null ? 'unobserved' : `${vtolResult()?.windEvidence?.phaseEnteredAtMs} ms` }}. Phase binding: {{ vtolResult()?.windEvidence?.phaseMatched ? 'matched' : 'unmatched' }}. Wind starts on the next 4 ms integration step.</p>
+              <p class="mt-2 text-neutral-400 text-xs">World exposure check: {{ vtolResult()?.windEvidence?.worldMatched ? 'matched' : 'unmatched' }}. Expected result: {{ windOutcomeLabel(vtolResult()?.windEvidence?.expectedOutcome) }}.</p>
               <p class="mt-2 text-neutral-400 text-xs">The wind is a model input. It is not supplied to the controller or reported as a measured wind estimate.</p>
               <p :if="vtolResult()?.windEvidence?.backHeadingRad !== undefined" class="mt-2 text-neutral-400 text-xs" data-vtol-wind-heading>Back hover heading: {{ vtolResult()?.windEvidence?.backHeadingRad?.toFixed(3) }} rad from north. Plan heading check: {{ vtolResult()?.windEvidence?.backHeadingMatched ? 'matched' : 'unmatched' }}. This result does not qualify other wind onset or heading plans.</p>
+              <p :if="vtolResult()?.windEvidence?.expectedOutcome === 'planning-limit'" class="mt-2 leading-relaxed text-amber-200 text-xs" data-vtol-planning-limit>The bounded forecast could not confirm capture within this plan's anchor, deadline, reserve and uncertainty limits. No hover or landing is confirmed.</p>
+              <p :if="vtolResult()?.windEvidence?.expectedOutcome === 'planning-limit-before-onset'" class="mt-2 leading-relaxed text-amber-200 text-xs" data-vtol-wind-unreached>The planning limit occurred before the selected landing phase. Wind onset was not reached. This recording has no wind exposure match.</p>
               <p :if="vtolResult()?.windEvidence?.expectedOutcome === 'envelope-stop'" class="mt-2 leading-relaxed text-amber-200 text-xs" data-vtol-wind-limit>This plan with a fixed north heading remains outside the supported route envelope. A matched stop does not certify hover, contact or a safe landing.</p>
             </div>
             <p :if="modeObservation()" class="mt-4 break-words font-mono text-sm" data-vtol-mode>{{ modeObservation()?.phase }} / {{ modeObservation()?.outcome }} / {{ modeObservation()?.taskId }}</p>
             <p :if="modeObservation()" class="mt-2 break-words font-mono text-neutral-400 text-xs">Last mode observation captured {{ modeObservation()?.capturedAtMs }} ms, sensor capture {{ modeObservation()?.measurementCapturedAtMs }} ms. Age at cursor: {{ playbackTime() - (modeObservation()?.capturedAtMs || 0) }} ms.</p>
             <p :if="!modeObservation()" class="mt-3 text-neutral-400 text-xs">No recorded mode observation at this time.</p>
             <p :if="current()?.vtol?.request" class="mt-3 break-all font-mono text-neutral-400 text-xs">Mode request {{ current()?.vtol?.request?.mode }} / {{ current()?.vtol?.request?.eventId }} / expires {{ current()?.vtol?.request?.expiresAtMs }} ms</p>
+            <div :if="backCapture()" class="mt-5" data-vtol-back-capture>
+              <h4 class="font-semibold text-sm">Recorded back-capture forecast</h4>
+              <p class="mt-2 break-words font-mono text-sm">{{ backCapture()?.status }} / {{ backCapture()?.reason }}</p>
+              <p class="mt-2 break-words font-mono text-neutral-400 text-xs">Forecast model {{ backCapture()?.model.version }}.</p>
+              <p class="mt-2 break-words font-mono text-neutral-400 text-xs">Declared anchor N/E/D: {{ vectorLabel(backCapture()?.anchorM) }} m. Forecast at {{ backCapture()?.observedAtMs }} ms from source {{ backCapture()?.sourceCapturedAtMs ?? 'unavailable' }} ms.</p>
+              <p class="mt-2 break-words font-mono text-neutral-400 text-xs">Captured wind estimate: {{ backCapture()?.windMps ? vectorLabel(backCapture()?.windMps) : 'unavailable' }} m/s. Sample radius {{ backCapture()?.windSampleRadiusMps?.toFixed(3) ?? 'unavailable' }} m/s. Brake at {{ backCapture()?.brakeAtMs === null ? 'unavailable' : backCapture()?.brakeAtMs + ' ms' }}.</p>
+              <p class="mt-2 text-neutral-400 text-xs">{{ backCapture()?.predictions.length }} private model traces, {{ capturePredictions().length }} at the selected approach time. These sampled cases are not an interval reachability proof or received flight observations.</p>
+              <p :if="backCapture()?.monitor" class="mt-2 break-words font-mono text-amber-200 text-xs">Invalidated at {{ backCapture()?.monitor?.observedAtMs }} ms, source {{ backCapture()?.monitor?.sourceCapturedAtMs }} ms. Observed uncertainty radius {{ backCapture()?.monitor?.windSampleRadiusMps?.toFixed(3) ?? 'unavailable' }} m/s. Current energy lower bound {{ backCapture()?.monitor?.battery?.remainingWhLowerBound.toFixed(3) ?? 'unavailable' }} Wh, remaining capture and DAG budget {{ backCapture()?.monitor?.requiredWh?.toFixed(3) ?? 'unavailable' }} Wh before reserve.</p>
+              <p class="mt-3 leading-relaxed text-neutral-400 text-xs">Fictional coefficients and uncertainty assumptions. The forecast uses private ideal model navigation; actual hover and contact still require the runtime's captured observations. Later source, wind or resource faults invalidate the plan.</p>
+            </div>
             <div :if="vtolDefinition()?.electrical" class="mt-5">
               <h4 class="font-semibold text-sm">Captured battery reading</h4>
               <dl :if="current()?.vtol?.battery" class="grid gap-4 grid-cols-2 mt-3 text-xs" data-vtol-battery>

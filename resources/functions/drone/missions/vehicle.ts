@@ -12,7 +12,7 @@ const active = (s: MissionState) => s === 'running' || s === 'paused'
 export function vehicleMissionContains(plan: VehicleMissionPlan, p: unknown) {
   return validVector(p) && Math.hypot(p[0], p[1]) <= plan.fence.radiusM && p[2] >= plan.fence.minDownM && p[2] <= plan.fence.maxDownM
 }
-export function vehicleTaskTarget(plan: VehicleMissionPlan, task: VehicleMissionTask) { return task.kind === 'return' ? [...plan.rallyM] : 'positionM' in task ? [...task.positionM] : null }
+export function vehicleTaskTarget(plan: VehicleMissionPlan, task: VehicleMissionTask) { return task.kind === 'return' ? [...plan.rallyM] : task.kind === 'vtol-mode' && task.approach ? [...task.anchorM!] : 'positionM' in task ? [...task.positionM] : null }
 export function validateVehicleMission(input: unknown): { plan: VehicleMissionPlan, worstCaseMs: number, requiredWh: number } {
   function invalid(): never { throw new TypeError('Invalid vehicle mission or unsupported profile') }
   if (!object(input) || !keys(input, ['version', 'vehicle', 'id', 'frame', 'altitude', 'terrain', 'origin', 'fence', 'rallyM', 'power', 'start', 'tasks']) || input.version !== 2 || !['fixed-wing', 'vtol', 'ground', 'surface', 'subsea'].includes(input.vehicle as string) || !id(input.id) || input.frame !== 'LOCAL_NED' || input.altitude !== 'ORIGIN_RELATIVE_DOWN' || input.terrain !== 'DECLARED_MODEL_SURFACE' || !id(input.start)) invalid()
@@ -27,9 +27,10 @@ export function validateVehicleMission(input: unknown): { plan: VehicleMissionPl
     if (t.kind === 'start') { fields.push('next'); if (t.id !== p.start || !id(t.next)) invalid(); edges = [t.next] }
     else if (t.kind === 'abort') { /* Terminal release, never an emergency landing. */ }
     else if (t.kind === 'vtol-mode') {
-      fields.push('mode', 'headingRad', 'timeoutMs', 'next', 'onFailure')
+      fields.push('mode', 'headingRad', 'timeoutMs', 'next', 'onFailure', 'anchorM', 'approach')
       if (p.vehicle !== 'vtol' || !['hover', 'cruise'].includes(t.mode) || !number(t.headingRad, -Math.PI, Math.PI) || !Number.isSafeInteger(t.timeoutMs) || !number(t.timeoutMs, 100, t.mode === 'hover' ? 45000 : 15000) || !id(t.next)) invalid()
       if (t.onFailure !== undefined && !id(t.onFailure)) invalid()
+      if ((t.approach !== undefined || t.anchorM !== undefined) && (t.mode !== 'hover' || t.approach !== 'bounded-approach-v1' || !vehicleMissionContains(p, t.anchorM))) invalid()
       durationMs = t.timeoutMs; edges = t.onFailure === undefined ? [t.next] : [t.next, t.onFailure]
     }
     else if (t.kind === 'branch') {
@@ -62,7 +63,7 @@ export function validateVehicleMission(input: unknown): { plan: VehicleMissionPl
   for (const task of p.tasks) {
     if (task.kind !== 'vtol-mode' || task.onFailure === undefined) continue
     const hover = p.tasks.find(candidate => candidate.id === task.onFailure)
-    if (!hover || hover.kind !== 'vtol-mode' || hover.mode !== 'hover' || hover.onFailure !== undefined) invalid()
+    if (!hover || hover.kind !== 'vtol-mode' || hover.mode !== 'hover' || hover.onFailure !== undefined || hover.approach !== undefined) invalid()
     const land = p.tasks.find(candidate => candidate.id === hover.next)
     if (!land || land.kind !== 'land' || land.next !== undefined || land.positionM[2] !== 0) invalid()
     // Failure routes are one-way, finite hover -> contact paths, never normal success or retries.
@@ -74,7 +75,7 @@ export function validateVehicleMission(input: unknown): { plan: VehicleMissionPl
   if (requiredWh > p.power.availableWh * (1 - p.power.reservePercent / 100)) throw new RangeError('Vehicle mission cannot preserve energy reserve')
   return { plan: structuredClone(p), worstCaseMs, requiredWh }
 }
-export interface VehicleMissionTrace { version: 2, evidence: 'owned-vehicle-mission-simulation', plan: VehicleMissionPlan, rows: { observation: VehicleMissionObservation, action: VehicleMissionAction | null, result: VehicleMissionSnapshot }[] }
+export interface VehicleMissionTrace { version: 2 | 3, evidence: 'owned-vehicle-mission-simulation', plan: VehicleMissionPlan, rows: { observation: VehicleMissionObservation, action: VehicleMissionAction | null, result: VehicleMissionSnapshot }[] }
 function validAck(value: unknown): value is VehiclePayloadAck {
   if (!object(value) || !keys(value, ['eventId', 'taskId', 'operation', 'containerId', 'capturedAtMs', 'reference', 'positionM', 'outcome', 'metadata']) || typeof value.eventId !== 'string' || value.eventId.length > 200 || !id(value.taskId) || !['camera-still', 'water-sample', 'material-drop', 'mower-enable', 'mower-disable', 'inspection-capture'].includes(value.operation as string) || (value.containerId !== null && !id(value.containerId)) || !Number.isSafeInteger(value.capturedAtMs) || (value.capturedAtMs as number) < 0 || typeof value.reference !== 'string' || value.reference.length > 120 || !validVector(value.positionM) || !['confirmed', 'rejected', 'uncertain'].includes(value.outcome as string)) return false
   if (value.metadata !== undefined && (!object(value.metadata) || Object.keys(value.metadata).length > 32 || Object.entries(value.metadata).some(([key, item]) => !/^[a-zA-Z][a-zA-Z0-9_-]{0,39}$/.test(key) || !(typeof item === 'boolean' || (typeof item === 'number' && Number.isFinite(item)) || (typeof item === 'string' && item.length <= 160))))) return false
@@ -93,6 +94,17 @@ export function createVehicleMissionEngine(input: unknown) {
   const { plan, worstCaseMs } = validateVehicleMission(input)
   const tasks = new Map(plan.tasks.map(t => [t.id, t]))
   const hasTransitions = plan.tasks.some(t => t.kind === 'vtol-mode')
+  const graph = plan.tasks.map(task => ({ id: task.id, durationMs: 'timeoutMs' in task ? task.timeoutMs : 20, edges: task.kind === 'branch' ? [task.then, task.otherwise] : 'next' in task && task.next ? task.kind === 'vtol-mode' && task.onFailure ? [task.next, task.onFailure] : [task.next] : [] }))
+  function capturePlanning(task: Extract<VehicleMissionTask, { kind: 'vtol-mode' }>) {
+    const roots = task.onFailure ? [task.next, task.onFailure] : [task.next]
+    const budgets = roots.map(root => {
+      const reachable = new Set<string>()
+      function visit(id: string) { if (reachable.has(id)) return; reachable.add(id); for (const edge of graph.find(node => node.id === id)!.edges) visit(edge) }
+      visit(root)
+      return missionGraphBudget(graph.filter(node => reachable.has(node.id)), root, vehicleMissionLimits.maximumMs)
+    })
+    return { method: 'bounded-approach-v1' as const, remainingMissionMs: Math.max(...budgets), power: structuredClone(plan.power), fence: structuredClone(plan.fence) }
+  }
   let state: MissionState = 'ready', taskId = plan.start, reason = 'awaiting-operator-start'
   let lastNow: number | null = null, startedAt: number | null = null, reference: string | null = null, taskElapsedMs = 0, settledMs = 0
   let targetM: VehicleMissionSnapshot['targetM'] = null, holdM: VehicleMissionSnapshot['targetM'] = null, pending: VehiclePayloadCommand | null = null
@@ -124,7 +136,7 @@ export function createVehicleMissionEngine(input: unknown) {
     return observed
   }
   function beginRecovery(task: Extract<VehicleMissionTask, { kind: 'vtol-mode' }>, o: VehicleMissionObservation, cause: NonNullable<VehicleMissionSnapshot['recovery']>['cause']) {
-    if (!task.onFailure || recovery) return false
+    if (!task.onFailure || recovery || !o.healthy || !o.positionM || !o.velocityMps) return false
     const failedEventId = transition?.eventId ?? null, hover = tasks.get(task.onFailure)!
     if (hover.kind !== 'vtol-mode') return false
     advance(hover.id)
@@ -135,15 +147,21 @@ export function createVehicleMissionEngine(input: unknown) {
   }
   return {
     snapshot,
-    trace(): VehicleMissionTrace { return structuredClone({ version: 2, evidence: 'owned-vehicle-mission-simulation', plan, rows }) },
+    trace(): VehicleMissionTrace { return structuredClone({ version: rows.some(row => row.observation.positionM === null) ? 3 : 2, evidence: 'owned-vehicle-mission-simulation', plan, rows }) },
     step(inputObservation: VehicleMissionObservation, action?: VehicleMissionAction): VehicleMissionSnapshot {
       if (rows.length >= vehicleMissionLimits.rows) { block('mission-trace-capacity'); throw new RangeError('Vehicle mission trace exhausted') }
       let o: VehicleMissionObservation
       try { o = structuredClone(inputObservation) }
       catch { block('invalid-observation-or-clock'); throw new TypeError('Invalid vehicle mission observation') }
-      if (!object(o) || !keys(o, ['kind', 'nowMs', 'reference', 'origin', 'healthy', 'positionM', 'velocityMps', 'authority', 'batteryPercent', 'onGround', 'payloadAck', ...(hasTransitions ? ['transition'] : [])]) || Object.keys(o).length !== (hasTransitions ? 12 : 11) || o.kind !== 'simulation' || !Number.isSafeInteger(o.nowMs) || o.nowMs < 0 || (lastNow !== null && o.nowMs <= lastNow) || typeof o.reference !== 'string' || o.reference.length > 120 || !/^[1-9][0-9]{0,19}:[0-9]+,[0-9]+,[0-9]+,[0-9]+,[0-9]+$/.test(o.reference) || !object(o.origin) || !keys(o.origin, ['latitudeDeg', 'longitudeDeg', 'ellipsoidHeightM']) || o.origin.latitudeDeg !== plan.origin.latitudeDeg || o.origin.longitudeDeg !== plan.origin.longitudeDeg || o.origin.ellipsoidHeightM !== plan.origin.ellipsoidHeightM || typeof o.healthy !== 'boolean' || typeof o.onGround !== 'boolean' || !validVector(o.positionM) || !validVector(o.velocityMps) || !authorityStates.includes(o.authority) || !number(o.batteryPercent, 0, 100) || (o.payloadAck !== null && !validAck(o.payloadAck)) || (hasTransitions && o.transition !== null && !validTransition(o.transition)) || (action !== undefined && !['start', 'pause', 'resume', 'abort', 'recover'].includes(action))) { block('invalid-observation-or-clock'); throw new TypeError('Invalid vehicle mission observation') }
+      if (!object(o) || !keys(o, ['kind', 'nowMs', 'reference', 'origin', 'healthy', 'positionM', 'velocityMps', 'authority', 'batteryPercent', 'onGround', 'payloadAck', ...(hasTransitions ? ['transition'] : [])]) || Object.keys(o).length !== (hasTransitions ? 12 : 11) || o.kind !== 'simulation' || !Number.isSafeInteger(o.nowMs) || o.nowMs < 0 || (lastNow !== null && o.nowMs <= lastNow) || typeof o.reference !== 'string' || o.reference.length > 120 || !/^[1-9][0-9]{0,19}:[0-9]+,[0-9]+,[0-9]+,[0-9]+,[0-9]+$/.test(o.reference) || !object(o.origin) || !keys(o.origin, ['latitudeDeg', 'longitudeDeg', 'ellipsoidHeightM']) || o.origin.latitudeDeg !== plan.origin.latitudeDeg || o.origin.longitudeDeg !== plan.origin.longitudeDeg || o.origin.ellipsoidHeightM !== plan.origin.ellipsoidHeightM || typeof o.healthy !== 'boolean' || typeof o.onGround !== 'boolean' || !(o.healthy === false && o.positionM === null && o.velocityMps === null || validVector(o.positionM) && validVector(o.velocityMps)) || !authorityStates.includes(o.authority) || !number(o.batteryPercent, 0, 100) || (o.payloadAck !== null && !validAck(o.payloadAck)) || (hasTransitions && o.transition !== null && !validTransition(o.transition)) || (action !== undefined && !['start', 'pause', 'resume', 'abort', 'recover'].includes(action))) { block('invalid-observation-or-clock'); throw new TypeError('Invalid vehicle mission observation') }
       const dt = lastNow === null ? 0 : o.nowMs - lastNow, previousState = state
       lastNow = o.nowMs
+      if (o.positionM === null || o.velocityMps === null) {
+        if (active(state) || state === 'ready') block('estimator-loss')
+        const result = snapshot()
+        rows.push({ observation: o, action: action ?? null, result: structuredClone(result) })
+        return result
+      }
       if (active(state)) {
         if (dt > vehicleMissionLimits.scheduleGapMs && action !== 'recover') block('mission-schedule-gap')
         else if (o.reference !== reference) block('estimator-reference-changed')
@@ -200,7 +218,7 @@ export function createVehicleMissionEngine(input: unknown) {
         else if (t.kind === 'branch') { advance(o.batteryPercent >= t.batteryAtLeast ? t.then : t.otherwise); reason = 'battery-branch' }
         else if (t.kind === 'vtol-mode') {
           if (!transition) {
-            transition = { eventId: `${plan.id}:${reference}:${t.id}`, taskId: t.id, mode: t.mode, headingRad: t.headingRad, issuedAtMs: o.nowMs, expiresAtMs: o.nowMs + t.timeoutMs - taskElapsedMs, positionM: [...o.positionM], reference: reference! }
+            transition = { eventId: `${plan.id}:${reference}:${t.id}`, taskId: t.id, mode: t.mode, headingRad: t.headingRad, issuedAtMs: o.nowMs, expiresAtMs: o.nowMs + t.timeoutMs - taskElapsedMs, positionM: t.approach ? [...t.anchorM!] : [...o.positionM], reference: reference!, ...(t.approach ? { planning: capturePlanning(t) } : {}) }
             reason = 'vtol-transition-requested'
           }
           targetM = [...transition.positionM]
@@ -245,10 +263,11 @@ export function createVehicleMissionEngine(input: unknown) {
   }
 }
 export function replayVehicleMission(trace: VehicleMissionTrace) {
-  if (!object(trace) || !keys(trace, ['version', 'evidence', 'plan', 'rows']) || trace.version !== 2 || trace.evidence !== 'owned-vehicle-mission-simulation' || !Array.isArray(trace.rows) || trace.rows.length > vehicleMissionLimits.rows) throw new TypeError('Invalid vehicle mission trace')
+  if (!object(trace) || !keys(trace, ['version', 'evidence', 'plan', 'rows']) || ![2, 3].includes(trace.version) || trace.evidence !== 'owned-vehicle-mission-simulation' || !Array.isArray(trace.rows) || trace.rows.length > vehicleMissionLimits.rows) throw new TypeError('Invalid vehicle mission trace')
   const engine = createVehicleMissionEngine(trace.plan)
   for (const row of trace.rows) {
     if (!object(row) || !keys(row, ['observation', 'action', 'result']) || (row.action !== null && !['start', 'pause', 'resume', 'abort', 'recover'].includes(row.action))) throw new TypeError('Invalid vehicle mission trace row')
+    if (trace.version === 2 && row.observation?.positionM === null) throw new TypeError('Unavailable navigation requires vehicle mission trace version 3')
     if (JSON.stringify(engine.step(row.observation, row.action ?? undefined)) !== JSON.stringify(row.result)) throw new TypeError('Vehicle mission trace decision mismatch')
   }
   return engine

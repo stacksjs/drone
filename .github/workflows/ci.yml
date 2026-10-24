@@ -180,6 +180,24 @@ jobs:
         working-directory: ${{ runner.temp }}
       - run: $GITHUB_WORKSPACE/storage/runtime-build/cli/drone vtol:simulate --scenario east-crosswind-limit-2mps --phase landing --electrical
         working-directory: ${{ runner.temp }}
+      - run: $GITHUB_WORKSPACE/storage/runtime-build/cli/drone vtol:simulate --scenario planned-back-capture
+        working-directory: ${{ runner.temp }}
+      - run: $GITHUB_WORKSPACE/storage/runtime-build/cli/drone vtol:simulate --scenario planned-headwind-2mps
+        working-directory: ${{ runner.temp }}
+      - run: $GITHUB_WORKSPACE/storage/runtime-build/cli/drone vtol:simulate --scenario planned-tailwind-2mps
+        working-directory: ${{ runner.temp }}
+      - run: $GITHUB_WORKSPACE/storage/runtime-build/cli/drone vtol:simulate --scenario planned-east-crosswind-limit-2mps
+        working-directory: ${{ runner.temp }}
+      - run: $GITHUB_WORKSPACE/storage/runtime-build/cli/drone vtol:simulate --scenario planned-west-crosswind-limit-2mps
+        working-directory: ${{ runner.temp }}
+      - run: $GITHUB_WORKSPACE/storage/runtime-build/cli/drone vtol:simulate --scenario planned-east-crosswind-2mps
+        working-directory: ${{ runner.temp }}
+      - run: $GITHUB_WORKSPACE/storage/runtime-build/cli/drone vtol:simulate --scenario planned-west-crosswind-2mps
+        working-directory: ${{ runner.temp }}
+      - run: $GITHUB_WORKSPACE/storage/runtime-build/cli/drone vtol:simulate --scenario planned-tailwind-2mps --phase back
+        working-directory: ${{ runner.temp }}
+      - run: $GITHUB_WORKSPACE/storage/runtime-build/cli/drone vtol:simulate --scenario planned-east-crosswind-limit-2mps --phase landing
+        working-directory: ${{ runner.temp }}
       - run: $GITHUB_WORKSPACE/storage/runtime-build/cli/drone authority:simulate --scenario pi-loss --seconds 4
         working-directory: ${{ runner.temp }}
       - run: $GITHUB_WORKSPACE/storage/runtime-build/cli/drone drivers:bench --driver ardupilot --drop-first-ack

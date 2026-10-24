@@ -1,11 +1,22 @@
 import { clampControl } from './model'
 export interface PidGains { kp: number, ki: number, kd: number, integralLimit: number, outputLimit: number, derivativeTauS: number, trackingGain: number }
+export interface BoundedPid {
+  reset(): void
+  state(): { integral: number, derivative: number }
+  step(error: number, measurement: number, dtS: number): number
+  track(residual: number, dtS: number): void
+  fork(): BoundedPid
+}
 /** Derivative on measurement, conditional integral and bounded allocation tracking feedback. */
-export function createBoundedPid(input: PidGains) {
+export function createBoundedPid(input: PidGains): BoundedPid {
   const g = { ...input }
   if (!Object.values(g).every(n => Number.isFinite(n) && n >= 0) || g.outputLimit <= 0 || g.derivativeTauS <= 0) throw new RangeError('Invalid simulated PID gains')
-  let integral = 0, derivative = 0, previous: number | null = null
+  return initializePid(g, { integral: 0, derivative: 0, previous: null })
+}
+function initializePid(g: PidGains, initial: { integral: number, derivative: number, previous: number | null }): BoundedPid {
+  let { integral, derivative, previous } = initial
   return {
+    fork() { return initializePid(g, { integral, derivative, previous }) },
     reset() { integral = 0; derivative = 0; previous = null },
     state() { return { integral, derivative } },
     step(error: number, measurement: number, dtS: number) {

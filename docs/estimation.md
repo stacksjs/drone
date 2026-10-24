@@ -65,6 +65,34 @@ No gyro bias learning, coning
 correction, accelerometer dynamic rejection beyond the norm heuristic, Earth-rate or lever-arm
 model is claimed.
 
+## Fixture IMU-aided prediction
+
+The optional `createEstimator({ gravityCorrection: 'initialization-only',
+positionPrediction: 'fixture-imu' })` mode is confined to synthetic fixture evidence. It
+assumes the initial relative-yaw frame points north; it does not observe absolute heading or
+qualify physical inertial navigation. Handshake evidence is rejected. The normal estimator
+and existing profiles keep constant-velocity prediction.
+
+This mode rotates qualified calibrated specific force through the estimated attitude, adds
+gravity and propagates the three position/velocity blocks between GNSS corrections. It retains
+the actual GNSS capture epoch separately from prediction time. Repeated sensor refreshes do
+not integrate a sample twice. Its bounded history holds at most 128 samples, with a 50 ms
+IMU interval limit, 80 ms IMU age limit, 1.5 second GNSS age limit and at most 1 ms declared
+epoch uncertainty. This mode requires a fixed capture-to-local epoch mapping; retiming
+retained samples withdraws prediction and changes its reference. Vehicle controllers retain
+their stricter freshness limits.
+
+Process variance combines calibrated force variance with an assumed 0.03 rad attitude error.
+The acceleration error is held across each GNSS prediction interval rather than treated as
+independent on every IMU sample. These are fictional model assumptions, not measured attitude
+covariance or validated error bounds. Cross-axis correlations, bias learning and physical heading alignment remain unqualified.
+The `fixture-imu-v1` constants appear in the planned VTOL case's navigation evidence.
+
+IMU loss or malformed dense vectors withdraws inertial position without falling back to a
+fresh-looking constant-velocity result. A new GNSS fix after unavailable inertial history may
+initialize a new position reference. The reset counter changes, so a controller bound to the
+previous reference cannot silently resume.
+
 ## Local position, height and covariance
 
 WGS84 latitude/longitude and **ellipsoid** height convert through ECEF to a fixed local NED tangent
@@ -74,12 +102,12 @@ rotated into the origin's NED axes, including near poles and across longitude ch
 persists through resets; create a new estimator to establish a different frame. Fixes beyond 5 km
 from the origin are rejected rather than silently rebasing.
 
-The GNSS filter uses independent `[position, velocity]` blocks for N/E/D with constant-velocity
+By default, the GNSS filter uses independent `[position, velocity]` blocks for N/E/D with constant-velocity
 prediction and assumed acceleration standard deviation 2 m/s². Each correction uses sensor-reported
 position/velocity variances. Rotation keeps their diagonal terms; cross-axis correlations are
 ignored. Returned blocks include position variance, position-velocity covariance and velocity
 variance. This is model-dependent approximate covariance, not validated error bounds or a tightly
-coupled inertial EKF. No accelerometer is integrated into translation while heading is unobserved.
+coupled inertial EKF. The default and physical receive-only path do not integrate accelerometer data into translation while heading is unobserved.
 
 A sum of normalized position and velocity innovations above 36 rejects the entire fix and
 invalidates position health until a later accepted fix. The gate uses marginal variances, not the

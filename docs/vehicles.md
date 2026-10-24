@@ -45,6 +45,14 @@ and gyro epochs and declared position/attitude/clock uncertainty. It projects th
 rejects unqualified capture timing or uncertainty below the sensor declaration. This is a modeled
 single-beam JSON artifact, not a calibrated or certified hydrographic product.
 
+## Unavailable navigation in mission recordings
+
+Vehicle mission trace version 3 represents an unavailable position and velocity as paired
+`null` fields with `healthy: false`. The runtime retains the declared origin, withdraws
+output authority and records a blocked estimator-loss outcome. It does not invent a position,
+velocity or fresh source time. Replay validates that outcome. Version 2 keeps its original
+vector-only contract; existing recordings retain their format and decisions.
+
 ## Reproduction and remaining gates
 
 ```sh

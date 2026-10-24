@@ -50,6 +50,14 @@ test('capture pose retains real estimator epochs and predicts attitude only with
   e.attitude!.capturedAtMs = 980
   const imu: SensorObservation = { kind: 'imu', deviceId: 'fixture-imu', sequence: 1, capturedUs: 980000n, receivedAtMs: 984, estimatedCaptureMs: 980, measurementAgeUpperMs: 20, transportAgeUpperMs: 4, timeUncertaintyUs: 0, quality: [], healthy: true, calibrationId: 'fixture', value: { frame: 'BODY_FRD', temperatureC: 25, specificForceMps2: [0, 0, -9.80665], angularRateRadS: [0, 0, 0.5], specificForceVariance: [0.001, 0.001, 0.001], angularRateVariance: [0.000001, 0.000001, 0.000001] } }
   const pose = predictVehicleMeasurementPose(e, imu, 1000)!
+  // Pose-only exporters have a strict existing schema. New capture motion is explicit.
+  expect(Object.hasOwn(pose, 'velocityMps')).toBe(false)
+  expect(Object.hasOwn(pose, 'covarianceBlocks')).toBe(false)
+  const motion = predictVehicleMeasurementPose(e, imu, 1000, { includeMotion: true })!
+  expect([...motion.velocityMps!]).toEqual(e.localPosition!.velocityMps)
+  expect(motion.covarianceBlocks).toEqual(e.localPosition!.covarianceBlocks)
+  expect(motion.velocityMps).not.toBe(e.localPosition!.velocityMps)
+  expect(motion.covarianceBlocks).not.toBe(e.localPosition!.covarianceBlocks)
   expect(pose.attitudeCapturedAtMs).toBe(980); expect(pose.attitudePredictedToMs).toBe(1000)
   expect(pose.quaternionWxyz[0]).toBeCloseTo(0.9999875000260416, 12)
   expect(pose.quaternionWxyz[3]).toBeCloseTo(0.004999979166692708, 12)

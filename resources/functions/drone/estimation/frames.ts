@@ -64,3 +64,10 @@ export function nedToGeodetic(positionM: SensorVector, origin: GeodeticOrigin): 
   const height = horizontal * Math.cos(latitude) + z * Math.sin(latitude) - n * (1 - e2 * Math.sin(latitude) ** 2)
   return { latitudeDeg: latitude * 180 / Math.PI, longitudeDeg: Math.atan2(y, x) * 180 / Math.PI, ellipsoidHeightM: height }
 }
+
+export function rotateBodyToNed(q: Quaternion, v: SensorVector): SensorVector {
+  const [w, x, y, z] = q
+  const t = [2 * (y * v[2] - z * v[1]), 2 * (z * v[0] - x * v[2]), 2 * (x * v[1] - y * v[0])]
+  return [v[0] + w * t[0]! + y * t[2]! - z * t[1]!, v[1] + w * t[1]! + z * t[0]! - x * t[2]!, v[2] + w * t[2]! + x * t[1]! - y * t[0]!]
+}
+export const rotateNedToBody = (q: Quaternion, v: SensorVector) => rotateBodyToNed([q[0], -q[1], -q[2], -q[3]], v)

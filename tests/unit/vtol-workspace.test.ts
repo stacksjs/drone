@@ -1,16 +1,16 @@
 import { expect, test } from 'bun:test'
-import { getMissionWorkspaceDefinition, runMissionWorkspace } from '../../resources/functions/drone/vehicles/workspace'
+import { getMissionWorkspaceDefinition, missionWorkspacePlot, runMissionWorkspace } from '../../resources/functions/drone/vehicles/workspace'
 import { createVtolSimulationCase } from '../../resources/functions/drone/vehicles/vtol/simulation'
 
 test('VTOL workspace records the complete modeled route with capture-bound mode acknowledgements', () => {
   const definition = getMissionWorkspaceDefinition('vtol')
-  expect(definition.scenarios).toHaveLength(20)
+  expect(definition.scenarios).toHaveLength(27)
   const run = runMissionWorkspace('vtol')
   expect(run.status).toBe('completed')
   expect(run.physicalActuationEnabled).toBe(false)
   expect(run.boardNeutral).toBe(true)
   expect(run.rows.at(-1)!.taskId).toBe('land')
-  expect(run.rows.some(row => row.positionM[2] < -1)).toBe(true)
+  expect(run.rows.some(row => row.positionM && row.positionM[2] < -1)).toBe(true)
   const confirmations = run.rows.flatMap(row => row.vtol?.observation?.outcome === 'confirmed' ? [row.vtol.observation] : [])
   expect(confirmations.map(row => [row.taskId, row.phase])).toEqual([['initial-hover', 'hover'], ['front', 'cruise'], ['back', 'hover']])
   for (const observation of confirmations) {
@@ -126,5 +126,28 @@ test('the workspace exposes the explicit crosswind back heading with its complet
   expect(run.vtol!.windEvidence).toMatchObject({ windMps: [0, 2, 0], backHeadingRad: -Math.PI / 2, backHeadingMatched: true, worldMatched: true, outcomeMatched: true })
   expect(run.vtol!.landingContact).toBe(true)
   expect(run.rows.at(-1)!.state).toBe('completed')
+  expect(run.boardNeutral).toBe(true)
+})
+
+
+test('workspace projection does not invent a current point when navigation is unavailable', () => {
+  const definition = getMissionWorkspaceDefinition('vtol', 'nominal')
+  const row = { atMs: 600, state: 'blocked', taskId: 'back', reason: 'estimator-loss', positionM: null, velocityMps: null, targetM: null, payloadRequest: null, payloadAck: null }
+  const plot = missionWorkspacePlot(definition, [row])
+  expect(plot.current).toBeNull()
+  expect(plot.estimated).toBe('')
+  expect(Number.isFinite(plot.spanM)).toBe(true)
+})
+
+
+test('the common workspace preserves a planning limit before requested wind onset', () => {
+  const run = runMissionWorkspace('vtol', 'planned-west-crosswind-2mps', { phase: 'landing' })
+  if (!('vtol' in run)) throw new Error('Expected the VTOL recording')
+  expect(run.status).toBe('blocked')
+  expect(run.fault).toBe('vtol-transition-aborted')
+  expect(run.vtol!.demonstrationMatched).toBe(false)
+  expect(run.vtol!.windEvidence).toMatchObject({ phase: 'landing', phaseEnteredAtMs: null, beginsAtMs: null, firstAppliedAtMs: null, appliedSteps: 0, worldMatched: false, outcomeMatched: true, expectedOutcome: 'planning-limit-before-onset' })
+  expect(run.rows.flatMap(row => row.vtol?.backCapture ? [row.vtol.backCapture.status] : [])).toEqual(['limit'])
+  expect(run.rows.some(row => row.taskId === 'land')).toBe(false)
   expect(run.boardNeutral).toBe(true)
 })

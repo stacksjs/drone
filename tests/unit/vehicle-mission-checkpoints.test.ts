@@ -142,7 +142,7 @@ test('recording dispatch preserves version budgets and verifies future rows befo
   corrupt.rows.at(-1)!.result.reason = 'forged-after-playback'
   expect(() => replayOwnedMissionAt(corrupt, corrupt.rows[10]!.observation.nowMs)).toThrow('mismatch')
   expect(() => parseOwnedMissionTrace('{private-invalid-json')).toThrow('Invalid mission trace JSON')
-  expect(() => parseOwnedMissionTrace(JSON.stringify({ ...v2, version: 3 }))).toThrow('version')
+  expect(() => parseOwnedMissionTrace(JSON.stringify({ ...v2, version: 4 }))).toThrow('version')
   const padding = ' '.repeat(8 * 1024 * 1024)
   expect(() => parseOwnedMissionTrace(JSON.stringify(v1) + padding)).toThrow('8 MiB')
   expect(parseOwnedMissionTrace(JSON.stringify(v2) + padding).version).toBe(2)
@@ -180,3 +180,44 @@ test('version dispatch accepts the full v2 row budget and rejects one extra row'
   trace.rows.push(structuredClone(trace.rows.at(-1)!))
   expect(() => parseOwnedMissionTrace(JSON.stringify(trace))).toThrow('Invalid vehicle mission trace')
 })
+
+// Returned decisions are caller-owned. Mutating one must not rewrite history.
+test('unavailable-navigation decisions remain detached from retained version-3 history', () => {
+  const plan = createGroundProfile().mission, engine = createVehicleMissionEngine(plan)
+  const observation: VehicleMissionObservation = { kind: 'simulation', nowMs: 0, reference: '55:0,0,0,0,0', origin: plan.origin, healthy: false, positionM: null, velocityMps: null, authority: 'autonomous', batteryPercent: 100, onGround: false, payloadAck: null }
+  const result = engine.step(observation), retained = JSON.stringify(engine.trace()), decision = engine.snapshot()
+  expect(result.state).toBe('blocked')
+  expect(result.reason).toBe('estimator-loss')
+  expect(engine.trace().version).toBe(3)
+  result.state = 'completed'
+  result.reason = 'caller-mutated'
+  result.targetM = [123, 0, 0]
+  expect(engine.snapshot()).toEqual(decision)
+  expect(JSON.stringify(engine.trace())).toBe(retained)
+  expect(replayVehicleMission(engine.trace()).snapshot()).toEqual(decision)
+})
+
+import { readMissionFile, writeMissionTrace } from '../../resources/functions/drone/missions/files'
+
+// The native replay boundary must read the same loss artifact that we persist.
+test('native replay reads a persisted version-3 navigation-loss recording', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'drone-v3-navigation-loss-'))
+  try {
+    const plan = createGroundProfile().mission, engine = createVehicleMissionEngine(plan)
+    const observation: VehicleMissionObservation = { kind: 'simulation', nowMs: 0, reference: '55:0,0,0,0,0', origin: plan.origin, healthy: true, positionM: [0, 0, 0], velocityMps: [0, 0, 0], authority: 'autonomous', batteryPercent: 100, onGround: true, payloadAck: null }
+    expect(engine.step(observation, 'start').state).toBe('running')
+    engine.step({ ...observation, nowMs: 20, healthy: false, positionM: null, velocityMps: null })
+    const trace = engine.trace()
+    expect(trace.version).toBe(3)
+    const path = await writeMissionTrace(join(root, 'loss'), trace)
+    const text = await readMissionFile(path, { maxBytes: 16 * 1024 * 1024 })
+    expect(parseOwnedMissionTrace(text)).toEqual(trace)
+    expect(replayOwnedMission(parseOwnedMissionTrace(text)).snapshot()).toEqual(engine.snapshot())
+    expect(() => parseOwnedMissionTrace(JSON.stringify({ ...trace, version: 2 }))).toThrow()
+    const replayed = await command(['missions:replay', path]).withTimeout(60000)
+    expect(replayed.exitCode).toBe(0)
+    expect(JSON.parse(replayed.stdout)).toMatchObject({ state: 'blocked', reason: 'estimator-loss', rows: 2, physicalFlightEnabled: false })
+    expect(await readFile(path, 'utf8')).toBe(text)
+  }
+  finally { await rm(root, { recursive: true, force: true }) }
+}, 60000)

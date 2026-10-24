@@ -13,7 +13,7 @@ export function parseOwnedMissionTrace(text: string): OwnedMissionTrace {
   catch { throw new TypeError('Invalid mission trace JSON') }
   if (!value || typeof value !== 'object' || !('version' in value)) throw new TypeError('Invalid mission trace version')
   if (value.version === 1) return parseMissionTrace(text)
-  if (value.version === 2) return parseVehicleMissionTrace(text)
+  if (value.version === 2 || value.version === 3 && 'evidence' in value && value.evidence === 'owned-vehicle-mission-simulation') return parseVehicleMissionTrace(text)
   throw new TypeError('Unsupported mission trace version')
 }
 export function replayOwnedMission(trace: OwnedMissionTrace) {

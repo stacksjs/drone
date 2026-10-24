@@ -95,6 +95,9 @@ The [owned estimator](estimation.md), recorded in [ADR 4](adr/0004-owned-estimat
 qualified sensor events on their capture epochs. It exposes tilt/relative-yaw, GNSS local NED and
 separate pressure height with health/reset counters. It is independent of both external autopilots
 and remains separate from control telemetry until heading, fusion and hardware validation exist.
+[ADR 33](adr/0033-fixture-inertial-capture-planning.md) adds an explicitly synthetic,
+initial-north IMU prediction mode for planned VTOL captures. It preserves the normal estimator
+and physical receive-only boundary.
 
 The [owned control physics harness](controls.md), recorded in [ADR 5](adr/0005-simulated-multirotor-controls.md),
 feeds modeled raw sensor records through the existing sensor pipeline and estimator into bounded

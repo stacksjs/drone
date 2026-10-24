@@ -133,7 +133,7 @@ test('high ground speed in a co-moving-air fault fixture cannot substitute for r
   const report = runVehicleSimulation(profile, { seconds: 60 })
   expect(report.status).toBe('blocked')
   expect(report.mission.reason).toBe('vtol-transition-outcome-uncertain')
-  const fast = report.trace.rows.filter(r => r.result.taskId === 'front' && Math.hypot(...r.observation.velocityMps) > 12)
+  const fast = report.trace.rows.filter(r => r.result.taskId === 'front' && Math.hypot(...r.observation.velocityMps!) > 12)
   expect(fast.length).toBeGreaterThan(20)
   const fastStart = fast[0]!.observation.nowMs
   expect(report.path.filter(p => p.atMs >= fastStart).every(p => (p.measurement!.values.airspeedMps as number) < 0.1)).toBe(true)

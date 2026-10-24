@@ -481,3 +481,15 @@ test('configured cargo constructor bounds errors from its own-load descriptor pr
   expect(failure).toBeInstanceOf(TypeError)
   expect((failure as Error).message).toBe('cargo-load-constructor')
 })
+
+// Public PID seam: a model forecast preserves control history and owns its mutations.
+test('a forecast PID copy preserves derivative history without changing the live controller', () => {
+  const live = createBoundedPid({ kp: 1.2, ki: 0.4, kd: 0.02, integralLimit: 1.5, outputLimit: 3, derivativeTauS: 0.03, trackingGain: 1 })
+  live.step(0.8, 0.1, 0.02); live.step(0.6, 0.2, 0.02); live.track(-0.1, 0.02)
+  const forecast = live.fork()
+  expect(forecast.step(0.4, 0.3, 0.02)).toBe(live.step(0.4, 0.3, 0.02))
+  const reference = live.fork()
+  forecast.step(-5, 4, 0.02); forecast.track(2, 0.02); forecast.reset()
+  expect(live.step(0.2, 0.35, 0.02)).toBe(reference.step(0.2, 0.35, 0.02))
+  expect(forecast.state()).toEqual({ integral: 0, derivative: 0 })
+})

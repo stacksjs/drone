@@ -104,8 +104,8 @@ for (const bankedEntry of [false, true]) test(`a paused wing-borne VTOL flies a 
   }
   const report = runVehicleSimulation(profile, { seconds: 160, missionActions: [{ atMs: 20000, action: 'pause' }, { atMs: 40000, action: 'resume' }] })
   const entry = report.trace.rows.find(row => row.observation.nowMs === 20000)!.observation
-  const course = Math.atan2(entry.velocityMps[1], entry.velocityMps[0])
-  const center = [entry.positionM[0] - 60 * Math.sin(course), entry.positionM[1] + 60 * Math.cos(course)]
+  const course = Math.atan2(entry.velocityMps![1], entry.velocityMps![0])
+  const center = [entry.positionM![0] - 60 * Math.sin(course), entry.positionM![1] + 60 * Math.cos(course)]
   const settled = observed.filter(row => row.atMs >= 26000)
   const radialError = Math.max(...settled.map(row => Math.abs(Math.hypot(row.state.positionM[0] - center[0]!, row.state.positionM[1] - center[1]!) - 60)))
   const paused = report.path.filter(row => row.mission.state === 'paused')

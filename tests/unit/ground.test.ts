@@ -209,7 +209,7 @@ test('mowing and materials logistics execute through the common owned sensor est
     expect(result.board.actuators).toEqual([0, 0, 0, 1])
     expect(result.trace.rows.some(row => row.observation.payloadAck?.outcome === 'confirmed')).toBe(true)
     expect(result.trace.rows.at(-1)!.observation.onGround).toBe(true)
-    expect(Math.hypot(...result.trace.rows.at(-1)!.observation.velocityMps)).toBeLessThanOrEqual(0.1)
+    expect(Math.hypot(...result.trace.rows.at(-1)!.observation.velocityMps!)).toBeLessThanOrEqual(0.1)
   }
 }, 60000)
 
