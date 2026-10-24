@@ -37,7 +37,7 @@ function record(input: unknown, fields: string[]): Record<string, unknown> {
   }
   return result
 }
-function captureDeclaration(input: unknown): CargoDeliveryDeclaration {
+export function captureCargoDeliveryDeclaration(input: unknown): CargoDeliveryDeclaration {
   const top = record(input, ['origin', 'site', 'releaseHeightM']), site = record(top.site, ['id', 'recipientId', 'containerId', 'positionM', 'radiusM'])
   const origin = record(top.origin, ['latitudeDeg', 'longitudeDeg', 'ellipsoidHeightM'])
   if (!['id', 'recipientId', 'containerId'].every(key => typeof site[key] === 'string' && /^[a-z][a-z0-9-]{0,63}$/.test(site[key] as string))
@@ -59,7 +59,7 @@ function finiteTuple(value: unknown, size: number) {
 
 /** Captured modeled release/custody policy behind the shared vehicle payload port. No physical IO. */
 export function createCargoDeliveryCoordinator(input: unknown, mechanism: ModeledCargoMechanism) {
-  const declaration = captureDeclaration(input), { site } = declaration
+  const declaration = captureCargoDeliveryDeclaration(input), { site } = declaration
   if (!mechanism || mechanism.evidence !== 'modeled-cargo-mechanism' || typeof mechanism.request !== 'function' || typeof mechanism.cancel !== 'function') throw new TypeError('cargo-delivery-modeled-mechanism')
   const delivery: CargoDeliveryCustody = { outcome: 'not-released', containerId: site.containerId, siteId: site.id, recipientId: site.recipientId, requestedAtMs: null, mechanismCapturedAtMs: null, receiptCapturedAtMs: null, acknowledgedAtMs: null, reason: null, mechanismOutcome: 'not-requested' }
   const measurements = createVehicleMeasurementQualifier('quadcopter')

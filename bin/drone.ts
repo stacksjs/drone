@@ -12,6 +12,7 @@ import AuthoritySimulate from '../app/Commands/AuthoritySimulate'
 import ControlsSimulate from '../app/Commands/ControlsSimulate'
 import CargoLoadBench from '../app/Commands/CargoLoadBench'
 import CargoDeliver from '../app/Commands/CargoDeliver'
+import CargoMission from '../app/Commands/CargoMission'
 
 import PayloadsBench from '../app/Commands/PayloadsBench'
 import PayloadsCapture from '../app/Commands/PayloadsCapture'
@@ -94,6 +95,7 @@ EstimatorReplay(app)
 ControlsSimulate(app)
 CargoLoadBench(app)
 CargoDeliver(app)
+CargoMission(app)
 AuthoritySimulate(app)
 DriversBench(app)
 PayloadsBench(app)

@@ -275,6 +275,19 @@ jobs:
             test "$actual" -eq "$expected"
             bun -e 'const [file, scenario] = process.argv.slice(1); const raw = await Bun.file(file).text(); const s = JSON.parse(raw); if (Buffer.byteLength(raw) > 16384 || s.scenario !== scenario || s.status !== (scenario === "link-loss" ? "unqualified" : "characterized") || s.physicalFlightEnabled !== false || s.boardOutputsInhibited !== true || Object.values(s.capabilities).some(Boolean) || s.final.landingPerformed !== false) throw new Error("Invalid compiled cargo characterization")' "$RUNNER_TEMP/cargo-$scenario.json" "$scenario"
           done
+      - name: Qualify copied cargo delivery, custody and phase failures
+        run: bun scripts/qualify-cargo-cli.ts "$GITHUB_WORKSPACE/storage/runtime-build/cli/drone" "$RUNNER_TEMP/cargo-delivery-cli"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: cargo-delivery-cli-evidence
+          if-no-files-found: ignore
+          retention-days: 7
+          path: |
+            ${{ runner.temp }}/cargo-delivery-cli/*.stdout
+            ${{ runner.temp }}/cargo-delivery-cli/*.stderr
+            ${{ runner.temp }}/cargo-delivery-cli/receipt.json
+            ${{ runner.temp }}/cargo-delivery-cli/request.json
       - name: Qualify compiled environmental datasets outside the checkout
         working-directory: ${{ runner.temp }}
         shell: bash

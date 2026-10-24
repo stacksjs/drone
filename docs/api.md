@@ -38,6 +38,25 @@ forgetting a lease, not a guaranteed real-time deadline. Do not automatically re
 without independently checking operator authority. `close()` is idempotent. The SITL example has
 a hard 30-second duration and a deliberately artificial target.
 
+## Modeled cargo missions
+
+The cargo modules expose the owned runtime directly, without an external-autopilot dependency:
+
+- `planCargoDelivery(configuration)` in `resources/functions/drone/cargo/plan.ts` captures a
+  complete declaration and validates the normal/alternate mission graph and declared reserve.
+- `simulateCargoDelivery({ configuration, scenario? })` in `cargo/delivery.ts` under the same
+  drone folder runs its actual loaded rigid body through the raw sensors, estimator, mission,
+  controls, authority and watchdog. Omitting configuration selects only the closed named fixture.
+- `cargoDeliverySummary(run)` produces a bounded compact projection, preserving actual mission,
+  custody and host-loss outcomes. A matched failure demonstration is not delivery completion.
+- `createCargoDeliveryCoordinator(declaration, modeledMechanism)` in `cargo/coordinator.ts`
+  implements `VehiclePayloadPort`, captured readiness and idempotent cancellation. Its adapter
+  contract is synchronous and explicitly modeled, with no built-in hardware I/O.
+
+The [cargo guide](cargo-delivery.md) defines the flat synthetic origin, finite load/route bounds,
+one-release and receipt semantics, phase-bound faults, native CLI exit codes and remaining
+fleet/physical/BVLOS work. Budgets are declared power ceilings, not electrical measurements.
+
 ## Target sources
 
 `createGpsTargetSource({ targetId, origin, maxSpeedMps?, now? })` converts trusted phone or GNSS fixes

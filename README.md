@@ -114,9 +114,19 @@ our existing multirotor sensor, estimator, control and authority loop.
 ./buddy cargo:load-bench --scenario link-loss
 ```
 
-Link loss is deliberately unqualified and exits 1. This is a [bounded physics prerequisite](docs/cargo-load.md)
-for [#25](https://github.com/stacksjs/drone/issues/25); delivery, physical release, custody and endurance
-qualification remain open.
+Link loss in this [bounded load characterization](docs/cargo-load.md) is deliberately unqualified
+and exits 1. Its capability flags remain separate from the modeled delivery mission:
+
+```sh
+./buddy cargo:mission examples/cargo-delivery.json
+./buddy cargo:mission examples/cargo-delivery.json --scenario after-release-host-loss
+```
+
+The [cargo delivery guide](docs/cargo-delivery.md) covers explicit mass/CG, receiver, alternate
+and power declarations, captured release/custody, redundant links and post-release failures.
+Exit 2 retains a configured mission that did not complete a matched delivery and carrier landing.
+Distinct-vehicle fleet handover, electrical/measured endurance and physical/operational
+qualification remain open in [#25](https://github.com/stacksjs/drone/issues/25).
 
 ## Agriculture sensing
 

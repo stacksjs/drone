@@ -84,7 +84,7 @@ See the [scenario commands and expected outcomes](vehicles-vtol.md) before compa
 | Prescribed application | Owned ground simulation for inert water or granules, with explicit implement authority | [Application](application.md) |
 | Public safety | Synthetic incident collection, authenticated records, review and local dataset management | [Public safety](public-safety.md) |
 | Patrol and docking | Retained modeled vehicle, explicit decisions, finite recurrence and charge opt-in | [Patrol CLI](patrol-cli.md) |
-| Cargo and cinema | Bounded carried-load characterization and a simulated POI angular reframe | [Cargo](cargo-load.md), [cinema](cinema.md) |
+| Cargo and cinema | Configured modeled delivery, captured release/custody, alternates and redundant links; fleet handover remains open. Separate carried-load and POI reframe experiments | [Cargo delivery](cargo-delivery.md), [load bench](cargo-load.md), [cinema](cinema.md) |
 | Environmental sampling and antenna pointing | Synthetic sampling and a selected-vehicle mount model | [Environment](environment.md), [antenna](antenna.md) |
 
 Each guide distinguishes implemented behavior, recorded evidence and remaining

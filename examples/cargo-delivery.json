@@ -1,0 +1,18 @@
+{
+  "version": 1,
+  "id": "operator-cargo-route",
+  "delivery": {
+    "origin": { "latitudeDeg": 0, "longitudeDeg": 0, "ellipsoidHeightM": 100 },
+    "site": {
+      "id": "declared-site",
+      "recipientId": "declared-recipient",
+      "containerId": "parcel-150g",
+      "positionM": [2, 1, 0],
+      "radiusM": 0.4
+    },
+    "releaseHeightM": 1.2
+  },
+  "load": { "massKg": 0.15, "forwardM": -0.04 },
+  "alternateM": [-1, 1, 0],
+  "power": { "availableWh": 50, "maxW": 700, "reservePercent": 35 }
+}

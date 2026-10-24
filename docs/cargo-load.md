@@ -1,6 +1,6 @@
 # Simulated carried-load characterization
 
-This is the first airborne physics prerequisite for [cargo issue #25](https://github.com/stacksjs/drone/issues/25). It characterizes a carried point mass and one prescribed split through our existing multirotor sensor, estimator, controller and authority loop. Delivery missions and physical release are still unimplemented.
+This is the first airborne physics prerequisite for [cargo issue #25](https://github.com/stacksjs/drone/issues/25). It characterizes a carried point mass and one prescribed split through our existing multirotor sensor, estimator, controller and authority loop. This bench does not implement delivery missions; the separate [modeled cargo mission](cargo-delivery.md) provides configured delivery and custody. Physical release remains unimplemented.
 
 ```sh
 ./buddy cargo:load-bench
@@ -35,6 +35,11 @@ The retained source qualification passed 38 tests and 5,553 assertions across co
 
 ## Remaining roadmap
 
-Issue #25 remains open, with its original acceptance criteria unchecked. Next work must add a delivery mission and site/recipient confirmation, verified release hardware and ACKs, custody, measured energy reserves and alternates. Redundant communications, degraded navigation, containment, diversion and fleet handover also remain open. Operational authorization, detect-and-avoid and physical/HIL evidence require their own documented qualification.
+Issue #25 remains open. The separate [modeled cargo mission](cargo-delivery.md) now implements
+configured delivery, captured mechanism/receiver evidence and custody, declared reserve budgets,
+alternates, two modeled links and phase-bound fault cases. Those capabilities do not change this
+bench's characterization result or flags. Distinct-vehicle fleet handover, measured/electrical
+endurance, release hardware, operational authorization, detect-and-avoid and physical/HIL
+qualification remain open.
 
 The result keeps `physicalFlightEnabled` and `identityAuthenticated` false, with physical board outputs inhibited. Its six delivery, mechanism verification, custody, recipient, mission and energy-margin capability flags remain false. This characterization does not authorize physical operation or long-range transport.

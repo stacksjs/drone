@@ -5,6 +5,7 @@ export interface BoundedProcessOptions {
   stdoutBytes: number
   stderrBytes: number
   label: string
+  strictUtf8?: boolean
 }
 
 export interface BoundedProcessResult {
@@ -46,7 +47,7 @@ export async function runBoundedProcess(command: string[], options: BoundedProce
     try {
       while (true) {
         const { done, value } = await reader.read()
-        if (done) return Buffer.concat(chunks, bytes).toString('utf8')
+        if (done) return new TextDecoder('utf-8', { fatal: options.strictUtf8 === true, ignoreBOM: true }).decode(Buffer.concat(chunks, bytes))
         if (value.byteLength > limit - bytes) {
           const error = new Error(`${options.label} ${label} exceeds byte limit`)
           stop(error, `${label} exceeds byte limit`)

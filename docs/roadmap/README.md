@@ -22,6 +22,10 @@ companion application and simulator, not a native board autopilot.
   pause/resume, recorded checkpoint recovery, conditional branches, native CLI and stx viewer.
   Whole-runtime checkpoint correlation, payload ACK reconciliation, driver translation and hardware
   evidence remain open in [#10](https://github.com/stacksjs/drone/issues/10).
+- Configured modeled cargo delivery uses captured release/receiver custody, finite alternate landing,
+  declared reserves, scoped redundant links and post-release failures on the shared runtime.
+  Distinct-vehicle fleet handover and physical/electrical/operational qualification remain in
+  [#25](https://github.com/stacksjs/drone/issues/25). See [cargo contracts](../cargo-delivery.md).
 - TypeScript follow/behavior library, kinematic simulator, controller leases and envelope checks.
 - Pi AI Camera acquisition bridge and explicit image-space target selection/loss policy, pending Pi hardware validation.
 - An optional visual guard that holds metric follow logic on lost, unconfirmed, stale or changed visual selection.
