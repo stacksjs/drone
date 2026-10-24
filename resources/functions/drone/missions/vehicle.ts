@@ -1,3 +1,4 @@
+import type { SensorVector } from '../sensors/types'
 import type { VehicleMissionAction, VehicleMissionObservation, VehicleMissionPlan, VehicleMissionSnapshot, VehicleMissionTask, VehiclePayloadAck, VehiclePayloadCommand, VehicleVtolTransitionCommand, VehicleVtolTransitionObservation } from '../vehicles/types'
 import type { MissionState } from './engine'
 import { vehicleKinds } from '../vehicles/types'
@@ -41,10 +42,13 @@ export function validateVehicleMission(input: unknown): { plan: VehicleMissionPl
     }
     else if (t.kind === 'payload') {
       fields.push('operation', 'containerId', 'timeoutMs', 'next', 'onFailure')
-      const supported = p.vehicle === 'quadcopter' ? ['camera-still', 'material-drop'] : p.vehicle === 'fixed-wing' || p.vehicle === 'vtol' ? ['camera-still'] : p.vehicle === 'ground' ? ['camera-still', 'material-drop', 'mower-enable', 'mower-disable'] : p.vehicle === 'surface' ? ['camera-still', 'water-sample'] : ['camera-still', 'inspection-capture']
-      if (!supported.includes(t.operation) || (t.containerId !== null && !id(t.containerId)) || (t.operation === 'water-sample' && !id(t.containerId)) || !number(t.timeoutMs, 100, 10000) || !id(t.next)) invalid()
-      if (p.vehicle === 'quadcopter' && t.operation === 'material-drop' && !id(t.containerId)) invalid()
-      if (t.onFailure !== undefined && (p.vehicle !== 'quadcopter' || t.operation !== 'material-drop' || !id(t.onFailure))) invalid()
+      const receiving = t.operation === 'material-receive'
+      if (receiving) fields.push('positionM')
+      const supported = p.vehicle === 'quadcopter' ? ['camera-still', 'material-drop', 'material-receive'] : p.vehicle === 'fixed-wing' || p.vehicle === 'vtol' ? ['camera-still'] : p.vehicle === 'ground' ? ['camera-still', 'material-drop', 'mower-enable', 'mower-disable'] : p.vehicle === 'surface' ? ['camera-still', 'water-sample'] : ['camera-still', 'inspection-capture']
+      if (!supported.includes(t.operation) || (t.containerId !== null && !id(t.containerId)) || (t.operation === 'water-sample' && !id(t.containerId)) || !number(t.timeoutMs, 100, receiving ? 60000 : 10000) || !id(t.next)) invalid()
+      if (p.vehicle === 'quadcopter' && ['material-drop', 'material-receive'].includes(t.operation) && !id(t.containerId)) invalid()
+      if (receiving && (!Number.isSafeInteger(t.timeoutMs) || !vehicleMissionContains(p, t.positionM) || t.positionM[2] < -1 || t.positionM[2] > 0)) invalid()
+      if (t.onFailure !== undefined && (p.vehicle !== 'quadcopter' || !['material-drop', 'material-receive'].includes(t.operation) || !id(t.onFailure))) invalid()
       durationMs = t.timeoutMs; edges = t.onFailure === undefined ? [t.next] : [t.next, t.onFailure]
     }
     else if (['takeoff', 'waypoint', 'land', 'stop', 'loiter', 'return'].includes(t.kind)) {
@@ -86,10 +90,17 @@ export function validateVehicleMission(input: unknown): { plan: VehicleMissionPl
   return { plan: structuredClone(p), worstCaseMs, requiredWh }
 }
 export interface VehicleMissionTrace { version: 2 | 3, evidence: 'owned-vehicle-mission-simulation', plan: VehicleMissionPlan, rows: { observation: VehicleMissionObservation, action: VehicleMissionAction | null, result: VehicleMissionSnapshot }[] }
+function validAckPosition(value: unknown): value is SensorVector {
+  return validVector(value) && [0, 1, 2].every(i => Object.hasOwn(value, i))
+}
 function validAck(value: unknown): value is VehiclePayloadAck {
-  if (!object(value) || !keys(value, ['eventId', 'taskId', 'operation', 'containerId', 'capturedAtMs', 'reference', 'positionM', 'outcome', 'metadata']) || typeof value.eventId !== 'string' || value.eventId.length > 200 || !id(value.taskId) || !['camera-still', 'water-sample', 'material-drop', 'mower-enable', 'mower-disable', 'inspection-capture'].includes(value.operation as string) || (value.containerId !== null && !id(value.containerId)) || !Number.isSafeInteger(value.capturedAtMs) || (value.capturedAtMs as number) < 0 || typeof value.reference !== 'string' || value.reference.length > 120 || !validVector(value.positionM) || !['confirmed', 'rejected', 'uncertain'].includes(value.outcome as string)) return false
+  if (!object(value) || !keys(value, ['eventId', 'taskId', 'operation', 'containerId', 'capturedAtMs', 'reference', 'positionM', 'outcome', 'metadata']) || typeof value.eventId !== 'string' || value.eventId.length > 200 || !id(value.taskId) || !['camera-still', 'water-sample', 'material-drop', 'material-receive', 'mower-enable', 'mower-disable', 'inspection-capture'].includes(value.operation as string) || (value.containerId !== null && !id(value.containerId)) || !Number.isSafeInteger(value.capturedAtMs) || (value.capturedAtMs as number) < 0 || typeof value.reference !== 'string' || value.reference.length > 120 || !validAckPosition(value.positionM) || !['confirmed', 'rejected', 'uncertain'].includes(value.outcome as string)) return false
   if (value.metadata !== undefined && (!object(value.metadata) || Object.keys(value.metadata).length > 32 || Object.entries(value.metadata).some(([key, item]) => !/^[a-zA-Z][a-zA-Z0-9_-]{0,39}$/.test(key) || !(typeof item === 'boolean' || (typeof item === 'number' && Number.isFinite(item)) || (typeof item === 'string' && item.length <= 160))))) return false
   return true
+}
+function receivingAtPad(task: Extract<VehicleMissionTask, { operation: 'material-receive' }>, o: VehicleMissionObservation) {
+  return o.onGround && o.positionM !== null && o.velocityMps !== null && Math.hypot(...o.velocityMps) <= .1
+    && Math.hypot(...o.positionM.map((n, i) => n - task.positionM[i]!)) <= .2
 }
 function validTransition(value: unknown): value is VehicleVtolTransitionObservation {
   return object(value) && keys(value, ['evidence', 'eventId', 'taskId', 'mode', 'reference', 'capturedAtMs', 'measurementCapturedAtMs', 'phase', 'outcome', 'reason'])
@@ -253,11 +264,13 @@ export function createVehicleMissionEngine(input: unknown) {
             else reason = 'vtol-transition-progress'
           }
         }
+        else if (t.kind === 'payload' && t.operation === 'material-receive' && !receivingAtPad(t, o)) block('material-receive-interlocks')
         else if (t.kind === 'payload') {
           pending ??= { eventId: `${plan.id}:${reference}:${t.id}`, taskId: t.id, operation: t.operation, containerId: t.containerId, issuedAtMs: o.nowMs, expiresAtMs: o.nowMs + t.timeoutMs - taskElapsedMs, positionM: [...o.positionM], reference: reference! }
           const ack = o.payloadAck
           if (ack) {
-            const scopeMismatch = ack.eventId !== pending.eventId || ack.taskId !== pending.taskId || ack.operation !== pending.operation || ack.containerId !== pending.containerId || ack.reference !== pending.reference || ack.capturedAtMs < pending.issuedAtMs || ack.capturedAtMs >= pending.expiresAtMs || ack.capturedAtMs > o.nowMs || o.nowMs - ack.capturedAtMs > 200 || Math.hypot(...ack.positionM.map((n, i) => n - pending!.positionM[i]!)) > 1
+            const separationM = Math.hypot(...ack.positionM.map((n, i) => n - pending!.positionM[i]!))
+            const scopeMismatch = ack.eventId !== pending.eventId || ack.taskId !== pending.taskId || ack.operation !== pending.operation || ack.containerId !== pending.containerId || ack.reference !== pending.reference || ack.capturedAtMs < pending.issuedAtMs || ack.capturedAtMs >= pending.expiresAtMs || ack.capturedAtMs > o.nowMs || o.nowMs - ack.capturedAtMs > 200 || !Number.isFinite(separationM) || separationM > 1
             if (scopeMismatch || ack.outcome !== 'confirmed') { if (!divertPayload(t, o, scopeMismatch ? 'scope-mismatch' : ack.outcome === 'rejected' ? 'rejected' : 'uncertain')) block('payload-outcome-uncertain') }
             else { advance(t.next); reason = 'payload-confirmed' }
           }
@@ -276,6 +289,12 @@ export function createVehicleMissionEngine(input: unknown) {
             }
           }
         }
+      }
+      // Intake must inhibit the first control frame, including entry directly from start.
+      const entered = tasks.get(taskId)!
+      if (state === 'running' && entered.kind === 'payload' && entered.operation === 'material-receive') {
+        if (!receivingAtPad(entered, o)) block('material-receive-interlocks')
+        else pending ??= { eventId: `${plan.id}:${reference}:${entered.id}`, taskId: entered.id, operation: entered.operation, containerId: entered.containerId, issuedAtMs: o.nowMs, expiresAtMs: o.nowMs + entered.timeoutMs - taskElapsedMs, positionM: [...o.positionM], reference: reference! }
       }
       const result = snapshot()
       rows.push({ observation: o, action: action ?? null, result: structuredClone(result) })

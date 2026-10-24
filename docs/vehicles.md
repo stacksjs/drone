@@ -101,6 +101,11 @@ Modeled acknowledgements preserve capture time separately from delivery. An unce
 result blocks progression and is never automatically retried as a new action. Recovery during a
 pending action also blocks. These identities do not establish exactly-once delivery on hardware.
 
+The opt-in quadcopter `material-receive` task adds a declared pad anchor and a bounded
+wait for one correlated receipt. It enters with inhibited motor commands under qualified
+surface contact. Its [interlocks and counted failure routes](cargo-delivery.md#receiving-mission-task-prerequisite)
+are distinct from the still-pending mechanical-intake and fleet custody coordinator.
+
 Surface sounding reduction retains raw acoustic corrections, local datum, capture-pose estimator
 and gyro epochs and declared position/attitude/clock uncertainty. It projects the beam footprint and
 rejects unqualified capture timing or uncertainty below the sensor declaration. This is a modeled

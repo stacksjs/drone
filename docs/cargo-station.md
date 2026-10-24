@@ -103,5 +103,6 @@ vertical work, strict admission, detached state and lifetime rejection.
 This actor does not grant a mechanism lease, authenticate a recipient, produce a custody
 ACK or coordinate two live vehicle mission engines. Those operations must use each
 vehicle's own sensor, estimator and current authority scope on the common clock. The
-material-receive mission operation, correlated acknowledgement, cancellation/uncertainty
-matrix and bounded fleet CLI remain open under [#25](https://github.com/stacksjs/drone/issues/25).
+[receiving mission task](cargo-delivery.md#receiving-mission-task-prerequisite) now holds
+a declared pad under the shared engine. Its physical-intake acknowledgement port, the
+two-vehicle custody protocol, cancellation/uncertainty matrix and bounded fleet CLI remain open under [#25](https://github.com/stacksjs/drone/issues/25).

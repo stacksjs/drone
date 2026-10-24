@@ -188,6 +188,37 @@ and actual receiving-body intake. The world coordinator must still consume the o
 check the receiver's current authority and produce correlated custody acknowledgement.
 This model alone does not implement a fleet mission or qualify electrical endurance.
 
+## Receiving mission task prerequisite
+
+The shared owned mission engine accepts `material-receive` only for quadcopters, with a
+non-null `containerId`, a required fixed-origin `positionM` pad anchor and an integer
+100 to 60,000 ms timeout. The anchor must be inside the mission fence and on or up to
+1 m above its declared zero surface. Normal and optional one-way alternate landing
+routes contribute to the longest-path time and declared reserve calculation.
+
+Entering intake immediately creates its scoped pending command, including the first
+control frame when the plan starts there. The quad controller uses qualified surface
+contact to keep modeled motor commands neutral during intake. This avoids a one-frame
+spin-up while waiting for the next mission evaluation. It does not erase existing motor
+lag, change mass or generate an acknowledgement.
+
+Mission observations must retain contact, speed at most 0.1 m/s and position within
+0.2 m of the pad. Losing these interlocks blocks receipt even if an ACK is present.
+A confirmed ACK still needs exact event/task/operation/container/reference correlation,
+a capture inside its deadline, freshness and a finite spatial check. ACK position requires
+three finite own coordinates; sparse arrays are rejected before acknowledgement handling. Timeout,
+foreign scope, rejection or uncertainty can follow a declared counted alternate route;
+they never advance the normal takeoff path or retry intake. A late unsolicited ACK
+blocks rather than reviving the original command.
+
+`tests/unit/cargo-receive-mission.test.ts` covers the native task and an actually empty
+receiving body in its own raw-sensor, estimator and authority runtime. With ACK withheld,
+it stays at the declared pad with zero actual motor thrust and no phantom parcel mass.
+The port that verifies an actual point intake and emits captured custody evidence is
+still unimplemented. A caller-invented ACK is not proof of mechanical transfer. The
+two-vehicle coordinator, fresh mechanism authority, cancellation/uncertainty matrix and
+bounded fleet CLI remain open under #25.
+
 ## BVLOS operations evidence
 
 
