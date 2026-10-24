@@ -44,7 +44,7 @@ export interface VehicleBatteryObservation {
   terminalV: number
   cutoff: boolean
 }
-export type VehiclePayloadOperation = 'camera-still' | 'material-drop' | 'water-sample' | 'mower-enable' | 'mower-disable' | 'inspection-capture'
+export type VehiclePayloadOperation = 'camera-still' | 'material-drop' | 'material-receive' | 'water-sample' | 'mower-enable' | 'mower-disable' | 'inspection-capture'
 export interface VehiclePayloadCommand { eventId: string, taskId: string, operation: VehiclePayloadOperation, containerId: string | null, issuedAtMs: number, expiresAtMs: number, positionM: SensorVector, reference: string }
 export interface VehiclePayloadAck { eventId: string, taskId: string, operation: VehiclePayloadOperation, containerId: string | null, capturedAtMs: number, reference: string, positionM: SensorVector, outcome: 'confirmed' | 'rejected' | 'uncertain', metadata?: Record<string, number | string | boolean> }
 export interface VehiclePayloadPort { observe?(context: VehicleControllerContext): void, request(command: VehiclePayloadCommand): void, poll(nowMs: number): VehiclePayloadAck | null, close(): void }
@@ -89,7 +89,8 @@ export type VehicleMissionTask =
   | { id: string, kind: 'takeoff' | 'waypoint' | 'land' | 'stop', positionM: SensorVector, acceptanceM: number, maxArrivalSpeedMps: number, settleMs: number, timeoutMs: number, next?: string }
   | { id: string, kind: 'return', acceptanceM: number, maxArrivalSpeedMps: number, settleMs: number, timeoutMs: number, next: string }
   | { id: string, kind: 'loiter', positionM: SensorVector, acceptanceM: number, maxArrivalSpeedMps: number, settleMs: number, timeoutMs: number, next: string }
-  | { id: string, kind: 'payload', operation: VehiclePayloadOperation, containerId: string | null, timeoutMs: number, next: string, onFailure?: string }
+  | { id: string, kind: 'payload', operation: Exclude<VehiclePayloadOperation, 'material-receive'>, containerId: string | null, timeoutMs: number, next: string, onFailure?: string }
+  | { id: string, kind: 'payload', operation: 'material-receive', containerId: string, positionM: SensorVector, timeoutMs: number, next: string, onFailure?: string }
   | { id: string, kind: 'branch', batteryAtLeast: number, then: string, otherwise: string }
   | { id: string, kind: 'abort' }
 /** Explicit v2 profile; v1 quadcopter plans and traces retain their original contract. */

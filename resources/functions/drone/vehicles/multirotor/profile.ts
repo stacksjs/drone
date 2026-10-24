@@ -48,7 +48,7 @@ function createSession(): VehicleSession {
           angularRateRadS: rate?.angularRateRadS ?? [0, 0, 0], rateCapturedAtMs: rate?.capturedAtMs ?? -Infinity,
           target: { positionM: context.mission.targetM ?? [0, 0, 0], yawRad: 0, issuedAtMs: context.nowMs } })
         const measurement = context.measurement
-        const contact = !output.inhibited && context.mission.taskKind === 'land' && measurement?.vehicle === 'quadcopter' && measurement.evidence === 'modeled-vehicle-sensors'
+        const contact = !output.inhibited && (context.mission.taskKind === 'land' || context.mission.payload?.operation === 'material-receive') && measurement?.vehicle === 'quadcopter' && measurement.evidence === 'modeled-vehicle-sensors'
           && measurement.reference === rate?.reference && measurement.capturedAtMs <= context.nowMs && context.nowMs - measurement.capturedAtMs <= 120 && measurement.receivedAtMs <= context.nowMs && measurement.values.onSurface === true
         return { kind: 'simulated-vehicle-control', vehicle: 'quadcopter', atMs: context.nowMs, actuators: contact ? [0, 0, 0, 0] : [...output.motorsN], inhibited: fault !== null || output.inhibited, reason: fault ?? (contact ? 'quad-qualified-contact' : output.reason), physicalFlightEnabled: false, boardOutputsInhibited: true }
       } }

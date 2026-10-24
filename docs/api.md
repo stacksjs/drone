@@ -62,6 +62,22 @@ provides the separate [point-load intake prerequisite](cargo-delivery.md#point-l
 It integrates real modeled mass/CG changes after one coincident inelastic point capture.
 The caller still owns the parcel, finite station handling and captured fleet custody protocol.
 
+`createCargoStationHandler(declaration)` in `cargo/station.ts` owns one existing point
+through ballistic capture, finite rail transport, cancellation braking and a single
+departure. See the [station model and integration limits](cargo-station.md). It does not
+grant vehicle authority or confirm custody.
+
+`simulateCargoFleet({ scenario? })` and `cargoFleetSummary(run)` in `cargo/fleet.ts`
+execute [two-carrier handover](cargo-fleet.md) through actual retained source and receiver
+runtimes, a consumed station parcel, current-authority intake and captured custody. The
+eleven bounded fault cases retain incomplete outcomes and actual mass separately from receipts.
+`createCargoFleetSession()` exposes exact-epoch `step`, detached `snapshot`/terminal `result`,
+scoped `decide` and idempotent `close`, with the exported `CargoFleetOperatorDecision` type.
+`simulateCargoFleetControl({ case? })` in `cargo/fleet-control.ts` supports four explicit
+transport cancellation/recovery cases. The [operator contract](cargo-fleet.md#retained-world-and-explicit-transport-decisions)
+retains current authority, a single physical point, original receive deadlines and
+attempted-intake uncertainty. It does not restore a failed vehicle session.
+
 ## Target sources
 
 `createGpsTargetSource({ targetId, origin, maxSpeedMps?, now? })` converts trusted phone or GNSS fixes

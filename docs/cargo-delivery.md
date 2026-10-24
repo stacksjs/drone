@@ -179,6 +179,48 @@ and limits. This primitive supplies no finite-duration contact forces or impact 
 release/intake acknowledgement, station handling, authorization or fleet custody handover.
 Those integrations remain open under issue #25.
 
+## Finite station handling prerequisite
+
+The separate [station actor](cargo-station.md) now retains one released point through
+ballistic surface capture, finite powered motion, cancellation braking and one departure
+to a declared receiving joint. Its public integration test uses actual source separation
+and actual receiving-body intake. The world coordinator must still consume the one parcel,
+check the receiver's current authority and produce correlated custody acknowledgement.
+This model alone does not implement a fleet mission or qualify electrical endurance.
+
+## Receiving mission task prerequisite
+
+The shared owned mission engine accepts `material-receive` only for quadcopters, with a
+non-null `containerId`, a required fixed-origin `positionM` pad anchor and an integer
+100 to 60,000 ms timeout. The anchor must be inside the mission fence and on or up to
+1 m above its declared zero surface. Normal and optional one-way alternate landing
+routes contribute to the longest-path time and declared reserve calculation.
+
+Entering intake immediately creates its scoped pending command, including the first
+control frame when the plan starts there. The quad controller uses qualified surface
+contact to keep modeled motor commands neutral during intake. This avoids a one-frame
+spin-up while waiting for the next mission evaluation. It does not erase existing motor
+lag, change mass or generate an acknowledgement.
+
+Mission observations must retain contact, speed at most 0.1 m/s and position within
+0.2 m of the pad. Losing these interlocks blocks receipt even if an ACK is present.
+A confirmed ACK still needs exact event/task/operation/container/reference correlation,
+a capture inside its deadline, freshness and a finite spatial check. ACK position requires
+three finite own coordinates; sparse arrays are rejected before acknowledgement handling. Timeout,
+foreign scope, rejection or uncertainty can follow a declared counted alternate route;
+they never advance the normal takeoff path or retry intake. A late unsolicited ACK
+blocks rather than reviving the original command.
+
+`tests/unit/cargo-receive-mission.test.ts` covers the native task and an actually empty
+receiving body in its own raw-sensor, estimator and authority runtime. With ACK withheld,
+it stays at the declared pad with zero actual motor thrust and no phantom parcel mass.
+A caller-invented ACK is not proof of mechanical transfer. The
+[two-carrier model](cargo-fleet.md) now binds its receipt port to actual intake, same-epoch
+receiver authority and eleven bounded fleet cases through `cargo:fleet`. The retained
+world and `cargo:fleet-control` add same-session station cancellation and bounded
+recovery before intake is attempted. General vehicle abort/replan, uncertain-intake
+reconciliation and the wider fault/recovery and operational matrix remain open under #25.
+
 ## BVLOS operations evidence
 
 
@@ -209,7 +251,8 @@ establish an airspace detect-and-avoid system.
 
 ## Remaining issue scope
 
-[#25](https://github.com/stacksjs/drone/issues/25) remains open for actual distinct-vehicle
-fleet handover, richer endurance models/measurements, durable cargo/runtime reconciliation,
+[#25](https://github.com/stacksjs/drone/issues/25) remains open for general fleet
+handover/recovery beyond the bounded two-carrier model, richer endurance
+models/measurements, durable cargo/runtime reconciliation,
 physical release/recipient validation and the separate operational evidence case.
 The original acceptance scope is not reduced to passing named demonstrations.
