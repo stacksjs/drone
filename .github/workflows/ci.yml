@@ -101,8 +101,22 @@ jobs:
           path: ${{ runner.temp }}/runtime-maintenance-evidence
       - run: ./buddy test
         env:
+          EXECUTION_LIFETIME_EVIDENCE: ${{ runner.temp }}/execution-lifetime-full-evidence
           RUNTIME_HOST_FILE_LIMIT_EVIDENCE: ${{ runner.temp }}/runtime-host-file-limit-full-evidence
           RUNTIME_MAINTENANCE_EVIDENCE: ${{ runner.temp }}/runtime-maintenance-full-evidence
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: execution-lifetime-full-evidence
+          if-no-files-found: ignore
+          retention-days: 7
+          path: |
+            ${{ runner.temp }}/execution-lifetime-full-evidence/*/fixture.stdout
+            ${{ runner.temp }}/execution-lifetime-full-evidence/*/fixture.stderr
+            ${{ runner.temp }}/execution-lifetime-full-evidence/*/lifecycle.json
+            ${{ runner.temp }}/execution-lifetime-full-evidence/*/access.sqlite
+            ${{ runner.temp }}/execution-lifetime-full-evidence/*/access.sqlite-wal
+            ${{ runner.temp }}/execution-lifetime-full-evidence/*/access.sqlite-shm
       - uses: actions/upload-artifact@v4
         if: always()
         with:
