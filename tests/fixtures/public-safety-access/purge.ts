@@ -6,7 +6,7 @@ import { join, resolve } from 'node:path'
 import { actor, as, seed, database, root, retention, records, managed, access, status } from './managed-context'
 import { purgeAbilities, purgeCoverage, purgeExclusions, purgePolicy } from '../../../resources/functions/drone/public-safety/purge/types'
 const { publicSafetyPurgeGate } = await import('../../../resources/functions/drone/public-safety/purge/policy')
-import { inspectTemporaryWorkspace } from '../../../resources/functions/artifacts/native-storage/temporary-workspaces'
+import { inspectTemporaryWorkspace } from '@stacksjs/storage/temporary-workspaces'
 const purge = await import('../../../resources/functions/drone/public-safety/purge/service')
 const job = (await import('../../../app/Jobs/PublicSafetyPurgeSweep')).default
 await mkdir(join(root, 'app/Jobs'), { recursive: true })

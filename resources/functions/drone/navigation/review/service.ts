@@ -1,3 +1,4 @@
+import type { DatabaseSchema } from '@stacksjs/database'
 import type { TransactionHandle } from '@stacksjs/orm'
 import { asRow, asRows, lockRow, mutationCount } from '@stacksjs/database/runtime'
 import { isUniqueViolation, transaction } from '@stacksjs/orm'
@@ -191,7 +192,7 @@ async function mutateReview(schedule: string, dueValue: number, value: unknown, 
       if (!consuming && expiresAt !== null && expiresAt <= at) throw new PatrolReviewError(409)
       const state = consuming ? 'consumed' : decision === 'approve' ? 'approved' : 'denied'
       if (mutationCount(await tx.updateTable('patrol_review_schedules').set({ version: row.version + 1 }).where('id', '=', row.id).where('version', '=', row.version).executeTakeFirst()) !== 1) throw new PatrolReviewError(409)
-      const changes = consuming ? { state, consumed_at_iso: at, consume_request_id: body.requestId } : { state, decision, reviewer_id: captured.userId, reviewer_token_id: captured.tokenId, reviewed_at_iso: at, expires_at_iso: expiresAt, review_request_id: body.requestId }
+      const changes = (consuming ? { state, consumed_at_iso: at, consume_request_id: body.requestId } : { state, decision, reviewer_id: captured.userId, reviewer_token_id: captured.tokenId, reviewed_at_iso: at, expires_at_iso: expiresAt, review_request_id: body.requestId }) satisfies Partial<DatabaseSchema['patrol_review_occurrences']>
       if (mutationCount(await tx.updateTable('patrol_review_occurrences').set(changes).where('id', '=', o.id).where('state', '=', consuming ? 'approved' : 'awaiting-review').executeTakeFirst()) !== 1) throw new PatrolReviewError(409)
       const details = { dueUtcMs: due, scopeDigest: o.scope_digest, inputDigest: row.input_digest, bindingDigest: row.binding_digest, previousVersion: row.version, resultVersion: row.version + 1, stateAfter: state, expiresAt }
       await tx.insertInto('patrol_review_audits').values({ schedule_id: row.id, sequence: row.version + 1, actor_id: captured.userId, token_id: captured.tokenId, action: state, request_id: body.requestId, request_digest: requestDigest, at_iso: at, details_json: json(details, 512) }).execute()

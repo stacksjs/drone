@@ -5,11 +5,11 @@ import { writeCompletedArtifact } from '../../artifacts/completed-directory'
 import { readMissionFile } from '../missions/files'
 import { normalizePatrolInput, simulatePatrol } from './patrol'
 
-type EngineVersion = '1.4.2' | '1.4.3'
+type EngineVersion = '1.4.2' | '1.4.3' | '1.4.4'
 
 function captureEngine(): Readonly<{ name: 'bun', version: EngineVersion }> {
   const version = Bun.version
-  if (version !== '1.4.2' && version !== '1.4.3') throw new TypeError('patrol-engine-unsupported')
+  if (version !== '1.4.2' && version !== '1.4.3' && version !== '1.4.4') throw new TypeError('patrol-engine-unsupported')
   return Object.freeze({ name: 'bun', version })
 }
 
@@ -99,7 +99,7 @@ function capturedBundle(input: unknown, engine: ReturnType<typeof captureEngine>
   const source = data(bundle.recording, ['version', 'evidence', 'replayProfile', 'engine', 'input', 'summarySha256'])
   const recordedEngine = data(source.engine, ['name', 'version'])
   if (source.version !== 1 || source.evidence !== 'owned-patrol-input-and-summary' || source.replayProfile !== 'owned-patrol-summary-v1' || recordedEngine.name !== 'bun') throw new TypeError('patrol-recording-profile-unsupported')
-  if (recordedEngine.version !== '1.4.2' && recordedEngine.version !== '1.4.3') throw new TypeError('patrol-recording-engine-unsupported')
+  if (recordedEngine.version !== '1.4.2' && recordedEngine.version !== '1.4.3' && recordedEngine.version !== '1.4.4') throw new TypeError('patrol-recording-engine-unsupported')
   if (recordedEngine.version !== engine.version) throw new TypeError('patrol-recording-engine-mismatch')
   const ownedInput = normalizePatrolInput(data(source.input, ['profile', 'unsignedLocalReview', 'enableCharge', 'decisions']))
   if (typeof source.summarySha256 !== 'string' || !/^[a-f0-9]{64}$/.test(source.summarySha256)) throw new TypeError('patrol-recording-digest')

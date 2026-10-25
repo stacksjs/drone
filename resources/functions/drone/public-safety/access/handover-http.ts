@@ -1,6 +1,6 @@
 import type { IncidentRequest } from './http'
 import { readTextBody, RequestBodyError } from '@stacksjs/router'
-import { parseJsonText } from '../../http/native-router/json'
+import { parseJsonText } from '@stacksjs/router/json'
 import { PublicSafetyAccessError } from './errors'
 import { assertIncidentDeadline, associateIncidentDeadline, incidentDeadline } from './deadline'
 import { execute, failure, privateHeaders } from './http'

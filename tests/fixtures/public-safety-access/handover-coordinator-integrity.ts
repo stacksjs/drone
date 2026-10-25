@@ -19,7 +19,7 @@ try {
   await f.database.db.primary.updateTable('public_safety_incident_members').set({ role: 'observer' }).where('incident_id', '=', before.incident!.id).where('user_id', '=', f.unrelated.id).execute()
   const accepted = await f.as(f.recipientToken, () => f.handover.decideIncidentHandover(seeded.key, f.decision(offered)))
   const after = await f.snapshot(seeded.key)
-  const coordinators = after.members.filter(row => row.role === 'coordinator' && (row.active === 1 || row.active === true))
+  const coordinators = after.members.filter(row => row.role === 'coordinator' && [1, true].includes(row.active))
   assert.equal(coordinators.length, 1)
   assert.equal(coordinators[0]!.user_id, accepted.incident.coordinatorId)
   console.log('PASS native coordinator corruption fails closed and transfer preserves exactly one active coordinator')

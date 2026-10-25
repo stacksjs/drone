@@ -99,7 +99,7 @@ else if (mode === 'upgrade') {
     assert(ledger.length > before.ledger.length, 'Actual generated migration must run, not an already-new schema')
     const oldPlan = before.rows.public_safety_purges![0]!
     const currentPlan = (await database.db.primary.selectFrom('public_safety_purges').selectAll().executeTakeFirst())!
-    for (const field of ['request_id', 'request_digest', 'frozen_header_json', 'frozen_counts_json', 'frozen_inventory_digest', 'accepted_incident_version', 'accepted_retention_version']) assert.deepEqual(currentPlan[field], oldPlan[field], `${field} remains exactly accepted v1`)
+    for (const field of ['request_id', 'request_digest', 'frozen_header_json', 'frozen_counts_json', 'frozen_inventory_digest', 'accepted_incident_version', 'accepted_retention_version'] as const) assert.deepEqual(currentPlan[field], oldPlan[field], `${field} remains exactly accepted v1`)
     const indexes = await database.db.unsafe('PRAGMA index_list(public_safety_audits)') as { name: string, unique: number }[]
     const indexed = await Promise.all(indexes.map(async index => ({ ...index, columns: (await database.db.unsafe(`PRAGMA index_info(${index.name})`) as { name: string }[]).map(column => column.name) })))
     for (const columns of [['incident_id', 'sequence'], ['incident_id', 'handover_key', 'handover_step'], ['incident_id', 'request_id']]) assert(indexed.some(index => index.unique === 1 && JSON.stringify(index.columns) === JSON.stringify(columns)), `Unique index preserved/generated: ${columns}`)
@@ -107,6 +107,7 @@ else if (mode === 'upgrade') {
     const legacy = before.rows.public_safety_audits![0]!, { id, ...duplicate } = legacy
     assert(id)
     await assert.rejects(() => database.db.primary.insertInto('public_safety_audits').values(duplicate).execute(), /UNIQUE constraint failed/)
+    // @ts-expect-error Deliberately invalid persisted enum verifies the real SQLite CHECK constraint.
     await assert.rejects(() => database.db.primary.insertInto('public_safety_audits').values({ ...duplicate, sequence: 2147483640, action: 'not-a-valid-action' }).execute(), /CHECK constraint failed/)
     await assert.rejects(() => database.db.primary.insertInto('public_safety_audits').values({ ...duplicate, incident_id: 2147483647 }).execute(), /FOREIGN KEY constraint failed/)
     assert.deepEqual(await database.db.unsafe('PRAGMA foreign_keys'), [{ foreign_keys: 1 }])

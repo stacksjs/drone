@@ -1,9 +1,10 @@
+import type { DatabaseSchema } from '@stacksjs/database'
 import type { TransactionHandle } from '@stacksjs/orm'
 import type { PurgeRow, PurgeScopeRow } from './internal'
 import type { IncidentRow } from '../access/policy'
 import type { PurgeCounts } from './types'
 import type { PurgeInventoryHeader } from './inventory'
-import type { CompletedArtifactIdentity, PreparedCompletedArtifactReceipt } from '../../../artifacts/native-storage/prepared-completed-artifact-directory'
+import type { CompletedArtifactIdentity, PreparedCompletedArtifactReceipt } from '@stacksjs/storage/prepared-completed-artifact-directory'
 import { randomUUID } from 'node:crypto'
 import { dirname, join } from 'node:path'
 import { asRows } from '@stacksjs/database/runtime'
@@ -17,7 +18,7 @@ interface BuildCursor { group: number, after: number, ordinal: number, digest: s
 async function insertItem(tx: TransactionHandle, row: PurgeRow, cursor: BuildCursor, values: Record<string, unknown>): Promise<number> {
   if (++cursor.ordinal >= 2147483647) purgeConflict()
   const at = new Date().toISOString()
-  const item = { purge_id: row.id, ordinal: cursor.ordinal, kind: 'db-row', parent_item_id: null, artifact_ordinal: null, source_table: null, source_row_id: null, planned_json: '{}', identity_json: null, alias_json: null, planned_bytes: null, planned_sha256: null, version: 1, generation: 1, operation_nonce: randomUUID(), state: 'planned', arm_json: null, observed_bytes: null, observed_sha256: null, result_code: null, armed_at_iso: null, verified_at_iso: null, ...values, created_at: at, updated_at: at }
+  const item = { purge_id: row.id, ordinal: cursor.ordinal, kind: 'db-row', parent_item_id: null, artifact_ordinal: null, source_table: null, source_row_id: null, planned_json: '{}', identity_json: null, alias_json: null, planned_bytes: null, planned_sha256: null, version: 1, generation: 1, operation_nonce: randomUUID(), state: 'planned', arm_json: null, observed_bytes: null, observed_sha256: null, result_code: null, armed_at_iso: null, verified_at_iso: null, ...values, created_at: at, updated_at: at } satisfies Partial<DatabaseSchema['public_safety_purge_items']>
   assertPurgeItemBounds(item)
   await tx.insertInto(purgeTables.item).values(item).execute()
   const result = asRows<{ id: number }>(await tx.selectFrom(purgeTables.item).select('id').where('purge_id', '=', row.id).where('ordinal', '=', cursor.ordinal).execute())

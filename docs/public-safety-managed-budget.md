@@ -16,7 +16,7 @@ Let S be the canonical UTF-8 source size, C the accepted capture count and N the
 
 `ts-images@0.2.31`'s actual PNG encoder in `dist/chunk-5z5cky6h.js` calls the embedded `dist/chunk-8edz5tfp.js`, not the independently installed @stacksjs/ts-png module. It supplies only width, height, RGBA bytes and deflateLevel 9. The embedded implementation uses 8-bit RGBA, a single filter byte per row, node:zlib deflateSync with strategy 3, no gamma/dictionary/custom metadata, and exactly one IHDR, IDAT and IEND chunk. PNG framing contributes 57 bytes per image.
 
-Qualified Bun 1.4.3 reports zlib commit 12731092979c6d07f42da27da673a9f6c7b13586. Its pinned [build source](https://github.com/oven-sh/bun/blob/c6da4a4d3/scripts/build/deps/zlib.ts) identifies that exact zlib-ng commit, and its [native binding](https://github.com/oven-sh/bun/blob/c6da4a4d3/src/runtime/node/zlib/NativeZlib.rs) calls deflate. [node:zlib defaults and sync processing](https://github.com/oven-sh/bun/blob/c6da4a4d3/src/js/node/zlib.ts) use default window/memory settings and Z_FINISH; no custom flush is supplied here.
+Qualified Bun 1.4.4, revision `38afee6c84fcf48c0edb2466aa4b27d287a59c30`, reports zlib commit `12731092979c6d07f42da27da673a9f6c7b13586`. Its pinned [build source](https://github.com/oven-sh/bun/blob/38afee6c84fcf48c0edb2466aa4b27d287a59c30/scripts/build/deps/zlib.ts) is byte-identical to the previously qualified 1.4.3 build definition. The [native binding](https://github.com/oven-sh/bun/blob/38afee6c84fcf48c0edb2466aa4b27d287a59c30/src/runtime/node/zlib/NativeZlib.rs) still calls deflate. The [node:zlib synchronous path](https://github.com/oven-sh/bun/blob/38afee6c84fcf48c0edb2466aa4b27d287a59c30/src/js/node/zlib.ts) retains default window/memory settings and Z_FINISH. Comparison with 1.4.3 found changes to asynchronous buffer/flush handling, without changing this synchronous encoder path. No custom flush is supplied here.
 
 The exact [zlib-ng deflateBound implementation](https://github.com/zlib-ng/zlib-ng/blob/12731092979c6d07f42da27da673a9f6c7b13586/deflate.c#L604) supplies the conservative compressed bound u+ceil(u/8)+ceil(u/64)+11 for a zlib-wrapped stream, broader than the default-parameter bound. These qualified arm64/x64 builds do not use the IBM DFLTCC hook. Summing per-image rounding generously adds at most 2C. Including PNG framing, all PNGs are bounded by U+ceil(U/8)+ceil(U/64)+70C, which is 5,570,925 bytes at the independent maxima U=4,868,387 and C=256. Thermal/support add exactly 3N=3,595,116 bytes.
 
@@ -47,8 +47,11 @@ arithmetic, and asserts the qualified Bun/zlib/ts-images versions and relevant s
 hashes. It performs no managed publication or deletion. It is an explicit qualification
 command, not a test of invented boundary recordings.
 
-The derivation was independently reviewed and reproduced on Bun 1.4.3. The sampled
-recordings and separate native 32 MiB filesystem workload are corroborating evidence;
+The derivation was initially independently reviewed and reproduced on Bun 1.4.3.
+The 1.4.4 requalification compares the pinned compression sources and repeats the
+executable proof on the actual runtime. Its guard also pins the exact Bun revision
+and arm64/x64 architecture. CI runs this proof on the frozen application graph.
+The sampled recordings and separate native 32 MiB filesystem workload are corroborating evidence;
 they do not establish the bound above. Future encoder, runtime or profile changes must
 re-establish the proof or qualify a reachable managed boundary before updating the
 script's assertions. The production byte guard continues to enforce its declared cap.

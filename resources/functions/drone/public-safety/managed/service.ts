@@ -1,5 +1,6 @@
+import type { DatabaseSchema } from '@stacksjs/database'
 import type { TransactionHandle } from '@stacksjs/orm'
-import type { PreparedCompletedArtifactDirectory, PreparedCompletedArtifactReceipt } from '../../../artifacts/native-storage/prepared-completed-artifact-directory'
+import type { PreparedCompletedArtifactDirectory, PreparedCompletedArtifactReceipt } from '@stacksjs/storage/prepared-completed-artifact-directory'
 import type { IncidentRow, ContentIncidentRow } from '../access/policy'
 import type { SourceRow } from '../access/records'
 import type { ManagedAbility, ManagedState, ManagedAction, ManagedOutcome, ManagedArtifactProjection, ManagedFileProjection, ManagedEventProjection, ManagedReceipt, ManagedListOptions, ManagedArtifactPage, ManagedArtifactRead, ManagedDownload, ManagedEventOptions, ManagedEventPage } from './types'
@@ -9,7 +10,7 @@ import { basename, join } from 'node:path'
 import { types } from 'node:util'
 import { asRow, asRows, lockRow, mutationCount, resolvedDatabaseDriver } from '@stacksjs/database/runtime'
 import { transaction } from '@stacksjs/orm'
-import { prepareCompletedArtifactDirectorySync } from '../../../artifacts/native-storage/prepared-completed-artifact-directory'
+import { prepareCompletedArtifactDirectorySync } from '@stacksjs/storage/prepared-completed-artifact-directory'
 import { PublicSafetyAccessError } from '../access/errors'
 import { exactRecord, expectedVersion, advance, maximumVersion, pagination } from '../access/mutations'
 import { verifyStoredSource, matchConfig } from '../access/records'
@@ -21,7 +22,7 @@ export { PublicSafetyAccessError } from '../access/errors'
 interface ArtifactRow {
   id: number, artifact_key: string, incident_id: number, retention_scope_id: number, source_id: number,
   source_digest: string, source_byte_length: number, source_created_sequence: number, config_digest: string,
-  source_profile: string, dataset_profile: 'owned-public-safety-dataset-v1', request_id: string, request_digest: string,
+  source_profile: SourceRow['replay_profile'], dataset_profile: 'owned-public-safety-dataset-v1', request_id: string, request_digest: string,
   requester_user_id: number, requested_at_iso: string, version: number, generation: number, operation_nonce: string, state: ManagedState,
   created_incident_version: number, latest_incident_version: number, requested_retention_version: number,
   planned_root_json: string, target_path: string, receipt_json: string | null, plan_digest: string, file_count: number,
@@ -29,7 +30,7 @@ interface ArtifactRow {
   interrupted_at_iso: string | null, completed_by_user_id: number | null, outcome_code: ManagedOutcome,
 }
 interface FileRow extends FilePlan { artifact_id: number, role: ManagedFileProjection['role'], capture_id: string | null, mime_type: string, observed_bytes: number | null, observed_sha256: string | null }
-interface EventRow { id: number, artifact_id: number, sequence: number, incident_version: number, action: ManagedAction, actor_user_id: number, request_id: string, request_digest: string, step: string, at_iso: string, outcome_code: ManagedOutcome }
+interface EventRow { id: number, artifact_id: number, sequence: number, incident_version: number, action: ManagedAction, actor_user_id: number, request_id: string, request_digest: string, step: DatabaseSchema['public_safety_managed_artifact_events']['step'], at_iso: string, outcome_code: ManagedOutcome }
 interface ScopeRow { id: number, incident_id: number, version: number, policy_version: string }
 type Access = Awaited<ReturnType<typeof requirePublicSafetyManagedAccess>>
 type Reader = Pick<TransactionHandle, 'selectFrom'>
@@ -91,7 +92,7 @@ async function replay(tx: Reader, access: Access, requestId: string, fingerprint
   managedDeadline(access.incident)
   return { artifact: artifactProjection(row, access), event: eventProjection(original), replayed: true }
 }
-async function event(tx: TransactionHandle, access: Access, row: ArtifactRow, action: ManagedAction, requestId: string, fingerprint: string, step: string): Promise<ManagedReceipt> {
+async function event(tx: TransactionHandle, access: Access, row: ArtifactRow, action: ManagedAction, requestId: string, fingerprint: string, step: EventRow['step']): Promise<ManagedReceipt> {
   const at = new Date().toISOString()
   await tx.insertInto(eventTable).values({ artifact_id: row.id, sequence: row.version, incident_version: access.incident.version, action, actor_user_id: access.principal.userId, at_iso: at, request_id: requestId, request_digest: fingerprint, step, outcome_code: row.outcome_code, created_at: at, updated_at: at }).execute()
   return { artifact: artifactProjection(row, access), event: eventProjection(await latest(tx, row)), replayed: false }
@@ -127,11 +128,12 @@ export async function createPublicSafetyManagedDataset(key: string, input: unkno
   const body = plain(input, ['expectedVersion', 'expectedRetentionVersion', 'sourceDigest', 'datasetProfile', 'requestId'])
   const expected = expectedVersion(body.expectedVersion), expectedRetention = expectedVersion(body.expectedRetentionVersion)
   uuid(body.requestId); digest(body.sourceDigest)
+  const requestId = body.requestId
   if (body.datasetProfile !== 'owned-public-safety-dataset-v1') throw new PublicSafetyAccessError(422, 'Invalid managed dataset profile')
   await authorizePublicSafetyManaged(key, 'create')
   const staged = await transaction(async tx => {
     const access = await requirePublicSafetyManagedAccess(key, 'create', tx), fingerprint = sha256(JSON.stringify(['create', access.principal.userId, body]))
-    const existing = await replay(tx, access, body.requestId as string, fingerprint)
+    const existing = await replay(tx, access, requestId, fingerprint)
     if (existing) return { existing }
     const scope = await scopeFor(tx, access)
     if (access.incident.version !== expected || scope.version !== expectedRetention) conflict()
@@ -147,7 +149,7 @@ export async function createPublicSafetyManagedDataset(key: string, input: unkno
   if (plan.length > 771 || total > managedBytes) throw new PublicSafetyAccessError(422, 'Managed dataset exceeds resource limits')
   const root = managedRoot(), artifactKey = randomUUID(), at = new Date().toISOString()
   const intent = await transaction(async tx => {
-    const access = await locked(tx, key, 'create'), existing = await replay(tx, access, body.requestId as string, fingerprint)
+    const access = await locked(tx, key, 'create'), existing = await replay(tx, access, requestId, fingerprint)
     if (existing) return { existing }
     const scope = await scopeFor(tx, access)
     if (access.incident.version !== expected || scope.version !== expectedRetention) conflict()
@@ -156,10 +158,10 @@ export async function createPublicSafetyManagedDataset(key: string, input: unkno
     sameRoot(root)
     access.incident = await advance(tx, access.incident) as ContentIncidentRow
     managedDeadline(access.incident)
-    await tx.insertInto(table).values({ artifact_key: artifactKey, incident_id: access.incident.id, retention_scope_id: scope.id, source_id: current.id, source_digest: current.digest, source_byte_length: current.byte_length, source_created_sequence: current.created_sequence, config_digest: sha256(access.incident.config_json), source_profile: current.replay_profile, dataset_profile: 'owned-public-safety-dataset-v1', request_id: body.requestId, request_digest: fingerprint, requester_user_id: access.principal.userId, requested_at_iso: at, version: 1, generation: 1, operation_nonce: randomUUID(), state: 'intent', created_incident_version: access.incident.version, latest_incident_version: access.incident.version, requested_retention_version: scope.version, planned_root_json: JSON.stringify(root), target_path: join(root.path, artifactKey), receipt_json: null, plan_digest: sha256(JSON.stringify(plan)), file_count: plan.length, total_planned_bytes: total, manifest_sha256: plan.at(-1)!.sha256, prepared_at_iso: null, completed_at_iso: null, interrupted_at_iso: null, completed_by_user_id: null, outcome_code: null, created_at: at, updated_at: at }).execute()
+    await tx.insertInto(table).values({ artifact_key: artifactKey, incident_id: access.incident.id, retention_scope_id: scope.id, source_id: current.id, source_digest: current.digest, source_byte_length: current.byte_length, source_created_sequence: current.created_sequence, config_digest: sha256(access.incident.config_json), source_profile: current.replay_profile, dataset_profile: 'owned-public-safety-dataset-v1', request_id: requestId, request_digest: fingerprint, requester_user_id: access.principal.userId, requested_at_iso: at, version: 1, generation: 1, operation_nonce: randomUUID(), state: 'intent', created_incident_version: access.incident.version, latest_incident_version: access.incident.version, requested_retention_version: scope.version, planned_root_json: JSON.stringify(root), target_path: join(root.path, artifactKey), receipt_json: null, plan_digest: sha256(JSON.stringify(plan)), file_count: plan.length, total_planned_bytes: total, manifest_sha256: plan.at(-1)!.sha256, prepared_at_iso: null, completed_at_iso: null, interrupted_at_iso: null, completed_by_user_id: null, outcome_code: null, created_at: at, updated_at: at }).execute()
     const artifact = await findArtifact(tx, access, artifactKey)
     for (const file of plan) await tx.insertInto(fileTable).values({ artifact_id: artifact.id, ...file, identity_json: null, observed_bytes: null, observed_sha256: null, created_at: at, updated_at: at }).execute()
-    return { artifact, result: await event(tx, access, artifact, 'intent-recorded', body.requestId as string, fingerprint, 'intent') }
+    return { artifact, result: await event(tx, access, artifact, 'intent-recorded', requestId, fingerprint, 'intent') }
   }, { retries: 0 })
   if (intent.existing) return intent.existing
   let prepared: PreparedCompletedArtifactDirectory | undefined
@@ -185,7 +187,7 @@ export async function createPublicSafetyManagedDataset(key: string, input: unkno
       next.prepared_at_iso = new Date().toISOString()
       await tx.updateTable(table).set({ receipt_json: encoded, prepared_at_iso: next.prepared_at_iso }).where('id', '=', current.id).execute()
       next.receipt_json = encoded
-      return event(tx, access, next, 'ownership-recorded', body.requestId as string, fingerprint, 'prepare')
+      return event(tx, access, next, 'ownership-recorded', requestId, fingerprint, 'prepare')
     }, { retries: 0 })
     // The actual identity COMMIT has resolved before any call to the payload closure.
     await transaction(async tx => {
@@ -198,7 +200,7 @@ export async function createPublicSafetyManagedDataset(key: string, input: unkno
       prepared.publishSync()
       next.completed_at_iso = new Date().toISOString()
       await tx.updateTable(table).set({ completed_at_iso: next.completed_at_iso }).where('id', '=', next.id).execute()
-      return event(tx, access, next, 'published', body.requestId as string, fingerprint, 'publish')
+      return event(tx, access, next, 'published', requestId, fingerprint, 'publish')
     }, { retries: 0 })
   }
   catch (error) { if (error instanceof PublicSafetyAccessError) throw error; throw new PublicSafetyAccessError(409, 'Managed dataset publication requires reconciliation') }

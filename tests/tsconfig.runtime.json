@@ -3,6 +3,7 @@
   "include": [
     "./unit/workspace-server-render.test.ts",
     "../storage/framework/types/env.d.ts",
+    "../database/types.d.ts",
     "../bin/drone.ts",
     "../resources/functions/drone/drivers/**/*.ts",
     "../resources/functions/drone/udp.ts",

@@ -1,11 +1,11 @@
 import type { BigIntStats } from 'node:fs'
-import type { CompletedArtifactIdentity, PreparedCompletedArtifactReceipt } from '../../../artifacts/native-storage/prepared-completed-artifact-directory'
+import type { CompletedArtifactIdentity, PreparedCompletedArtifactReceipt } from '@stacksjs/storage/prepared-completed-artifact-directory'
 import { createHash } from 'node:crypto'
 import { closeSync, constants, fstatSync, lstatSync, openSync, readSync, readdirSync, realpathSync } from 'node:fs'
 import { basename, dirname, join, relative, resolve } from 'node:path'
 import { env } from '@stacksjs/env'
 import { publicPath, storagePath } from '@stacksjs/path'
-import { inspectDirectoryMounts } from '../../../artifacts/native-storage/temporary-workspaces'
+import { inspectDirectoryMounts } from '@stacksjs/storage/temporary-workspaces'
 import { PublicSafetyAccessError } from '../access/errors'
 
 export const managedBytes = 32 * 1024 * 1024

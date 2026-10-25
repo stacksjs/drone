@@ -1,3 +1,4 @@
+import type { DatabaseSchema } from '@stacksjs/database'
 import type { PurgeState, PurgeArmState, PurgeOutcome, PurgeCounts, PurgeProgress, PurgeActor, PurgeAction, PurgeEvent, PurgeStatus, PurgeReceipt } from './types'
 import type { TransactionHandle } from '@stacksjs/orm'
 import type { IncidentRow } from '../access/policy'
@@ -24,7 +25,7 @@ export interface PurgeItemRow {
   source_row_id: number | null, planned_json: string, identity_json: string | null, alias_json: string | null, planned_bytes: number | null,
   planned_sha256: string | null, version: number, generation: number, operation_nonce: string,
   state: 'planned' | 'armed' | 'verified-absent' | 'row-removed' | 'blocked', arm_json: string | null,
-  observed_bytes: number | null, observed_sha256: string | null, result_code: string | null, armed_at_iso: string | null, verified_at_iso: string | null,
+  observed_bytes: number | null, observed_sha256: string | null, result_code: DatabaseSchema['public_safety_purge_items']['result_code'], armed_at_iso: string | null, verified_at_iso: string | null,
 }
 export interface PurgeEventRow { sequence: number, incident_version: number, retention_version: number, actor_kind: 'human' | 'system', actor_user_id: number | null, system_actor: 'public-safety-local-purge-v1' | null, step: PurgeAction, at_iso: string, counts_json: string, outcome_code: PurgeOutcome | null, request_digest: string | null }
 export const systemPurgeActor = { kind: 'system', name: 'public-safety-local-purge-v1' } as const

@@ -9,7 +9,9 @@ import { renderPublicSafetyDataset } from '../resources/functions/drone/public-s
 // A version/source change requires reviewing the derivation before updating these assertions.
 const project = resolve(import.meta.dir, '..')
 const hash = (path: string) => createHash('sha256').update(readFileSync(resolve(project, path))).digest('hex')
-assert.equal(Bun.version, '1.4.3', 'Requalify the Bun compression implementation')
+assert.equal(Bun.version, '1.4.4', 'Requalify the Bun compression implementation')
+assert.equal(Bun.revision, '38afee6c84fcf48c0edb2466aa4b27d287a59c30', 'Requalify the Bun source revision')
+assert(['arm64', 'x64'].includes(process.arch), 'Requalify the compression architecture')
 assert.equal(process.versions.zlib, '12731092979c6d07f42da27da673a9f6c7b13586', 'Requalify the zlib implementation')
 assert.equal(JSON.parse(readFileSync(resolve(project, 'node_modules/ts-images/package.json'), 'utf8')).version, '0.2.31')
 const qualifiedSources = {
@@ -84,6 +86,9 @@ console.log(JSON.stringify({
   managedCap: 32 * 1024 * 1024,
   headroom: 32 * 1024 * 1024 - upper,
   bun: Bun.version,
+  bunRevision: Bun.revision,
+  architecture: process.arch,
+  platform: process.platform,
   zlibCommit: process.versions.zlib,
   qualifiedSources,
 }))

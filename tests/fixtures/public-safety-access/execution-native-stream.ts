@@ -1,25 +1,24 @@
 import assert from 'node:assert/strict'
 import { AsyncLocalStorage } from 'node:async_hooks'
 import { cp, mkdir, writeFile } from 'node:fs/promises'
-import { join, resolve } from 'node:path'
+import { join } from 'node:path'
 import { createBroadcastHub } from '@stacksjs/realtime'
 import { emit } from '@stacksjs/realtime/emit'
-import type { BroadcastStreamMetadata, BroadcastStreamOptions } from '../../../resources/functions/drone/http/native-realtime/stream'
+import type { BroadcastStreamMetadata, BroadcastStreamOptions } from '@stacksjs/realtime/stream'
 import { setupHandoverFixture } from './handover-setup'
+import { qualifyPortableNativeStreamAction } from '../../helpers/public-safety-native-stream-artifact'
 
 const mode = Bun.argv[2]
 assert(mode === 'source' || mode === 'artifact')
 const f = await setupHandoverFixture()
-const source = resolve(import.meta.dir, '../../..')
-const relative = 'resources/functions/drone/http/native-realtime/stream'
 let reader: ReadableStreamDefaultReader<Uint8Array> | undefined
 let closed = 0
 try {
-  let module = join(source, `${relative}.ts`)
+  let module = '@stacksjs/realtime/stream'
   let publish = emit
   if (mode === 'artifact') {
     // Native app packaging options: app root, ESM/Bun, no splitting, only SWC
-    // external. A benign private fixture Action calls the real copied bridge.
+    // external. A benign private fixture Action calls the released stream export.
     // This is bounded transport packaging, not authenticated server acceptance.
     const outdir = join(process.cwd(), 'native-stream-build')
     const copied = join(process.cwd(), 'relocated-native-stream')
@@ -29,7 +28,7 @@ try {
 import { createBroadcastHub } from '@stacksjs/realtime'
 import { emit } from '@stacksjs/realtime/emit'
 import { enhanceRequest, getCurrentRequest, runWithRequest } from '@stacksjs/router'
-import { createBroadcastResponse } from ${JSON.stringify(join(source, `${relative}.ts`))}
+import { createBroadcastResponse } from '@stacksjs/realtime/stream'
 let selected
 const action = new Action({ name: 'NativeStreamProbe', method: 'GET', handle: request => {
   const original = selected
@@ -56,8 +55,9 @@ export function publish(channel, event, data) {
     assert(built.success, built.logs.map(String).join('\n'))
     await cp(outdir, copied, { recursive: true })
     module = join(copied, 'Actions/NativeStreamProbe.js')
+    await qualifyPortableNativeStreamAction(module, entry)
   }
-  const loaded = await import(module) as typeof import('../../../resources/functions/drone/http/native-realtime/stream') & { open: typeof import('../../../resources/functions/drone/http/native-realtime/stream').createBroadcastResponse, publish: typeof emit, default: { name: string } }
+  const loaded = await import(module) as typeof import('@stacksjs/realtime/stream') & { open: typeof import('@stacksjs/realtime/stream').createBroadcastResponse, publish: typeof emit, default: { name: string } }
   const createBroadcastResponse = mode === 'artifact' ? loaded.open : loaded.createBroadcastResponse
   if (mode === 'artifact') { assert.equal(loaded.default.name, 'NativeStreamProbe'); publish = loaded.publish }
   const core = await import('../../../resources/functions/drone/public-safety/execution/service')

@@ -59,7 +59,7 @@ try {
       { details_json: '{' }, { details_json: JSON.stringify({ ...details, unexpected: true }) }, { details_json: JSON.stringify(withoutProfile) },
       { handover_key: null }, { handover_step: null }, { handover_assignment_version: null }, { request_id: null }, { request_digest: null },
       { handover_assignment_version: 2 }, { target_user_id: f.unrelated.id }, { action: 'created' },
-    ]
+    ] as const
     for (const corruption of corruptions) {
       await f.database.db.primary.updateTable('public_safety_audits').set(corruption).where('id', '=', row.id).execute()
       const changed = await f.snapshot(seeded.key)
@@ -68,7 +68,7 @@ try {
       await assert.rejects(() => f.as(f.recipientToken, () => f.handover.decideIncidentHandover(seeded.key, f.decision(offered))), unavailable)
       await assert.rejects(() => f.offer(seeded), unavailable)
       assert.deepEqual(await f.snapshot(seeded.key), changed)
-      await f.database.db.primary.updateTable('public_safety_audits').set(Object.fromEntries(Object.keys(corruption).map(key => [key, row[key]]))).where('id', '=', row.id).execute()
+      await f.database.db.primary.updateTable('public_safety_audits').set(Object.fromEntries(Object.entries(row).filter(([key]) => key in corruption))).where('id', '=', row.id).execute()
     }
     assert.deepEqual(await f.snapshot(seeded.key), before)
     console.log('PASS malformed legitimate offer JSON, shape and lookup/detail metadata fail closed without authority effects')
@@ -84,7 +84,7 @@ try {
       { details_json: '[' }, { details_json: JSON.stringify({ ...details, unexpected: true }) }, { details_json: JSON.stringify({ ...details, acknowledged: true }) },
       { handover_key: null }, { handover_key: subsequent.offer.key }, { handover_step: null }, { handover_assignment_version: null }, { request_id: null }, { request_digest: null },
       { handover_assignment_version: 2 }, { target_user_id: f.unrelated.id }, { action: 'created' },
-    ]
+    ] as const
     for (const corruption of corruptions) {
       await f.database.db.primary.updateTable('public_safety_audits').set(corruption).where('id', '=', row.id).execute()
       const changed = await f.snapshot(seeded.key)
@@ -93,7 +93,7 @@ try {
       const refused = (error: unknown) => f.status(409)(error) || f.status(404)(error)
       await assert.rejects(() => f.as(f.senderToken, () => f.handover.decideIncidentHandover(seeded.key, cancelBody)), refused)
       assert.deepEqual(await f.snapshot(seeded.key), changed)
-      await f.database.db.primary.updateTable('public_safety_audits').set(Object.fromEntries(Object.keys(corruption).map(key => [key, row[key]]))).where('id', '=', row.id).execute()
+      await f.database.db.primary.updateTable('public_safety_audits').set(Object.fromEntries(Object.entries(row).filter(([key]) => key in corruption))).where('id', '=', row.id).execute()
     }
     assert.equal((await f.as(f.recipientToken, () => f.handover.readIncidentHandoverDesk(seeded.key, { offerKey: offered.offer.key }))).offer!.state, 'canceled')
     assert.deepEqual(await f.snapshot(seeded.key), before)

@@ -6,7 +6,7 @@ import { actor, as, seed, database, root, retention, records, managed, access, s
 import type { PurgeStatus } from '../../../resources/functions/drone/public-safety/purge/types'
 import { purgeAbilities, purgeCoverage, purgeExclusions, purgePolicy } from '../../../resources/functions/drone/public-safety/purge/types'
 import { examplePublicSafetyConfig } from '../../../resources/functions/drone/public-safety/fixtures'
-import { inspectTemporaryWorkspace } from '../../../resources/functions/artifacts/native-storage/temporary-workspaces'
+import { inspectTemporaryWorkspace } from '@stacksjs/storage/temporary-workspaces'
 const { publicSafetyPurgeGate } = await import('../../../resources/functions/drone/public-safety/purge/policy')
 const purge = await import('../../../resources/functions/drone/public-safety/purge/service')
 const job = (await import('../../../app/Jobs/PublicSafetyPurgeSweep')).default

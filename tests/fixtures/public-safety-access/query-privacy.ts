@@ -16,23 +16,33 @@ assert.equal(config.database.queryLogging?.enabled, true)
 assert.equal(config.database.queryLogging?.captureBindings, true)
 const db = database.db
 const now = new Date().toISOString()
+function fixtureId(value: unknown): number {
+  assert(typeof value === 'number' && Number.isSafeInteger(value) && value > 0, 'Expected a positive fixture row ID')
+  return value
+}
 try {
   const user = await User.create({ name: 'Diagnostic fixture', email: 'diagnostic@example.invalid', password: 'temporary-fixture-password' })
-  await db.insertInto('public_safety_incidents').values({ incident_key: 'diagnostic-fixture', version: 1, coordinator_id: user.id, status: 'active', purpose: 'search-and-rescue', revision: 'revision-1', config_json: '{}', retain_until: new Date(Date.now() + 86400000).toISOString(), created_at: now, updated_at: now }).execute()
+  const userId = fixtureId(user.id)
+  await db.insertInto('public_safety_incidents').values({ incident_key: 'diagnostic-fixture', version: 1, coordinator_id: userId, status: 'active', purpose: 'search-and-rescue', revision: 'revision-1', config_json: '{}', retain_until: new Date(Date.now() + 86400000).toISOString(), created_at: now, updated_at: now }).execute()
   const incident = await db.primary.selectFrom('public_safety_incidents').select('id').where('incident_key', '=', 'diagnostic-fixture').executeTakeFirst()
   assert(incident)
-  await db.insertInto('public_safety_sources').values({ incident_id: incident.id, digest: 'a'.repeat(64), byte_length: 2, canonical_json: '{}', replay_profile: 'owned-public-safety-collection-v1', evidence: 'owned-public-safety-physics-simulation', uploader_id: user.id, uploaded_at_iso: now, created_sequence: 2, created_at: now, updated_at: now }).execute()
-  const sourceRow = await db.primary.selectFrom('public_safety_sources').select('id').where('incident_id', '=', incident.id).executeTakeFirst()
+  const incidentId = fixtureId(incident.id)
+  await db.insertInto('public_safety_sources').values({ incident_id: incidentId, digest: 'a'.repeat(64), byte_length: 2, canonical_json: '{}', replay_profile: 'owned-public-safety-collection-v1', evidence: 'owned-public-safety-physics-simulation', uploader_id: userId, uploaded_at_iso: now, created_sequence: 2, created_at: now, updated_at: now }).execute()
+  const sourceRow = await db.primary.selectFrom('public_safety_sources').select('id').where('incident_id', '=', incidentId).executeTakeFirst()
   assert(sourceRow)
-  await db.insertInto('public_safety_observations').values({ source_id: sourceRow.id, capture_id: 'photo-0001', modality: 'visible', pixel_x: 0, pixel_y: 0, note: 'bootstrap', uncertainty_note: 'bootstrap', actor_id: user.id, observed_at_iso: now, created_sequence: 3, created_at: now, updated_at: now }).execute()
-  const observation = await db.primary.selectFrom('public_safety_observations').select('id').where('source_id', '=', sourceRow.id).executeTakeFirst()
+  const sourceRowId = fixtureId(sourceRow.id)
+  await db.insertInto('public_safety_observations').values({ source_id: sourceRowId, capture_id: 'photo-0001', modality: 'visible', pixel_x: 0, pixel_y: 0, note: 'bootstrap', uncertainty_note: 'bootstrap', actor_id: userId, observed_at_iso: now, created_sequence: 3, created_at: now, updated_at: now }).execute()
+  const observation = await db.primary.selectFrom('public_safety_observations').select('id').where('source_id', '=', sourceRowId).executeTakeFirst()
   assert(observation)
-  await db.insertInto('public_safety_reviews').values({ observation_id: observation.id, previous_review_id: null, disposition: 'unresolved', note: 'bootstrap', actor_id: user.id, reviewed_at_iso: now, created_sequence: 4, created_at: now, updated_at: now }).execute()
-  const review = await db.primary.selectFrom('public_safety_reviews').select('id').where('observation_id', '=', observation.id).executeTakeFirst()
+  const observationId = fixtureId(observation.id)
+  await db.insertInto('public_safety_reviews').values({ observation_id: observationId, previous_review_id: null, disposition: 'unresolved', note: 'bootstrap', actor_id: userId, reviewed_at_iso: now, created_sequence: 4, created_at: now, updated_at: now }).execute()
+  const review = await db.primary.selectFrom('public_safety_reviews').select('id').where('observation_id', '=', observationId).executeTakeFirst()
   assert(review)
-  await db.insertInto('public_safety_audits').values({ incident_id: incident.id, sequence: 1, actor_id: user.id, action: 'created', target_user_id: null, at_iso: now, details_json: '{}', created_at: now, updated_at: now }).execute()
-  const audit = await db.primary.selectFrom('public_safety_audits').select('id').where('incident_id', '=', incident.id).executeTakeFirst()
+  const reviewId = fixtureId(review.id)
+  await db.insertInto('public_safety_audits').values({ incident_id: incidentId, sequence: 1, actor_id: userId, action: 'created', target_user_id: null, at_iso: now, details_json: '{}', created_at: now, updated_at: now }).execute()
+  const audit = await db.primary.selectFrom('public_safety_audits').select('id').where('incident_id', '=', incidentId).executeTakeFirst()
   assert(audit)
+  const auditId = fixtureId(audit.id)
   const canaries: string[] = []
   for (const field of ['details_json', 'handover_key', 'handover_step', 'handover_assignment_version', 'request_id', 'request_digest']) {
     const canary = `Private diagnostic handover ${field} ordinary fixture words`
@@ -42,17 +52,17 @@ try {
     assert(!fallback.error?.includes(canary), `handover reflected fallback must redact ${field}`)
   }
   const targets = [
-    ['public_safety_incidents', 'config_json', incident.id],
-    ['public_safety_sources', 'canonical_json', sourceRow.id],
-    ['public_safety_observations', 'note', observation.id],
-    ['public_safety_observations', 'uncertainty_note', observation.id],
-    ['public_safety_reviews', 'note', review.id],
-    ['public_safety_audits', 'details_json', audit.id],
-    ['public_safety_audits', 'handover_key', audit.id],
-    ['public_safety_audits', 'handover_step', audit.id],
-    ['public_safety_audits', 'handover_assignment_version', audit.id],
-    ['public_safety_audits', 'request_id', audit.id],
-    ['public_safety_audits', 'request_digest', audit.id],
+    ['public_safety_incidents', 'config_json', incidentId],
+    ['public_safety_sources', 'canonical_json', sourceRowId],
+    ['public_safety_observations', 'note', observationId],
+    ['public_safety_observations', 'uncertainty_note', observationId],
+    ['public_safety_reviews', 'note', reviewId],
+    ['public_safety_audits', 'details_json', auditId],
+    ['public_safety_audits', 'handover_key', auditId],
+    ['public_safety_audits', 'handover_step', auditId],
+    ['public_safety_audits', 'handover_assignment_version', auditId],
+    ['public_safety_audits', 'request_id', auditId],
+    ['public_safety_audits', 'request_digest', auditId],
   ] as const
   for (const [index, [table, field, id]] of targets.entries()) {
     const successful = field === 'handover_step' ? 'offer' : field === 'handover_assignment_version' ? 1837491336 : `Private diagnostic success surface ${index} fixture words`

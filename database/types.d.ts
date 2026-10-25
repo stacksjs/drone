@@ -678,6 +678,7 @@ declare module '@stacksjs/database' {
       message: string
       stack: string
       status: number
+      resolution: "unresolved" | "resolved" | "ignored"
       additional_info: string
     }
     failed_jobs: {
@@ -1101,6 +1102,52 @@ declare module '@stacksjs/database' {
       author_id: number
       site_id: number
     }
+    patrol_review_audits: {
+      // columns
+      id: number
+      schedule_id: number
+      sequence: number
+      actor_id: number
+      token_id: number
+      action: "created" | "approved" | "denied" | "consumed"
+      request_id: string
+      request_digest: string
+      at_iso: string
+      details_json: string
+    }
+    patrol_review_occurrences: {
+      // columns
+      id: number
+      schedule_id: number
+      due_utc_ms: number
+      scope_digest: string
+      state: "awaiting-review" | "approved" | "denied" | "consumed"
+      decision: "approve" | "deny" | null
+      reviewer_id: number | null
+      reviewer_token_id: number | null
+      reviewed_at_iso: string | null
+      expires_at_iso: string | null
+      review_request_id: string | null
+      consumed_at_iso: string | null
+      consume_request_id: string | null
+    }
+    patrol_review_schedules: {
+      // columns
+      id: number
+      owner_user_id: number
+      schedule_key: string
+      revision: number
+      version: number
+      profile: "nominal"
+      recurrence_profile: "minute-zero-one-v1"
+      anchor_utc_ms: number
+      horizon_ms: number
+      input_json: string
+      binding_json: string
+      input_digest: string
+      binding_digest: string
+      created_at_iso: string
+    }
     payment_methods: {
       // columns
       id: number
@@ -1280,6 +1327,291 @@ declare module '@stacksjs/database' {
       nutritional_info: string
       category_id: number
       manufacturer_id: number
+    }
+    public_safety_audits: {
+      // columns
+      id: number
+      created_at: string
+      updated_at: string | null
+      incident_id: number
+      sequence: number
+      actor_id: number
+      action: "created" | "member-granted" | "member-revoked" | "closed" | "source-registered" | "observation-created" | "review-appended" | "handover-offered" | "handover-accepted" | "handover-declined" | "handover-canceled"
+      target_user_id: number
+      at_iso: string
+      handover_key: string | null
+      handover_step: "offer" | "terminal" | null
+      handover_assignment_version: number | null
+      request_id: string | null
+      request_digest: string | null
+      details_json: string
+    }
+    public_safety_incident_members: {
+      // columns
+      id: number
+      created_at: string
+      updated_at: string | null
+      incident_id: number
+      user_id: number
+      role: "coordinator" | "pilot" | "observer" | "reviewer" | "evidence-custodian"
+      active: number
+      version: number
+      granted_by: number
+      revoked_by: number
+    }
+    public_safety_incidents: {
+      // columns
+      id: number
+      created_at: string
+      updated_at: string | null
+      incident_key: string
+      version: number
+      coordinator_id: number
+      status: "active" | "closed" | "purged"
+      purpose: "search-and-rescue" | "fire-observation" | "disaster-assessment" | "lawful-police-observation" | null
+      revision: string | null
+      config_json: string | null
+      retain_until: string
+    }
+    public_safety_managed_artifact_events: {
+      // columns
+      id: number
+      created_at: string
+      updated_at: string | null
+      artifact_id: number
+      sequence: number
+      incident_version: number
+      action: "intent-recorded" | "ownership-recorded" | "published" | "reconcile-claimed" | "reconciled-complete" | "interrupted" | "blocked"
+      actor_user_id: number
+      at_iso: string
+      request_id: string
+      request_digest: string
+      step: "intent" | "prepare" | "publish" | "claim" | "result"
+      outcome_code: string
+    }
+    public_safety_managed_artifact_files: {
+      // columns
+      id: number
+      created_at: string
+      updated_at: string | null
+      artifact_id: number
+      ordinal: number
+      role: "recording" | "visible" | "thermal" | "support" | "readme" | "manifest"
+      capture_id: string
+      relative_path: string
+      mime_type: string
+      planned_bytes: number
+      sha256: string
+      identity_json: string
+      observed_bytes: number
+      observed_sha256: string
+    }
+    public_safety_managed_artifacts: {
+      // columns
+      id: number
+      created_at: string
+      updated_at: string | null
+      artifact_key: string
+      incident_id: number
+      retention_scope_id: number
+      source_id: number | null
+      source_digest: string
+      source_byte_length: number
+      source_created_sequence: number
+      config_digest: string
+      source_profile: "owned-public-safety-collection-v1"
+      dataset_profile: "owned-public-safety-dataset-v1"
+      request_id: string
+      request_digest: string
+      requester_user_id: number
+      requested_at_iso: string
+      version: number
+      generation: number
+      operation_nonce: string
+      state: "intent" | "prepared" | "inspecting" | "complete" | "interrupted" | "blocked"
+      created_incident_version: number
+      latest_incident_version: number
+      requested_retention_version: number
+      planned_root_json: string
+      target_path: string
+      receipt_json: string
+      plan_digest: string
+      file_count: number
+      total_planned_bytes: number
+      manifest_sha256: string
+      prepared_at_iso: string
+      completed_at_iso: string
+      interrupted_at_iso: string
+      completed_by_user_id: number
+      outcome_code: string
+    }
+    public_safety_observations: {
+      // columns
+      id: number
+      created_at: string
+      updated_at: string | null
+      source_id: number
+      capture_id: string
+      modality: "visible" | "thermal"
+      pixel_x: number
+      pixel_y: number
+      note: string
+      uncertainty_note: string
+      actor_id: number
+      observed_at_iso: string
+      created_sequence: number
+    }
+    public_safety_purge_events: {
+      // columns
+      id: number
+      created_at: string
+      updated_at: string | null
+      purge_id: number
+      sequence: number
+      incident_version: number
+      retention_version: number
+      operation_id: string
+      step: "accept" | "build" | "arm" | "result" | "db-batch" | "blocked" | "retry" | "minimize" | "complete" | "member-revoked"
+      actor_kind: "human" | "system"
+      actor_user_id: number | null
+      system_actor: "public-safety-local-purge-v1" | null
+      request_digest: string | null
+      at_iso: string
+      counts_json: string
+      outcome_code: "executor-disabled" | "ownership-uncertain" | "inspection-unavailable" | "identity-changed" | "unexpected-entry" | "unexpected-link" | "missing-unarmed" | "io-failed" | "sql-failed" | "inventory-changed" | "foreign-reference" | "capacity-exceeded" | null
+    }
+    public_safety_purge_items: {
+      // columns
+      id: number
+      created_at: string
+      updated_at: string | null
+      purge_id: number
+      ordinal: number
+      kind: "artifact" | "file" | "directory" | "db-row"
+      parent_item_id: number | null
+      artifact_ordinal: number | null
+      source_table: "managed-artifact" | "review" | "observation" | "source" | "audit" | "noncustody-membership" | "incident-payload" | null
+      source_row_id: number | null
+      planned_json: string
+      identity_json: string | null
+      alias_json: string | null
+      arm_json: string | null
+      planned_bytes: number | null
+      observed_bytes: number | null
+      planned_sha256: string | null
+      observed_sha256: string | null
+      version: number
+      generation: number
+      operation_nonce: string
+      state: "planned" | "armed" | "verified-absent" | "row-removed" | "blocked"
+      result_code: "observed-unlinked" | "absence-reconciled" | "row-removed" | "no-preparation-observed" | "executor-disabled" | "ownership-uncertain" | "inspection-unavailable" | "identity-changed" | "unexpected-entry" | "unexpected-link" | "missing-unarmed" | "io-failed" | "sql-failed" | "inventory-changed" | "foreign-reference" | "capacity-exceeded" | null
+      armed_at_iso: string | null
+      verified_at_iso: string | null
+    }
+    public_safety_purges: {
+      // columns
+      id: number
+      created_at: string
+      updated_at: string | null
+      incident_id: number
+      retention_scope_id: number
+      accepted_by_user_id: number
+      purge_key: string
+      request_id: string
+      operation_nonce: string
+      policy_version: "local-managed-purge-v1"
+      coverage: "active-db-and-registered-namespace-v1"
+      request_digest: string
+      frozen_inventory_digest: string
+      accepted_at_iso: string
+      next_eligible_at_iso: string
+      completed_at_iso: string | null
+      receipt_retain_until_iso: string | null
+      blocked_at_iso: string | null
+      review_due_at_iso: string | null
+      accepted_incident_version: number
+      accepted_retention_version: number
+      version: number
+      generation: number
+      receipt_retention_days: number
+      frozen_counts_json: string
+      frozen_header_json: string
+      build_cursor_json: string
+      db_cursor_json: string
+      minimize_cursor_json: string
+      materialized_counts_json: string
+      progress_counts_json: string
+      sealed_totals_json: string
+      build_digest: string | null
+      state: "building" | "ready" | "running" | "blocked" | "minimizing" | "complete"
+      fs_state: "pending" | "running" | "blocked" | "complete"
+      db_state: "pending" | "running" | "blocked" | "complete"
+      outcome_code: "executor-disabled" | "ownership-uncertain" | "inspection-unavailable" | "identity-changed" | "unexpected-entry" | "unexpected-link" | "missing-unarmed" | "io-failed" | "sql-failed" | "inventory-changed" | "foreign-reference" | "capacity-exceeded" | null
+    }
+    public_safety_retention_events: {
+      // columns
+      id: number
+      created_at: string
+      updated_at: string | null
+      scope_id: number
+      sequence: number
+      incident_version: number
+      action: "enrolled" | "hold-reviewed" | "member-revoked"
+      request_id: string
+      request_digest: string
+      actor_user_id: number
+      at_iso: string
+      decision: "retain" | "release"
+      case_reference: string
+      review_due_at: string
+      target_user_id: number
+    }
+    public_safety_retention_scopes: {
+      // columns
+      id: number
+      created_at: string
+      updated_at: string | null
+      incident_id: number
+      freeze_state: "retained" | "frozen" | "purged"
+      version: number
+      policy_version: "local-managed-v1"
+      inventory_digest: string | null
+      original_hold: "none" | "declared-review-required"
+      hold_state: "none" | "pending-review" | "held" | "released"
+      case_reference: string
+      review_due_at: string
+      reviewer_user_id: number
+      reviewed_at_iso: string
+      enrolled_by_user_id: number
+      enrolled_at_iso: string
+    }
+    public_safety_reviews: {
+      // columns
+      id: number
+      created_at: string
+      updated_at: string | null
+      observation_id: number
+      previous_review_id: number
+      disposition: "unresolved" | "supported-by-source" | "not-supported-by-source"
+      note: string
+      actor_id: number
+      reviewed_at_iso: string
+      created_sequence: number
+    }
+    public_safety_sources: {
+      // columns
+      id: number
+      created_at: string
+      updated_at: string | null
+      incident_id: number
+      digest: string
+      byte_length: number
+      canonical_json: string
+      replay_profile: "owned-public-safety-collection-v1"
+      evidence: "owned-public-safety-physics-simulation"
+      uploader_id: number
+      uploaded_at_iso: string
+      created_sequence: number
     }
     query_logs: {
       // columns

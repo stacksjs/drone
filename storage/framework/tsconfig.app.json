@@ -1,115 +1,44 @@
 {
-  // Framework-provided defaults for YOUR application code: `app/`, `config/`,
-  // `resources/` and `routes/`. The project's root `tsconfig.json` extends this
-  // file, so everything set here applies unless the root overrides it.
-  //
-  // Framework internals are checked separately, by `tsconfig.framework.json`.
+  // Framework-provided defaults for application code when Stacks is installed
+  // from npm. Published @stacksjs packages resolve through their package
+  // exports, while application aliases continue to point into this project.
   "extends": "./tsconfig.base.json",
   "compilerOptions": {
-    // The globals a `.stx` page is checked against beyond the stx runtime's
-    // own: `requestContext` is installed by the dev and production servers,
-    // not by stx, so neither checker can know it unless told. Both read this
-    // list - `stx typecheck` (and so `bun run typecheck:views`) and the stx
-    // extension's TypeScript plugin in the editor - so a page cannot pass one
-    // and fail the other (stacksjs/stx#2028). Paths are relative to this file.
-    "plugins": [
-      { "name": "@stacksjs/stx-typescript-plugin", "libs": ["./types/request-context.d.ts"] }
-    ],
-    // App code runs on both the server and in the browser (stx templates,
-    // stores, composables), so DOM types sit on top of the base `esnext` lib.
     "lib": ["esnext", "dom"],
     "rootDir": "../..",
-    // Deliberately NOT incremental, unlike the framework's own projects.
-    //
-    // `tsc`'s incremental state goes stale across the regeneration of the
-    // auto-import barrels, and it does so in the direction that matters: after
-    // removing a job and running `buddy generate`, a warm cache reported ZERO
-    // errors on an app whose `Scheduler.ts` still scheduled the deleted job -
-    // the exact diagnostic `SchedulableJobs` exists to produce. Cold, the same
-    // tree reports it. Neither half does this alone: deleting the file alone is
-    // caught, editing the barrel alone is caught; only the combination loses
-    // it, and it goes stale in both directions.
-    //
-    // The trade is not close. Measured on this project: cold 3.3s, warm 1.9s
-    // raw, and through `buddy typecheck` the difference is inside the noise of
-    // CLI boot. A second and a half is not worth a check that can pass on code
-    // that does not compile, in precisely the workflow that produces the
-    // mistake - delete an example job, regenerate, typecheck, ship.
-    //
-    // The framework's own projects keep the cache, where it saves considerably
-    // more; `generateAutoImportFiles()` drops their build-info files whenever it
-    // rewrites a barrel. stacksjs/stacks#2405.
+    // Not incremental, for the reason spelled out in tsconfig.app.json: the
+    // cache reports a false green after the auto-import barrels are
+    // regenerated. stacksjs/stacks#2405.
     "incremental": false,
     "paths": {
-      "@stacksjs/actions/*": ["./core/actions/src/*"],
-      "@stacksjs/auth/*": ["./core/auth/src/*"],
-      "@stacksjs/config/*": ["./core/config/src/*"],
-      "@stacksjs/env/*": ["./core/env/src/*"],
-      "@stacksjs/features/*": ["./core/features/src/*"],
-      "@stacksjs/server/*": ["./core/server/src/*"],
-      // Governs `storage/framework/defaults` as well, at runtime: the server
-      // loads the auto-import barrels by path and the stx bundler builds page
-      // scripts on the deploy box, which has no `dist/`. Without this entry
-      // every `@stacksjs/browser/composables/*` import in `defaults/functions`
-      // missed there, so the whole functions barrel failed to load and the
-      // login and password forms shipped unbundled scripts.
-      "@stacksjs/browser/*": ["./core/browser/src/*"],
-      "@stacksjs/composables/*": ["./core/composables/src/*"],
-      "@stacksjs/commerce/*": ["./core/commerce/src/*"],
-      // Deep runtime entrypoints must resolve to source in a clean checkout.
-      "@stacksjs/database/*": ["./core/database/src/*"],
-      "@stacksjs/error-handling/*": ["./core/error-handling/src/*"],
-      "@stacksjs/logging/*": ["./core/logging/src/*"],
-      "@stacksjs/path/*": ["./core/path/src/*"],
-      "@stacksjs/router/*": ["./core/router/src/*"],
-      "@stacksjs/storage/*": ["./core/storage/src/*"],
-      "@stacksjs/validation/*": ["./core/validation/src/*"],
-      // Deep entrypoint, mapped explicitly: `@stacksjs/*` below binds the
-      // wildcard to the whole remainder, so `@stacksjs/orm/routes` looks for
-      // `./core/orm/routes/src`, misses, and falls through to the package's
-      // `exports` — which point at a `dist/` that a clean checkout has not
-      // built. Bun uses these mappings at RUNTIME too, so without this line the
-      // ORM route generator is unreachable in CI and every model's endpoints
-      // vanish from the generated OpenAPI spec.
-      "@stacksjs/orm/routes": ["./core/orm/src/routes.ts"],
-      // Same, for the Bun-only mobile testing entrypoint `docs/guide/mobile.md` imports.
-      "@stacksjs/mobile/testing": ["./core/mobile/src/testing.ts"],
-      "@stacksjs/types/exit-code": ["./core/types/src/exit-code.ts"],
-      "@stacksjs/*": ["./core/*/src"],
-      "stacks/*": ["./core/*/src"],
-      "buddy": ["./core/buddy/src/index.ts"],
-      "buddy/*": ["./core/buddy/src/*"],
       "Actions/*": ["../../app/Actions/*"],
       "Commands/*": ["../../app/Commands/*"],
       "Jobs/*": ["../../app/Jobs/*"],
       "Middleware/*": ["../../app/Middleware/*"],
       "Models/*": ["../../app/Models/*"],
       "Notifications/*": ["../../app/Notifications/*"],
+      // The framework defaults by package name. Lands on this project's
+      // `storage/framework/defaults` when there is one (a framework checkout, a
+      // vendored app, or the link to node_modules), and falls back to the
+      // installed `@stacksjs/defaults` when the mapped file does not exist -
+      // Bun and tsc both try the package after a `paths` miss. So one
+      // specifier resolves in every layout, which `~/storage/framework/
+      // defaults/...` does not.
+      "@stacksjs/defaults/*": ["./defaults/*"],
       "~/*": ["../../*"],
-      "@/*": ["../../resources/*"],
-      // Dashboard browser dependencies. The dev server bundles each of these
-      // entrypoints on demand and serves it at the URL on the left, so a
-      // dashboard component reaches its charting runtime with
-      // `await import('/__deps/charts.js')` and never through node_modules.
-      // Without the mapping that specifier is just an unresolvable module, so
-      // every chart in the dashboard was typed `any` behind a TS2307.
-      //
-      // `/__deps/ts-charts.js` is deliberately absent: the dev server finds its
-      // entrypoint at one of three locations depending on the machine, so a
-      // single mapping would resolve here and nowhere else. Nothing imports it
-      // today; give it a mapping when something does and the location settles.
-      "/__deps/charts.js": ["./core/charts/src/index.ts"]
+      "@/*": ["../../resources/*"]
     }
   },
-  // Only the four directories you author, plus the generated framework
-  // declarations (auto-imports, ORM globals, model attributes) they rely on.
-  // Keeping this list tight is the single biggest lever on check time.
   "include": [
     "./types/**/*.d.ts",
     // The generated table shapes, from `buddy generate:db-types`. Without this
     // the augmentation is written and never loaded, so `db.selectFrom('users')`
     // answers the framework's default `users` - or an unknown-valued record -
     // and an application's own columns are invisible to the compiler.
+    //
+    // Kept in step with tsconfig.app.json deliberately: this is the copy a
+    // package-based app receives, and the two drifting is how the fix landed
+    // in the vendored layout and reached no application.
     "../../database/types.d.ts",
     "../../app/**/*.ts",
     "../../config/**/*.ts",

@@ -15,7 +15,7 @@ survey accuracy or a field-qualified service.
 
 ## Start locally
 
-Use Bun 1.4.2 or newer and the repository's frozen lockfile:
+Use Bun 1.4.4 and the repository's frozen lockfile:
 
 ```sh
 git clone https://github.com/stacksjs/drone.git

@@ -24,6 +24,9 @@ declare global {
   const parseAgricultureRecording: typeof autoImports.parseAgricultureRecording
   const agricultureEvidenceLimits: typeof autoImports.agricultureEvidenceLimits
   const writeAgricultureDataset: typeof autoImports.writeAgricultureDataset
+  const collectFarmingObservation: typeof autoImports.collectFarmingObservation
+  const planFarmingObservation: typeof autoImports.planFarmingObservation
+  const observeFarmingProducer: typeof autoImports.observeFarmingProducer
   const readAgricultureConfig: typeof autoImports.readAgricultureConfig
   const readAgricultureRecording: typeof autoImports.readAgricultureRecording
   const readAgricultureObservations: typeof autoImports.readAgricultureObservations
@@ -97,15 +100,53 @@ declare global {
   const cameraSession: typeof autoImports.cameraSession
   const validBox: typeof autoImports.validBox
   const createVisualTracker: typeof autoImports.createVisualTracker
+  const captureCargoDeliveryDeclaration: typeof autoImports.captureCargoDeliveryDeclaration
+  const createCargoDeliveryCoordinator: typeof autoImports.createCargoDeliveryCoordinator
+  const simulateCargoDelivery: typeof autoImports.simulateCargoDelivery
+  const cargoDeliverySummary: typeof autoImports.cargoDeliverySummary
+  const cargoDeliveryScenarios: typeof autoImports.cargoDeliveryScenarios
+  const simulateCargoFleetControl: typeof autoImports.simulateCargoFleetControl
+  const cargoFleetOperatorCases: typeof autoImports.cargoFleetOperatorCases
+  const createCargoFleetSession: typeof autoImports.createCargoFleetSession
+  const simulateCargoFleet: typeof autoImports.simulateCargoFleet
+  const cargoFleetSummary: typeof autoImports.cargoFleetSummary
+  const cargoFleetScenarios: typeof autoImports.cargoFleetScenarios
+  const createCargoIntakeCoordinator: typeof autoImports.createCargoIntakeCoordinator
+  const simulateCargoLoad: typeof autoImports.simulateCargoLoad
+  const cargoLoadSummary: typeof autoImports.cargoLoadSummary
+  const cargoLoadScenarios: typeof autoImports.cargoLoadScenarios
+  const planCargoDelivery: typeof autoImports.planCargoDelivery
+  const createCargoStationHandler: typeof autoImports.createCargoStationHandler
+  const cinemaModel: typeof autoImports.cinemaModel
+  const createCinemaRenderer: typeof autoImports.createCinemaRenderer
+  const cinemaImageQuality: typeof autoImports.cinemaImageQuality
+  const measureCountedCinemaEncoder: typeof autoImports.measureCountedCinemaEncoder
+  const cinemaCountedEncoderMethod: typeof autoImports.cinemaCountedEncoderMethod
+  const cinemaCountedTranslationScenarios: typeof autoImports.cinemaCountedTranslationScenarios
+  const withinCinemaTravel: typeof autoImports.withinCinemaTravel
+  const cinemaJointQuaternion: typeof autoImports.cinemaJointQuaternion
+  const cinemaOffset: typeof autoImports.cinemaOffset
+  const cinemaGoal: typeof autoImports.cinemaGoal
+  const createCinemaGimbal: typeof autoImports.createCinemaGimbal
+  const createCountedCinemaGimbal: typeof autoImports.createCountedCinemaGimbal
+  const evaluateCinemaMotion: typeof autoImports.evaluateCinemaMotion
+  const neutralOptical: typeof autoImports.neutralOptical
+  const cinemaManagedScenarios: typeof autoImports.cinemaManagedScenarios
+  const simulateCinema: typeof autoImports.simulateCinema
+  const simulateManagedCinema: typeof autoImports.simulateManagedCinema
+  const simulateCountedTranslatingCinema: typeof autoImports.simulateCountedTranslatingCinema
+  const cinemaScenarios: typeof autoImports.cinemaScenarios
   const createController: typeof autoImports.createController
   const quadXWrench: typeof autoImports.quadXWrench
   const allocateQuadX: typeof autoImports.allocateQuadX
   const createSimulatedMultirotorController: typeof autoImports.createSimulatedMultirotorController
+  const createSimulatedLiftController: typeof autoImports.createSimulatedLiftController
   const multirotorModel: typeof autoImports.multirotorModel
   const validVector: typeof autoImports.validVector
   const clampControl: typeof autoImports.clampControl
-  const rotateBodyToNed: typeof autoImports.rotateBodyToNed
   const createRigidBody: typeof autoImports.createRigidBody
+  const createReceivingRigidBody: typeof autoImports.createReceivingRigidBody
+  const rotateBodyToNed: typeof autoImports.rotateBodyToNed
   const rotateNedToBody: typeof autoImports.rotateNedToBody
   const createBoundedPid: typeof autoImports.createBoundedPid
   const createPhysicsSensorFeed: typeof autoImports.createPhysicsSensorFeed
@@ -134,6 +175,7 @@ declare global {
   const diagnoseDiagnostics: typeof autoImports.diagnoseDiagnostics
   const diagnosticLimits: typeof autoImports.diagnosticLimits
   const diagnosticHealthCodes: typeof autoImports.diagnosticHealthCodes
+  const createDriverBenchPeer: typeof autoImports.createDriverBenchPeer
   const runDriverProtocolBench: typeof autoImports.runDriverProtocolBench
   const createArduPilotDriver: typeof autoImports.createArduPilotDriver
   const createPx4Driver: typeof autoImports.createPx4Driver
@@ -156,8 +198,42 @@ declare global {
   const driverProfiles: typeof autoImports.driverProfiles
   const createDriverProtocol: typeof autoImports.createDriverProtocol
   const DriverProtocolError: typeof autoImports.DriverProtocolError
+  const createAutopilotSession: typeof autoImports.createAutopilotSession
   const createMavlinkSigning: typeof autoImports.createMavlinkSigning
+  const writeEnvironmentDataset: typeof autoImports.writeEnvironmentDataset
+  const environmentOutputDirectory: typeof autoImports.environmentOutputDirectory
+  const encodeEnvironmentDataset: typeof autoImports.encodeEnvironmentDataset
+  const unavailable: typeof autoImports.unavailable
+  const dataRecord: typeof autoImports.dataRecord
+  const denseArray: typeof autoImports.denseArray
+  const finite: typeof autoImports.finite
+  const integer: typeof autoImports.integer
+  const vector: typeof autoImports.vector
+  const sha256: typeof autoImports.sha256
+  const compact: typeof autoImports.compact
+  const normalizeEnvironmentInput: typeof autoImports.normalizeEnvironmentInput
+  const environmentModel: typeof autoImports.environmentModel
+  const environmentPolicy: typeof autoImports.environmentPolicy
+  const environmentMission: typeof autoImports.environmentMission
+  const environmentProfiles: typeof autoImports.environmentProfiles
+  const environmentLimits: typeof autoImports.environmentLimits
+  const qualifyEnvironmentNavigation: typeof autoImports.qualifyEnvironmentNavigation
+  const qualifyEnvironmentPacket: typeof autoImports.qualifyEnvironmentPacket
+  const createEnvironmentCustody: typeof autoImports.createEnvironmentCustody
+  const simulateEnvironment: typeof autoImports.simulateEnvironment
+  const environmentSummary: typeof autoImports.environmentSummary
+  const validateEnvironmentRun: typeof autoImports.validateEnvironmentRun
+  const environmentFailureReasons: typeof autoImports.environmentFailureReasons
+  const fitEnvironmentCalibration: typeof autoImports.fitEnvironmentCalibration
+  const reduceEnvironmentCount: typeof autoImports.reduceEnvironmentCount
+  const environmentField: typeof autoImports.environmentField
+  const stepEnvironmentCell: typeof autoImports.stepEnvironmentCell
+  const validateRawEnvironmentPacket: typeof autoImports.validateRawEnvironmentPacket
+  const createEnvironmentDetector: typeof autoImports.createEnvironmentDetector
+  const environmentHeldOut: typeof autoImports.environmentHeldOut
   const createEstimator: typeof autoImports.createEstimator
+  const createFixtureInertialPrediction: typeof autoImports.createFixtureInertialPrediction
+  const fixtureInertialModel: typeof autoImports.fixtureInertialModel
   const geodeticToEcef: typeof autoImports.geodeticToEcef
   const geodeticToNed: typeof autoImports.geodeticToNed
   const nedRotation: typeof autoImports.nedRotation
@@ -214,6 +290,7 @@ declare global {
   const encodeFrame: typeof autoImports.encodeFrame
   const encodeFrameV2: typeof autoImports.encodeFrameV2
   const decodeDatagram: typeof autoImports.decodeDatagram
+  const createMavlinkStreamDecoder: typeof autoImports.createMavlinkStreamDecoder
   const encodeVelocity: typeof autoImports.encodeVelocity
   const observeMission: typeof autoImports.observeMission
   const createMissionEngine: typeof autoImports.createMissionEngine
@@ -222,6 +299,12 @@ declare global {
   const checkpointMission: typeof autoImports.checkpointMission
   const recoverMission: typeof autoImports.recoverMission
   const resumeMission: typeof autoImports.resumeMission
+  const createReadinessMissionEngine: typeof autoImports.createReadinessMissionEngine
+  const replayReadinessMission: typeof autoImports.replayReadinessMission
+  const parseReadinessMissionTrace: typeof autoImports.parseReadinessMissionTrace
+  const createTaskMotionMissionEngine: typeof autoImports.createTaskMotionMissionEngine
+  const replayTaskMotionMission: typeof autoImports.replayTaskMotionMission
+  const parseTaskMotionMissionTrace: typeof autoImports.parseTaskMotionMissionTrace
   const missionLimits: typeof autoImports.missionLimits
   const readMissionFile: typeof autoImports.readMissionFile
   const writeMissionTrace: typeof autoImports.writeMissionTrace
@@ -232,6 +315,16 @@ declare global {
   const validateMission: typeof autoImports.validateMission
   const exampleMission: typeof autoImports.exampleMission
   const parseMissionPlan: typeof autoImports.parseMissionPlan
+  const validateReadinessMission: typeof autoImports.validateReadinessMission
+  const validateTaskMotionMission: typeof autoImports.validateTaskMotionMission
+  const parseOwnedMissionTrace: typeof autoImports.parseOwnedMissionTrace
+  const replayOwnedMission: typeof autoImports.replayOwnedMission
+  const checkpointOwnedMission: typeof autoImports.checkpointOwnedMission
+  const recoverOwnedMission: typeof autoImports.recoverOwnedMission
+  const resumeOwnedMission: typeof autoImports.resumeOwnedMission
+  const replayOwnedMissionAt: typeof autoImports.replayOwnedMissionAt
+  const simulateTaskMotionMission: typeof autoImports.simulateTaskMotionMission
+  const assertMissionSimulationOrigin: typeof autoImports.assertMissionSimulationOrigin
   const simulateMission: typeof autoImports.simulateMission
   const missionScenarios: typeof autoImports.missionScenarios
   const vehicleMissionContains: typeof autoImports.vehicleMissionContains
@@ -241,9 +334,27 @@ declare global {
   const replayVehicleMission: typeof autoImports.replayVehicleMission
   const parseVehicleMissionTrace: typeof autoImports.parseVehicleMissionTrace
   const recoverVehicleMission: typeof autoImports.recoverVehicleMission
+  const checkpointVehicleMission: typeof autoImports.checkpointVehicleMission
+  const resumeVehicleMission: typeof autoImports.resumeVehicleMission
   const vehicleMissionLimits: typeof autoImports.vehicleMissionLimits
+  const normalizeChargeApproval: typeof autoImports.normalizeChargeApproval
+  const createChargeOutputWatchdog: typeof autoImports.createChargeOutputWatchdog
+  const createChargePlant: typeof autoImports.createChargePlant
+  const qualifyChargeEnvironment: typeof autoImports.qualifyChargeEnvironment
+  const createChargeDomain: typeof autoImports.createChargeDomain
+  const chargeProfiles: typeof autoImports.chargeProfiles
+  const chargeModel: typeof autoImports.chargeModel
+  const contactGeometry: typeof autoImports.contactGeometry
+  const createContactFeed: typeof autoImports.createContactFeed
+  const contactEligibility: typeof autoImports.contactEligibility
+  const initialContactVerification: typeof autoImports.initialContactVerification
+  const reduceContactVerification: typeof autoImports.reduceContactVerification
+  const contactProfiles: typeof autoImports.contactProfiles
+  const contactModel: typeof autoImports.contactModel
   const navigationGoal: typeof autoImports.navigationGoal
   const createNavigator: typeof autoImports.createNavigator
+  const normalizePatrolInput: typeof autoImports.normalizePatrolInput
+  const simulatePatrol: typeof autoImports.simulatePatrol
   const detectNavigationMap: typeof autoImports.detectNavigationMap
   const validateNavigationMap: typeof autoImports.validateNavigationMap
   const terrainDownAt: typeof autoImports.terrainDownAt
@@ -251,9 +362,56 @@ declare global {
   const planNavigationPath: typeof autoImports.planNavigationPath
   const navigationSegmentClear: typeof autoImports.navigationSegmentClear
   const navigationPolicy: typeof autoImports.navigationPolicy
+  const writePatrolDataset: typeof autoImports.writePatrolDataset
+  const replayPatrolDataset: typeof autoImports.replayPatrolDataset
+  const createPatrolRecording: typeof autoImports.createPatrolRecording
+  const replayPatrolRecording: typeof autoImports.replayPatrolRecording
+  const createPatrolRecurrence: typeof autoImports.createPatrolRecurrence
+  const data: typeof autoImports.data
+  const key: typeof autoImports.key
+  const requestId: typeof autoImports.requestId
+  const databaseId: typeof autoImports.databaseId
+  const iso: typeof autoImports.iso
+  const json: typeof autoImports.json
+  const sha: typeof autoImports.sha
+  const normalizeInput: typeof autoImports.normalizeInput
+  const normalizeBinding: typeof autoImports.normalizeBinding
+  const normalizeCreate: typeof autoImports.normalizeCreate
+  const digests: typeof autoImports.digests
+  const scopeDigest: typeof autoImports.scopeDigest
+  const createRequestDigest: typeof autoImports.createRequestDigest
+  const utcMs: typeof autoImports.utcMs
+  const routeDue: typeof autoImports.routeDue
+  const version: typeof autoImports.version
+  const digest: typeof autoImports.digest
+  const normalizeDecision: typeof autoImports.normalizeDecision
+  const normalizeConsume: typeof autoImports.normalizeConsume
+  const transitionDigest: typeof autoImports.transitionDigest
+  const isPatrolDatabaseBusy: typeof autoImports.isPatrolDatabaseBusy
+  const canonicalVersion: typeof autoImports.canonicalVersion
+  const anchorUtcMs: typeof autoImports.anchorUtcMs
+  const recurrenceProfile: typeof autoImports.recurrenceProfile
+  const origin: typeof autoImports.origin
+  const safety: typeof autoImports.safety
+  const PatrolReviewError: typeof autoImports.PatrolReviewError
+  const patrolHttpBoundary: typeof autoImports.patrolHttpBoundary
+  const createPatrolReviewHttp: typeof autoImports.createPatrolReviewHttp
+  const readPatrolReviewHttp: typeof autoImports.readPatrolReviewHttp
+  const decidePatrolReviewHttp: typeof autoImports.decidePatrolReviewHttp
+  const consumePatrolReviewHttp: typeof autoImports.consumePatrolReviewHttp
+  const requirePatrolPrincipal: typeof autoImports.requirePatrolPrincipal
+  const patrolReviewGate: typeof autoImports.patrolReviewGate
+  const authorizePatrol: typeof autoImports.authorizePatrol
+  const createPatrolReviewSchedule: typeof autoImports.createPatrolReviewSchedule
+  const readPatrolReviewSchedule: typeof autoImports.readPatrolReviewSchedule
+  const decidePatrolReview: typeof autoImports.decidePatrolReview
+  const consumePatrolReview: typeof autoImports.consumePatrolReview
+  const createNavigationSession: typeof autoImports.createNavigationSession
+  const runNavigationFixture: typeof autoImports.runNavigationFixture
+  const createNavigationOccurrenceSession: typeof autoImports.createNavigationOccurrenceSession
+  const navigationScenarios: typeof autoImports.navigationScenarios
   const createNavigationSensorFeed: typeof autoImports.createNavigationSensorFeed
   const simulateNavigation: typeof autoImports.simulateNavigation
-  const navigationScenarios: typeof autoImports.navigationScenarios
   const savePayloadCapture: typeof autoImports.savePayloadCapture
   const runPayloadBench: typeof autoImports.runPayloadBench
   const payloadJson: typeof autoImports.payloadJson
@@ -264,6 +422,7 @@ declare global {
   const createPayloadCaptureSession: typeof autoImports.createPayloadCaptureSession
   const validatePayloadBus: typeof autoImports.validatePayloadBus
   const payloadInventory: typeof autoImports.payloadInventory
+  const createGimbalAuthority: typeof autoImports.createGimbalAuthority
   const createModeledCamera: typeof autoImports.createModeledCamera
   const createModeledShutter: typeof autoImports.createModeledShutter
   const openPiAiCameraPayload: typeof autoImports.openPiAiCameraPayload
@@ -274,6 +433,111 @@ declare global {
   const payloadLimits: typeof autoImports.payloadLimits
   const PayloadCaptureError: typeof autoImports.PayloadCaptureError
   const rasterPreviewDataUri: typeof autoImports.rasterPreviewDataUri
+  const checkedIncidentResult: typeof autoImports.checkedIncidentResult
+  const incidentDeadline: typeof autoImports.incidentDeadline
+  const associateIncidentDeadline: typeof autoImports.associateIncidentDeadline
+  const assertIncidentDeadline: typeof autoImports.assertIncidentDeadline
+  const PublicSafetyAccessError: typeof autoImports.PublicSafetyAccessError
+  const incidentDataExposureBoundary: typeof autoImports.incidentDataExposureBoundary
+  const stageHandoverSource: typeof autoImports.stageHandoverSource
+  const unchangedHandoverSource: typeof autoImports.unchangedHandoverSource
+  const verifiedHandoverSource: typeof autoImports.verifiedHandoverSource
+  const newerHandoverContext: typeof autoImports.newerHandoverContext
+  const projectIncidentSourceContext: typeof autoImports.projectIncidentSourceContext
+  const handoverBriefing: typeof autoImports.handoverBriefing
+  const offeredSource: typeof autoImports.offeredSource
+  const handoverSourceFields: typeof autoImports.handoverSourceFields
+  const offerHandoverHttp: typeof autoImports.offerHandoverHttp
+  const readHandoverDeskHttp: typeof autoImports.readHandoverDeskHttp
+  const decideHandoverHttp: typeof autoImports.decideHandoverHttp
+  const findOffer: typeof autoImports.findOffer
+  const terminalFor: typeof autoImports.terminalFor
+  const appendHandoverAudit: typeof autoImports.appendHandoverAudit
+  const handoverConflict: typeof autoImports.handoverConflict
+  const handoverUnavailable: typeof autoImports.handoverUnavailable
+  const handoverInteger: typeof autoImports.handoverInteger
+  const handoverUuid: typeof autoImports.handoverUuid
+  const handoverDigest: typeof autoImports.handoverDigest
+  const handoverRole: typeof autoImports.handoverRole
+  const handoverPlain: typeof autoImports.handoverPlain
+  const offerInput: typeof autoImports.offerInput
+  const decisionInput: typeof autoImports.decisionInput
+  const commandDigest: typeof autoImports.commandDigest
+  const parseOffer: typeof autoImports.parseOffer
+  const eventProjection: typeof autoImports.eventProjection
+  const handoverProfile: typeof autoImports.handoverProfile
+  const handoverTable: typeof autoImports.handoverTable
+  const hashHandover: typeof autoImports.hashHandover
+  const offerDigest: typeof autoImports.offerDigest
+  const requireHandoverAccess: typeof autoImports.requireHandoverAccess
+  const requireHandoverHuman: typeof autoImports.requireHandoverHuman
+  const publicSafetyHandoverGate: typeof autoImports.publicSafetyHandoverGate
+  const authorizePublicSafetyHandover: typeof autoImports.authorizePublicSafetyHandover
+  const activeMember: typeof autoImports.activeMember
+  const isCoordinator: typeof autoImports.isCoordinator
+  const readIncidentHandoverDesk: typeof autoImports.readIncidentHandoverDesk
+  const pendingWorkspaceHandoverSource: typeof autoImports.pendingWorkspaceHandoverSource
+  const projectIncidentHandoverDesk: typeof autoImports.projectIncidentHandoverDesk
+  const offerIncidentCoordination: typeof autoImports.offerIncidentCoordination
+  const decideIncidentHandover: typeof autoImports.decideIncidentHandover
+  const incidentHttpBoundary: typeof autoImports.incidentHttpBoundary
+  const execute: typeof autoImports.execute
+  const readBody: typeof autoImports.readBody
+  const failure: typeof autoImports.failure
+  const createIncidentHttp: typeof autoImports.createIncidentHttp
+  const readIncidentHttp: typeof autoImports.readIncidentHttp
+  const changeIncidentMembershipHttp: typeof autoImports.changeIncidentMembershipHttp
+  const closeIncidentHttp: typeof autoImports.closeIncidentHttp
+  const auditIncidentHttp: typeof autoImports.auditIncidentHttp
+  const privateHeaders: typeof autoImports.privateHeaders
+  const audit: typeof autoImports.audit
+  const mutation: typeof autoImports.mutation
+  const advance: typeof autoImports.advance
+  const exactRecord: typeof autoImports.exactRecord
+  const expectedVersion: typeof autoImports.expectedVersion
+  const projection: typeof autoImports.projection
+  const pagination: typeof autoImports.pagination
+  const maximumVersion: typeof autoImports.maximumVersion
+  const requireIncidentUnfrozen: typeof autoImports.requireIncidentUnfrozen
+  const requireIncidentAccess: typeof autoImports.requireIncidentAccess
+  const publicSafetyIncidentGate: typeof autoImports.publicSafetyIncidentGate
+  const publicSafetyCreateGate: typeof autoImports.publicSafetyCreateGate
+  const assertIncidentPayload: typeof autoImports.assertIncidentPayload
+  const validateIncidentKey: typeof autoImports.validateIncidentKey
+  const incidentPermission: typeof autoImports.incidentPermission
+  const requirePublicSafetyPrincipal: typeof autoImports.requirePublicSafetyPrincipal
+  const provisionIncidentAccess: typeof autoImports.provisionIncidentAccess
+  const reviewDispositions: typeof autoImports.reviewDispositions
+  const registerSourceHttp: typeof autoImports.registerSourceHttp
+  const readSourceHttp: typeof autoImports.readSourceHttp
+  const listSourcesHttp: typeof autoImports.listSourcesHttp
+  const appendObservationHttp: typeof autoImports.appendObservationHttp
+  const readObservationHttp: typeof autoImports.readObservationHttp
+  const listObservationsHttp: typeof autoImports.listObservationsHttp
+  const appendReviewHttp: typeof autoImports.appendReviewHttp
+  const listReviewsHttp: typeof autoImports.listReviewsHttp
+  const registerPublicSafetySource: typeof autoImports.registerPublicSafetySource
+  const registerPublicSafetySourceChecked: typeof autoImports.registerPublicSafetySourceChecked
+  const readPublicSafetySource: typeof autoImports.readPublicSafetySource
+  const listPublicSafetySources: typeof autoImports.listPublicSafetySources
+  const projectIncidentSourceCatalog: typeof autoImports.projectIncidentSourceCatalog
+  const appendPublicSafetyObservation: typeof autoImports.appendPublicSafetyObservation
+  const readPublicSafetyObservation: typeof autoImports.readPublicSafetyObservation
+  const listPublicSafetyObservations: typeof autoImports.listPublicSafetyObservations
+  const appendPublicSafetyReview: typeof autoImports.appendPublicSafetyReview
+  const listPublicSafetyReviews: typeof autoImports.listPublicSafetyReviews
+  const sourceProjection: typeof autoImports.sourceProjection
+  const verifyStoredSource: typeof autoImports.verifyStoredSource
+  const matchConfig: typeof autoImports.matchConfig
+  const authorizePublicSafetyCreate: typeof autoImports.authorizePublicSafetyCreate
+  const authorizePublicSafetyIncident: typeof autoImports.authorizePublicSafetyIncident
+  const createPublicSafetyIncident: typeof autoImports.createPublicSafetyIncident
+  const readPublicSafetyIncident: typeof autoImports.readPublicSafetyIncident
+  const changePublicSafetyMembership: typeof autoImports.changePublicSafetyMembership
+  const closePublicSafetyIncident: typeof autoImports.closePublicSafetyIncident
+  const readPublicSafetyAudit: typeof autoImports.readPublicSafetyAudit
+  const incidentRoles: typeof autoImports.incidentRoles
+  const incidentAbilities: typeof autoImports.incidentAbilities
   const renderPublicSafetyImage: typeof autoImports.renderPublicSafetyImage
   const createPublicSafetyCamera: typeof autoImports.createPublicSafetyCamera
   const publicSafetyRecordingData: typeof autoImports.publicSafetyRecordingData
@@ -281,13 +545,154 @@ declare global {
   const publicSafetyRecordingJson: typeof autoImports.publicSafetyRecordingJson
   const parsePublicSafetyRecording: typeof autoImports.parsePublicSafetyRecording
   const publicSafetyEvidenceLimits: typeof autoImports.publicSafetyEvidenceLimits
+  const openIncidentExecution: typeof autoImports.openIncidentExecution
+  const startExecutionHttp: typeof autoImports.startExecutionHttp
+  const readExecutionHttp: typeof autoImports.readExecutionHttp
+  const closeExecutionHttp: typeof autoImports.closeExecutionHttp
+  const admitExecutionHttp: typeof autoImports.admitExecutionHttp
+  const streamExecutionHttp: typeof autoImports.streamExecutionHttp
+  const executionAccess: typeof autoImports.executionAccess
+  const runExecutionCheck: typeof autoImports.runExecutionCheck
+  const checkExecutionAuthority: typeof autoImports.checkExecutionAuthority
+  const captureExecutionContext: typeof autoImports.captureExecutionContext
+  const requireExecutionScope: typeof autoImports.requireExecutionScope
+  const matchExecutionBinding: typeof autoImports.matchExecutionBinding
+  const parseExecutionWorkerMessage: typeof autoImports.parseExecutionWorkerMessage
+  const executionWords: typeof autoImports.executionWords
+  const executionDigest: typeof autoImports.executionDigest
+  const readIncidentExecution: typeof autoImports.readIncidentExecution
+  const startIncidentExecution: typeof autoImports.startIncidentExecution
+  const closeIncidentExecution: typeof autoImports.closeIncidentExecution
+  const attachIncidentExecution: typeof autoImports.attachIncidentExecution
+  const admitIncidentExecution: typeof autoImports.admitIncidentExecution
+  const executionOwner: typeof autoImports.executionOwner
+  const openIncidentExecutionStream: typeof autoImports.openIncidentExecutionStream
+  const runPublicSafetyWorker: typeof autoImports.runPublicSafetyWorker
   const writePublicSafetyDataset: typeof autoImports.writePublicSafetyDataset
+  const renderPublicSafetyDataset: typeof autoImports.renderPublicSafetyDataset
   const examplePublicSafetyConfig: typeof autoImports.examplePublicSafetyConfig
+  const associateManagedDownload: typeof autoImports.associateManagedDownload
+  const managedDownloadDeadline: typeof autoImports.managedDownloadDeadline
+  const managedUnavailable: typeof autoImports.managedUnavailable
+  const observedIdentity: typeof autoImports.observedIdentity
+  const identityMatches: typeof autoImports.identityMatches
+  const managedRoot: typeof autoImports.managedRoot
+  const sameRoot: typeof autoImports.sameRoot
+  const qualifiedReceipt: typeof autoImports.qualifiedReceipt
+  const inspectManagedArtifact: typeof autoImports.inspectManagedArtifact
+  const readManagedBytes: typeof autoImports.readManagedBytes
+  const managedFingerprint: typeof autoImports.managedFingerprint
+  const managedBytes: typeof autoImports.managedBytes
+  const createManagedDatasetHttp: typeof autoImports.createManagedDatasetHttp
+  const readManagedArtifactFileHttp: typeof autoImports.readManagedArtifactFileHttp
+  const listManagedArtifactsHttp: typeof autoImports.listManagedArtifactsHttp
+  const readManagedArtifactHttp: typeof autoImports.readManagedArtifactHttp
+  const listManagedArtifactEventsHttp: typeof autoImports.listManagedArtifactEventsHttp
+  const reconcileManagedArtifactHttp: typeof autoImports.reconcileManagedArtifactHttp
+  const requirePublicSafetyManagedAccess: typeof autoImports.requirePublicSafetyManagedAccess
+  const publicSafetyManagedGate: typeof autoImports.publicSafetyManagedGate
+  const authorizePublicSafetyManaged: typeof autoImports.authorizePublicSafetyManaged
+  const managedDeadline: typeof autoImports.managedDeadline
+  const createPublicSafetyManagedDataset: typeof autoImports.createPublicSafetyManagedDataset
+  const listPublicSafetyManagedArtifacts: typeof autoImports.listPublicSafetyManagedArtifacts
+  const readPublicSafetyManagedArtifact: typeof autoImports.readPublicSafetyManagedArtifact
+  const readPublicSafetyManagedArtifactFile: typeof autoImports.readPublicSafetyManagedArtifactFile
+  const listPublicSafetyManagedArtifactEvents: typeof autoImports.listPublicSafetyManagedArtifactEvents
+  const reconcilePublicSafetyManagedArtifact: typeof autoImports.reconcilePublicSafetyManagedArtifact
+  const managedAbilities: typeof autoImports.managedAbilities
+  const managedStates: typeof autoImports.managedStates
+  const managedActions: typeof autoImports.managedActions
   const publicSafetySegmentInside: typeof autoImports.publicSafetySegmentInside
   const publicSafetySessionId: typeof autoImports.publicSafetySessionId
   const planPublicSafetyMission: typeof autoImports.planPublicSafetyMission
+  const buildPurgePage: typeof autoImports.buildPurgePage
+  const verifyPurgeConvergence: typeof autoImports.verifyPurgeConvergence
+  const runPublicSafetyPurgeBatch: typeof autoImports.runPublicSafetyPurgeBatch
+  const observePurgeFile: typeof autoImports.observePurgeFile
+  const revalidatePurgeArmObservation: typeof autoImports.revalidatePurgeArmObservation
+  const executePurgeFile: typeof autoImports.executePurgeFile
+  const PurgeFileBlocked: typeof autoImports.PurgeFileBlocked
+  const acceptPurgeHttp: typeof autoImports.acceptPurgeHttp
+  const retryPurgeHttp: typeof autoImports.retryPurgeHttp
+  const previewPurgeHttp: typeof autoImports.previewPurgeHttp
+  const readPurgeHttp: typeof autoImports.readPurgeHttp
+  const listPurgeEventsHttp: typeof autoImports.listPurgeEventsHttp
+  const appendPurgeEvent: typeof autoImports.appendPurgeEvent
+  const transitionPurge: typeof autoImports.transitionPurge
+  const findPurge: typeof autoImports.findPurge
+  const purgeConflict: typeof autoImports.purgeConflict
+  const purgeUnavailable: typeof autoImports.purgeUnavailable
+  const purgeUuid: typeof autoImports.purgeUuid
+  const purgePlain: typeof autoImports.purgePlain
+  const addProgress: typeof autoImports.addProgress
+  const purgeEventProjection: typeof autoImports.purgeEventProjection
+  const purgeDeadline: typeof autoImports.purgeDeadline
+  const tagPurgeReceipt: typeof autoImports.tagPurgeReceipt
+  const purgeReceiptDeadline: typeof autoImports.purgeReceiptDeadline
+  const purgeStatus: typeof autoImports.purgeStatus
+  const systemPurgeActor: typeof autoImports.systemPurgeActor
+  const purgeTables: typeof autoImports.purgeTables
+  const inventoryPage: typeof autoImports.inventoryPage
+  const purgeInventory: typeof autoImports.purgeInventory
+  const purgeInventoryHeader: typeof autoImports.purgeInventoryHeader
+  const inventoryLine: typeof autoImports.inventoryLine
+  const inventoryAdd: typeof autoImports.inventoryAdd
+  const inventoryGroups: typeof autoImports.inventoryGroups
+  const inventoryFields: typeof autoImports.inventoryFields
+  const inventoryTables: typeof autoImports.inventoryTables
+  const assertPurgeItemBounds: typeof autoImports.assertPurgeItemBounds
+  const requirePublicSafetyPurgeAccess: typeof autoImports.requirePublicSafetyPurgeAccess
+  const publicSafetyPurgeGate: typeof autoImports.publicSafetyPurgeGate
+  const authorizePublicSafetyPurge: typeof autoImports.authorizePublicSafetyPurge
+  const purgeEnabled: typeof autoImports.purgeEnabled
+  const requirePurgeEnabled: typeof autoImports.requirePurgeEnabled
+  const previewPublicSafetyPurge: typeof autoImports.previewPublicSafetyPurge
+  const acceptPublicSafetyPurge: typeof autoImports.acceptPublicSafetyPurge
+  const readPublicSafetyPurge: typeof autoImports.readPublicSafetyPurge
+  const listPublicSafetyPurgeEvents: typeof autoImports.listPublicSafetyPurgeEvents
+  const retryPublicSafetyPurge: typeof autoImports.retryPublicSafetyPurge
+  const zeroPurgeCounts: typeof autoImports.zeroPurgeCounts
+  const zeroPurgeProgress: typeof autoImports.zeroPurgeProgress
+  const purgeAbilities: typeof autoImports.purgeAbilities
+  const purgeOutcomes: typeof autoImports.purgeOutcomes
+  const purgeCoverage: typeof autoImports.purgeCoverage
+  const purgePolicy: typeof autoImports.purgePolicy
+  const purgeExclusions: typeof autoImports.purgeExclusions
+  const previewRetentionHttp: typeof autoImports.previewRetentionHttp
+  const enrollRetentionHttp: typeof autoImports.enrollRetentionHttp
+  const readRetentionHttp: typeof autoImports.readRetentionHttp
+  const reviewRetentionHoldHttp: typeof autoImports.reviewRetentionHoldHttp
+  const listRetentionEventsHttp: typeof autoImports.listRetentionEventsHttp
+  const revokeCustodyMemberHttp: typeof autoImports.revokeCustodyMemberHttp
+  const requirePublicSafetyRetentionAccess: typeof autoImports.requirePublicSafetyRetentionAccess
+  const publicSafetyRetentionGate: typeof autoImports.publicSafetyRetentionGate
+  const authorizePublicSafetyRetention: typeof autoImports.authorizePublicSafetyRetention
+  const previewPublicSafetyRetention: typeof autoImports.previewPublicSafetyRetention
+  const enrollPublicSafetyRetention: typeof autoImports.enrollPublicSafetyRetention
+  const readPublicSafetyRetention: typeof autoImports.readPublicSafetyRetention
+  const reviewPublicSafetyRetentionHold: typeof autoImports.reviewPublicSafetyRetentionHold
+  const listPublicSafetyRetentionEvents: typeof autoImports.listPublicSafetyRetentionEvents
+  const revokePublicSafetyCustodyMember: typeof autoImports.revokePublicSafetyCustodyMember
+  const retentionAbilities: typeof autoImports.retentionAbilities
   const publicSafetyScenarios: typeof autoImports.publicSafetyScenarios
   const simulatePublicSafety: typeof autoImports.simulatePublicSafety
+  const openIncidentWorkspace: typeof autoImports.openIncidentWorkspace
+  const workspaceInteger: typeof autoImports.workspaceInteger
+  const workspaceOptions: typeof autoImports.workspaceOptions
+  const contextCursor: typeof autoImports.contextCursor
+  const readContextCursor: typeof autoImports.readContextCursor
+  const streamWorkspaceHttp: typeof autoImports.streamWorkspaceHttp
+  const readWorkspaceHttp: typeof autoImports.readWorkspaceHttp
+  const workspaceCaptures: typeof autoImports.workspaceCaptures
+  const workspaceCapturePreview: typeof autoImports.workspaceCapturePreview
+  const workspacePixel: typeof autoImports.workspacePixel
+  const workspaceAccess: typeof autoImports.workspaceAccess
+  const readWorkspaceAccess: typeof autoImports.readWorkspaceAccess
+  const readIncidentWorkspace: typeof autoImports.readIncidentWorkspace
+  const openIncidentWorkspaceStream: typeof autoImports.openIncidentWorkspaceStream
+  const captureWorkspaceCheck: typeof autoImports.captureWorkspaceCheck
+  const workspaceRefreshChannel: typeof autoImports.workspaceRefreshChannel
+  const queueIncidentWorkspaceRefresh: typeof autoImports.queueIncidentWorkspaceRefresh
   const runRuntimeBench: typeof autoImports.runRuntimeBench
   const runtimeBenchFaults: typeof autoImports.runtimeBenchFaults
   const buildRuntime: typeof autoImports.buildRuntime
@@ -321,7 +726,53 @@ declare global {
   const maxSensorDatasetBytes: typeof autoImports.maxSensorDatasetBytes
   const createSimulator: typeof autoImports.createSimulator
   const createGpsTargetSource: typeof autoImports.createGpsTargetSource
+  const createTcpAdapter: typeof autoImports.createTcpAdapter
   const createUdpAdapter: typeof autoImports.createUdpAdapter
+  const finishRuntimeCandidate: typeof autoImports.finishRuntimeCandidate
+  const runtimeCandidateOutput: typeof autoImports.runtimeCandidateOutput
+  const storeCommandFailure: typeof autoImports.storeCommandFailure
+  const firmwareCommandPolicy: typeof autoImports.firmwareCommandPolicy
+  const storeCommandEnrollment: typeof autoImports.storeCommandEnrollment
+  const storeCommandReference: typeof autoImports.storeCommandReference
+  const hostTrialCommandOptions: typeof autoImports.hostTrialCommandOptions
+  const firmwarePolicyFlags: typeof autoImports.firmwarePolicyFlags
+  const storeEnrollmentFlags: typeof autoImports.storeEnrollmentFlags
+  const storeReferenceFlags: typeof autoImports.storeReferenceFlags
+  const hostTrialFlags: typeof autoImports.hostTrialFlags
+  const enrollRuntimeTrust: typeof autoImports.enrollRuntimeTrust
+  const inspectRuntimeTrust: typeof autoImports.inspectRuntimeTrust
+  const safePath: typeof autoImports.safePath
+  const regularFile: typeof autoImports.regularFile
+  const directory: typeof autoImports.directory
+  const repositoryFile: typeof autoImports.repositoryFile
+  const writeExclusive: typeof autoImports.writeExclusive
+  const syncDirectory: typeof autoImports.syncDirectory
+  const syncTree: typeof autoImports.syncTree
+  const metadataLimit: typeof autoImports.metadataLimit
+  const imageLimit: typeof autoImports.imageLimit
+  const verifyRuntimeHostTranscript: typeof autoImports.verifyRuntimeHostTranscript
+  const observeRuntimeHostImage: typeof autoImports.observeRuntimeHostImage
+  const runtimeHostBuildProject: typeof autoImports.runtimeHostBuildProject
+  const admitSignedRuntime: typeof autoImports.admitSignedRuntime
+  const RuntimeManifestRejected: typeof autoImports.RuntimeManifestRejected
+  const object: typeof autoImports.object
+  const validateMetadata: typeof autoImports.validateMetadata
+  const admitPolicy: typeof autoImports.admitPolicy
+  const stageRuntimeFirmware: typeof autoImports.stageRuntimeFirmware
+  const inspectStagedRuntimeFirmware: typeof autoImports.inspectStagedRuntimeFirmware
+  const createRuntimeTrustStore: typeof autoImports.createRuntimeTrustStore
+  const inspectRuntimeTrustStore: typeof autoImports.inspectRuntimeTrustStore
+  const refreshRuntimeTrustStore: typeof autoImports.refreshRuntimeTrustStore
+  const continueRuntimeTrustMaintenance: typeof autoImports.continueRuntimeTrustMaintenance
+  const prepareRuntimeFirmwareUpdate: typeof autoImports.prepareRuntimeFirmwareUpdate
+  const inspectRuntimeFirmwareCandidates: typeof autoImports.inspectRuntimeFirmwareCandidates
+  const retireRuntimeFirmwareCandidate: typeof autoImports.retireRuntimeFirmwareCandidate
+  const reserveRuntimeFirmwareCandidate: typeof autoImports.reserveRuntimeFirmwareCandidate
+  const inspectRuntimeFirmwareSlots: typeof autoImports.inspectRuntimeFirmwareSlots
+  const abandonRuntimeFirmwareTrial: typeof autoImports.abandonRuntimeFirmwareTrial
+  const trialRuntimeFirmwareCandidate: typeof autoImports.trialRuntimeFirmwareCandidate
+  const rollbackRuntimeFirmwareSlot: typeof autoImports.rollbackRuntimeFirmwareSlot
+  const recoverRuntimeTrustStore: typeof autoImports.recoverRuntimeTrustStore
   const createAirController: typeof autoImports.createAirController
   const createAirProfile: typeof autoImports.createAirProfile
   const airScenarios: typeof autoImports.airScenarios
@@ -338,9 +789,17 @@ declare global {
   const createGroundSession: typeof autoImports.createGroundSession
   const createGroundProfile: typeof autoImports.createGroundProfile
   const groundScenarios: typeof autoImports.groundScenarios
+  const createRedundantVehicleLinks: typeof autoImports.createRedundantVehicleLinks
   const vehicleReference: typeof autoImports.vehicleReference
+  const captureVehicleBatteryModel: typeof autoImports.captureVehicleBatteryModel
+  const observeVehicleBattery: typeof autoImports.observeVehicleBattery
   const createVehicleMeasurementQualifier: typeof autoImports.createVehicleMeasurementQualifier
   const predictVehicleMeasurementPose: typeof autoImports.predictVehicleMeasurementPose
+  const multirotorMission: typeof autoImports.multirotorMission
+  const createMultirotorPlant: typeof autoImports.createMultirotorPlant
+  const createMultirotorProfile: typeof autoImports.createMultirotorProfile
+  const multirotorScenarios: typeof autoImports.multirotorScenarios
+  const createVehicleSimulationSession: typeof autoImports.createVehicleSimulationSession
   const runVehicleSimulation: typeof autoImports.runVehicleSimulation
   const subseaWrenchFromThrusters: typeof autoImports.subseaWrenchFromThrusters
   const allocateSubseaWrench: typeof autoImports.allocateSubseaWrench
@@ -371,6 +830,34 @@ declare global {
   const correctSurfaceSounding: typeof autoImports.correctSurfaceSounding
   const exportSurfaceSurvey: typeof autoImports.exportSurfaceSurvey
   const reduceSurfaceSurvey: typeof autoImports.reduceSurfaceSurvey
+  const vehicleKinds: typeof autoImports.vehicleKinds
+  const allocateVtolLift: typeof autoImports.allocateVtolLift
+  const createVtolBackCaptureProfile: typeof autoImports.createVtolBackCaptureProfile
+  const validVtolBackCapturePolicy: typeof autoImports.validVtolBackCapturePolicy
+  const createVtolBackCaptureResourceObserver: typeof autoImports.createVtolBackCaptureResourceObserver
+  const observeVtolBackCaptureMotion: typeof autoImports.observeVtolBackCaptureMotion
+  const forecastVtolBackCapture: typeof autoImports.forecastVtolBackCapture
+  const vtolBackCaptureModel: typeof autoImports.vtolBackCaptureModel
+  const createVtolVehicleHoverController: typeof autoImports.createVtolVehicleHoverController
+  const createVtolFlightController: typeof autoImports.createVtolFlightController
+  const createVtolHoverController: typeof autoImports.createVtolHoverController
+  const createVtolHoverProfile: typeof autoImports.createVtolHoverProfile
+  const vtolHoverScenarios: typeof autoImports.vtolHoverScenarios
+  const numericPacket: typeof autoImports.numericPacket
+  const vtolAerodynamics: typeof autoImports.vtolAerodynamics
+  const createVtolPlant: typeof autoImports.createVtolPlant
+  const vtolModel: typeof autoImports.vtolModel
+  const vtolElectricalLoad: typeof autoImports.vtolElectricalLoad
+  const vtolElectricalSupply: typeof autoImports.vtolElectricalSupply
+  const vtolElectricalMaximumW: typeof autoImports.vtolElectricalMaximumW
+  const renderVtolElectricalMeasurement: typeof autoImports.renderVtolElectricalMeasurement
+  const vtolElectricalModel: typeof autoImports.vtolElectricalModel
+  const createVtolSimulationCase: typeof autoImports.createVtolSimulationCase
+  const runVtolSimulation: typeof autoImports.runVtolSimulation
+  const vtolSimulationScenarios: typeof autoImports.vtolSimulationScenarios
+  const vtolSimulationPhases: typeof autoImports.vtolSimulationPhases
+  const vtolSimulationWindPhases: typeof autoImports.vtolSimulationWindPhases
+  const createVtolTransitionProfile: typeof autoImports.createVtolTransitionProfile
   const getMissionWorkspaceDefinition: typeof autoImports.getMissionWorkspaceDefinition
   const runMissionWorkspace: typeof autoImports.runMissionWorkspace
   const missionWorkspacePlot: typeof autoImports.missionWorkspacePlot
@@ -382,8 +869,12 @@ declare global {
   const parseVisionProfile: typeof autoImports.parseVisionProfile
   const simulateVision: typeof autoImports.simulateVision
   const visionScenarios: typeof autoImports.visionScenarios
+  const captureSurfaceBytes: typeof autoImports.captureSurfaceBytes
+  const SurfaceByteRejection: typeof autoImports.SurfaceByteRejection
   const processStockpile: typeof autoImports.processStockpile
   const writeVolumeDataset: typeof autoImports.writeVolumeDataset
+  const readGeoTiffFile: typeof autoImports.readGeoTiffFile
+  const readLasFile: typeof autoImports.readLasFile
   const exampleVolumeRequest: typeof autoImports.exampleVolumeRequest
   const volumeScenarios: typeof autoImports.volumeScenarios
   const volumeCross2D: typeof autoImports.volumeCross2D
@@ -399,6 +890,7 @@ declare global {
   const volumeBounds: typeof autoImports.volumeBounds
   const volumeBoundsOverlap: typeof autoImports.volumeBoundsOverlap
   const volumeGeometryEpsilon: typeof autoImports.volumeGeometryEpsilon
+  const importGeoTiffSurface: typeof autoImports.importGeoTiffSurface
   const surfaceSourceDigest: typeof autoImports.surfaceSourceDigest
   const importGridSurface: typeof autoImports.importGridSurface
   const importPlySurface: typeof autoImports.importPlySurface
@@ -406,11 +898,13 @@ declare global {
   const exportGridSurface: typeof autoImports.exportGridSurface
   const exportPlySurface: typeof autoImports.exportPlySurface
   const surfaceImportLimits: typeof autoImports.surfaceImportLimits
+  const importLasSurface: typeof autoImports.importLasSurface
   const validateSurfaceReference: typeof autoImports.validateSurfaceReference
   const validateSurfaceMetadata: typeof autoImports.validateSurfaceMetadata
   const validateKnownSurface: typeof autoImports.validateKnownSurface
   const validateVolumeRequest: typeof autoImports.validateVolumeRequest
   const volumeLimits: typeof autoImports.volumeLimits
+  const runBoundedHostProcess: typeof autoImports.runBoundedHostProcess
 }
 
 export {}

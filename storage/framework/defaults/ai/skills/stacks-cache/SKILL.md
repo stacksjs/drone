@@ -52,11 +52,18 @@ re-exported CacheLock contract and selected driver separately.
 and prefix. Clone-on-read/write is enabled by default.
 `createRedisCache(options?)` accepts URL or host/port/credentials/database/TLS
 plus TTL/prefix options. `createSingleStoreCache(options?)` exposes the
-experimental SQL-backed cache. `createCache(driver, options?)` selects one
-of memory, redis or singlestore.
+experimental SQL-backed cache. `createSqliteCache(options?)` keeps entries in
+a table of a SQLite file (`path`, `table`, `prefix`, `stdTTL`), so they outlive
+the process: use it for results that are expensive and safe to keep across
+deploys, pointing `path` at a file the deploy preserves (the app's own SQLite
+database works; the table is the driver's alone). `createCache(driver,
+options?)` selects one of memory, redis, singlestore or sqlite.
 
-The `cache` export is the same memory instance as `memory`. Use an explicit
-Redis instance for application data that must be shared across processes.
+The `cache` export is the driver `config/cache.ts` selects (`driver`, with
+`prefix` and `ttl` applied to the non-memory drivers), resolved on first use
+and once the app's config has loaded. With the default `driver: 'memory'` it
+answers from the `memory` instance itself. `cacheFromConfig(settings?)` builds
+the same choice explicitly; `resetConfiguredCache()` forgets it.
 The capability registry proves memory and a versioned Redis core/TTL contract;
 TLS/authenticated Redis deployments need separate provider evidence. SingleStore
 has no dedicated service conformance matrix. Source:
@@ -79,7 +86,8 @@ are distinct from StacksCache and auth's RateLimiter.
 ## Source and verification
 
 `storage/framework/core/cache/src/drivers/index.ts` is the facade/factory
-contract. `drivers/singlestore.ts` owns the experimental backend.
+contract. `drivers/singlestore.ts` owns the experimental backend and
+`drivers/sqlite.ts` the durable file-backed one (`sqlite-cache.test.ts`).
 Retained tests: `ttl.test.ts`, `getorset-timeout.test.ts`,
 `tagged-flush-race.test.ts`, `redis-contract.test.ts` and
 `cache-factory.test.ts` under `core/cache/tests/`.

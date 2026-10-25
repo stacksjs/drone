@@ -72,7 +72,7 @@ try {
   const member = actorSnapshot.members.find(row => row.id === h.original.member.id)!
   assert.equal(member.version, 3)
   assert.equal(member.role, 'pilot')
-  assert.equal(member.active === true || member.active === 1, true)
+  assert.equal([true, 1].includes(member.active), true)
   assert(mutationReads > 0)
   assert.equal(guardCreatedAtReads, 1, 'The actual checked guard ran on the sole mutation handle')
   assert(h.postActorAllows() > 0, 'Actual current native source eligibility survived the same-role ABA')

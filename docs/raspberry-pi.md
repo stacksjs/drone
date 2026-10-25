@@ -7,7 +7,7 @@ Keep propellers removed during bench integration. This release receives physical
    Raspberry Pi Imager, enable SSH with your own key and a non-default account, then boot on the official
    bench power supply. Identify the board with `cat /proc/device-tree/model`.
 2. Install Bun for Linux ARM64 using the [official Bun installation instructions](https://bun.sh/docs/installation).
-   Check `bun --version` is at least 1.4.2. Follow the OS's current supported package workflow for Git
+   Use Bun 1.4.4 and check `bun --version` before installing dependencies. Follow the OS's current supported package workflow for Git
    and Python if using MAVProxy; do not run arbitrary project services as root.
 3. Clone `https://github.com/stacksjs/drone`, then `bun install --frozen-lockfile`, copy `.env.example`
    to `.env` and run `./buddy key:generate`. Run `bun run simulate` before connecting a flight controller.

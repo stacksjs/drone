@@ -106,9 +106,11 @@ as the service account with mode 0700, or configures an existing private absolut
 remain outside public/static roots and preserve their qualified identities. Configuration drift
 does not relocate or adopt existing artifacts. Unsupported or uncertain ownership blocks writes.
 
-Drone's installed native version does not contain the prepared export. The explicit
-[source bridge provenance](https://github.com/stacksjs/drone/blob/main/resources/functions/artifacts/native-storage/PROVENANCE.md) records
-the qualified published native source used here. It does not imply a dependency upgrade.
+Managed publication uses the maintained `@stacksjs/storage/prepared-completed-artifact-directory`
+export. Mount and workspace inspection use `@stacksjs/storage/temporary-workspaces`.
+The application retains private-path policy, SQL authority fences and reconciliation decisions;
+the native filesystem primitives do not grant permission to publish or delete an artifact.
+See [dependency source releases](dependency-source-releases.md) for the release boundary.
 Deliberate native SQLite connection retirement is tested as a terminal process boundary. The
 captured transaction correctly refuses further file effects, but current Bun/native driver
 behavior can retain a write lock until process exit after an active transaction is closed.

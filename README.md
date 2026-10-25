@@ -12,7 +12,7 @@ status and the dependency roadmap. Buddy serves the documentation at `/docs`.
 
 ## Run it
 
-Requires Bun >= 1.4.2. The owner has a Raspberry Pi 5 with 8 GB RAM.
+Requires Bun >= 1.4.4. The owner has a Raspberry Pi 5 with 8 GB RAM.
 
 ```sh
 bun install --frozen-lockfile

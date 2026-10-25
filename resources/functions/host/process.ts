@@ -1,2 +1,2 @@
-export { runBoundedProcess as runBoundedHostProcess } from '../artifacts/native-cli/process'
-export type { BoundedProcessOptions as BoundedHostProcessOptions } from '../artifacts/native-cli/process'
+export { runBoundedProcess as runBoundedHostProcess } from '@stacksjs/cli/process'
+export type { BoundedProcessOptions as BoundedHostProcessOptions } from '@stacksjs/cli/process'

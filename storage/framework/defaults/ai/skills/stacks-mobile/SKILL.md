@@ -49,10 +49,19 @@ platform-specific commands when iterating on only one native target. The same
 targets are available through `buddy build mobile`, `buddy build ios`, and
 `buddy build android`.
 
-The build validates `config/mobile.ts`, initializes a Craft iOS project,
-selects either a remote application URL or bundled web assets, generates the
-Xcode project with xcodegen, and records source, capability, and Craft builder
-revision provenance in `stacks-mobile.json`.
+The build validates `config/mobile.ts`, compiles configured STX native screens,
+initializes the Craft platform project and records source, capability and builder
+revision provenance in `stacks-mobile.json`. With `renderer: 'native'`, Craft
+draws platform controls from the compiled bundle without a WebView. The same STX
+components and TypeScript behavior can also serve browser routes; keep browser
+route adapters thin and share the component implementation. Native capabilities
+still depend on the host, OS, hardware and permission.
+
+With `renderer: 'web'`, Craft loads a remote page or bundled web assets. This is
+a separate renderer configuration. A native renderer's `url` supplies its API
+and fallback browser origin; it does not fetch the native UI from that URL at
+launch. Changes to bundled screens, native code or capabilities require a new
+app build. API data refreshes independently.
 
 xcodegen comes from Pantry, never from `PATH`: the version is
 `iosDependencies` in `config/deps.ts` (beside `androidDependencies`; the
@@ -93,10 +102,12 @@ import type { MobileConfig } from '@stacksjs/types'
 
 export default {
   ios: {
+    renderer: 'native',
+    nativeScreens: { '/m/': 'Home' },
+    nativeScreensDir: 'resources/components',
     appName: 'My App',
     bundleId: 'com.example.app',
     url: 'https://example.com',
-    fallbackWebAssets: 'dist',
     deploymentTarget: '16.0',
     orientations: ['portrait'],
     urlSchemes: ['myapp'],
@@ -108,10 +119,12 @@ export default {
     },
   },
   android: {
+    renderer: 'native',
+    nativeScreens: { '/m/': 'Home' },
+    nativeScreensDir: 'resources/components',
     appName: 'My App',
     packageName: 'com.example.app',
     url: 'https://example.com',
-    fallbackWebAssets: 'dist',
     capabilities: {
       haptics: true,
       share: true,
@@ -122,13 +135,21 @@ export default {
 } satisfies MobileConfig
 ```
 
-Choose exactly one primary content source:
+For the native renderer, every app-owned route must map to an STX screen in
+`nativeScreens` on both platforms. The example maps `/m/` to
+`resources/components/Home.stx`; browser routes should render that same shared
+component rather than duplicate it. Compile and test the actual screen bundle
+for both targets. External authorization or checkout routes may use the system
+browser with an explicit return path.
+
+For the web renderer, choose a primary content source:
 
 - `url`: load the deployed Stacks application and keep server-rendered routes.
 - `webAssets`: bundle a static distribution containing `index.html` and every
   referenced asset.
-- `fallbackWebAssets`: with `url`, bundle a static distribution that Craft
-  loads when the remote application is unreachable on cold start.
+- `fallbackWebAssets`: optionally pair with `url` to load bundled web assets
+  when the remote page is unreachable on cold start. This does not supply an
+  offline native UI; native screens are already in their compiled bundle.
 
 Only enable capabilities the product uses. Craft turns enabled capabilities
 into native bridge availability and required iOS privacy descriptions.
@@ -145,7 +166,9 @@ the default `deploymentTarget` stays, older systems drawing classic bars.
 
 ## Native screen bindings
 
-Screens under `resources/native/` use the same STX client syntax as web views.
+Screens in `nativeScreensDir` (default `resources/native/`) use the same STX
+client syntax as web views. Point it at the shared component directory when
+those components also serve browser routes.
 Declare reactive data in `<script client>` and bind text with `:text`, props
 with `:prop`, and native presses with `@click`. Pull-to-refresh uses `@refresh`
 and a boolean `:refreshing` signal. Bare signals auto-unwrap in bindings;
@@ -187,6 +210,20 @@ Each `release:ios` also creates the tag's GitHub release (the TestFlight build
 number and the changes since the previous tag), using `GITHUB_TOKEN`,
 `GH_TOKEN`, the GitHub CLI's token or the git credential. When that fails the
 tag is still out; `buddy release:github <tag>` creates the missing release.
+
+Testers' notes come with every release. From the conventional commits since
+the previous `v*-build.*` tag (logsmith's parser, so the same sections as the
+changelog; `chore`, `ci`, `test`, `docs` and `chore(release)` left out),
+`release:ios` writes `storage/framework/mobile/ios/TestFlight/WhatToTest.<locale>.txt`
+(en-US plus `ios.nativeMessages` languages, under 1000 characters) into the
+release commit, where Xcode Cloud reads it, and puts the list in the GitHub
+release. Overrides, first wins: `--notes` / `--notes-file`, `RELEASE_NOTES` /
+`RELEASE_NOTES_FILE`, `release.notes` / `release.notesFile` in
+`config/mobile.ts`. `--dry-run` prints them. `--wait [minutes]` (with an App
+Store Connect key) also sets What to Test through the API once the build
+appears; `buddy release:notes <tag> --testflight` does it later, and
+`buddy release:notes <tag> --play` prints the 500-character Google Play text.
+The code is `@stacksjs/actions/release-notes`.
 
 ## Device search index
 
@@ -394,9 +431,14 @@ The runtime is browser-safe. Craft-backed operations use the native bridge;
 supported web APIs provide fallback behavior outside a native host. Inside a
 native host whose bridge is still loading (an older shell installs it after
 the page loads), a call waits for it briefly instead of taking the web path.
-Nothing throws for being unsupported: it resolves `null` or `false`.
+Unsupported behavior belongs to each service's contract: some availability
+queries return `false`, while permission requests, writes and operations that
+must enforce identity may reject. Check the documented capability predicate
+and handle typed errors; never treat a missing native method as success or
+silently replace a guarded operation with an unguarded fallback.
 
-Beyond the services above, each with a web fallback:
+Other services include the following; browser behavior and native support vary
+by operation:
 
 ```ts
 import { browser, clipboard, confirmAction, contextMenu, db, dialog, files, haptics, orientation, shortcuts, storeKit, symbols, useActionSheet, widgets } from '@stacksjs/mobile'
@@ -421,12 +463,20 @@ settles.
 
 For a run or ride, `createRouteRecorder({ location, onUpdate })` starts, pauses,
 resumes and stops the native recording, re-attaches to one that outlived the
-app (`attach()`), and reports live distance and pace from `routeStats(fixes)`,
+app (`attach({ expectedId })` with the ID saved in the account's draft), and reports live distance and pace from `routeStats(fixes)`,
 which ignores GPS drift, inaccurate fixes and the ground crossed during a pause.
 Recorder operations serialize; repeated `stop()` returns the same recording.
 Call `dispose()` when the owning page is destroyed to stop polling without
 stopping the native recording. Refreshes coalesce and cannot overwrite a final
-recording with a stale read.
+recording with a stale read. Persist `recordingId` (and `heartRateRecordingId`
+when bundled) under the account and workout that started it. Never adopt the
+current native slot without its saved ID. Guarded metadata, reads and stop
+recover that ID's completed archive even if another recording is now active.
+Only after durably checkpointing its result, or committing its discard, call
+`location.acknowledgeRecording({ expectedId })` and the matching heart-rate
+acknowledgement. A storage failure must retain the native copy. Ownership
+operations require support from both the SDK adapter and the native host;
+unsupported hosts reject with `RECORDING_OWNERSHIP_UNSUPPORTED`.
 
 For timestamp-based timers use `startSessionClock(now)`,
 `pauseSessionClock(clock, now)`, `resumeSessionClock(clock, now)` and
@@ -540,7 +590,10 @@ Enable `healthKit` on iOS or `healthConnect` on Android, then use the shared
 and `health.getDailyStatistics(type)` returns one value per day for steps,
 energy, distance, heart rate, resting heart rate, HRV, weight and sleep.
 `health.getHeartRateSamples(range)` returns every heart-rate reading (bpm,
-start/end, source and device) and `health.getSleepIntervals(range)` the night's
+start/end, source and device), `health.getSamples('bloodGlucose' |
+'insulinDelivery' | 'dietaryCarbohydrates', range)` each glucose reading,
+insulin dose (basal or bolus) or carb entry with its id (read only; no insulin
+on Health Connect), and `health.getSleepIntervals(range)` the night's
 in-bed, awake and asleep stages; check `health.supports(method)` first, since an
 app build that predates a read resolves `[]` for it. Mindful minutes go through
 `health.saveMindfulSession({ id, startDate, endDate })` (the `mindful` grant;

@@ -1,7 +1,7 @@
 import type { TransactionHandle } from '@stacksjs/orm'
 import type { IncidentRow } from '../access/policy'
 import type { PurgeCounts } from './types'
-import type { PreparedCompletedArtifactReceipt } from '../../../artifacts/native-storage/prepared-completed-artifact-directory'
+import type { PreparedCompletedArtifactReceipt } from '@stacksjs/storage/prepared-completed-artifact-directory'
 import { asRows } from '@stacksjs/database/runtime'
 import { sha256 } from '../managed/files'
 import { purgeConflict } from './internal'

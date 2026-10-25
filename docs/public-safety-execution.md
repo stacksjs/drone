@@ -91,9 +91,12 @@ These are finite software admission rules, not hard CPU, memory or scheduling
 bounds. Worker completion does not establish an individual OS thread join.
 
 The initial deployment target is the source Stacks app with a file-based Worker.
-The installed realtime package uses a [pinned native compatibility module](https://github.com/stacksjs/drone/blob/main/resources/functions/drone/http/native-realtime/README.md)
-for enqueue and close observers. Complete authenticated bundled-server, Docker
-and physical Pi deployment need separate qualification.
+The installed Stacks 0.75.301 realtime package provides the public
+`@stacksjs/realtime/stream` enqueue and close observers. The copied Action also
+passes a fresh-process module-loading and stream-lifecycle qualification, with
+source fallback denied. See [dependency source releases](dependency-source-releases.md).
+Complete authenticated bundled-server, Docker and physical Pi deployment need
+separate qualification.
 
 The tracer adds no durable run model, job queue, filesystem recording, derivative
 cache or accepted purge inventory item. Process loss ends volatile work. Sector

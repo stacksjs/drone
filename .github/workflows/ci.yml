@@ -16,7 +16,7 @@ jobs:
           fetch-depth: 0
       - uses: oven-sh/setup-bun@v2
         with:
-          bun-version: 1.4.3
+          bun-version: 1.4.4
       - run: bun install --frozen-lockfile
       - run: cp .env.example .env
       - run: ./buddy key:generate
@@ -28,6 +28,7 @@ jobs:
       - run: test -f dist/docs/.bunpress/index.html
       - run: bun run roadmap:check
       - run: bun run parity:check
+      - run: bun scripts/qualify-public-safety-managed-budget.ts
       - run: python3 -m py_compile resources/functions/drone/camera/imx500_worker.py
       - run: python3 -m unittest discover -s tests/hardware
       - name: Qualify startup observations with actual exited and live native processes
@@ -542,7 +543,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: oven-sh/setup-bun@v2
         with:
-          bun-version: 1.4.3
+          bun-version: 1.4.4
       - run: bun install --frozen-lockfile
       - run: cp .env.example .env
       - run: ./buddy key:generate
@@ -573,7 +574,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: oven-sh/setup-bun@v2
         with:
-          bun-version: 1.4.3
+          bun-version: 1.4.4
       - run: bun install --frozen-lockfile
       - run: cp .env.example .env
       - run: ./buddy key:generate
@@ -611,7 +612,7 @@ jobs:
           fetch-depth: 0
       - uses: oven-sh/setup-bun@v2
         with:
-          bun-version: 1.4.3
+          bun-version: 1.4.4
       - run: bun install --frozen-lockfile
       - run: cp .env.example .env
       - run: ./buddy key:generate

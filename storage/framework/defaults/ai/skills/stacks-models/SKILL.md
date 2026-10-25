@@ -123,7 +123,12 @@ of forcing a cast. See `orm/tests/inference-attributes.test-d.ts`.
 
 Also at the top level: `indexes: [{ name, columns, unique?, where? }]` for
 composite and partial-unique indexes, and `dashboard: { highlight: true }` to
-feature the model in the admin UI.
+feature the model in the admin UI. Use `dashboard: { access: false }` to
+exclude a model from generic dashboard catalogs/counts/search and the generic
+model-browser CRUD Actions before database work. Its default is `true`;
+`dashboard.enabled: false` still only hides the sidebar row. `access` leaves
+direct ORM calls, named domain Actions and generated `useApi` routes available.
+Those APIs require their own route selection, middleware, ownership and policies.
 
 `useApi` is an API capability, not a dashboard-view generator. Its generated
 routes are registered from the merged model registry. Framework defaults are
@@ -370,6 +375,26 @@ traits: {
   },
 },
 ```
+
+A factory receives `faker`, the attributes generated above it, and a context
+whose `pick(model, column = 'id')` resolves to a value from a row that already
+exists. Use it for a column whose valid values another row decides, such as a
+polymorphic `subject_id`, which `belongsTo` cannot express because its foreign
+key would forbid most of the values. List every model a factory picks from in
+`useSeeder.after` so it seeds first:
+
+```ts
+traits: { useSeeder: { count: 30, after: ['Issue', 'PullRequest'] } },
+attributes: {
+  subjectType: { required: true, factory: faker => faker.helpers.arrayElement(['Issue', 'PullRequest']) },
+  subjectId: { required: true, factory: (faker, { subjectType }, { pick }) => pick(subjectType) },
+},
+```
+
+A pick that cannot be satisfied (no rows yet, or the model seeds later and is
+missing from `after`) fails that model with the fix in its message, and so does
+a factory that leaves a required column `null`. Neither invents a value
+(#2951).
 
 `buddy seed` walks every model carrying the trait and fills its table from the
 attribute factories. Model fixture data needs no separate seeder or registration.

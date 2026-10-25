@@ -235,6 +235,9 @@ test('complete codec preflight refuses malformed bytes identities and schema whi
   expect(() => replayPatrolRecording({ ...bundle, extra: true })).toThrow(TypeError)
   expect(() => replayPatrolRecording({ ...bundle, recording: { ...bundle.recording, replayProfile: 'future' } })).toThrow('patrol-recording-profile-unsupported')
   expect(() => replayPatrolRecording({ ...bundle, recording: { ...bundle.recording, engine: { name: 'bun', version: '0.0.0' } } })).toThrow('patrol-recording-engine-unsupported')
+  for (const version of ['1.4.2', '1.4.3', '1.4.4']) {
+    if (version !== Bun.version) expect(() => replayPatrolRecording({ ...bundle, recording: { ...bundle.recording, engine: { name: 'bun', version } } })).toThrow('patrol-recording-engine-mismatch')
+  }
   expect(() => replayPatrolRecording({ ...bundle, summaryJson: `${bundle.summaryJson} ` })).toThrow('patrol-recording-summary')
   expect(() => replayPatrolRecording(replace(`${bundle.summaryJson}\n`))).toThrow('patrol-recording-summary-shape')
   expect(() => replayPatrolRecording(replace(' '.repeat(16385)))).toThrow('patrol-recording-summary')

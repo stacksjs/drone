@@ -13,7 +13,7 @@ This is the `stacksjs/drone` Stacks application. Read `README.md` for implemente
 
 ## Required conventions
 
-- TypeScript and Bun >= 1.4.2. Use pickier through `./buddy lint` and `./buddy lint:fix`, never ESLint directly.
+- TypeScript and Bun >= 1.4.4. Use pickier through `./buddy lint` and `./buddy lint:fix`, never ESLint directly.
 - stx templates and ts-css utilities only. No vanilla DOM globals in stx scripts, no extra icon or motion packages.
 - Imported TypeScript modules explicitly import their dependencies. Browser entry bindings do not leak into modules.
 - `better-dx` supplies shared dev tooling; do not redeclare its tools. Keep Bun's hoisted linker.

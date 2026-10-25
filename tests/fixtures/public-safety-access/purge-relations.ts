@@ -38,7 +38,9 @@ try {
         assert.equal(current.state, 'ready')
         // Actual post-ready relationship change, without changing any private C plan.
         const outsideSource = (await database.db.primary.selectFrom('public_safety_sources').select('incident_id').where('id', '=', fixture.outside.sourceId).executeTakeFirst())!
-        await database.db.primary.updateTable('public_safety_sources').set({ incident_id: outsideSource.incident_id }).where('id', '=', fixture.owned.sourceId).execute()
+        const outsideIncidentId = outsideSource.incident_id
+        assert(typeof outsideIncidentId === 'number' && Number.isSafeInteger(outsideIncidentId) && outsideIncidentId > 0)
+        await database.db.primary.updateTable('public_safety_sources').set({ incident_id: outsideIncidentId }).where('id', '=', fixture.owned.sourceId).execute()
       }
       for (let n = 0; n < 30 && current.state !== 'blocked' && current.state !== 'complete'; n++) { await job.dispatchNow({ purgeKey: current.purgeKey }); current = await purge.readPublicSafetyPurge(fixture.owned.key, current.purgeKey) }
       assert.equal(current.state, 'blocked'); assert.equal(current.dbState, 'blocked'); assert.equal(current.outcomeCode, 'foreign-reference'); assert.equal(current.completed.reviewRowsRemoved, 0)

@@ -5,6 +5,60 @@ edits to installed package files are prohibited. Fix and test the owning source
 repository, run its `bun run release:patch` command, then qualify the released
 package in this application with a native frozen install.
 
+## Native Stacks exports
+
+Drone consumes [Stacks 0.75.301](https://github.com/stacksjs/stacks/releases/tag/v0.75.301),
+released from `fe69e25d5b60c8eb3a9b22e691c350fae1ba0349` with the native
+`bun run release:patch` workflow. The
+[exact source CI](https://github.com/stacksjs/stacks/actions/runs/40155235120)
+and [package release](https://github.com/stacksjs/stacks/actions/runs/40155235514)
+passed before adoption. Upgrade with `./buddy upgrade --version 0.75.301`,
+then qualify the actual installed versions and frozen locks.
+
+The former source bridges now resolve through these public package exports:
+
+| Export | Application responsibility retained |
+|---|---|
+| `@stacksjs/cli/process` | The host facade and caller-specific command trust, paths, deadlines, output limits and strict UTF-8 policy |
+| `@stacksjs/storage/prepared-completed-artifact-directory` | Private roots, publication authority, fencing and artifact identity |
+| `@stacksjs/storage/temporary-workspaces` | Purge scope, namespace admission and mount visibility |
+| `@stacksjs/router/json` | Current authorization, body limits, duplicate-key rejection and domain validation |
+| `@stacksjs/realtime/stream` | Producer credit, current authority and the exact successfully enqueued view |
+
+The application-owned asynchronous completed-directory writer retains its own
+publication protocol. Framework primitives do not grant authority to publish,
+delete, fly or operate hardware. Successful local stream enqueue is not remote
+receipt. Process-crash tests do not establish physical power-loss durability.
+
+The copied Action qualification runs from a fresh private directory with no
+installed dependencies, disabled auto-install and explicit denial of the original
+source entry. It checks authorization, enqueue object identity, revocation and
+close cleanup. This qualifies the module-loading and stream boundary, not a
+sandbox for untrusted code or a physical vehicle. See
+[issue #109](https://github.com/stacksjs/drone/issues/109) for adoption evidence.
+
+## Runtime auto-import generator
+
+The native generator uses [bun-plugin-auto-imports 0.4.5](https://github.com/stacksjs/bun-plugin-auto-imports/releases/tag/v0.4.5),
+released from `44e816038020dd934bc2324971a91e275b936de9` after
+[source fix #1186](https://github.com/stacksjs/bun-plugin-auto-imports/pull/1186).
+The owning `bun run release:patch` command created and pushed the release commit
+and tag. Its local publication step failed without registry credentials; the
+[tag release workflow](https://github.com/stacksjs/bun-plugin-auto-imports/actions/runs/40166776443)
+published the package, and
+[exact release CI](https://github.com/stacksjs/bun-plugin-auto-imports/actions/runs/40166776197)
+passed. The public archive integrity and its recorded source provenance were
+checked before adoption.
+
+The generator selects the first registered name consistently across runtime
+imports, globals and declarations, including default exports. It comments
+collisions in the generated runtime index. Application functions take precedence
+over framework defaults by directory order; use explicit imports when distinct
+functions share a name. Update the transitive package with native
+`bun update bun-plugin-auto-imports`, then regenerate with `./buddy generate`.
+Keep the root dependency declarations and maintained TUF archive unchanged.
+Generated output and installed package files are never patched by hand.
+
 ## Maintained TUF client
 
 The `tuf-js` dependency key points to the immutable

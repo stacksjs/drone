@@ -6,7 +6,7 @@
   "description": "A Stacks framework for drone companion logic, simulation, and Raspberry Pi telemetry.",
   "license": "MIT",
   "engines": {
-    "bun": "1.4.2"
+    "bun": "1.4.4"
   },
   "scripts": {
     "dev": "./buddy dev",
@@ -28,27 +28,29 @@
     "runtime:cli": "bun scripts/build-runtime-cli.ts",
     "typecheck:runtime": "tsc --noEmit -p tests/tsconfig.runtime.json",
     "parity:check": "bun scripts/parity-check.ts",
-    "parity:refresh": "bun scripts/parity-refresh.ts"
+    "parity:refresh": "bun scripts/parity-refresh.ts",
+    "typecheck:app": "bun x --bun tsc --noEmit -p tsconfig.json --pretty false",
+    "types:check": "bun run typecheck"
   },
   "dependencies": {
-    "@stacksjs/actions": "^0.75.221",
-    "@stacksjs/auth": "^0.75.221",
-    "@stacksjs/cli": "^0.75.221",
-    "@stacksjs/cron": "0.75.221",
-    "@stacksjs/database": "^0.75.221",
-    "@stacksjs/env": "^0.75.221",
-    "@stacksjs/error-handling": "^0.75.221",
-    "@stacksjs/orm": "^0.75.221",
-    "@stacksjs/path": "^0.75.221",
-    "@stacksjs/queue": "^0.75.221",
-    "@stacksjs/realtime": "0.75.221",
-    "@stacksjs/router": "^0.75.221",
-    "@stacksjs/security": "^0.75.221",
-    "@stacksjs/storage": "^0.75.221",
-    "@stacksjs/stx": "0.2.564",
-    "@stacksjs/testing": "^0.75.221",
-    "@stacksjs/validation": "^0.75.221",
-    "stacks": "^0.75.221",
+    "@stacksjs/actions": "^0.75.301",
+    "@stacksjs/auth": "^0.75.301",
+    "@stacksjs/cli": "^0.75.301",
+    "@stacksjs/cron": "0.75.301",
+    "@stacksjs/database": "^0.75.301",
+    "@stacksjs/env": "^0.75.301",
+    "@stacksjs/error-handling": "^0.75.301",
+    "@stacksjs/orm": "^0.75.301",
+    "@stacksjs/path": "^0.75.301",
+    "@stacksjs/queue": "^0.75.301",
+    "@stacksjs/realtime": "0.75.301",
+    "@stacksjs/router": "^0.75.301",
+    "@stacksjs/security": "^0.75.301",
+    "@stacksjs/storage": "^0.75.301",
+    "@stacksjs/stx": "0.2.687",
+    "@stacksjs/testing": "^0.75.301",
+    "@stacksjs/validation": "^0.75.301",
+    "stacks": "^0.75.301",
     "ts-images": "0.2.31",
     "tuf-js": "https://github.com/stacksjs/tuf-js/releases/download/sdk-v6.0.1/stacksjs-tuf-js-6.0.1.tgz",
     "@tufjs/canonical-json": "2.0.0"
@@ -67,7 +69,7 @@
     "commit-msg": "bun x gitlint --edit \"$1\""
   },
   "devDependencies": {
-    "@stacksjs/query-builder": "0.75.221",
+    "@stacksjs/query-builder": "0.75.301",
     "better-dx": "^0.2.37",
     "@tufjs/models": "5.0.0"
   },
