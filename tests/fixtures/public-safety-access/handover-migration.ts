@@ -106,10 +106,10 @@ else if (mode === 'upgrade') {
     assert(indexed.some(index => JSON.stringify(index.columns) === JSON.stringify(['incident_id', 'actor_id', 'handover_assignment_version', 'action', 'sequence'])))
     const legacy = before.rows.public_safety_audits![0]!, { id, ...duplicate } = legacy
     assert(id)
-    await assert.rejects(() => database.db.primary.insertInto('public_safety_audits').values(duplicate).execute(), /UNIQUE constraint failed/)
+    assert.throws(() => database.db.primary.insertInto('public_safety_audits').values(duplicate).execute(), /UNIQUE constraint failed/)
     // @ts-expect-error Deliberately invalid persisted enum verifies the real SQLite CHECK constraint.
-    await assert.rejects(() => database.db.primary.insertInto('public_safety_audits').values({ ...duplicate, sequence: 2147483640, action: 'not-a-valid-action' }).execute(), /CHECK constraint failed/)
-    await assert.rejects(() => database.db.primary.insertInto('public_safety_audits').values({ ...duplicate, incident_id: 2147483647 }).execute(), /FOREIGN KEY constraint failed/)
+    assert.throws(() => database.db.primary.insertInto('public_safety_audits').values({ ...duplicate, sequence: 2147483640, action: 'not-a-valid-action' }).execute(), /CHECK constraint failed/)
+    assert.throws(() => database.db.primary.insertInto('public_safety_audits').values({ ...duplicate, incident_id: 2147483647 }).execute(), /FOREIGN KEY constraint failed/)
     assert.deepEqual(await database.db.unsafe('PRAGMA foreign_keys'), [{ foreign_keys: 1 }])
     assert.deepEqual(await database.db.unsafe('PRAGMA foreign_key_check'), [])
     assert.deepEqual(await database.db.unsafe('PRAGMA integrity_check'), [{ integrity_check: 'ok' }])

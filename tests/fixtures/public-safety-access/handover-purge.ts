@@ -53,10 +53,10 @@ try {
   }
   const { id, ...duplicate } = protocol[0]!
   assert(id)
-  await assert.rejects(() => database.db.primary.insertInto('public_safety_audits').values({ ...duplicate, sequence: 2147483640, request_id: randomUUID() }).execute(), /UNIQUE constraint failed/)
-  await assert.rejects(() => database.db.primary.insertInto('public_safety_audits').values({ ...duplicate, sequence: 2147483640, handover_key: randomUUID() }).execute(), /UNIQUE constraint failed/)
+  assert.throws(() => database.db.primary.insertInto('public_safety_audits').values({ ...duplicate, sequence: 2147483640, request_id: randomUUID() }).execute(), /UNIQUE constraint failed/)
+  assert.throws(() => database.db.primary.insertInto('public_safety_audits').values({ ...duplicate, sequence: 2147483640, handover_key: randomUUID() }).execute(), /UNIQUE constraint failed/)
   // @ts-expect-error Deliberately invalid persisted enum verifies the real SQLite CHECK constraint.
-  await assert.rejects(() => database.db.primary.insertInto('public_safety_audits').values({ ...duplicate, sequence: 2147483640, handover_key: randomUUID(), request_id: randomUUID(), handover_step: 'not-a-step' }).execute(), /CHECK constraint failed/)
+  assert.throws(() => database.db.primary.insertInto('public_safety_audits').values({ ...duplicate, sequence: 2147483640, handover_key: randomUUID(), request_id: randomUUID(), handover_step: 'not-a-step' }).execute(), /CHECK constraint failed/)
   const siblingBefore = Object.fromEntries(await Promise.all(['public_safety_incidents', 'public_safety_incident_members', 'public_safety_audits', 'public_safety_sources', 'public_safety_retention_scopes'].map(async table => {
     const column = table === 'public_safety_incidents' ? 'id' : 'incident_id'
     return [table, await database.db.primary.selectFrom(table).selectAll().where(column, '=', sibling.id).orderBy('id', 'asc').execute()]

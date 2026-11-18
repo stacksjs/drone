@@ -76,14 +76,14 @@ try {
     // The trigger is solely a fixture fault and is confined to this generated private schema.
     await db.unsafe(`CREATE TRIGGER diagnostic_failure_${index} BEFORE UPDATE OF ${field} ON ${table} WHEN CAST(NEW.${field} AS TEXT) = '${failed}' BEGIN SELECT RAISE(ABORT, '${failed}'); END`).execute()
     await db.updateTable(table).set({ [field]: successful }).where('id', '=', id).execute()
-    await assert.rejects(() => db.updateTable(table.toUpperCase()).set({ [field]: failed }).where('id', '=', id).execute(), error => error instanceof Error && error.message.includes(String(failed)), `actual reflected driver failure required for ${field}`)
+    assert.throws(() => db.updateTable(table.toUpperCase()).set({ [field]: failed }).where('id', '=', id).execute(), error => error instanceof Error && error.message.includes(String(failed)), `actual reflected driver failure required for ${field}`)
     const row = await db.primary.selectFrom(table).select(field).where('id', '=', id).executeTakeFirst()
     assert.equal(row?.[field], successful)
   }
   await db.unsafe('CREATE TABLE diagnostic_public_probe (id INTEGER PRIMARY KEY, caption TEXT NOT NULL)').execute()
   const publicSuccess = 'Public diagnostic success fixture words', publicFailure = 'Public diagnostic failure fixture words'
   await db.insertInto('diagnostic_public_probe').values({ id: 1, caption: publicSuccess }).execute()
-  await assert.rejects(() => db.insertInto('diagnostic_public_probe').values({ id: 1, caption: publicFailure }).execute())
+  assert.throws(() => db.insertInto('diagnostic_public_probe').values({ id: 1, caption: publicFailure }).execute())
   // A later real query is the persistence barrier for earlier native hook events.
   const barrier = 'Public diagnostic final barrier fixture words'
   await db.updateTable('diagnostic_public_probe').set({ caption: barrier }).where('id', '=', 1).execute()

@@ -21,7 +21,7 @@ Browser runtime bindings are documented separately in `stacks-auto-imports`.
 | `@stacksjs/auth` | [`stacks-auth`](../stacks-auth/SKILL.md) | [entrypoint](https://github.com/stacksjs/stacks/blob/main/storage/framework/core/auth/src/index.ts) | 136 |
 | `@stacksjs/browser` | [`stacks-browser`](../stacks-browser/SKILL.md) | [entrypoint](https://github.com/stacksjs/stacks/blob/main/storage/framework/core/browser/src/index.ts) | 10 |
 | `@stacksjs/browser-extension` | [`stacks-browser-extension`](../stacks-browser-extension/SKILL.md) | [entrypoint](https://github.com/stacksjs/stacks/blob/main/storage/framework/core/browser-extension/src/index.ts) | 9 |
-| `@stacksjs/buddy` | [`stacks-buddy`](../stacks-buddy/SKILL.md) | [entrypoint](https://github.com/stacksjs/stacks/blob/main/storage/framework/core/buddy/src/index.ts) | 214 |
+| `@stacksjs/buddy` | [`stacks-buddy`](../stacks-buddy/SKILL.md) | [entrypoint](https://github.com/stacksjs/stacks/blob/main/storage/framework/core/buddy/src/index.ts) | 215 |
 | `@stacksjs/build` | [`stacks-build`](../stacks-build/SKILL.md) | [entrypoint](https://github.com/stacksjs/stacks/blob/main/storage/framework/core/build/src/index.ts) | 7 |
 | `@stacksjs/cache` | [`stacks-cache`](../stacks-cache/SKILL.md) | [entrypoint](https://github.com/stacksjs/stacks/blob/main/storage/framework/core/cache/src/index.ts) | 24 |
 | `@stacksjs/calendar-api` | [`stacks-calendar`](../stacks-calendar/SKILL.md) | [entrypoint](https://github.com/stacksjs/stacks/blob/main/storage/framework/core/calendar-api/src/index.ts) | 5 |
@@ -45,7 +45,7 @@ Browser runtime bindings are documented separately in `stacks-auto-imports`.
 | `@stacksjs/docs` | [`stacks-docs`](../stacks-docs/SKILL.md) | [entrypoint](https://github.com/stacksjs/stacks/blob/main/storage/framework/core/docs/src/index.ts) | 5 |
 | `@stacksjs/email` | [`stacks-email`](../stacks-email/SKILL.md) | [entrypoint](https://github.com/stacksjs/stacks/blob/main/storage/framework/core/email/src/index.ts) | 27 |
 | `@stacksjs/enums` | [`stacks-enums`](../stacks-enums/SKILL.md) | [entrypoint](https://github.com/stacksjs/stacks/blob/main/storage/framework/core/enums/src/index.ts) | 3 |
-| `@stacksjs/env` | [`stacks-env`](../stacks-env/SKILL.md) | [entrypoint](https://github.com/stacksjs/stacks/blob/main/storage/framework/core/env/src/index.ts) | 32 |
+| `@stacksjs/env` | [`stacks-env`](../stacks-env/SKILL.md) | [entrypoint](https://github.com/stacksjs/stacks/blob/main/storage/framework/core/env/src/index.ts) | 33 |
 | `@stacksjs/error-handling` | [`stacks-error-handling`](../stacks-error-handling/SKILL.md) | [entrypoint](https://github.com/stacksjs/stacks/blob/main/storage/framework/core/error-handling/src/index.ts) | 10 |
 | `@stacksjs/events` | [`stacks-events`](../stacks-events/SKILL.md) | [entrypoint](https://github.com/stacksjs/stacks/blob/main/storage/framework/core/events/src/index.ts) | 13 |
 | `@stacksjs/faker` | [`stacks-faker`](../stacks-faker/SKILL.md) | [entrypoint](https://github.com/stacksjs/stacks/blob/main/storage/framework/core/faker/src/index.ts) | 1 |
@@ -66,7 +66,7 @@ Browser runtime bindings are documented separately in `stacks-auto-imports`.
 | `@stacksjs/newsletter` | [`stacks-newsletter`](../stacks-newsletter/SKILL.md) | [entrypoint](https://github.com/stacksjs/stacks/blob/main/storage/framework/core/newsletter/src/index.ts) | 10 |
 | `@stacksjs/notifications` | [`stacks-notifications`](../stacks-notifications/SKILL.md) | [entrypoint](https://github.com/stacksjs/stacks/blob/main/storage/framework/core/notifications/src/index.ts) | 18 |
 | `@stacksjs/objects` | [`stacks-objects`](../stacks-objects/SKILL.md) | [entrypoint](https://github.com/stacksjs/stacks/blob/main/storage/framework/core/objects/src/index.ts) | 10 |
-| `@stacksjs/orm` | [`stacks-orm`](../stacks-orm/SKILL.md) | [entrypoint](https://github.com/stacksjs/stacks/blob/main/storage/framework/core/orm/src/index.ts) | 79 |
+| `@stacksjs/orm` | [`stacks-orm`](../stacks-orm/SKILL.md) | [entrypoint](https://github.com/stacksjs/stacks/blob/main/storage/framework/core/orm/src/index.ts) | 80 |
 | `@stacksjs/pagination` | [`stacks-pagination`](../stacks-pagination/SKILL.md) | [entrypoint](https://github.com/stacksjs/stacks/blob/main/storage/framework/core/pagination/src/index.ts) | 1 |
 | `@stacksjs/path` | [`stacks-path`](../stacks-path/SKILL.md) | [entrypoint](https://github.com/stacksjs/stacks/blob/main/storage/framework/core/path/src/index.ts) | 14 |
 | `@stacksjs/payments` | [`stacks-payments`](../stacks-payments/SKILL.md) | [entrypoint](https://github.com/stacksjs/stacks/blob/main/storage/framework/core/payments/src/index.ts) | 40 |
@@ -222,7 +222,7 @@ Read the entrypoint and package export map for re-exported or type-only surfaces
 
 Local source modules: [src/commands/index.ts](https://github.com/stacksjs/stacks/blob/main/storage/framework/core/buddy/src/commands/index.ts).
 
-Evidence directory: [214 retained tests](https://github.com/stacksjs/stacks/blob/main/storage/framework/core/buddy/tests). These files are evidence pointers, not a claim that all tests were run for this catalog.
+Evidence directory: [215 retained tests](https://github.com/stacksjs/stacks/blob/main/storage/framework/core/buddy/tests). These files are evidence pointers, not a claim that all tests were run for this catalog.
 
 ### @stacksjs/build
 
@@ -452,7 +452,7 @@ Read the entrypoint and package export map for re-exported or type-only surfaces
 
 Local source modules: [src/cli.ts](https://github.com/stacksjs/stacks/blob/main/storage/framework/core/env/src/cli.ts), [src/crypto.ts](https://github.com/stacksjs/stacks/blob/main/storage/framework/core/env/src/crypto.ts), [src/deployment.ts](https://github.com/stacksjs/stacks/blob/main/storage/framework/core/env/src/deployment.ts), [src/integrations.ts](https://github.com/stacksjs/stacks/blob/main/storage/framework/core/env/src/integrations.ts), [src/numeric-keys.ts](https://github.com/stacksjs/stacks/blob/main/storage/framework/core/env/src/numeric-keys.ts), [src/parser.ts](https://github.com/stacksjs/stacks/blob/main/storage/framework/core/env/src/parser.ts), [src/plaintext.ts](https://github.com/stacksjs/stacks/blob/main/storage/framework/core/env/src/plaintext.ts), [src/plugin.ts](https://github.com/stacksjs/stacks/blob/main/storage/framework/core/env/src/plugin.ts), [src/runtime.ts](https://github.com/stacksjs/stacks/blob/main/storage/framework/core/env/src/runtime.ts), [src/tenants.ts](https://github.com/stacksjs/stacks/blob/main/storage/framework/core/env/src/tenants.ts), [src/types.ts](https://github.com/stacksjs/stacks/blob/main/storage/framework/core/env/src/types.ts), [src/utils.ts](https://github.com/stacksjs/stacks/blob/main/storage/framework/core/env/src/utils.ts), [src/withheld.ts](https://github.com/stacksjs/stacks/blob/main/storage/framework/core/env/src/withheld.ts).
 
-Evidence directory: [32 retained tests](https://github.com/stacksjs/stacks/blob/main/storage/framework/core/env/tests). These files are evidence pointers, not a claim that all tests were run for this catalog.
+Evidence directory: [33 retained tests](https://github.com/stacksjs/stacks/blob/main/storage/framework/core/env/tests). These files are evidence pointers, not a claim that all tests were run for this catalog.
 
 ### @stacksjs/error-handling
 
@@ -654,7 +654,7 @@ Declared runtime exports: `Activity`, `AnalyticsEvent`, `Auction`, `AuctionItem`
 
 Local source modules: [src/auto-crud.ts](https://github.com/stacksjs/stacks/blob/main/storage/framework/core/orm/src/auto-crud.ts), [src/batch-loader.ts](https://github.com/stacksjs/stacks/blob/main/storage/framework/core/orm/src/batch-loader.ts), [src/db.ts](https://github.com/stacksjs/stacks/blob/main/storage/framework/core/orm/src/db.ts), [src/define-model.ts](https://github.com/stacksjs/stacks/blob/main/storage/framework/core/orm/src/define-model.ts), [src/extend-model.ts](https://github.com/stacksjs/stacks/blob/main/storage/framework/core/orm/src/extend-model.ts), [src/gdpr/index.ts](https://github.com/stacksjs/stacks/blob/main/storage/framework/core/orm/src/gdpr/index.ts), [src/generate-database-schema.ts](https://github.com/stacksjs/stacks/blob/main/storage/framework/core/orm/src/generate-database-schema.ts), [src/locked-row.ts](https://github.com/stacksjs/stacks/blob/main/storage/framework/core/orm/src/locked-row.ts), [src/messaging.ts](https://github.com/stacksjs/stacks/blob/main/storage/framework/core/orm/src/messaging.ts), [src/model-types.ts](https://github.com/stacksjs/stacks/blob/main/storage/framework/core/orm/src/model-types.ts), [src/ownership.ts](https://github.com/stacksjs/stacks/blob/main/storage/framework/core/orm/src/ownership.ts), [src/paginator-request.ts](https://github.com/stacksjs/stacks/blob/main/storage/framework/core/orm/src/paginator-request.ts), [src/row-token.ts](https://github.com/stacksjs/stacks/blob/main/storage/framework/core/orm/src/row-token.ts), [src/subquery.ts](https://github.com/stacksjs/stacks/blob/main/storage/framework/core/orm/src/subquery.ts), [src/traits/audit.ts](https://github.com/stacksjs/stacks/blob/main/storage/framework/core/orm/src/traits/audit.ts), [src/traits/billable.ts](https://github.com/stacksjs/stacks/blob/main/storage/framework/core/orm/src/traits/billable.ts), [src/traits/categorizable.ts](https://github.com/stacksjs/stacks/blob/main/storage/framework/core/orm/src/traits/categorizable.ts), [src/traits/commentable.ts](https://github.com/stacksjs/stacks/blob/main/storage/framework/core/orm/src/traits/commentable.ts), [src/traits/likeable.ts](https://github.com/stacksjs/stacks/blob/main/storage/framework/core/orm/src/traits/likeable.ts), [src/traits/taggable.ts](https://github.com/stacksjs/stacks/blob/main/storage/framework/core/orm/src/traits/taggable.ts), [src/transaction.ts](https://github.com/stacksjs/stacks/blob/main/storage/framework/core/orm/src/transaction.ts), [src/types.ts](https://github.com/stacksjs/stacks/blob/main/storage/framework/core/orm/src/types.ts), [src/utils/encrypted.ts](https://github.com/stacksjs/stacks/blob/main/storage/framework/core/orm/src/utils/encrypted.ts), [src/utils/prunable.ts](https://github.com/stacksjs/stacks/blob/main/storage/framework/core/orm/src/utils/prunable.ts).
 
-Evidence directory: [79 retained tests](https://github.com/stacksjs/stacks/blob/main/storage/framework/core/orm/tests). These files are evidence pointers, not a claim that all tests were run for this catalog.
+Evidence directory: [80 retained tests](https://github.com/stacksjs/stacks/blob/main/storage/framework/core/orm/tests). These files are evidence pointers, not a claim that all tests were run for this catalog.
 
 ### @stacksjs/pagination
 

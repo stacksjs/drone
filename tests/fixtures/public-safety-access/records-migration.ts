@@ -124,8 +124,8 @@ else if (mode === 'seed' || mode === 'upgrade') {
         const old = before.rows.public_safety_audits![0]!
         const { id, ...duplicate } = old
         assert(id)
-        await assert.rejects(() => database.db.primary.insertInto('public_safety_audits').values(duplicate).execute(), /UNIQUE constraint failed/)
-        await assert.rejects(() => database.db.primary.insertInto('public_safety_audits').values({ ...duplicate, incident_id: 2147483647 }).execute(), /FOREIGN KEY constraint failed/)
+        assert.throws(() => database.db.primary.insertInto('public_safety_audits').values(duplicate).execute(), /UNIQUE constraint failed/)
+        assert.throws(() => database.db.primary.insertInto('public_safety_audits').values({ ...duplicate, incident_id: 2147483647 }).execute(), /FOREIGN KEY constraint failed/)
         const { registerPublicSafetySource } = await import('../../../resources/functions/drone/public-safety/access/records')
         const { simulatePublicSafety } = await import('../../../resources/functions/drone/public-safety/runtime')
         const registered = await registerPublicSafetySource('upgrade-records', { expectedVersion: 2, recording: simulatePublicSafety({ config: before.config, seconds: 16 }) })

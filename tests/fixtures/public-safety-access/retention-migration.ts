@@ -131,8 +131,8 @@ else if (mode === 'seed' || mode === 'upgrade') {
         const event = (await database.db.primary.selectFrom('public_safety_retention_events').selectAll().execute())[0]!
         const { id, ...duplicate } = event
         assert(id)
-        await assert.rejects(() => database.db.primary.insertInto('public_safety_retention_events').values(duplicate).execute(), /UNIQUE constraint failed/)
-        await assert.rejects(() => database.db.primary.insertInto('public_safety_retention_events').values({ ...duplicate, scope_id: 2147483647 }).execute(), /FOREIGN KEY constraint failed/)
+        assert.throws(() => database.db.primary.insertInto('public_safety_retention_events').values(duplicate).execute(), /UNIQUE constraint failed/)
+        assert.throws(() => database.db.primary.insertInto('public_safety_retention_events').values({ ...duplicate, scope_id: 2147483647 }).execute(), /FOREIGN KEY constraint failed/)
       })
       const snapshot = readFileSync(join(root, snapshotPath), 'utf8'), files = (await readdir(join(root, 'database/migrations'))).sort()
       assert.equal(snapshot, readFileSync(join(source, snapshotPath), 'utf8'))
