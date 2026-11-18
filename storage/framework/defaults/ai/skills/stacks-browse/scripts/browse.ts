@@ -23,6 +23,7 @@ import { spawn } from 'bun'
 import { existsSync, mkdirSync, readFileSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
+import { chromeHasUpdater, findChrome, prepareMacChrome } from './chrome'
 
 // ── Browser discovery ──────────────────────────────────────────────────────
 
@@ -45,8 +46,11 @@ function collectCandidates(): string[] {
   if (process.env.BROWSE_BROWSER)
     add(process.env.BROWSE_BROWSER)
 
-  for (const bin of ['chromium', 'chromium-browser', 'google-chrome-stable', 'google-chrome', 'brave-browser', 'microsoft-edge', 'chrome'])
+  // Some distribution Chromium launchers answer --version but cannot open a
+  // DevTools target. Prefer an installed Chrome before spending their bounds.
+  for (const bin of ['google-chrome-stable', 'google-chrome', 'chromium', 'chromium-browser', 'brave-browser', 'microsoft-edge', 'chrome'])
     add(which(bin))
+  add(findChrome())
 
   for (const p of [
     '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome',
@@ -197,17 +201,19 @@ export async function waitForBrowserPort(proc: { exitCode: number | null }, port
 }
 
 async function tryLaunch(browser: string): Promise<Session | null> {
+  const executable = chromeHasUpdater(browser) ? prepareMacChrome({ source: browser }).executable : browser
   const userDataDir = join(tmpdir(), `stacks-browse-${process.pid}-${Math.floor(Number(process.hrtime.bigint() % 1000000n))}`)
   mkdirSync(userDataDir, { recursive: true })
 
-  const isHeadlessShell = /chrome-headless-shell|headless_shell/.test(browser)
+  const isHeadlessShell = /chrome-headless-shell|headless_shell/.test(executable)
   const proc = spawn([
-    browser,
+    executable,
     ...(isHeadlessShell ? [] : ['--headless=new']),
     '--remote-debugging-port=0',
     `--user-data-dir=${userDataDir}`,
     '--no-first-run',
     '--no-default-browser-check',
+    ...(process.platform === 'darwin' ? ['--use-mock-keychain'] : []),
     '--disable-gpu',
     '--disable-dev-shm-usage',
     '--hide-scrollbars',
@@ -221,7 +227,7 @@ async function tryLaunch(browser: string): Promise<Session | null> {
   let port: number | null = null
   try {
     port = await waitForBrowserPort(proc, portFile, 15_000)
-    if (port !== null) return { proc, port, userDataDir, browser }
+    if (port !== null) return { proc, port, userDataDir, browser: executable }
   }
   finally {
     if (port === null) {
@@ -594,6 +600,14 @@ function parseViewport(value: string | undefined): { w: number, h: number } {
   return { w, h }
 }
 
+export function parseDeviceScale(value: string | boolean | Array<string | boolean> | undefined): number {
+  if (value === undefined) return 1
+  if (typeof value !== 'string' || !value.trim()) throw new TypeError('--scale requires one positive finite device-pixel ratio, for example --scale 2.')
+  const scale = Number(value)
+  if (!Number.isFinite(scale) || scale <= 0) throw new TypeError(`Invalid --scale "${value}". Expected a positive finite device-pixel ratio.`)
+  return scale
+}
+
 /** `--scroll-y` on `screenshot`: an explicit document Y to jump to before
  *  capturing just the viewport, for content a full-page capture cannot show
  *  (sticky/fixed elements, scroll-linked animation) at a specific fold. */
@@ -703,7 +717,9 @@ export async function runScenarioStep(cdp: Pick<Cdp, 'send'>, step: ScenarioStep
     const key = step.key || ''
     // CDP's key name alone does not perform native navigation or scrolling.
     // Supply the matching virtual key on both events, as a real keyboard does.
-    const keyCode = key.length === 1 ? key.charCodeAt(0) : ({
+    const letter = /^[a-z]$/i.test(key), digit = /^[0-9]$/.test(key)
+    const code = letter ? `Key${key.toUpperCase()}` : digit ? `Digit${key}` : key === ' ' ? 'Space' : key
+    const keyCode = key.length === 1 ? (letter ? key.toUpperCase() : key).charCodeAt(0) : ({
       Backspace: 8, Tab: 9, Enter: 13, Escape: 27,
       PageUp: 33, PageDown: 34, End: 35, Home: 36,
       ArrowLeft: 37, ArrowUp: 38, ArrowRight: 39, ArrowDown: 40,
@@ -712,8 +728,8 @@ export async function runScenarioStep(cdp: Pick<Cdp, 'send'>, step: ScenarioStep
     if (!keyCode) throw new Error(`Unsupported scenario key: ${JSON.stringify(key)}`)
     // Enter's text generates the keypress that activates native buttons/forms.
     const text = key === 'Enter' ? '\r' : undefined
-    await cdp.send('Input.dispatchKeyEvent', { type: 'keyDown', key, code: key, windowsVirtualKeyCode: keyCode, text, unmodifiedText: text })
-    await cdp.send('Input.dispatchKeyEvent', { type: 'keyUp', key, code: key, windowsVirtualKeyCode: keyCode })
+    await cdp.send('Input.dispatchKeyEvent', { type: 'keyDown', key, code, windowsVirtualKeyCode: keyCode, text, unmodifiedText: text })
+    await cdp.send('Input.dispatchKeyEvent', { type: 'keyUp', key, code, windowsVirtualKeyCode: keyCode })
     return { action: step.action, key, ok: true }
   }
 
@@ -843,6 +859,7 @@ async function main() {
     process.exit(url ? 0 : 1)
   }
 
+  const scale = parseDeviceScale(flags.scale)
   let session = await launch()
   const cookies = flagList(flags.cookie)
   const settleMs = flags.settle ? Number(flags.settle) : undefined
@@ -861,7 +878,7 @@ async function main() {
     if (command === 'navigate' || command === 'go') {
       const cdp = await openPage(session.port)
       const t0 = performance.now()
-      const state = await gotoAndInstrument(cdp, url, { cookies, settleMs, scheme })
+      const state = await gotoAndInstrument(cdp, url, { scale, cookies, settleMs, scheme })
       const loadMs = Math.round(performance.now() - t0)
       console.log(JSON.stringify({
         browser: session.browser,
@@ -879,7 +896,6 @@ async function main() {
     else if (command === 'screenshot') {
       const cdp = await openPage(session.port)
       const viewport = parseViewport(typeof flags.viewport === 'string' ? flags.viewport : undefined)
-      const scale = flags.scale ? Number(flags.scale) : 1
       const scrollY = parseScrollY(flags['scroll-y'])
       const modes = [flags.full && 'full', flags.element && 'element', scrollY != null && 'scroll-y'].filter(Boolean)
       if (modes.length > 1)
@@ -900,7 +916,7 @@ async function main() {
       const results: any[] = []
       for (const bp of BREAKPOINTS) {
         const cdp = await openPage(session.port)
-        const state = await gotoAndInstrument(cdp, url, { viewport: { w: bp.w, h: bp.h }, cookies, settleMs, scheme, reducedMotion: true })
+        const state = await gotoAndInstrument(cdp, url, { viewport: { w: bp.w, h: bp.h }, scale, cookies, settleMs, scheme, reducedMotion: true })
         const overflow = await cdp.send('Runtime.evaluate', {
           // Mobile Chrome may expand innerWidth to fit overflowing content.
           // Compare the page with the requested device width, not that expansion.
@@ -919,7 +935,7 @@ async function main() {
     else if (command === 'monitor') {
       const cdp = await openPage(session.port)
       const ms = flags.ms ? Number(flags.ms) : 5000
-      const state = await gotoAndInstrument(cdp, url, { cookies, settleMs, scheme })
+      const state = await gotoAndInstrument(cdp, url, { scale, cookies, settleMs, scheme })
       await Bun.sleep(ms)
       const failed = state.responses.filter(r => r.status >= 400)
       const slow = state.responses.filter(r => r.ms > 3000)
@@ -942,7 +958,7 @@ async function main() {
       // auto-imported `state` signal factory, which has no `dispose`, so
       // `browse snapshot` threw on its last line and left the CDP listeners
       // attached.
-      const state = await gotoAndInstrument(cdp, url, { cookies, settleMs, scheme })
+      const state = await gotoAndInstrument(cdp, url, { scale, cookies, settleMs, scheme })
       const expr = `(() => {
         const sel = (q) => Array.from(document.querySelectorAll(q));
         const txt = (e) => (e.innerText || e.textContent || '').trim().slice(0, 80);
@@ -968,7 +984,7 @@ async function main() {
 
       const cdp = await openPage(session.port)
       const viewport = parseViewport(typeof flags.viewport === 'string' ? flags.viewport : undefined)
-      const state = await gotoAndInstrument(cdp, url, { viewport, cookies, settleMs, scheme, reducedMotion: !!flags.full })
+      const state = await gotoAndInstrument(cdp, url, { viewport, scale, cookies, settleMs, scheme, reducedMotion: !!flags.full })
       const results: Record<string, unknown>[] = []
       await cdp.send('Page.bringToFront')
       await cdp.send('Runtime.evaluate', {
@@ -999,8 +1015,11 @@ async function main() {
           await Bun.sleep(step.settle ?? 250)
       }
 
-      const finalState = await cdp.send('Runtime.evaluate', {
-        expression: `({
+      const collectionErrors: { phase: string, error: string }[] = []
+      let finalState: unknown = null
+      try {
+        const collected = await cdp.send('Runtime.evaluate', {
+          expression: `({
           url: location.href,
           title: document.title,
           focusHistory: window.__browseFocusHistory || [],
@@ -1014,26 +1033,39 @@ async function main() {
           } : null,
           bodyText: (document.body.innerText || '').replace(/\\s+/g, ' ').trim().slice(0, 500),
         })`,
-        returnByValue: true,
-      })
+          returnByValue: true,
+        })
+        finalState = collected.result?.value ?? null
+      }
+      catch (error) {
+        collectionErrors.push({ phase: 'final-state', error: error instanceof Error ? error.message : String(error) })
+      }
       let screenshot: string | null = null
       if (typeof flags.out === 'string') {
-        screenshot = flags.out
-        mkdirSync(screenshot.split('/').slice(0, -1).join('/') || '.', { recursive: true })
-        await Bun.write(screenshot, await captureScreenshot(cdp, { full: !!flags.full }))
+        try {
+          const output = flags.out
+          mkdirSync(output.split('/').slice(0, -1).join('/') || '.', { recursive: true })
+          await Bun.write(output, await captureScreenshot(cdp, { full: !!flags.full }))
+          screenshot = output
+        }
+        catch (error) {
+          collectionErrors.push({ phase: 'screenshot', error: error instanceof Error ? error.message : String(error) })
+        }
       }
       const failedRequests = state.responses.filter(response => response.status >= 400)
       console.log(JSON.stringify({
         url,
         viewport: `${viewport.w}x${viewport.h}`,
+        scale,
         steps: results,
-        final: finalState.result?.value,
+        final: finalState,
         screenshot,
+        collectionErrors,
         consoleMessages: state.console,
         consoleErrors: state.consoleErrors,
         failedRequests,
       }, null, 2))
-      if (scenarioFailed || state.consoleErrors.length || failedRequests.length)
+      if (scenarioFailed || collectionErrors.length || state.consoleErrors.length || failedRequests.length)
         process.exitCode = 1
       state.dispose()
       cdp.close()
@@ -1092,6 +1124,7 @@ async function main() {
           let state: PageState | undefined
           try {
             state = await gotoAndInstrument(cdp, current, {
+              scale,
               cookies,
               settleMs: crawlSettleMs,
               scheme,

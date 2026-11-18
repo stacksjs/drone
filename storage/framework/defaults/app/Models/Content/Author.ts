@@ -16,6 +16,8 @@ export default defineModel({
   ],
 
   traits: {
+    // So a fresh seed fills its dashboard page (stacksjs/stacks#3000).
+    useSeeder: { count: 5 },
     gdpr: { erasure: 'anonymize', basis: 'legitimate_interests', purpose: 'Byline on published content' },
     useAuth: {
       usePasskey: true,
@@ -111,5 +113,11 @@ export default defineModel({
   },
   dashboard: {
     highlight: true,
+    // Chosen as a file. Its address is what is stored, as before.
+    // Prose, asked for in a box with room for it.
+    fields: {
+      avatar: { input: 'upload', accept: 'image/*' },
+      bio: { input: 'longtext' },
+    },
   },
 } as const)

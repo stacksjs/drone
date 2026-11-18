@@ -18,7 +18,7 @@ const couriers = useReactiveProp('couriers', [] as CourierRow[])
 const loading = useReactiveProp('loading', false)
 /** The parent's search: a change returns to the first page. */
 const pageResetKey = useReactiveProp<unknown>('pageResetKey', '')
-const emit = defineEmits()
+const emit = defineEmits(['edit', 'delete'])
 
 const COLUMNS = [
   { key: 'name', label: 'Courier', sortable: true, class: 'font-medium text-stone-800 whitespace-nowrap dark:text-white' },
@@ -41,8 +41,8 @@ const COLUMNS = [
 ]
 
 const ROW_ACTIONS = [
-  { action: 'edit', label: 'Edit', icon: 'i-hugeicons-edit-01' },
-  { action: 'delete', label: 'Delete', icon: 'i-hugeicons-waste', class: 'text-red-500' },
+  { action: 'edit', label: 'Edit' },
+  { action: 'delete', label: 'Delete' },
 ]
 
 const rows = derived(() => couriers().map(courier => ({

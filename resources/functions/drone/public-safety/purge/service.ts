@@ -23,7 +23,7 @@ async function locked(tx: TransactionHandle, key: string, ability: 'accept' | 'r
 }
 export async function previewPublicSafetyPurge(key: string): Promise<PurgePreview> {
   await authorizePublicSafetyPurge(key, 'preview')
-  return checkedIncidentResult(transaction(async tx => {
+  return checkedIncidentResult(transaction(async (tx): Promise<PurgePreview> => {
     const access = await requirePublicSafetyPurgeAccess(key, 'preview', tx), retained = await scope(tx, access.incident.id)
     const existing = asRow<PurgeRow>(await tx.selectFrom(purgeTables.purge).selectAll().where('incident_id', '=', access.incident.id).executeTakeFirst())
     if (existing) purgeReceiptDeadline(existing)

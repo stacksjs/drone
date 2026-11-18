@@ -3,7 +3,7 @@ import { publicSafetyHandoverGate } from '../resources/functions/drone/public-sa
 import { publicSafetyRetentionGate } from '../resources/functions/drone/public-safety/retention/policy'
 import { publicSafetyManagedGate } from '../resources/functions/drone/public-safety/managed/policy'
 import { publicSafetyPurgeGate } from '../resources/functions/drone/public-safety/purge/policy'
-import type { UserModel } from '@stacksjs/orm'
+import type { GateUser } from '@stacksjs/auth'
 import { defineGates } from '@stacksjs/auth'
 import { publicSafetyCreateGate, publicSafetyIncidentGate } from '../resources/functions/drone/public-safety/access/policy'
 
@@ -63,18 +63,18 @@ export default defineGates({
     'public-safety:observation-create': (user, key: string) => publicSafetyIncidentGate(user, key, 'observation-create'),
     'public-safety:review-append': (user, key: string) => publicSafetyIncidentGate(user, key, 'review-append'),
     /** Check if user can access admin area */
-    'access-admin': (user: UserModel | null) => {
+    'access-admin': (user: GateUser | null) => {
       return user?.email?.endsWith('@stacksjs.com') ?? false
     },
 
     /** Check if user can edit application settings */
-    'edit-settings': (user: UserModel | null) => {
+    'edit-settings': (user: GateUser | null) => {
       // Add your logic here
       return user !== null
     },
 
     /** Check if user can view dashboard */
-    'view-dashboard': (user: UserModel | null) => {
+    'view-dashboard': (user: GateUser | null) => {
       return user !== null
     },
 
@@ -91,7 +91,7 @@ export default defineGates({
      * 'run-remote-command': (user, hostKey) =>
      *   hostKey === 'app' && user?.email?.endsWith('@example.com') === true,
      */
-    // 'run-remote-command': (user: UserModel | null, hostKey: string, commandKey: string) => false,
+    // 'run-remote-command': (user: GateUser | null, hostKey: string, commandKey: string) => false,
 
     /**
      * Whether a user may open an interactive terminal on a configured host
@@ -105,7 +105,7 @@ export default defineGates({
      * 'open-remote-terminal': (user, hostKey) =>
      *   hostKey === 'app' && user?.email?.endsWith('@example.com') === true,
      */
-    // 'open-remote-terminal': (user: UserModel | null, hostKey: string) => false,
+    // 'open-remote-terminal': (user: GateUser | null, hostKey: string) => false,
 
     // Add more gates here...
     // 'ability-name': (user, ...args) => boolean,

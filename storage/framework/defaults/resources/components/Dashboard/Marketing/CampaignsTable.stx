@@ -11,7 +11,7 @@ const loading = useReactiveProp('loading', false)
 const sortResetKey = useReactiveProp<unknown>('sortResetKey', '')
 /** The parent's search and filters: a change returns to the first page. */
 const pageResetKey = useReactiveProp<unknown>('pageResetKey', '')
-const emit = defineEmits()
+const emit = defineEmits(['deliver', 'send', 'schedule', 'cancel', 'edit', 'delete'])
 
 function titleCase(value: string): string {
   return value.replace('-', ' ').replace(/\b\w/g, letter => letter.toUpperCase())
@@ -69,8 +69,8 @@ const ROW_ACTIONS = [
   { action: 'schedule', label: 'Schedule', icon: 'i-hugeicons-calendar-03', when: { key: 'scheduleLabel', equals: 'schedule' } },
   { action: 'schedule', label: 'Reschedule', icon: 'i-hugeicons-calendar-03', when: { key: 'scheduleLabel', equals: 'reschedule' } },
   { action: 'cancel', label: 'Cancel delivery of', icon: 'i-hugeicons-cancel-circle', class: 'text-red-500', when: { key: 'cancellable', equals: true } },
-  { action: 'edit', label: 'Edit', icon: 'i-hugeicons-edit-02', when: { key: 'editable', equals: true } },
-  { action: 'delete', label: 'Delete', icon: 'i-hugeicons-delete-02', class: 'text-red-500', when: { key: 'deletable', equals: true } },
+  { action: 'edit', label: 'Edit', when: { key: 'editable', equals: true } },
+  { action: 'delete', label: 'Delete', when: { key: 'deletable', equals: true } },
 ]
 
 const rows = derived(() => records().map(record => ({

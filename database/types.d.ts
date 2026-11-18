@@ -327,6 +327,15 @@ declare module '@stacksjs/database' {
       currency: string
       notes: string
       applied_coupon_id: string
+      session_token: string
+      checkout_step: "cart" | "shipping" | "payment" | "placed"
+      email: string
+      shipping_name: string
+      shipping_address: string
+      shipping_city: string
+      shipping_state: string
+      shipping_zip: string
+      discount_code: string | null
       customer_id: number
       coupon_id: number
     }
@@ -341,14 +350,14 @@ declare module '@stacksjs/database' {
       slug: string
       image_url: string
       is_active: number
-      parent_category_id: string
+      parent_category_id: number
       display_order: number
     }
     categorizable_models: {
       // columns
       id: number
-      category_id: number
       categorizable_id: number
+      category_id: number
       categorizable_type: string
       created_at: string
       updated_at: string | null
@@ -609,6 +618,39 @@ declare module '@stacksjs/database' {
       automatic_delivery: number
       status: "active" | "inactive"
     }
+    discounts: {
+      // columns
+      id: number
+      uuid: string
+      created_at: string
+      updated_at: string | null
+      title: string
+      code: string | null
+      type: "percentage" | "fixed_amount" | "buy_x_get_y" | "volume" | "free_shipping"
+      value: number
+      scope: "product" | "order" | null
+      per_item: number
+      target: string | null
+      buy_quantity: number | null
+      buy_target: string | null
+      get_quantity: number | null
+      get_target: string | null
+      get_percent: number | null
+      max_applications: number | null
+      tiers: string | null
+      max_shipping: number | null
+      minimum_subtotal: number | null
+      minimum_quantity: number | null
+      max_amount: number | null
+      combines_with_product: number
+      combines_with_order: number
+      combines_with_shipping: number
+      usage_limit: number | null
+      usage_count: number
+      is_active: number
+      starts_at: string | null
+      ends_at: string | null
+    }
     email_idempotency: {
       // columns
       id: number
@@ -844,6 +886,21 @@ declare module '@stacksjs/database' {
       name: string
       color: string
     }
+    license_activations: {
+      // columns
+      id: number
+      created_at: string
+      updated_at: string | null
+      device_hash: string
+      device_name: string | null
+      platform: string | null
+      app_version: string | null
+      license_seat_id: number | null
+      first_seen_at: string
+      last_seen_at: string
+      released_at: string | null
+      license_key_id: number
+    }
     license_keys: {
       // columns
       id: number
@@ -852,11 +909,35 @@ declare module '@stacksjs/database' {
       updated_at: string | null
       key: string
       template: "Standard License" | "Premium License" | "Enterprise License"
-      expiry_date: string
-      status: "active" | "inactive" | "unassigned"
+      expiry_date: string | null
+      status: "active" | "inactive" | "unassigned" | "revoked" | "refunded"
+      tier: "standard" | "lifetime" | "team"
+      updates_until: string | null
+      max_devices: number
+      seats: number
+      email: string | null
+      purchase_reference: string | null
+      payment_reference: string | null
+      provider: string | null
+      amount_paid: number | null
+      amount_refunded: number
+      currency: string | null
+      revoked_at: string | null
       customer_id: number
       product_id: number
       order_id: number
+      team_id: number
+    }
+    license_seats: {
+      // columns
+      id: number
+      created_at: string
+      updated_at: string | null
+      email: string
+      assigned_at: string
+      license_key_id: number
+      team_member_id: number
+      user_id: number
     }
     logs: {
       // columns
@@ -1245,6 +1326,49 @@ declare module '@stacksjs/database' {
       auction_id: number
       customer_id: number
     }
+    post_purchase_offer_responses: {
+      // columns
+      id: number
+      created_at: string
+      updated_at: string | null
+      status: "viewed" | "pending" | "accepted" | "declined" | "failed"
+      product_id: number
+      variant_id: number | null
+      quantity: number | null
+      unit_price: number | null
+      compare_at_price: number | null
+      amount: number | null
+      currency: string | null
+      payment_reference: string | null
+      payment_provider: string | null
+      failure_reason: string | null
+      order_item_id: number | null
+      responded_at: string | null
+      post_purchase_offer_id: number
+      order_id: number
+    }
+    post_purchase_offers: {
+      // columns
+      id: number
+      uuid: string
+      created_at: string
+      updated_at: string | null
+      name: string
+      headline: string | null
+      message: string | null
+      product_ids: string
+      discount_percent: number
+      min_quantity: number
+      default_quantity: number
+      max_quantity: number | null
+      trigger_product_ids: string | null
+      min_order_total: number | null
+      window_minutes: number
+      priority: number
+      is_active: number
+      starts_at: string | null
+      ends_at: string | null
+    }
     posts: {
       // columns
       id: number
@@ -1317,6 +1441,7 @@ declare module '@stacksjs/database' {
       created_at: string
       updated_at: string | null
       name: string
+      slug: string
       description: string
       price: number
       image_url: string
@@ -1650,6 +1775,12 @@ declare module '@stacksjs/database' {
       paused_at: string | null
       resume_at: string | null
     }
+    queue_workers: {
+      // columns
+      worker_id: string
+      snapshot: string
+      heartbeat_at: number | bigint
+    }
     receipts: {
       // columns
       id: number
@@ -1715,7 +1846,7 @@ declare module '@stacksjs/database' {
       created_at: string
       updated_at: string | null
       deleted_at: string | null
-      method: "GET" | "POST" | "PUT" | "PATCH" | "DELETE" | "OPTIONS" | "HEAD"
+      method: string
       path: string
       status_code: number
       duration_ms: number
@@ -1742,6 +1873,7 @@ declare module '@stacksjs/database' {
       images: string
       product_id: number
       customer_id: number
+      order_id: number
     }
     role_permissions: {
       // columns
