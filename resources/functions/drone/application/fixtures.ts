@@ -1,4 +1,9 @@
-import type { ApplicationConfig, ApplicationImplement } from './types'
+import type { AerialApplicationDeclaration, ApplicationConfig, ApplicationImplement } from './types'
+import aerialWater from '../../../../examples/application-aerial-water.json'
+
+export function exampleAerialApplicationConfig(): AerialApplicationDeclaration {
+  return structuredClone(aerialWater) as unknown as AerialApplicationDeclaration
+}
 
 /** Declared inert-material model only. Neither preset qualifies a physical implement or field dose. */
 export function exampleApplicationConfig(type: ApplicationImplement = 'sprayer'): ApplicationConfig {

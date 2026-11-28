@@ -22,12 +22,17 @@ status. The default is a dry test with no implement grant. Selecting apply mode 
 authority while remaining in test mode emits no material. Every run remains physically inhibited.
 The compiled standalone CLI exposes the same commands outside the checkout.
 
-## Aerial water planning
+## Aerial water simulation
 
-Run the quad-X planner with an explicit synthetic setup.
+Select **Aerial water sprayer** in the application workspace, or use the native commands with an
+explicit synthetic declaration. Start with the dry run and compare it with an authorized run.
 
 ```sh
 ./buddy application:plan examples/application-aerial-water.json --vehicle quadcopter
+./buddy application:simulate --vehicle quadcopter --config examples/application-aerial-water.json
+./buddy application:simulate --vehicle quadcopter --config examples/application-aerial-water.json --mode apply --authorize-implement --output /tmp/new-aerial-visit
+./buddy application:process /tmp/new-aerial-visit/recording.json
+./buddy application:replay /tmp/new-aerial-visit/recording.json
 ```
 
 The declaration adds centered sensor, tank, pump and mounting masses to the water inventory and
@@ -36,8 +41,21 @@ budgets peak propulsion and pump consumption over the full flight path, includin
 before checking the energy reserve. The plan retains treatment polygons, exclusions, loading
 calculations and the return path. The mount assumption is an idealized centered mass.
 
-This command produces a plan. Follow [the aerial simulation issue](https://github.com/stacksjs/drone/issues/113)
-for the moving load, metering, reserve, independent-closure and deposition evidence.
+The quad-X model uses a fixed centered point load for the fitted equipment and the current retained
+mass of water at each physics step. This model omits slosh and changes to inertia. Propulsion energy
+uses achieved rotor thrust and pump energy uses modeled pump power. The mission's reserve input
+comes from the delayed, qualified battery packet with the shared age allowance. The independent
+probes retain remaining mass, propulsion and pump energy, and energy above reserve.
+
+Only an active apply pass with a separate lease can request flow. Release also requires qualified
+estimated motion, height, attitude and a forecast clear of the exclusions. Aerial coverage shifts
+each finite kernel using the independently modeled horizontal release velocity and wind over the
+declared fixed fall time. This is an idealized deposition model.
+
+Try `--scenario meter-loss`, `host-loss` or `master-stuck` with the same explicit grant. An implement
+fault remains latched even if the modeled aircraft completes its planned return and landing.
+Host loss exercises the modeled board lease timeout. The independent tail preserves residual
+flow and unverified closure when both barriers stick. See [aerial trial acceptance](https://github.com/stacksjs/drone/issues/113).
 
 ## Planning and calibration
 

@@ -65,6 +65,11 @@ export interface AerialApplicationAircraft {
   pumpMaxW: number
   reservePercent: number
 }
+export interface AerialApplicationDeclaration {
+  version: 1
+  application: ApplicationConfig
+  aircraft: AerialApplicationAircraft
+}
 export interface AerialApplicationPlan extends ApplicationPlan {
   aircraft: AerialApplicationAircraft
   load: {
@@ -113,6 +118,8 @@ export interface ApplicationRelease {
   positionM: SensorVector
   yawRad: number
   windMps: [number, number]
+  /** Flight-only modeled horizontal velocity carried through the configured synthetic fall time. */
+  releaseVelocityMps?: [number, number]
   taskId: string | null
   hostAvailable: boolean
   positionEvidence: 'modeled-plant-truth'

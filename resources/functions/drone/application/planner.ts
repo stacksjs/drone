@@ -18,6 +18,9 @@ function id(value: unknown) { if (typeof value !== 'string' || !/^[a-z][a-z0-9-]
 export function applicationNeutralTailMs(config: ApplicationConfig): number {
   return Math.ceil(Math.max(2000, config.calibration.closingAllowanceMs, Math.max(config.calibration.primaryCloseMs, config.calibration.masterCloseMs) + 8 * config.calibration.energyTauMs + 200 + config.implement.fallTimeS * 1000) / 4) * 4
 }
+export function applicationAerialSpeedMps(implement: ApplicationConfig['implement']): number {
+  return (implement.minSpeedMps + implement.maxSpeedMps) / 2
+}
 /** Reject accessors/cycles/prototypes and bound configuration work before cloning any input. */
 function bounded(input: unknown) {
   let nodes = 0, bytes = 0
@@ -221,7 +224,8 @@ export function planAerialApplication(input: unknown): AerialApplicationPlan {
     { id: 'takeoff', kind: 'takeoff', positionM: rally, ...spatial, timeoutMs: 14000, next: 'approach' },
   ]
   let previous: VolumeXY = [0, 0]
-  const legTimeout = (from: VolumeXY, to: VolumeXY) => Math.ceil(7000 + 1000 * Math.hypot(to[0] - from[0], to[1] - from[1]) / .6)
+  const routeSpeedMps = applicationAerialSpeedMps(config.implement)
+  const legTimeout = (from: VolumeXY, to: VolumeXY) => Math.ceil(7000 + 1000 * Math.hypot(to[0] - from[0], to[1] - from[1]) / routeSpeedMps)
   for (const [i, point] of config.routeM.entries()) {
     tasks.push({
       id: i === 0 ? 'approach' : `apply-${i}`, kind: 'waypoint', positionM: [point[0], point[1], rally[2]], ...spatial,

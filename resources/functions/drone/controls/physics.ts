@@ -13,7 +13,8 @@ interface LoadProperties<P extends PointLoadPhase = 'attached' | 'separated'> { 
 interface LoadSnapshot<P extends PointLoadPhase = 'attached' | 'separated'> { properties: LoadProperties<P>, centerPositionM: SensorVector, centerVelocityMps: SensorVector }
 interface SeparationSide<P extends PointLoadPhase = 'attached' | 'separated'> { properties: LoadProperties<P>, bodyPositionM: SensorVector, bodyVelocityMps: SensorVector, quaternionWxyz: Quaternion, angularRateRadS: SensorVector, actualMotorsN: Motors, centerPositionM: SensorVector, centerVelocityMps: SensorVector }
 type LoadSeparation = { outcome: 'separated', reason: 'prescribed-zero-ejection', before: SeparationSide, after: SeparationSide, parcel: { massKg: number, positionM: SensorVector, velocityMps: SensorVector } } | { outcome: 'refused', reason: 'already-separated' }
-interface RigidBody { snapshot(): BodySnapshot, step(command: Motors, dtS: number, disturbance?: { windMps?: SensorVector, forceN?: SensorVector, torqueNm?: SensorVector }): BodySnapshot }
+interface RigidBodyEnvironment { windMps?: SensorVector, forceN?: SensorVector, torqueNm?: SensorVector, centeredLoadKg?: number }
+interface RigidBody { snapshot(): BodySnapshot, step(command: Motors, dtS: number, disturbance?: RigidBodyEnvironment): BodySnapshot }
 interface LoadedRigidBody extends RigidBody { loadSnapshot(): LoadSnapshot, separateCarriedLoad(): LoadSeparation }
 export interface IntakeParcel { id: string, massKg: number, positionM: SensorVector, velocityMps: SensorVector }
 export type PointLoadAttachment = {
@@ -127,10 +128,12 @@ function createBody(input: RigidBodyInput, configured: ReturnType<typeof capture
   let centerVelocityMps: SensorVector | null = configured ? [...velocityMps] : null
   const body = {
     snapshot,
-    step(command: Motors, dtS: number, disturbance: { windMps?: SensorVector, forceN?: SensorVector, torqueNm?: SensorVector } = {}) {
+    step(command: Motors, dtS: number, disturbance: RigidBodyEnvironment = {}) {
       quadXWrench(command)
       const wind = disturbance.windMps ?? [0, 0, 0], force = disturbance.forceN ?? [0, 0, 0], torque = disturbance.torqueNm ?? [0, 0, 0]
       if (!Number.isFinite(dtS) || dtS <= 0 || dtS > 0.01 || ![wind, force, torque].every(validVector)) throw new RangeError('Invalid physics step or disturbance')
+      const centeredLoadKg = disturbance.centeredLoadKg ?? 0
+      if (!Number.isFinite(centeredLoadKg) || centeredLoadKg < 0 || centeredLoadKg > 4 * model.maxMotorThrustN / model.gravityMps2 - model.massKg || configured && centeredLoadKg !== 0) throw new RangeError('Invalid centered load for quad-X physics')
       motorsN = motorsN.map((n, i) => n + (command[i]! - n) * (1 - Math.exp(-dtS / model.motorTimeConstantS))) as Motors
       const wrench = quadXWrench(motorsN)
       let alpha: SensorVector | null = null
@@ -162,7 +165,8 @@ function createBody(input: RigidBodyInput, configured: ReturnType<typeof capture
         accelerationMps2 = centerAcceleration.map((n, i) => n - accelerationLever[i]!) as SensorVector
       }
       else {
-        accelerationMps2 = thrust.map((n, i) => (n + force[i]! - model.linearDragKgPerS * (velocityMps[i]! - wind[i]!)) / model.massKg + (i === 2 ? model.gravityMps2 : 0)) as SensorVector
+        // A point mass centered on the body origin moves with the body and contributes no inertia.
+        accelerationMps2 = thrust.map((n, i) => (n + force[i]! - model.linearDragKgPerS * (velocityMps[i]! - wind[i]!)) / (model.massKg + centeredLoadKg) + (i === 2 ? model.gravityMps2 : 0)) as SensorVector
         velocityMps = velocityMps.map((n, i) => n + accelerationMps2[i]! * dtS) as SensorVector
         positionM = positionM.map((n, i) => n + velocityMps[i]! * dtS) as SensorVector
       }

@@ -65,6 +65,7 @@ export function createVehicleSimulationSession(profileInput: VehicleProfile, opt
   let transitionObservation: VehicleVtolTransitionObservation | null = null
   const actuators = structuredClone(profileInput.actuators), fence = structuredClone(profileInput.authorityFence)
   const session = profileInput.createSession(), navigation = session.createNavigation?.()
+  const targetHeading = session.targetHeadingRad?.bind(session)
   const linkProvider = session.linkObservation, renderMeasurement = session.renderMeasurement.bind(session)
   const observeIndependent = session.observeIndependent?.bind(session), updateNavigation = navigation?.update.bind(navigation)
   if (vehicle === 'subsea' && !navigation) throw new TypeError('Subsea profile requires owned pressure/DVL navigation')
@@ -149,9 +150,9 @@ export function createVehicleSimulationSession(profileInput: VehicleProfile, opt
       rc: { capturedAtMs: nowMs, connected: true, armSwitch: true, override: faults.rcOverride ?? false },
       interlocks: { capturedAtMs: qualified?.capturedAtMs ?? nowMs - 1000, killActive: faults.kill ?? false, onGround: qualified?.values.onSurface === true, motorsStopped: qualified?.values.stopped === true },
       battery: { capturedAtMs: batteryModel ? qualified?.capturedAtMs ?? nowMs - 1000 : nowMs, remainingPercent: batteryPercent }, link }
-    const send = (action: 'arm' | 'engage' | 'renew' | 'disarm', targetM = mission.targetM) => {
+    const send = (action: 'arm' | 'engage' | 'renew' | 'disarm', targetM = mission.targetM, yawRad = 0) => {
       const s = supervisor.snapshot()
-      return supervisor.update(observation, { version: 1, sessionId: s.sessionId, bootId: s.bootId, epoch: s.epoch, sequence: s.sequence + 1, issuedAtMs: nowMs, action, mode: 'position', leaseMs: 100, target: { positionM: targetM ?? [0, 0, 0], yawRad: 0 } })
+      return supervisor.update(observation, { version: 1, sessionId: s.sessionId, bootId: s.bootId, epoch: s.epoch, sequence: s.sequence + 1, issuedAtMs: nowMs, action, mode: 'position', leaseMs: 100, target: { positionM: targetM ?? [0, 0, 0], yawRad } })
     }
     supervisor.update(observation)
     if (nowMs === 600) { send('arm'); send('engage', [0, 0, 0]) }
@@ -172,9 +173,11 @@ export function createVehicleSimulationSession(profileInput: VehicleProfile, opt
       else { owned(() => observePayload?.(structuredClone({ ...context, mission }))); owned(() => requestPayload!(structuredClone(mission.payload!))); requested.add(mission.payload.eventId) }
     }
     const active = mission.state === 'running' || mission.state === 'paused'
-    if (active && mission.targetM && !fault) send('renew')
+    const targetYawRad = targetHeading && active ? captured(() => targetHeading(mission.taskId)) : 0
+    if (!Number.isFinite(targetYawRad) || Math.abs(targetYawRad) > Math.PI) throw new RangeError('Invalid simulated task heading')
+    if (active && mission.targetM && !fault) send('renew', mission.targetM, targetYawRad)
     else { send('disarm'); board.revoke() }
-    const output: VehicleControlOutput = captured(() => stepController({ ...context, enabled: supervisor.snapshot().state === 'autonomous', mission }))
+    const output: VehicleControlOutput = captured(() => stepController({ ...context, enabled: supervisor.snapshot().state === 'autonomous', mission, ...(targetHeading ? { targetYawRad } : {}) }))
     if (hasTransitions && active && !output.inhibited && supervisor.snapshot().state === 'autonomous') transitionObservation = output.transition ? structuredClone(output.transition) : null
     if (active && output.inhibited && supervisor.snapshot().state === 'autonomous') { fault ??= output.reason; send('disarm'); board.revoke() }
     const frame = supervisor.gate(output, nowMs)

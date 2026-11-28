@@ -159,7 +159,7 @@ export interface VehicleMeasurementPose {
 }
 /** Current calibrated gyro from the same qualified raw IMU capture as estimator attitude. */
 export interface VehicleControlRate { evidence: 'modeled-qualified-imu', reference: string, capturedAtMs: number, angularRateRadS: SensorVector }
-export interface VehicleControllerContext { nowMs: number, enabled: boolean, estimate: EstimatorSnapshot, measurement: VehicleMeasurement | null, measurementPose?: VehicleMeasurementPose | null, controlRate?: VehicleControlRate | null, mission: VehicleMissionSnapshot }
+export interface VehicleControllerContext { nowMs: number, enabled: boolean, estimate: EstimatorSnapshot, measurement: VehicleMeasurement | null, measurementPose?: VehicleMeasurementPose | null, controlRate?: VehicleControlRate | null, mission: VehicleMissionSnapshot, targetYawRad?: number }
 export interface VehicleController { step(context: VehicleControllerContext): VehicleControlOutput }
 export interface VehicleFaults {
   windMps?: SensorVector
@@ -175,6 +175,8 @@ export interface VehicleFaults {
 /** One execution owns its plant, controller, payload and measurement sequence. */
 export interface VehicleNavigation { update(base: EstimatorSnapshot, measurement: VehicleMeasurement | null, nowMs: number): EstimatorSnapshot }
 export interface VehicleSession {
+  /** Declared simulated task heading in the same local frame as the position target. */
+  targetHeadingRad?(taskId: string): number
   /** Optional received link evidence on the runtime's monotonic clock, without receipt-time restamping. */
   linkObservation?(nowMs: number): { capturedAtMs: number, connected: boolean }
   createNavigation?(): VehicleNavigation

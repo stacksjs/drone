@@ -293,12 +293,12 @@ replacing the example URL when Buddy selects a different port. The check require
 covers the simulated mapping, crop scouting, animal observation, incomplete parcel and water
 application paths.
 
-For the first treatment walkthrough, use `/application` with the inert-water sprayer. Run the dry
-mode first and observe zero modeled discharge. Select Metered model and grant the separate
-implement lease, then compare the dose map, covered and missed area, and shutdown evidence. Run
-`master-stuck` and inspect the independent tail. The blocked run retains unverified closure and
-reports residual model flow. This walkthrough runs on the modeled ground vehicle with an explicit
-prescription. The aerial simulator is tracked separately. [Prescribed application and evidence](application.md),
+For the first treatment walkthrough, open `/application` and select **Aerial water sprayer**.
+Run the dry mode first and observe zero modeled discharge. Select **Metered model** and grant
+the separate implement lease. Compare the dose map, excluded and missed area, remaining aircraft
+mass, battery reserve and shutdown evidence. Run `master-stuck` and inspect the independent tail
+for residual flow. Record whether the grower can distinguish a modeled landing from verified
+implement closure. [Prescribed application and evidence](application.md),
 [aerial water simulation issue](https://github.com/stacksjs/drone/issues/113)
 
 For an on-farm trial, decide the required map accuracy or decision error with the grower and

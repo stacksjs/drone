@@ -1,11 +1,13 @@
-import type { ApplicationRun, ApplicationControllerInput } from './runtime-types'
+import type { AerialApplicationPlan } from './types'
+import type { AerialApplicationProbe, ApplicationHostInput, ApplicationProbe, ApplicationRun, RecordedApplicationRun } from './runtime-types'
 import type { ApplicationPlantSnapshot } from './types'
 import { authorityStates } from '../authority/supervisor'
 import { replayVehicleMission } from '../missions/vehicle'
-import { createVehicleMeasurementQualifier } from '../vehicles/measurements'
+import { createVehicleMeasurementQualifier, observeVehicleBattery } from '../vehicles/measurements'
+import { multirotorModel } from '../controls/model'
 import { applicationPulseFactor, applicationScaleFactor } from './calibration'
 import { createApplicationController } from './controller'
-import { applicationNeutralTailMs, planApplication, validateApplicationConfig } from './planner'
+import { applicationNeutralTailMs, planAerialApplication, planApplication, validateApplicationConfig } from './planner'
 
 export const applicationEvidenceLimits = Object.freeze({ recordingBytes: 16 * 1024 * 1024, hostRows: 9001, probes: 10001, releases: 10001, maximumMs: 200000 })
 function fail(reason: string): never { throw new TypeError(`Invalid application recording: ${reason}`) }
@@ -21,8 +23,8 @@ function finite(v: unknown, min = -1000000, max = 1000000): v is number {
 }
 function epoch(v: unknown): v is number { return Number.isSafeInteger(v) && finite(v, 0, applicationEvidenceLimits.maximumMs) }
 function vector(v: unknown, size: number): v is number[] { return Array.isArray(v) && v.length === size && v.every(n => finite(n)) }
-function channels(v: unknown): v is number[] {
-  return vector(v, 7) && v.every((n, i) => n >= (i < 3 ? -1 : 0) && n <= 1)
+function channels(v: unknown, aerial: AerialApplicationPlan | null): v is number[] {
+  return vector(v, 7) && v.every((n, i) => n >= (!aerial && i < 3 ? -1 : 0) && n <= (aerial && i < 4 ? multirotorModel.maxMotorThrustN : 1))
 }
 function identifier(v: unknown): v is string { return typeof v === 'string' && /^[a-z][a-z0-9-]{0,63}$/.test(v) }
 function text(v: unknown): v is string {
@@ -80,12 +82,21 @@ function plant(state: ApplicationPlantSnapshot, config: ApplicationRun['config']
   const kg = state.remainingAmount * (config.material.unit === 'L' ? config.material.densityKgPerL! : 1)
   if (Math.abs(state.scaleRaw - config.calibration.scale.tareRaw - kg * applicationScaleFactor(config.calibration.scale)) > .500001) fail('plant scale accounting')
 }
-function controllerInput(input: ApplicationControllerInput) {
-  fields(input, ['atMs', 'enabled', 'reference', 'missionState', 'taskId', 'ground', 'feedback', 'weather', 'grant', 'emergency'])
+function controllerInput(input: ApplicationHostInput, aerial: AerialApplicationPlan | null) {
+  fields(input, ['atMs', 'enabled', 'reference', 'missionState', 'taskId', aerial ? 'flight' : 'ground', 'feedback', 'weather', 'grant', 'emergency'])
   if (!epoch(input.atMs) || typeof input.enabled !== 'boolean' || typeof input.emergency !== 'boolean' || typeof input.reference !== 'string' || !/^[1-9][0-9]{0,19}:[0-9]+,[0-9]+,[0-9]+,[0-9]+,[0-9]+$/.test(input.reference) || !['ready', 'running', 'paused', 'completed', 'aborted', 'blocked'].includes(input.missionState) || !identifier(input.taskId)) fail('controller input scope or epoch')
-  fields(input.ground, ['healthy', 'reason', 'positionM', 'speedMps', 'wheelSpeedMps', 'yawRad', 'yawRateRadS', 'obstacleM', 'personM', 'onSurface', 'stopped', 'guardClosed', 'emergency', 'uncertaintyM'])
-  const ground = input.ground
-  if (![ground.healthy, ground.onSurface, ground.stopped, ground.guardClosed, ground.emergency].every(n => typeof n === 'boolean') || !text(ground.reason) || !vector(ground.positionM, 3) || ![ground.speedMps, ground.wheelSpeedMps, ground.yawRad, ground.yawRateRadS].every(n => finite(n, -1000, 1000)) || ![ground.obstacleM, ground.personM, ground.uncertaintyM].every(n => finite(n, 0, 1000))) fail('recorded ground observation')
+  if ('flight' in input) {
+    const flight = input.flight
+    fields(flight, ['healthy', 'reason', 'positionM', 'velocityMps', 'yawRad', 'yawRateRadS', 'tiltRad', 'uncertaintyM', 'verticalUncertaintyM', 'onSurface', 'guardClosed'])
+    if (![flight.healthy, flight.onSurface, flight.guardClosed].every(n => typeof n === 'boolean') || !text(flight.reason) || !vector(flight.positionM, 3) || !vector(flight.velocityMps, 3)
+      || ![flight.yawRad, flight.yawRateRadS].every(n => finite(n, -1000, 1000)) || !finite(flight.tiltRad, 0, Math.PI)
+      || ![flight.uncertaintyM, flight.verticalUncertaintyM].every(n => finite(n, 0, 1))) fail('recorded flight observation')
+  }
+  else {
+    const ground = input.ground
+    fields(ground, ['healthy', 'reason', 'positionM', 'speedMps', 'wheelSpeedMps', 'yawRad', 'yawRateRadS', 'obstacleM', 'personM', 'onSurface', 'stopped', 'guardClosed', 'emergency', 'uncertaintyM'])
+    if (![ground.healthy, ground.onSurface, ground.stopped, ground.guardClosed, ground.emergency].every(n => typeof n === 'boolean') || !text(ground.reason) || !vector(ground.positionM, 3) || ![ground.speedMps, ground.wheelSpeedMps, ground.yawRad, ground.yawRateRadS].every(n => finite(n, -1000, 1000)) || ![ground.obstacleM, ground.personM, ground.uncertaintyM].every(n => finite(n, 0, 1000))) fail('recorded ground observation')
+  }
   fields(input.weather, ['windMps', 'temperatureC', 'humidityPercent', 'inversion', 'capturedAtMs'])
   if (!vector(input.weather.windMps, 2) || !finite(input.weather.temperatureC, -100, 100) || !finite(input.weather.humidityPercent, 0, 100) || typeof input.weather.inversion !== 'boolean' || !epoch(input.weather.capturedAtMs)) fail('weather declaration')
   if (input.feedback !== null) {
@@ -101,18 +112,23 @@ function uint64(value: unknown): value is bigint {
   return typeof value === 'bigint' && value >= 0n && value <= 0xFFFFFFFFFFFFFFFFn
 }
 /** Replay recorded mission and implement inputs. This verifies unsigned consistency, not producer authenticity or full sensor/plant replay. */
-export function validateApplicationRun(input: unknown): ApplicationRun {
+export function validateApplicationRun(input: unknown): RecordedApplicationRun {
   bounded(input)
   fields(input, ['version', 'evidence', 'physicalFlightEnabled', 'physicalApplicationVerified', 'physicalTrialEligible', 'options', 'config', 'plan', 'vehicle', 'inputs', 'decisions', 'releases', 'probes', 'final', 'shutdown', 'status', 'reason', 'faultDemonstrated'])
-  const source = input as ApplicationRun
+  const source = input as ApplicationRun<ApplicationHostInput, ApplicationProbe | AerialApplicationProbe>
   if (source.version !== 1 || source.evidence !== 'owned-application-physics-simulation' || source.physicalFlightEnabled !== false || source.physicalApplicationVerified !== false || source.physicalTrialEligible !== false || !['dry-completed', 'completed', 'blocked', 'host-lost', 'incomplete'].includes(source.status) || !text(source.reason) || typeof source.faultDemonstrated !== 'boolean') fail('unsupported application evidence')
   fields(source.options, ['scenario', 'visitId', 'seconds', 'authorizeImplement', 'testMode'])
   if (!identifier(source.options.visitId) || !['nominal', 'empty', 'stuck-valve', 'master-stuck', 'blocked-flow', 'meter-loss', 'meter-replay', 'weather', 'manual', 'host-loss', 'emergency', 'localization-loss', 'guard-open', 'lease-expiry'].includes(source.options.scenario) || !Number.isSafeInteger(source.options.seconds) || source.options.seconds < 2 || source.options.seconds > 180 || typeof source.options.authorizeImplement !== 'boolean' || typeof source.options.testMode !== 'boolean') fail('normalized application options')
-  const config = validateApplicationConfig(source.config), plan = planApplication(config)
+  const config = validateApplicationConfig(source.config)
+  const aerial = record(source.plan) && 'aircraft' in source.plan
+    ? planAerialApplication({ version: 1, application: config, aircraft: source.plan.aircraft })
+    : null
+  const plan = aerial ?? planApplication(config)
+  const carrier = plan.mission.vehicle
   if (!equivalent(source.plan, plan) || !Array.isArray(source.inputs) || !source.inputs.length || source.inputs.length > applicationEvidenceLimits.hostRows || !Array.isArray(source.decisions) || source.decisions.length !== source.inputs.length || !Array.isArray(source.probes) || !source.probes.length || source.probes.length > applicationEvidenceLimits.probes || !Array.isArray(source.releases) || source.releases.length > applicationEvidenceLimits.releases) fail('plan or recording counts')
   const run = structuredClone(source), vehicle = run.vehicle
-  fields(vehicle, ['version', 'evidence', 'physicalFlightEnabled', 'boardOutputsInhibited', 'vehicle', 'scenario', 'status', 'fault', 'navigationEvidence', 'mission', 'trace', 'path', 'transitions', 'budget', 'authority', 'board', 'finalTruthPositionM'])
-  if (vehicle.version !== 1 || vehicle.evidence !== 'owned-vehicle-physics-simulation' || vehicle.physicalFlightEnabled !== false || vehicle.boardOutputsInhibited !== true || vehicle.vehicle !== 'ground' || vehicle.scenario !== run.options.scenario || !['completed', 'blocked', 'host-lost', 'duration-exhausted'].includes(vehicle.status) || (vehicle.fault !== null && !text(vehicle.fault)) || !vector(vehicle.finalTruthPositionM, 3) || !equivalent(vehicle.trace.plan, plan.mission) || !Array.isArray(vehicle.trace.rows) || vehicle.trace.rows.length !== run.inputs.length || !Array.isArray(vehicle.path) || vehicle.path.length !== run.inputs.length) fail('vehicle profile, trace or host epochs')
+  fields(vehicle, ['version', 'evidence', 'physicalFlightEnabled', 'boardOutputsInhibited', 'vehicle', 'scenario', 'status', 'fault', 'navigationEvidence', 'mission', 'trace', 'path', 'transitions', 'budget', 'authority', 'board', 'finalTruthPositionM', ...(aerial ? ['energy'] : [])])
+  if (vehicle.version !== 1 || vehicle.evidence !== 'owned-vehicle-physics-simulation' || vehicle.physicalFlightEnabled !== false || vehicle.boardOutputsInhibited !== true || vehicle.vehicle !== carrier || vehicle.scenario !== run.options.scenario || !['completed', 'blocked', 'host-lost', 'duration-exhausted'].includes(vehicle.status) || (vehicle.fault !== null && !text(vehicle.fault)) || !vector(vehicle.finalTruthPositionM, 3) || !equivalent(vehicle.trace.plan, plan.mission) || !Array.isArray(vehicle.trace.rows) || vehicle.trace.rows.length !== run.inputs.length || !Array.isArray(vehicle.path) || vehicle.path.length !== run.inputs.length) fail('vehicle profile, trace or host epochs')
   const mission = replayVehicleMission(vehicle.trace).snapshot()
   if (vehicle.status === 'completed' && mission.state !== 'completed' || vehicle.status === 'blocked' && !['blocked', 'aborted'].includes(mission.state) || ['duration-exhausted', 'host-lost'].includes(vehicle.status) && !['ready', 'running', 'paused'].includes(mission.state)) fail('vehicle status differs from mission replay')
   if (!equivalent(mission, vehicle.mission) || !equivalent(vehicle.budget, { worstCaseMs: plan.worstCaseMs, requiredWh: plan.requiredWh })) fail('replayed mission or energy budget')
@@ -121,7 +137,7 @@ export function validateApplicationRun(input: unknown): ApplicationRun {
   if (![vehicle.navigationEvidence.observedSensors.imu, vehicle.navigationEvidence.observedSensors.gnss].every(n => Number.isSafeInteger(n) && n >= 0) || typeof vehicle.navigationEvidence.localPositionHealthy !== 'boolean' || !Array.isArray(vehicle.navigationEvidence.quality) || vehicle.navigationEvidence.quality.length > 64 || vehicle.navigationEvidence.quality.some(n => !text(n)) || (vehicle.navigationEvidence.datum !== null && vehicle.navigationEvidence.datum !== 'WGS84_ELLIPSOID')) fail('navigation declarations')
   fields(vehicle.authority, ['version', 'state', 'epoch', 'sessionId', 'bootId', 'sequence', 'lastCheckedAtMs', 'reason', 'commandAccepted', 'leaseUntilMs', 'target', 'physicalFlightEnabled', 'boardOutputsInhibited', 'events', 'vehicle', 'physicalActuationEnabled'])
   fields(vehicle.board, ['bootId', 'lastCheckedAtMs', 'sequence', 'epoch', 'expiresAtMs', 'fault', 'physicalFlightEnabled', 'boardOutputsInhibited', 'vehicle', 'actuators', 'physicalActuationEnabled'])
-  if (!uint64(vehicle.authority.bootId) || !uint64(vehicle.authority.sessionId) || !uint64(vehicle.board.bootId) || vehicle.authority.bootId !== vehicle.board.bootId || vehicle.authority.physicalFlightEnabled !== false || vehicle.authority.physicalActuationEnabled !== false || vehicle.authority.boardOutputsInhibited !== true || vehicle.board.boardOutputsInhibited !== true || vehicle.board.physicalFlightEnabled !== false || vehicle.board.physicalActuationEnabled !== false || vehicle.authority.vehicle !== 'ground' || vehicle.board.vehicle !== 'ground' || !channels(vehicle.board.actuators)) fail('native diagnostic scope or physical flags')
+  if (!uint64(vehicle.authority.bootId) || !uint64(vehicle.authority.sessionId) || !uint64(vehicle.board.bootId) || vehicle.authority.bootId !== vehicle.board.bootId || vehicle.authority.physicalFlightEnabled !== false || vehicle.authority.physicalActuationEnabled !== false || vehicle.authority.boardOutputsInhibited !== true || vehicle.board.boardOutputsInhibited !== true || vehicle.board.physicalFlightEnabled !== false || vehicle.board.physicalActuationEnabled !== false || vehicle.authority.vehicle !== carrier || vehicle.board.vehicle !== carrier || !channels(vehicle.board.actuators, aerial)) fail('native diagnostic scope or physical flags')
   const authority = vehicle.authority, board = vehicle.board
   if (authority.version !== 1 || !authorityStates.includes(authority.state) || !Number.isSafeInteger(authority.epoch) || authority.epoch < 0 || !Number.isSafeInteger(authority.sequence) || authority.sequence < -1 || !epoch(authority.lastCheckedAtMs) || !text(authority.reason) || typeof authority.commandAccepted !== 'boolean' || (authority.leaseUntilMs !== null && !epoch(authority.leaseUntilMs)) || !Array.isArray(authority.events) || authority.events.length > 1000 || !Number.isSafeInteger(board.sequence) || board.sequence < -1 || !Number.isSafeInteger(board.epoch) || board.epoch < 0 || !epoch(board.lastCheckedAtMs) || (board.expiresAtMs !== null && !epoch(board.expiresAtMs)) || (board.fault !== null && !text(board.fault))) fail('native diagnostic quantities')
   if (authority.target !== null) { fields(authority.target, ['positionM', 'yawRad']); if (!vector(authority.target.positionM, 3) || !finite(authority.target.yawRad)) fail('native diagnostic target') }
@@ -129,16 +145,24 @@ export function validateApplicationRun(input: unknown): ApplicationRun {
     fields(event, ['atMs', 'from', 'to', 'reason', 'epoch'])
     if ((event.atMs !== null && !epoch(event.atMs)) || !authorityStates.includes(event.from) || !authorityStates.includes(event.to) || !text(event.reason) || !Number.isSafeInteger(event.epoch) || event.epoch < 0) fail('native diagnostic event')
   }
-  const controller = createApplicationController(config, { visitId: run.options.visitId, authorizeImplement: run.options.authorizeImplement, testMode: run.options.testMode }), qualifier = createVehicleMeasurementQualifier('ground')
+  const controller = createApplicationController(config, { visitId: run.options.visitId, authorizeImplement: run.options.authorizeImplement, testMode: run.options.testMode }, aerial?.aircraft.operatingHeightM)
+  const battery = aerial ? { evidence: 'modeled-vehicle-battery-v1' as const, capacityWh: aerial.aircraft.availableWh, maximumSourceW: plan.mission.power.maxW } : undefined
+  const qualifier = createVehicleMeasurementQualifier(carrier, battery)
+  let lastBattery: ReturnType<typeof observeVehicleBattery> | null = null
   let previousMs = -1
   const transitions: ApplicationRun['vehicle']['transitions'] = []
   let previousState = '', previousTask = ''
   for (let i = 0; i < run.inputs.length; i++) {
     const recorded = run.inputs[i]!, row = vehicle.path[i]!, trace = vehicle.trace.rows[i]!
-    controllerInput(recorded)
+    controllerInput(recorded, aerial)
     fields(row, ['atMs', 'positionM', 'truthPositionM', 'mission', 'measurement', 'measurementPose', 'actuators'])
-    if (recorded.atMs !== 600 + i * 20 || recorded.atMs !== row.atMs || row.atMs !== trace.observation.nowMs || recorded.reference !== trace.observation.reference || recorded.taskId !== row.mission.taskId || recorded.missionState !== row.mission.state || !equivalent(row.mission, trace.result) || (row.positionM !== null && (!vector(row.positionM, 3) || !equivalent(row.positionM, trace.observation.positionM))) || !vector(row.truthPositionM, 3) || !channels(row.actuators) || (recorded.enabled && trace.observation.authority !== 'autonomous')) fail('host input, mission or pose epoch mismatch')
-    if (recorded.ground.healthy && (!row.positionM || Math.hypot(...recorded.ground.positionM.map((n, j) => n - row.positionM![j]!)) > recorded.ground.uncertaintyM + config.implement.maxSpeedMps * .14)) fail('qualified ground observation diverges beyond declared uncertainty and latency travel')
+    if (recorded.atMs !== 600 + i * 20 || recorded.atMs !== row.atMs || row.atMs !== trace.observation.nowMs || recorded.reference !== trace.observation.reference || recorded.taskId !== row.mission.taskId || recorded.missionState !== row.mission.state || !equivalent(row.mission, trace.result) || (row.positionM !== null && (!vector(row.positionM, 3) || !equivalent(row.positionM, trace.observation.positionM))) || !vector(row.truthPositionM, 3) || !channels(row.actuators, aerial) || (recorded.enabled && trace.observation.authority !== 'autonomous')) fail('host input, mission or pose epoch mismatch')
+    if ('flight' in recorded) {
+      const flight = recorded.flight
+      if (flight.healthy && (!equivalent(flight.positionM, row.positionM) || !equivalent(flight.velocityMps, trace.observation.velocityMps))) fail('qualified flight motion differs from mission estimate')
+      if (flight.onSurface !== (row.measurement?.values.onSurface !== false) || flight.guardClosed !== (row.measurement?.values.guardClosed === true)) fail('qualified flight interlocks differ from recorded sensors')
+    }
+    else if (recorded.ground.healthy && (!row.positionM || Math.hypot(...recorded.ground.positionM.map((n, j) => n - row.positionM![j]!)) > recorded.ground.uncertaintyM + config.implement.maxSpeedMps * .14)) fail('qualified ground observation diverges beyond declared uncertainty and latency travel')
     if (row.measurement !== null) {
       fields(row.measurement, ['version', 'evidence', 'vehicle', 'sequence', 'reference', 'capturedAtMs', 'receivedAtMs', 'values'])
       qualifier.qualify(row.measurement, row.atMs, recorded.reference)
@@ -147,7 +171,12 @@ export function validateApplicationRun(input: unknown): ApplicationRun {
     const meterKeys = ['applicationMeterSequence', 'applicationMeterAtMs', 'applicationPulseCount', 'applicationScaleRaw', 'applicationPrimaryEncoder', 'applicationMasterEncoder', 'applicationEnergyEncoder']
     const meterPresent = !!packetValues && packetValues.applicationCalibration === config.calibration.id && meterKeys.every(key => typeof packetValues[key] === 'number')
     if (meterPresent !== (recorded.feedback !== null)) fail('meter input presence differs from recorded sensor packet')
-    if (recorded.ground.healthy && packetValues && (recorded.ground.guardClosed !== packetValues.guardClosed || recorded.ground.onSurface !== packetValues.onSurface || recorded.ground.stopped !== packetValues.stopped || recorded.ground.emergency !== (!!packetValues.emergency || !!packetValues.bumper) || recorded.ground.personM !== Number(packetValues.personMm) / 1000 || recorded.ground.obstacleM !== Number(packetValues.obstacleMm) / 1000)) fail('qualified ground safety values differ from recorded sensors')
+    if ('ground' in recorded && recorded.ground.healthy && packetValues && (recorded.ground.guardClosed !== packetValues.guardClosed || recorded.ground.onSurface !== packetValues.onSurface || recorded.ground.stopped !== packetValues.stopped || recorded.ground.emergency !== (!!packetValues.emergency || !!packetValues.bumper) || recorded.ground.personM !== Number(packetValues.personMm) / 1000 || recorded.ground.obstacleM !== Number(packetValues.obstacleMm) / 1000)) fail('qualified ground safety values differ from recorded sensors')
+    if (battery) {
+      const observed = row.measurement ? observeVehicleBattery(row.measurement, battery, row.atMs) : null
+      if (observed) lastBattery = observed
+      if (!equivalent(trace.observation.batteryPercent, !observed || observed.cutoff ? 0 : observed.remainingPercentLowerBound)) fail('mission reserve input differs from qualified battery packet')
+    }
     if (recorded.feedback) {
       const values = row.measurement?.values, feedback = recorded.feedback
       if (!values || feedback.sequence !== values.applicationMeterSequence || feedback.capturedAtMs !== values.applicationMeterAtMs || feedback.pulseCount !== values.applicationPulseCount || feedback.scaleRaw !== values.applicationScaleRaw || feedback.primaryEncoder !== values.applicationPrimaryEncoder || feedback.masterEncoder !== values.applicationMasterEncoder || feedback.energyEncoder !== values.applicationEnergyEncoder || values.applicationCalibration !== config.calibration.id) fail('meter input differs from recorded sensor packet')
@@ -163,28 +192,43 @@ export function validateApplicationRun(input: unknown): ApplicationRun {
     if (row.mission.state !== previousState || row.mission.taskId !== previousTask) { transitions.push({ atMs: row.atMs, state: row.mission.state, taskId: row.mission.taskId, reason: row.mission.reason }); previousState = row.mission.state; previousTask = row.mission.taskId }
     previousMs = recorded.atMs
   }
+  if (battery && !equivalent(vehicle.energy, { evidence: battery.evidence, model: battery, lastObservation: lastBattery })) fail('final battery observation differs from host recording')
   if (!equivalent(transitions, vehicle.transitions)) fail('vehicle transition log differs from mission replay')
   fields(run.shutdown, ['requestedAtMs', 'finalAtMs', 'emittedAfterRequest', 'closureVerified', 'evidence'])
   if (!epoch(run.shutdown.requestedAtMs) || !epoch(run.shutdown.finalAtMs) || run.shutdown.requestedAtMs > run.shutdown.finalAtMs || run.shutdown.finalAtMs < previousMs || !finite(run.shutdown.emittedAfterRequest, 0) || typeof run.shutdown.closureVerified !== 'boolean' || run.shutdown.evidence !== 'independent-modeled-plant-tail') fail('shutdown declaration')
   let previousPlant: ApplicationPlantSnapshot | undefined, emitted = 0, emittedBeforeRequest = 0, releaseIndex = 0
-  const probesByEpoch = new Map<number, ApplicationRun['probes'][number]>()
+  let previousFlight: AerialApplicationProbe['flight'] | null = null
+  const probesByEpoch = new Map<number, ApplicationProbe | AerialApplicationProbe>()
   let firstUnavailableAtMs: number | null = null
   for (let index = 0; index < run.probes.length; index++) {
     const probe = run.probes[index]!
-    fields(probe, ['atMs', 'hostAvailable', 'positionM', 'yawRad', 'state', 'boardChannels'])
-    if (!epoch(probe.atMs) || probe.atMs !== probe.state.atMs || !vector(probe.positionM, 3) || !finite(probe.yawRad, -1000, 1000) || typeof probe.hostAvailable !== 'boolean' || !channels(probe.boardChannels) || probe.hostAvailable !== (probe.atMs <= previousMs)) fail('independent probe scope')
+    fields(probe, ['atMs', 'hostAvailable', 'positionM', 'yawRad', 'state', 'boardChannels', ...(aerial ? ['flight'] : [])])
+    if (!epoch(probe.atMs) || probe.atMs !== probe.state.atMs || !vector(probe.positionM, 3) || !finite(probe.yawRad, -1000, 1000) || typeof probe.hostAvailable !== 'boolean' || !channels(probe.boardChannels, aerial) || probe.hostAvailable !== (probe.atMs <= previousMs)) fail('independent probe scope')
     const regularEpoch = 600 + index * 20
     const finalPartial = index === run.probes.length - 1 && probe.atMs === run.shutdown.finalAtMs && previousPlant && probe.atMs > previousPlant.atMs && probe.atMs < regularEpoch && probe.atMs % 4 === 0
     if (probe.atMs !== regularEpoch && !finalPartial) fail('independent probe cadence')
     if (!probe.hostAvailable) firstUnavailableAtMs ??= probe.atMs
     plant(probe.state, config, previousPlant)
+    const flight = 'flight' in probe ? probe.flight : null
+    if (aerial && flight) {
+      fields(flight, ['velocityMps', 'massKg', 'propulsionEnergyWh', 'pumpEnergyWh', 'reserveMarginWh'])
+      const durationHours = (probe.atMs - (previousPlant?.atMs ?? 600)) / 3600000
+      const propulsionWh = flight.propulsionEnergyWh - (previousFlight?.propulsionEnergyWh ?? 0)
+      const pumpWh = flight.pumpEnergyWh - (previousFlight?.pumpEnergyWh ?? 0)
+      if (!vector(flight.velocityMps, 3) || !equivalent(flight.massKg, aerial.load.emptySystemMassKg + probe.state.remainingAmount * config.material.densityKgPerL!)
+        || !finite(propulsionWh, 0, aerial.aircraft.propulsionMaxW * durationHours + 1e-10) || !finite(pumpWh, 0, aerial.aircraft.pumpMaxW * durationHours + 1e-10)
+        || !equivalent(flight.reserveMarginWh, aerial.aircraft.availableWh - flight.propulsionEnergyWh - flight.pumpEnergyWh - aerial.powerBudget.reserveWh)) fail('flight mass, power or reserve differs from independent inventory and energy')
+      previousFlight = flight
+    }
+    else if (aerial) fail('missing independent flight probe')
     probesByEpoch.set(probe.atMs, probe)
     const next = run.releases[releaseIndex], delta = probe.state.emittedAmount - (previousPlant?.emittedAmount ?? 0)
     if (next && next.atMs < probe.atMs) fail('release has no matching plant probe')
     if (next?.atMs === probe.atMs) {
-      fields(next, ['atMs', 'amount', 'positionM', 'yawRad', 'windMps', 'taskId', 'hostAvailable', 'positionEvidence'])
+      fields(next, ['atMs', 'amount', 'positionM', 'yawRad', 'windMps', 'taskId', 'hostAvailable', 'positionEvidence', ...(aerial ? ['releaseVelocityMps'] : [])])
       const decision = run.decisions.findLast(item => item.atMs < next.atMs)
       if (!finite(next.amount, Number.MIN_VALUE) || !equivalent(next.amount, delta) || !equivalent(next.positionM, probe.positionM) || !equivalent(next.yawRad, probe.yawRad) || next.hostAvailable !== probe.hostAvailable || next.positionEvidence !== 'modeled-plant-truth' || !vector(next.windMps, 2) || !equivalent(next.windMps, config.weather.windMps) || next.taskId !== (probe.hostAvailable ? decision?.taskId ?? null : null)) fail('release differs from actual probe delta, position or pass scope')
+      if (flight && !equivalent(next.releaseVelocityMps, flight.velocityMps.slice(0, 2))) fail('release velocity differs from independent flight probe')
       emitted += next.amount
       if (next.atMs <= run.shutdown.requestedAtMs) emittedBeforeRequest += next.amount
       releaseIndex++
@@ -192,7 +236,14 @@ export function validateApplicationRun(input: unknown): ApplicationRun {
     else if (!equivalent(delta, 0)) fail('emitted material is missing a release record')
     previousPlant = probe.state
   }
-  for (const row of vehicle.path) if (!equivalent(row.truthPositionM, probesByEpoch.get(row.atMs)?.positionM)) fail('host truth position differs from independent same-epoch probe')
+  for (const row of vehicle.path) {
+    if (!equivalent(row.truthPositionM, probesByEpoch.get(row.atMs)?.positionM)) fail('host truth position differs from independent same-epoch probe')
+    if (battery && row.measurement) {
+      const observedAtMs = row.measurement.capturedAtMs, captured = probesByEpoch.get(observedAtMs)
+      const measuredEnergy = observedAtMs < 600 ? 0 : captured && 'flight' in captured ? Math.min(battery.capacityWh, captured.flight.propulsionEnergyWh + captured.flight.pumpEnergyWh) : null
+      if (measuredEnergy === null || !equivalent(row.measurement.values.batteryEnergyUsedWh, measuredEnergy)) fail('battery reading differs from independent energy probe at capture')
+    }
+  }
   if (!equivalent(vehicle.finalTruthPositionM, run.probes.at(-1)!.positionM)) fail('vehicle final truth differs from final independent probe')
   let requestedByDecisions: number | null = null
   for (let i = 0; i < run.decisions.length; i++) {
@@ -210,25 +261,27 @@ export function validateApplicationRun(input: unknown): ApplicationRun {
   if (!previousPlant || !equivalent(previousPlant, run.final) || releaseIndex !== run.releases.length || !equivalent(emitted, run.final.emittedAmount) || !equivalent(run.shutdown.emittedAfterRequest, emitted - emittedBeforeRequest) || run.final.atMs !== run.shutdown.finalAtMs) fail('final inventory, releases or residual shutdown accounting')
   const closed = run.final.masterPosition <= .001 && run.final.energy <= .001 && run.final.flowPerSecond <= 1e-10 && run.shutdown.finalAtMs - run.shutdown.requestedAtMs >= config.calibration.closingAllowanceMs
   if (run.shutdown.closureVerified !== closed) fail('shutdown closure claim differs from independent final probe')
-  if (run.status === 'blocked' && vehicle.status !== 'blocked' || run.status === 'completed' && (vehicle.status !== 'completed' || !run.options.authorizeImplement || run.options.testMode || !closed) || run.status === 'dry-completed' && (vehicle.status !== 'completed' || run.final.emittedAmount !== 0) || run.status === 'host-lost' && vehicle.status !== 'host-lost' || run.status === 'incomplete' && vehicle.status !== 'duration-exhausted') fail('aggregate application status differs from vehicle or material evidence')
+  const latched = run.decisions.find(decision => decision.state === 'latched')
   const dry = !run.options.authorizeImplement || run.options.testMode
-  const expectedReason = run.decisions.find(decision => decision.state === 'latched')?.reason ?? vehicle.fault ?? (dry ? 'application-dry-test' : run.final.emittedAmount === 0 && run.status === 'completed' ? 'application-no-material-discharged' : vehicle.mission.reason)
-  if (run.reason !== expectedReason || run.status === 'dry-completed' && !dry || run.status === 'completed' && dry || authority.lastCheckedAtMs !== previousMs || board.lastCheckedAtMs !== run.final.atMs) fail('aggregate reason, authority or board epoch differs from retained runtime')
+  const expectedStatus = vehicle.status === 'host-lost' ? 'host-lost' : vehicle.status === 'blocked' || aerial && latched ? 'blocked' : vehicle.status === 'completed' ? dry ? 'dry-completed' : 'completed' : 'incomplete'
+  if (run.status !== expectedStatus || run.status === 'completed' && !closed || run.status === 'dry-completed' && run.final.emittedAmount !== 0) fail('aggregate application status differs from vehicle or material evidence')
+  const expectedReason = latched?.reason ?? vehicle.fault ?? (dry ? 'application-dry-test' : run.final.emittedAmount === 0 && run.status === 'completed' ? 'application-no-material-discharged' : vehicle.mission.reason)
+  if (run.reason !== expectedReason || authority.lastCheckedAtMs !== previousMs || board.lastCheckedAtMs !== run.final.atMs) fail('aggregate reason, authority or board epoch differs from retained runtime')
   if (run.faultDemonstrated && (run.options.scenario === 'nominal' || run.final.emittedAmount <= 0 || !['blocked', 'host-lost'].includes(run.status))) fail('premature or unexercised fault claim')
-  return { ...run, config, plan }
+  return { ...run, config, plan } as RecordedApplicationRun
 }
-export function applicationRecordingJson(input: ApplicationRun): string {
+export function applicationRecordingJson(input: RecordedApplicationRun): string {
   const run = validateApplicationRun(input)
   return JSON.stringify(run, (_key, value) => typeof value === 'bigint' ? { $applicationUint64: value.toString() } : value)
 }
-export function parseApplicationRecording(text: string): ApplicationRun {
+export function parseApplicationRecording(text: string): RecordedApplicationRun {
   if (typeof text !== 'string' || text.length > applicationEvidenceLimits.recordingBytes) fail('recording exceeds 16 MiB')
   if (new TextEncoder().encode(text).length > applicationEvidenceLimits.recordingBytes) fail('recording exceeds 16 MiB')
   let value: unknown
   try { value = JSON.parse(text) }
   catch { throw new TypeError('Invalid application recording JSON') }
   bounded(value)
-  const run = value as ApplicationRun
+  const run = value as RecordedApplicationRun
   if (!record(run?.vehicle) || !record(run.vehicle.authority) || !record(run.vehicle.board)) fail('missing native diagnostic records')
   for (const [target, key] of [[run.vehicle.authority, 'bootId'], [run.vehicle.authority, 'sessionId'], [run.vehicle.board, 'bootId']] as const) {
     const diagnostics = target as unknown as Record<string, unknown>

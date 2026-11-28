@@ -101,6 +101,30 @@ try {
   assert(Number.parseFloat((await visibleText('[aria-labelledby=application-rate] dd')) ?? '') > 0, 'The independent tail must retain model flow after failed closure')
   await checkPage()
   console.log('PASS water dry run, authorized dose map and unverified shutdown on the rendered application page')
+
+  await setField('#application-implement', 'aerial-water')
+  await setField('#application-scenario', 'nominal')
+  await setField('#application-authority', 'none')
+  await click(cdp, { selector: 'button', text: 'Run modeled route' })
+  await waitForText('#application-result', 'dry-completed')
+  assert.equal(Number.parseFloat((await visibleText(modeledEmission)) ?? ''), 0, 'Aerial metering without the separate grant must emit zero')
+  await waitForText('[data-application-aircraft]', 'landed')
+
+  await setField('#application-authority', 'grant')
+  await click(cdp, { selector: 'button', text: 'Run modeled route' })
+  await waitForText('#application-result', 'completed / landed')
+  assert(Number.parseFloat((await visibleText(modeledEmission)) ?? '') > 0, 'The authorized aerial run must meter water')
+  await waitForText('[data-application-aircraft]', 'Energy above reserve')
+  await waitForText(closure, 'Modeled closure verified in the independent tail')
+  await waitFor(() => cdp.evaluate('Boolean(document.querySelector("[aria-labelledby=application-dose] img")?.naturalWidth)'), 5000, { label: 'Decoded aerial dose map' })
+
+  await setField('#application-scenario', 'master-stuck')
+  await click(cdp, { selector: 'button', text: 'Run modeled route' })
+  await waitForText('#application-result', 'blocked / application-barrier-position-disagreement')
+  await waitForText('[data-application-aircraft]', 'landed')
+  await waitForText(closure, 'Modeled closure unverified')
+  await checkPage()
+  console.log('PASS aerial grant, dose, loaded landing and failed closure on the rendered application page')
 }
 finally {
   await close()

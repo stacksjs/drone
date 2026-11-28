@@ -4,20 +4,21 @@ import { createGroundPlant } from '../vehicles/ground/plant'
 import { applicationPulseFactor, applicationScaleFactor } from './calibration'
 import { validateApplicationConfig } from './planner'
 
-/** Ground dynamics retain four traction channels, followed by three independent implement channels. Steps must be integer 1..10 milliseconds. */
+/** Four carrier channels followed by three independent implement channels. Steps are integer 1..10 milliseconds. */
 export function createApplicationPlant(configInput: ApplicationConfig, options: ApplicationPlantOptions = {}): ApplicationPlant {
   const config = validateApplicationConfig(configInput)
-  const ground = options.ground ?? createGroundPlant(), scale = applicationScaleFactor(config.calibration.scale)
+  const scale = applicationScaleFactor(config.calibration.scale)
   const pulseFactor = config.calibration.pulse ? applicationPulseFactor(config.calibration.pulse) : 0
   const initial = options.initialAmount ?? config.material.initialAmount
   if (!Number.isFinite(initial) || initial < 0 || initial > config.material.initialAmount) throw new RangeError('Invalid modeled application inventory')
   let atMs = options.startAtMs ?? 0, primary = 0, master = 0, energy = 0, remaining = initial, emitted = 0, loss = 0, flow = 0, release = 0
+  const carrier = options.createCarrier?.(() => remaining) ?? options.ground ?? createGroundPlant()
   let fault: ApplicationScenario | null = null, stuckPrimary = 0, stuckMaster = 0
   if (!Number.isSafeInteger(atMs) || atMs < 0) throw new RangeError('Invalid modeled application clock')
   const mass = () => config.material.unit === 'L' ? remaining * config.material.densityKgPerL! : remaining
   function meterSnapshot(): ApplicationPlantSnapshot { return { atMs, primaryPosition: primary, masterPosition: master, energy, flowPerSecond: flow, remainingAmount: remaining, emittedAmount: emitted, unmeteredLossAmount: loss, pulseCount: Math.floor(emitted * pulseFactor), scaleRaw: Math.round(config.calibration.scale.tareRaw + mass() * scale) } }
   function snapshot() {
-    const state = ground.snapshot(), m = meterSnapshot()
+    const state = carrier.snapshot(), m = meterSnapshot()
     return { ...state, details: { ...state.details, applicationPrimary: primary, applicationMaster: master, applicationEnergy: energy, applicationFlow: flow, applicationRemaining: remaining, applicationEmitted: emitted, applicationPulseCount: m.pulseCount, applicationScaleRaw: m.scaleRaw } }
   }
   const slew = (value: number, goal: number, ms: number, dt: number) => value + Math.sign(goal - value) * Math.min(Math.abs(goal - value), dt * 1000 / ms)
@@ -35,7 +36,7 @@ export function createApplicationPlant(configInput: ApplicationConfig, options: 
     step(channels, dt, environment) {
       const stepMs = dt * 1000
       if (!Array.isArray(channels) || channels.length !== 7 || channels.some(n => !Number.isFinite(n)) || channels.slice(4).some(n => n < 0 || n > 1) || !Number.isSafeInteger(stepMs) || stepMs < 1 || stepMs > 10 || !Number.isSafeInteger(atMs + stepMs)) throw new RangeError('Invalid seven-channel application plant input or integer 1..10 ms step')
-      ground.step(channels.slice(0, 4), dt, environment)
+      carrier.step(channels.slice(0, 4), dt, environment)
       primary = fault === 'stuck-valve' || fault === 'master-stuck' ? stuckPrimary : slew(primary, channels[4]!, config.calibration.primaryCloseMs, dt)
       master = fault === 'master-stuck' ? stuckMaster : slew(master, channels[5]!, config.calibration.masterCloseMs, dt)
       energy += (channels[6]! - energy) * (1 - Math.exp(-dt * 1000 / config.calibration.energyTauMs))

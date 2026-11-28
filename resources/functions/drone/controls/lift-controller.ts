@@ -16,8 +16,10 @@ export interface SimulatedControlInput {
 }
 interface LiftProfile { massKg: number, gravityMps2: number, rateScale: SensorVector, attitudeControl: 'quaternion-error-v1' | 'thrust-heading-v2', allocate(wrench: Wrench, previous: Motors, dtS: number): { motorsN: Motors, achieved: Wrench, limited: boolean } }
 /** Shared simulated lift cascade. Vehicle wrappers own mass, tuning and allocation; no vehicle IO. */
-export function createSimulatedLiftController(options: { headingAlignment: 'initial-simulation-north' }, profile: LiftProfile) {
+export function createSimulatedLiftController(options: { headingAlignment: 'initial-simulation-north', horizontalSpeedLimitMps?: number }, profile: LiftProfile) {
   if (options.headingAlignment !== 'initial-simulation-north') throw new TypeError('An explicit simulation heading alignment is required')
+  const horizontalSpeedLimitMps = options.horizontalSpeedLimitMps ?? 3
+  if (!Number.isFinite(horizontalSpeedLimitMps) || horizontalSpeedLimitMps <= 0 || horizontalSpeedLimitMps > 3) throw new RangeError('Invalid simulated horizontal speed limit')
   const model = { massKg: profile.massKg, gravityMps2: profile.gravityMps2 }, allocate = profile.allocate, attitudeControl = profile.attitudeControl
   const rateScale = Array.isArray(profile.rateScale) ? [...profile.rateScale] : []
   if (!Number.isFinite(model.massKg) || model.massKg <= 0 || !Number.isFinite(model.gravityMps2) || model.gravityMps2 <= 0 || !validVector(rateScale) || rateScale.some(n => n <= 0) || !['quaternion-error-v1', 'thrust-heading-v2'].includes(attitudeControl) || typeof allocate !== 'function') throw new RangeError('Invalid simulated lift profile')
@@ -54,7 +56,7 @@ export function createSimulatedLiftController(options: { headingAlignment: 'init
       reference = identity
       const velocity = target.positionM.map((n, i) => n - position.positionM[i]!) as SensorVector
       const horizontal = Math.hypot(velocity[0], velocity[1])
-      if (horizontal > 3) { velocity[0] *= 3 / horizontal; velocity[1] *= 3 / horizontal }
+      if (horizontal > horizontalSpeedLimitMps) { velocity[0] *= horizontalSpeedLimitMps / horizontal; velocity[1] *= horizontalSpeedLimitMps / horizontal }
       velocity[2] = clampControl(velocity[2], 2)
       const acceleration = velocity.map((n, i) => velocityPid[i]!.step(n - position.velocityMps[i]!, position.velocityMps[i]!, dt)) as SensorVector
       const beforeLimit = [...acceleration]

@@ -1,4 +1,4 @@
-import type { ApplicationRun } from './runtime-types'
+import type { RecordedApplicationRun } from './runtime-types'
 import { createHash } from 'node:crypto'
 import { writeCompletedArtifact } from '../../artifacts/completed-directory'
 import { nedToGeodetic } from '../estimation/frames'
@@ -8,7 +8,7 @@ import { processApplication } from './coverage'
 function hash(bytes: string) { return createHash('sha256').update(bytes, 'utf8').digest('hex') }
 function json(value: unknown) { return `${JSON.stringify(value, null, 2)}\n` }
 /** Exclusive, private local artifacts. manifest.json is published after content and directory durability barriers. */
-export async function writeApplicationDataset(directory: string, input: ApplicationRun): Promise<string> {
+export async function writeApplicationDataset(directory: string, input: RecordedApplicationRun): Promise<string> {
   if (typeof directory !== 'string' || directory.length < 1 || directory.length > 4096 || directory.includes('\0')) throw new TypeError('Invalid application dataset directory')
   // Every source value and derived artifact is detached/validated before the first filesystem await.
   const run = validateApplicationRun(input), report = processApplication(run)
@@ -38,7 +38,7 @@ export async function writeApplicationDataset(directory: string, input: Applicat
       'measured-ledger.json contains quantized host meter/scale estimates and their declared uncertainties. These are distinct from independent simulation truth.',
       'independent-truth.json preserves actual modeled plant releases, inventory, cumulative emission, independent probes and neutral-tail closure.',
       'Inventory loss is separate from emitted application material. Emitted material remains conserved across treatable in-field, excluded, outside and in-flight amounts.',
-      'report.json uses finite uniform rectangular deposition kernels, oriented by modeled yaw and advected by release wind times fixed fall time.',
+      'report.json uses finite uniform rectangular deposition kernels, oriented by modeled yaw. Release wind and, on aerial runs, horizontal release velocity offset the kernel over fixed fall time.',
       'Coverage is clipped polygon union. Overlap requires distinct apply-* task IDs. Repeated 20 ms stamps of the same pass are not separate passes.',
       'cells.geojson contains grid-centre points with rectangular LOCAL_NED bounds and exact clipped support areas, not full-cell application footprints.',
       'Cell area includes field support. Excluded area is a subset; dose uses remaining treatable support. Prescribed, missed and uncovered support are retained.',

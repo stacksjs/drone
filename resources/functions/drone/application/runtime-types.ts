@@ -2,7 +2,7 @@ import type { SensorVector } from '../sensors/types'
 import type { GroundObservation } from '../vehicles/ground/odometry'
 import type { VehiclePlant, VehiclePlantState } from '../vehicles/types'
 import type { runVehicleSimulation } from '../vehicles/runtime'
-import type { ApplicationConfig, ApplicationOptions, ApplicationPlan, ApplicationPlantSnapshot, ApplicationRelease, ApplicationScenario } from './types'
+import type { AerialApplicationPlan, ApplicationConfig, ApplicationOptions, ApplicationPlan, ApplicationPlantSnapshot, ApplicationRelease, ApplicationScenario } from './types'
 
 export interface ApplicationMeterFeedback {
   sequence: number
@@ -24,18 +24,33 @@ export interface ApplicationGrant {
   reference: string
 }
 /** Recorded qualified host inputs contain no plant truth or command-derived flow. */
-export interface ApplicationControllerInput {
+interface ApplicationHostContext {
   atMs: number
   enabled: boolean
   reference: string
   missionState: string
   taskId: string
-  ground: GroundObservation
   feedback: ApplicationMeterFeedback | null
   weather: ApplicationConfig['weather'] & { capturedAtMs: number }
   grant: ApplicationGrant | null
   emergency: boolean
 }
+export interface ApplicationControllerInput extends ApplicationHostContext { ground: GroundObservation }
+export interface ApplicationFlightObservation {
+  healthy: boolean
+  reason: string
+  positionM: SensorVector
+  velocityMps: SensorVector
+  yawRad: number
+  yawRateRadS: number
+  tiltRad: number
+  uncertaintyM: number
+  verticalUncertaintyM: number
+  onSurface: boolean
+  guardClosed: boolean
+}
+export interface AerialApplicationControllerInput extends ApplicationHostContext { flight: ApplicationFlightObservation }
+export type ApplicationHostInput = ApplicationControllerInput | AerialApplicationControllerInput
 export interface ApplicationDecision {
   atMs: number
   state: 'dry' | 'applying' | 'standby' | 'latched'
@@ -53,6 +68,15 @@ export interface ApplicationDecision {
   stopVehicle: boolean
 }
 export interface ApplicationProbe { atMs: number, hostAvailable: boolean, positionM: SensorVector, yawRad: number, state: ApplicationPlantSnapshot, boardChannels: number[] }
+export interface AerialApplicationProbe extends ApplicationProbe {
+  flight: {
+    velocityMps: SensorVector
+    massKg: number
+    propulsionEnergyWh: number
+    pumpEnergyWh: number
+    reserveMarginWh: number
+  }
+}
 export interface ApplicationShutdown {
   requestedAtMs: number
   finalAtMs: number
@@ -60,7 +84,7 @@ export interface ApplicationShutdown {
   closureVerified: boolean
   evidence: 'independent-modeled-plant-tail'
 }
-export interface ApplicationRun {
+export interface ApplicationRun<Input extends ApplicationHostInput = ApplicationControllerInput, Probe extends ApplicationProbe = ApplicationProbe> {
   version: 1
   evidence: 'owned-application-physics-simulation'
   physicalFlightEnabled: false
@@ -70,21 +94,25 @@ export interface ApplicationRun {
   config: ApplicationConfig
   plan: ApplicationPlan
   vehicle: ReturnType<typeof runVehicleSimulation>
-  inputs: ApplicationControllerInput[]
+  inputs: Input[]
   decisions: ApplicationDecision[]
   releases: ApplicationRelease[]
-  probes: ApplicationProbe[]
+  probes: Probe[]
   final: ApplicationPlantSnapshot
   shutdown: ApplicationShutdown
   status: 'dry-completed' | 'completed' | 'blocked' | 'host-lost' | 'incomplete'
   reason: string
   faultDemonstrated: boolean
 }
+export interface AerialApplicationRun extends ApplicationRun<AerialApplicationControllerInput, AerialApplicationProbe> {
+  plan: AerialApplicationPlan
+}
+export type RecordedApplicationRun = ApplicationRun | AerialApplicationRun
 export interface ApplicationPlant extends VehiclePlant {
   meterSnapshot(): ApplicationPlantSnapshot
   setFault(fault: ApplicationScenario | null): void
   /** One 4ms integration release amount, independent of host observations. */
   takeRelease(): number
 }
-export interface ApplicationPlantOptions { ground?: VehiclePlant, initialAmount?: number, startAtMs?: number }
+export interface ApplicationPlantOptions { ground?: VehiclePlant, createCarrier?: (readRemainingAmount: () => number) => VehiclePlant, initialAmount?: number, startAtMs?: number }
 export type ApplicationTruthState = VehiclePlantState

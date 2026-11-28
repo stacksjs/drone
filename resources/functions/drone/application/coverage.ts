@@ -1,5 +1,5 @@
 import type { ApplicationConfig, ApplicationRelease, ApplicationReport } from './types'
-import type { ApplicationRun } from './runtime-types'
+import type { RecordedApplicationRun } from './runtime-types'
 import type { VolumeXY } from '../volumes/types'
 import { volumeBounds, volumeBoundsOverlap, volumeClipHalfPlane, volumeCross2D, volumeIntersectConvex, volumeSignedArea, volumeTriangulateRing } from '../volumes/geometry'
 import { validateApplicationConfig } from './planner'
@@ -32,7 +32,9 @@ export function processApplicationReleases(input: ApplicationConfig, source: rea
     const descriptor = Object.getOwnPropertyDescriptor(source, String(i))
     if (!descriptor || !('value' in descriptor)) throw new TypeError('Application release array accessors or gaps')
     const release = descriptor.value as ApplicationRelease
-    releaseFields(release, ['atMs', 'amount', 'positionM', 'yawRad', 'windMps', 'taskId', 'hostAvailable', 'positionEvidence'])
+    const hasVelocity = !!release && Object.hasOwn(release, 'releaseVelocityMps')
+    releaseFields(release, ['atMs', 'amount', 'positionM', 'yawRad', 'windMps', 'taskId', 'hostAvailable', 'positionEvidence', ...(hasVelocity ? ['releaseVelocityMps'] : [])])
+    if (hasVelocity && !tuple(release.releaseVelocityMps, 2)) throw new TypeError('Invalid modeled release velocity')
     if (!Number.isSafeInteger(release.atMs) || release.atMs < 0 || release.atMs <= previous || release.atMs > endAtMs || typeof release.amount !== 'number' || !Number.isFinite(release.amount) || release.amount < 0 || release.amount > 1000 || !tuple(release.positionM, 3) || !tuple(release.windMps, 2) || typeof release.yawRad !== 'number' || !Number.isFinite(release.yawRad) || Math.abs(release.yawRad) > 1000 || (release.taskId !== null && (typeof release.taskId !== 'string' || !/^[a-z][a-z0-9-]{0,39}$/.test(release.taskId))) || typeof release.hostAvailable !== 'boolean' || release.positionEvidence !== 'modeled-plant-truth') throw new TypeError('Invalid modeled application release quantities or scope')
     releases.push(structuredClone(release)); previous = release.atMs
   }
@@ -105,7 +107,10 @@ export function processApplicationReleases(input: ApplicationConfig, source: rea
     emittedAmount += release.amount
     if (release.amount === 0) continue
     if (release.atMs + config.implement.fallTimeS * 1000 > endAtMs) { inFlightAmount += release.amount; continue }
-    const north = release.positionM[0] + release.windMps[0] * config.implement.fallTimeS, east = release.positionM[1] + release.windMps[1] * config.implement.fallTimeS, cos = Math.cos(release.yawRad), sin = Math.sin(release.yawRad)
+    const fall = config.implement.fallTimeS
+    const north = release.positionM[0] + (release.windMps[0] + (release.releaseVelocityMps?.[0] ?? 0)) * fall
+    const east = release.positionM[1] + (release.windMps[1] + (release.releaseVelocityMps?.[1] ?? 0)) * fall
+    const cos = Math.cos(release.yawRad), sin = Math.sin(release.yawRad)
     const halfLength = config.implement.footprintLengthM / 2, halfWidth = config.implement.swathM / 2
     const kernel = polygon(([[-halfLength, -halfWidth], [halfLength, -halfWidth], [halfLength, halfWidth], [-halfLength, halfWidth]] as VolumeXY[]).map(([along, across]) => [north + along * cos - across * sin, east + along * sin + across * cos]))!
     const area = support(kernel), density = release.amount / kernelArea
@@ -145,7 +150,7 @@ export function processApplicationReleases(input: ApplicationConfig, source: rea
       'Exact geometry has explicit operation and fragment limits and fails on exhaustion. Polygons below 1e-12 square metres are below numerical resolution.',
     ] }
 }
-export function processApplication(input: ApplicationRun): ApplicationReport {
+export function processApplication(input: RecordedApplicationRun): ApplicationReport {
   const run = validateApplicationRun(input)
   return processApplicationReleases(run.config, run.releases, run.shutdown.finalAtMs)
 }

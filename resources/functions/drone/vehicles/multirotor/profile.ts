@@ -25,20 +25,22 @@ export function multirotorMission(): VehicleMissionPlan {
 }
 
 /** Both bare and carried-load bodies use the same quad plant interface. */
-export function createMultirotorPlant(body: ReturnType<typeof createRigidBody>): VehiclePlant {
+export function createMultirotorPlant(body: ReturnType<typeof createRigidBody>, readCenteredLoadKg?: () => number): VehiclePlant {
   function snapshot(): VehiclePlantState {
     const state = body.snapshot()
     return { positionM: [...state.positionM], velocityMps: [...state.velocityMps], accelerationMps2: [...state.accelerationMps2], quaternionWxyz: [...state.quaternionWxyz], angularRateRadS: [...state.angularRateRadS], onSurface: state.groundContact || state.positionM[2] >= -.1 && state.velocityMps[2] >= 0, details: Object.fromEntries(state.motorsN.map((thrust, i) => ['motor' + i + 'N', thrust])) }
   }
-  return { snapshot, step(actuators, dtS, environment) { body.step(actuators as [number, number, number, number], dtS, { windMps: environment.windMps }); return snapshot() } }
+  return { snapshot, step(actuators, dtS, environment) { body.step(actuators as [number, number, number, number], dtS, { windMps: environment.windMps, centeredLoadKg: readCenteredLoadKg?.() }); return snapshot() } }
 }
 
-function createSession(): VehicleSession {
+export function createMultirotorSession(motion?: { nominalMassKg: number, horizontalSpeedLimitMps: number, headingByTaskRad: ReadonlyMap<string, number> }): VehicleSession {
   let sequence = 0, plant: VehiclePlant | null = null
+  const heading = motion ? new Map(motion.headingByTaskRad) : null
   return {
+    ...(heading ? { targetHeadingRad: (taskId: string) => heading.get(taskId) ?? 0 } : {}),
     createPlant: () => plant ??= createMultirotorPlant(createRigidBody({ positionM: [0, 0, -.1], groundDownM: -.1 })),
     createController() {
-      const controller = createSimulatedMultirotorController({ headingAlignment: 'initial-simulation-north' })
+      const controller = createSimulatedMultirotorController({ headingAlignment: 'initial-simulation-north', horizontalSpeedLimitMps: motion?.horizontalSpeedLimitMps }, motion?.nominalMassKg)
       let fault: string | null = null
       return { step(context) {
         const rate = context.controlRate
@@ -46,7 +48,7 @@ function createSession(): VehicleSession {
           || !Array.isArray(rate.angularRateRadS) || rate.angularRateRadS.length !== 3 || ![0, 1, 2].every(i => Object.hasOwn(rate.angularRateRadS, i) && Number.isFinite(rate.angularRateRadS[i])))) fault ??= 'quad-rate-unqualified'
         const output = controller.step({ kind: 'simulation', nowMs: context.nowMs, enabled: context.enabled && fault === null, estimate: context.estimate,
           angularRateRadS: rate?.angularRateRadS ?? [0, 0, 0], rateCapturedAtMs: rate?.capturedAtMs ?? -Infinity,
-          target: { positionM: context.mission.targetM ?? [0, 0, 0], yawRad: 0, issuedAtMs: context.nowMs } })
+          target: { positionM: context.mission.targetM ?? [0, 0, 0], yawRad: context.targetYawRad ?? 0, issuedAtMs: context.nowMs } })
         const measurement = context.measurement
         const contact = !output.inhibited && (context.mission.taskKind === 'land' || context.mission.payload?.operation === 'material-receive') && measurement?.vehicle === 'quadcopter' && measurement.evidence === 'modeled-vehicle-sensors'
           && measurement.reference === rate?.reference && measurement.capturedAtMs <= context.nowMs && context.nowMs - measurement.capturedAtMs <= 120 && measurement.receivedAtMs <= context.nowMs && measurement.values.onSurface === true
@@ -64,7 +66,7 @@ export function createMultirotorProfile(scenario: MultirotorScenario = 'nominal'
   if (!multirotorScenarios.includes(scenario)) throw new RangeError('Unknown multirotor scenario')
   return { scenario, vehicle: 'quadcopter', name: 'Owned quad-X shared mission', scenarios: [...multirotorScenarios], evidence: 'modeled-vehicle-profile', physicalFlightEnabled: false,
     actuators: [0, 1, 2, 3].map(i => ({ name: 'motor-' + i, unit: 'newton', min: 0, max: multirotorModel.maxMotorThrustN, neutral: 0 })),
-    mission: multirotorMission(), authorityFence: { radiusM: 12, minDownM: -5, maxDownM: 0 }, createSession,
+    mission: multirotorMission(), authorityFence: { radiusM: 12, minDownM: -5, maxDownM: 0 }, createSession: createMultirotorSession,
     faults(selectedScenario, atMs) {
       if (selectedScenario !== scenario) throw new TypeError('Multirotor scenario changed after capture')
       const active = atMs >= 5000
