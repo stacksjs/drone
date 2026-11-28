@@ -76,6 +76,31 @@ try {
   assert.equal(await visibleText('[data-agriculture-observation]'), null)
   await checkPage()
   console.log('PASS band synchronization abort and missing parcel support on the rendered page')
+
+  assert(await navigate(cdp, new URL('/application', base).href), 'Application page must load')
+  const modeledEmission = '[aria-labelledby=application-result] dd:first-of-type'
+  const closure = '[aria-labelledby=application-closure] > p'
+  await click(cdp, { selector: 'button', text: 'Run modeled route' })
+  await waitForText('#application-result', 'dry-completed')
+  assert.equal(Number.parseFloat((await visibleText(modeledEmission)) ?? ''), 0, 'Default dry mode must emit zero water')
+
+  await setField('#application-mode', 'apply')
+  await setField('#application-authority', 'grant')
+  await click(cdp, { selector: 'button', text: 'Run modeled route' })
+  await waitFor(async () => await visibleText('#application-result') === 'completed / stopped', 15000, { label: 'Authorized nominal application completes' })
+  assert(Number.parseFloat((await visibleText(modeledEmission)) ?? '') > 0, 'The authorized water model must emit water')
+  await waitForText(closure, 'Modeled closure verified in the independent tail')
+  await waitFor(() => cdp.evaluate('Boolean(document.querySelector("[aria-labelledby=application-dose] img")?.naturalWidth)'), 5000, { label: 'Decoded dose map' })
+
+  await setField('#application-scenario', 'master-stuck')
+  await click(cdp, { selector: 'button', text: 'Run modeled route' })
+  await waitForText('#application-result', 'blocked / application-barrier-position-disagreement')
+  await waitForText(closure, 'Modeled closure unverified')
+  await click(cdp, { selector: 'button', text: 'Independent tail end' })
+  await waitForText('[aria-labelledby=application-rate]', 'No host observation at this epoch')
+  assert(Number.parseFloat((await visibleText('[aria-labelledby=application-rate] dd')) ?? '') > 0, 'The independent tail must retain model flow after failed closure')
+  await checkPage()
+  console.log('PASS water dry run, authorized dose map and unverified shutdown on the rendered application page')
 }
 finally {
   await close()
