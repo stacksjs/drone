@@ -68,6 +68,33 @@ for software installation and receive-only telemetry. The [PX4 airframe guide](h
 documents the development kit and companion mounting space. Assembly, loaded endurance, on-device
 camera evidence and field operation still require qualification.
 
+### Select for the complete payload and software target
+
+Use the X500 as the lower-cost development candidate for the Pi and a small fixed sensor. Holybro
+lists 1.5 kg without the battery at 70% throttle, and about 18 minutes of hover with a 5,000 mAh
+battery and no additional payload. Its payload and endurance figures describe different conditions.
+Use measurements of the mounted build to establish what load it can carry for the required mission.
+
+Compare the [Holybro X650 Pixhawk 6C/M10 kit](https://holybro.com/products/x650-development-kit)
+for a larger sensor package or cargo study. The November 28, 2026 listing showed $1,139 before
+battery and shipping. Holybro lists 3.1 kg additional payload with a 1.2 kg, 10,000 mAh 6S battery at
+its stated 70%-throttle takeoff weight limit. The same battery's 30-minute hover figure is for no
+additional payload. Verify Pi 5 mounting clearance, final mass, centre of gravity and time with
+battery reserve in the proposed configuration. The X650 battery specification differs from the X500.
+
+Record the payload's purpose, mass and dimensions before buying. Include the Pi, sensor or cargo,
+mount, power supply, wiring and any mechanism as installed. Set the required duration, reserve and
+operating conditions before selecting a candidate. A delivery or release also requires separate
+mechanical and flight qualification under [cargo issue #25](https://github.com/stacksjs/drone/issues/25).
+
+The Pi 5 boots its own [Linux OS image](https://www.raspberrypi.com/documentation/computers/getting-started.html)
+and runs the Stacks app. The Pixhawk 6C supports [PX4 built from source](https://docs.px4.io/main/en/flight_controller/pixhawk6c)
+and [ArduPilot firmware](https://ardupilot.org/copter/docs/common-holybro-pixhawk6C.html). Drone's
+physical integration remains receive-only. Its [owned controller runtime](adr/0002-bench-runtime.md)
+currently targets a separate neutral-output Pico 2 bench board. The DJI options below use stock
+flight firmware. Supported models expose [vendor SDK interfaces](https://developer.dji.com/mobile-sdk/)
+for companion applications.
+
 Choose a legal telemetry frequency locally. The manufacturer offers 433 and 915 MHz; its regional
 labels are a starting point, not permission to use that band in every country. RC control is a separate link.
 The kit supports 4S batteries. Manufacturer guidance is **4S 3,000-5,000 mAh, 20C or higher, XT60**.
