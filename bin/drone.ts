@@ -8,6 +8,7 @@ import SensorsReplay from '../app/Commands/SensorsReplay'
 import SensorsInspect from '../app/Commands/SensorsInspect'
 import EstimatorReplay from '../app/Commands/EstimatorReplay'
 import DriversBench from '../app/Commands/DriversBench'
+import TelemetryReceive from '../app/Commands/TelemetryReceive'
 import AuthoritySimulate from '../app/Commands/AuthoritySimulate'
 import ControlsSimulate from '../app/Commands/ControlsSimulate'
 import CargoLoadBench from '../app/Commands/CargoLoadBench'
@@ -102,6 +103,7 @@ CargoFleet(app)
 CargoFleetControl(app)
 AuthoritySimulate(app)
 DriversBench(app)
+TelemetryReceive(app)
 PayloadsBench(app)
 PayloadsCapture(app)
 DiagnosticsRecord(app)

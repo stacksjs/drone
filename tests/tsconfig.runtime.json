@@ -11,6 +11,7 @@
     "../resources/functions/drone/mavlink.ts",
     "./unit/driver-protocol.test.ts",
     "./unit/driver-tcp.test.ts",
+    "./unit/udp.test.ts",
     "./unit/mavlink-stream.test.ts",
     "../scripts/build-runtime-cli.ts",
     "../scripts/qualify-farm-browser.ts",

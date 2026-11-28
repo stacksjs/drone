@@ -28,7 +28,7 @@ connection to an aircraft. It deliberately pauses time when the tab is hidden.
 ```sh
 bun run simulate        # deterministic terminal demo, no hardware
 ./buddy drone:simulate  # the same library through a native Stacks command
-bun run telemetry       # receive-only MAVLink endpoint on 127.0.0.1:14551
+./buddy telemetry:receive px4 # receive-only MAVLink for the stock X500 profile
 bun run sitl --enable-sitl # 30-second local simulator experiment; read docs/sitl.md first
 ./buddy lint
 ./buddy typecheck

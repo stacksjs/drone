@@ -1,4 +1,7 @@
 import { createSocket } from 'node:dgram'
+import { spawn } from 'node:child_process'
+import { createInterface } from 'node:readline'
+import { once } from 'node:events'
 import { describe, expect, test } from 'bun:test'
 import fixtures from '../fixtures/mavlink.json'
 import { decodeDatagram, encodeFrame } from '../../resources/functions/drone/mavlink'
@@ -32,6 +35,56 @@ function dataFrames() {
   view.setFloat32(12, -12, true)
   return [Buffer.from(fixtures.v2Heartbeat, 'hex'), encodeFrame(1, battery, 1, 1, 1), encodeFrame(32, position, 2, 1, 1)]
 }
+
+test('native receiver accepts a PX4 heartbeat with loopback telemetry and never sends a MAVLink reply', async () => {
+  const peer = await bindPeer()
+  const child = spawn('./buddy', ['telemetry:receive', 'px4', '--port', '0'], { stdio: ['ignore', 'pipe', 'pipe'] })
+  const exited = once(child, 'close')
+  const lines = createInterface({ input: child.stdout })
+  const output = lines[Symbol.asyncIterator]()
+  let stderr = ''
+  child.stderr.on('data', chunk => { stderr += String(chunk) })
+  let replies = 0
+  peer.on('message', () => replies++)
+  const guard = setTimeout(() => child.kill('SIGKILL'), 20000)
+  try {
+    let ready: RegExpMatchArray | null = null
+    while (!ready) {
+      const line = await output.next()
+      if (line.done) throw new Error(`Receiver did not bind. ${stderr}`)
+      ready = line.value.match(/^Receive-only px4 telemetry on 127\.0\.0\.1:(\d+)$/)
+    }
+    const port = Number(ready[1])
+    const [wrong, battery, position] = dataFrames() as [Uint8Array, Uint8Array, Uint8Array]
+    const send = async (...packets: Uint8Array[]) => {
+      await new Promise<void>((resolve, reject) => peer.send(Buffer.concat(packets), port, '127.0.0.1', error => error ? reject(error) : resolve()))
+    }
+    const read = async () => {
+      const line = await output.next()
+      if (line.done) throw new Error(`Receiver ended before a telemetry sample. ${stderr}`)
+      return JSON.parse(line.value)
+    }
+    await send(wrong, battery, position)
+    expect(await read()).toMatchObject({ receivedAtMs: null, positionHealthy: false, batteryPercent: -1 })
+
+    const heartbeat = new Uint8Array([0, 0, 0, 0, 2, 12, 0, 4, 3])
+    await send(encodeFrame(0, heartbeat, 0, 1, 1), battery, position)
+    const sample = await read()
+    expect(sample).toMatchObject({ position: { north: -20, east: 0, down: -12 }, batteryPercent: 90, positionHealthy: false, armed: false })
+    expect(typeof sample.receivedAtMs).toBe('number')
+    expect(replies).toBe(0)
+    child.kill('SIGTERM')
+    expect(await exited).toEqual([0, null])
+    expect(stderr).toBe('')
+  }
+  finally {
+    clearTimeout(guard)
+    lines.close()
+    if (child.exitCode === null && child.signalCode === null) child.kill('SIGKILL')
+    await exited
+    peer.close()
+  }
+}, 25000)
 
 describe('real loopback UDP boundary', () => {
   test('physical telemetry mode never transmits, even if asked to move', async () => {

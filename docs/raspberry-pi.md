@@ -2,6 +2,7 @@
 
 Target: Pi 5, 8 GB, Raspberry Pi OS Lite 64-bit. Use Ethernet for the first bench session.
 Keep propellers removed during bench integration. This release receives physical telemetry only.
+Track the first aircraft setup and measured bench results in the [commissioning issue](https://github.com/stacksjs/drone/issues/112).
 
 1. Install the Active Cooler, microSD and camera cable with power disconnected. Image the card using
    Raspberry Pi Imager, enable SSH with your own key and a non-default account, then boot on the official
@@ -47,23 +48,26 @@ Use this path when you want receive-only telemetry from an independent flight
 controller. It is separate from developing the owned runtime and does not enable
 physical flight commands.
 
-5. Install the supported ArduCopter firmware for Pixhawk 6C using an appropriate ground station.
-   Connect the autopilot to the Pi over USB using the exact connector on your board, then identify its
+5. Keep the X500 kit's supplied PX4 firmware for the initial telemetry check, or use the
+   matching ArduCopter profile if the Pixhawk already runs ArduCopter. Connect the autopilot
+   to the Pi over USB using the exact connector on your board, then identify its
    stable `/dev/serial/by-id/...` device. Grant the service account the OS's serial-device permissions.
 6. Use a maintained MAVLink router or MAVProxy to forward common telemetry to `127.0.0.1:14551`.
    For example, with MAVProxy installed in an isolated Python environment:
 
    ```sh
    mavproxy.py --master=/dev/serial/by-id/YOUR_CONTROLLER --baudrate=115200 --out=udp:127.0.0.1:14551
-   bun run telemetry
+   ./buddy telemetry:receive px4
    ```
 
-   Replace the device path. USB serial commonly ignores the baud-rate setting; UART does not.
-   The script prints JSON once per second and transmits no commands. An incomplete telemetry stream
-   retains a missing/stale receipt timestamp, so it cannot pass a controller's freshness gate.
+   Replace the device path and run the receiver in a separate terminal from the forwarder.
+   USB serial commonly ignores the baud-rate setting. UART requires the matching rate.
+   The receiver prints JSON once per second and sends no MAVLink messages. It binds to loopback
+   and reports the oldest component receipt time, or `null` while a component is missing.
 7. Ensure HEARTBEAT, SYS_STATUS and LOCAL_POSITION_NED arrive at suitable rates. A bench controller
    may have no local EKF position. That is an expected unavailable estimate, not permission to invent it.
-   Confirm system/component IDs if not the default 1/1. For PX4 select the explicit `createPx4Driver` profile instead; mode numbers differ. See `drivers.md`.
+   The receiver expects system/component IDs 1/1. Use `./buddy telemetry:receive ardupilot` for
+   ArduCopter. See the [driver contract](drivers.md) for firmware-specific mode interpretation.
 8. After bench operation works, design and inspect the fused regulated Pi power harness and mechanical
    mounting. Measure loaded voltage, current, thermal behavior and centre of gravity. Check the Pi's
    undervoltage/throttling diagnostics under CPU and camera load before considering flight.
