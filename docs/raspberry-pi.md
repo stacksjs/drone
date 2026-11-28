@@ -15,6 +15,23 @@ Keep propellers removed during bench integration. This release receives physical
    or [camera software guide](https://www.raspberrypi.com/documentation/computers/camera_software.html).
    `rpicam-hello --list-cameras` lists detected cameras. The [camera pipeline](camera-tracking.md) now consumes IMX500 frames/detections; its on-device validation remains pending.
 
+Before connecting an airframe, verify the source installation on the Pi with the checked-in
+fictional farm requests. Each collection writes a new private destination.
+
+```sh
+uname -m
+bun --version
+./buddy farming:plan examples/farming-plan.json
+check_dir=$(mktemp -d)
+./buddy farming:collect examples/farming-collection.json "$check_dir/collection"
+test -f "$check_dir/collection/attempt/manifest.json"
+```
+
+Expect `aarch64`, Bun 1.4.4 or later, a planning preview and a completed synthetic collection
+with `physicalFlightEnabled: false`. Run `./buddy dev --frontend` to open `/mapping` and
+`/agriculture` on the frontend. A Pi installation check does not verify the camera, power,
+telemetry or bundled aircraft configuration. Record those observations when commissioning the kit.
+
 ## Owned runtime development
 
 Continue with the [owned runtime bench](runtime.md#run-the-native-host-harness),

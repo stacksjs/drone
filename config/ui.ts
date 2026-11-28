@@ -27,6 +27,10 @@ export default {
   // `<Card />` in a template resolved to nothing and stx warned on every boot.
   componentsDir: 'components',
 
+  // Browser composables live here. Domain and server modules in functions
+  // are not auto-discovered as composables. Client scripts import their dependencies.
+  composablesDir: 'composables',
+
   // Expose @stacksjs/components' ui library (<Sidebar>, <Button>, ...)
   // to tag resolution everywhere — the dashboard's macOS-style sidebar
   // resolves through this. See the plugin file for the lookup order.

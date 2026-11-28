@@ -276,3 +276,36 @@ The capability tickets cover distinct normal, loss and completion behavior:
 [Marketing and docs issue 25](https://github.com/theopenfarm/openfarm.ing/issues/25) tracks catalog
 counts, missing herding translations and flight-stack guidance. Marketing copy and simulator
 outputs do not close the hardware, field-validation or application-integration gates.
+
+## First grower trials
+
+Track participant and field acceptance in the [grower trial issue](https://github.com/theopenfarm/openfarm.ing/issues/46).
+Begin with one mapped block and one task agreed with each participating grower. In the first
+session, have the grower run the example in `/mapping`, inspect its acknowledged images, then
+compare the `nominal` and `band-skew` visits in `/agriculture`. Ask the grower to identify a sampled
+parcel, find the original frame and explain what a missing area means. For livestock, record a
+label against one explicit pixel and check that changing frames does not move the observation.
+These are synthetic tasks the grower can try before aircraft or farm data are available.
+
+The browser check uses the same pages through the native frontend. Start `./buddy dev --frontend`
+and pass the frontend URL it prints to `bun scripts/qualify-farm-browser.ts http://localhost:3000`,
+replacing the example URL when Buddy selects a different port. The check requires Chrome and
+covers the simulated mapping, crop scouting, animal observation and incomplete parcel paths.
+
+For an on-farm trial, decide the required map accuracy or decision error with the grower and
+reviewer before looking at results. Use an independent reference, including sampled locations the
+system did not flag. Capture repeat visits when the task depends on a change over time.
+
+| Grower task | Evidence needed for acceptance |
+| --- | --- |
+| Automatic field mapping | Original geotagged imagery, verified field geometry, a reconstructed orthomosaic and positional error measured against held-out surveyed checkpoints. Record gaps as uncovered. [Mapping issue](https://github.com/theopenfarm/openfarm.ing/issues/6), [OpenDroneMap precision guidance](https://docs.opendronemap.org/map-accuracy/) |
+| Where to harvest | Specify the crop, variety, intended use and what makes a zone ready. Record dated, georeferenced maturity or moisture samples and compare the zone results with what the grower actually harvested. [Harvest readiness issue](https://github.com/theopenfarm/openfarm.ing/issues/47), [Yield issue](https://github.com/theopenfarm/openfarm.ing/issues/10), [Penn State silage example](https://extension.psu.edu/corn-silage-approaching-maturity-moving-past-thumb-rules) |
+| Where to water | Pair radiometric canopy observations with weather and references, soil moisture or grower measurements, and irrigation outcomes. Confirm anomalies in the field before using them for irrigation decisions. [Irrigation issue](https://github.com/theopenfarm/openfarm.ing/issues/18), [Virginia Cooperative Extension sensor guidance](https://www.pubs.ext.vt.edu/BSE/BSE-338/BSE-338.html) |
+| Where to look for pests | Compare registered repeat images and keep the source frames. Ground scouts inspect both flagged and unflagged places, recording pest, damage, crop stage and count. [Pest issue](https://github.com/theopenfarm/openfarm.ing/issues/9), [University of Minnesota soybean aphid scouting](https://extension.umn.edu/agriculture/crop-production/soybean/scouting-for-soybean-aphid) |
+| Where animals are and which fence needs a visit | Check count and location against a manual count, with separate unknown coverage. For each checked fence segment, retain its previous and current views, then have the grower verify damage or obstruction on the ground. [Livestock and fences issue](https://github.com/theopenfarm/openfarm.ing/issues/12) |
+
+For each trial, record the task, build, tool and sensor versions, elapsed operator time, covered
+area or fence length, missed/false findings, unknown coverage, follow-up time and the grower's
+decision. Keep farm locations, imagery, participant details and ground records in the farm's
+private trial record. Use aggregate outcomes to compare cost per accepted hectare or checked
+fence length before specifying a fleet.

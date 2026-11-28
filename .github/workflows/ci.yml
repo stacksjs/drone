@@ -581,6 +581,35 @@ jobs:
             ${{ runner.temp }}/workspace-browser-evidence/compiled.html
             ${{ runner.temp }}/workspace-browser-evidence/browser-launch.json
             ${{ runner.temp }}/workspace-browser-evidence/chrome-startup-stderr.log
+  farm-browser:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.4.4
+      - run: bun install --frozen-lockfile
+      - run: cp .env.example .env
+      - run: ./buddy key:generate
+      - name: Qualify simulated mapping and agriculture in the native frontend
+        shell: bash
+        run: |
+          set -euo pipefail
+          export CHROME_PATH="$(command -v google-chrome)"
+          test -x "$CHROME_PATH"
+          ./buddy dev --frontend > "$RUNNER_TEMP/farm-frontend.log" 2>&1 &
+          frontend_pid=$!
+          trap 'kill "$frontend_pid" 2>/dev/null || true; wait "$frontend_pid" 2>/dev/null || true' EXIT
+          curl --noproxy '*' --fail --silent --show-error --max-time 10 --retry 30 --retry-connrefused --retry-delay 1 --retry-max-time 45 \
+            --output /dev/null http://localhost:3000/agriculture
+          bun scripts/qualify-farm-browser.ts http://localhost:3000
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: farm-browser-frontend-log
+          path: ${{ runner.temp }}/farm-frontend.log
+          retention-days: 7
   execution-browser:
     runs-on: ubuntu-latest
     timeout-minutes: 10

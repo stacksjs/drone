@@ -13,6 +13,7 @@
     "./unit/driver-tcp.test.ts",
     "./unit/mavlink-stream.test.ts",
     "../scripts/build-runtime-cli.ts",
+    "../scripts/qualify-farm-browser.ts",
     "../scripts/qualify-public-safety-managed-budget.ts",
     "../resources/functions/drone/runtime/**/*.ts",
     "../resources/functions/drone/sensors/**/*.ts",
