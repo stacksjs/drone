@@ -19,6 +19,14 @@ Import factories from `resources/functions/drone/drivers/index.ts` on the server
 transport mode are captured at construction and cannot be promoted by mutating caller options.
 They reject the other firmware's heartbeat and currently support only the quadcopter vehicle type.
 
+On Linux, `./buddy telemetry:receive px4 --serial /dev/serial/by-id/YOUR_CONTROLLER` opens a
+stable tty for receive-only telemetry. It uses the same firmware selection and telemetry
+projection as loopback UDP. Before an accepted matching heartbeat, it ignores battery and
+position packets. It rejects repeated or backwards upstream position epochs, allows 32-bit boot
+time wrap, and keeps physical position health unqualified. The receiver supports both profiles
+with the corresponding explicit `px4` or `ardupilot` selection. See the
+[Pi bench procedure](raspberry-pi.md#optional-flight-controller-telemetry).
+
 PX4 `custom_mode` stores main mode in bits 16-23 and submode in bits 24-31. Main 6 is Offboard;
 Auto submodes 5/6 are Return/Land. These are distinct from ArduCopter's mode numbers.
 The existing generic `guided` field means external-velocity authority, not a PX4 mode name.

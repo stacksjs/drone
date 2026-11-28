@@ -8,8 +8,8 @@ Track the first aircraft setup and measured bench results in the [commissioning 
    Raspberry Pi Imager, enable SSH with your own key and a non-default account, then boot on the official
    bench power supply. Identify the board with `cat /proc/device-tree/model`.
 2. Install Bun for Linux ARM64 using the [official Bun installation instructions](https://bun.sh/docs/installation).
-   Use Bun 1.4.4 and check `bun --version` before installing dependencies. Follow the OS's current supported package workflow for Git
-   and Python if using MAVProxy; do not run arbitrary project services as root.
+   Use Bun 1.4.4 and check `bun --version` before installing dependencies. Install Git through the
+   OS package manager. Use a service account with serial-device access for receive-only telemetry.
 3. Clone `https://github.com/stacksjs/drone`, then `bun install --frozen-lockfile`, copy `.env.example`
    to `.env` and run `./buddy key:generate`. Run `bun run simulate` before connecting a flight controller.
 4. Validate the camera independently with Raspberry Pi's [AI Camera guide](https://www.raspberrypi.com/documentation/accessories/ai-camera.html)
@@ -52,18 +52,22 @@ physical flight commands.
    matching ArduCopter profile if the Pixhawk already runs ArduCopter. Connect the autopilot
    to the Pi over USB using the exact connector on your board, then identify its
    stable `/dev/serial/by-id/...` device. Grant the service account the OS's serial-device permissions.
-6. Use a maintained MAVLink router or MAVProxy to forward common telemetry to `127.0.0.1:14551`.
-   For example, with MAVProxy installed in an isolated Python environment:
+6. Open the controller directly with the Pi's Linux serial receiver. Close other programs using
+   that tty first. The receiver uses the OS's `/usr/bin/stty` to configure the port.
 
    ```sh
-   mavproxy.py --master=/dev/serial/by-id/YOUR_CONTROLLER --baudrate=115200 --out=udp:127.0.0.1:14551
-   ./buddy telemetry:receive px4
+   ./buddy telemetry:receive px4 --serial /dev/serial/by-id/YOUR_CONTROLLER
    ```
 
-   Replace the device path and run the receiver in a separate terminal from the forwarder.
-   USB serial commonly ignores the baud-rate setting. UART requires the matching rate.
-   The receiver prints JSON once per second and sends no MAVLink messages. It binds to loopback
-   and reports the oldest component receipt time, or `null` while a component is missing.
+   Replace the device path with the actual USB identity. The default serial settings are
+   115200 baud, 8 data bits, no parity, one stop bit and no flow control. Select `--baud`
+   to match a rate required by the endpoint. The receiver uses a read-only descriptor and sends no
+   MAVLink bytes. It prints JSON once per second and reports the oldest component receipt time, or
+   `null` while a component is missing. A disconnect ends the session. After reconnecting the device,
+   run the command again to establish a new telemetry scope.
+
+   Where a local router already owns the tty, use `./buddy telemetry:receive px4 --port 14551` with
+   its existing loopback UDP feed.
 7. Ensure HEARTBEAT, SYS_STATUS and LOCAL_POSITION_NED arrive at suitable rates. A bench controller
    may have no local EKF position. That is an expected unavailable estimate, not permission to invent it.
    The receiver expects system/component IDs 1/1. Use `./buddy telemetry:receive ardupilot` for

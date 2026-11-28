@@ -28,7 +28,7 @@ connection to an aircraft. It deliberately pauses time when the tab is hidden.
 ```sh
 bun run simulate        # deterministic terminal demo, no hardware
 ./buddy drone:simulate  # the same library through a native Stacks command
-./buddy telemetry:receive px4 # receive-only MAVLink for the stock X500 profile
+./buddy telemetry:receive px4 --serial /dev/serial/by-id/YOUR_CONTROLLER # receive-only Linux USB telemetry
 bun run sitl --enable-sitl # 30-second local simulator experiment; read docs/sitl.md first
 ./buddy lint
 ./buddy typecheck
@@ -545,7 +545,7 @@ the native board kernel remains neutral-only. Custom PCB design is not implement
 
 - Implemented: kinematic follow simulation, configurable envelope, custom behavior hooks,
   monotonic freshness and lease checks, target identity lock, GPS-fix normalization with jump
-  rejection, verified MAVLink subset, local UDP receive/transmit tests, receive-only Pi telemetry.
+  rejection, verified MAVLink subset, local UDP receive/transmit tests and receive-only Linux serial telemetry.
 - Hardware control is receive-only. No arming, takeoff, mode switching, motor output, or RTL command is implemented.
 - SITL commands require the separate explicit runners; `bun run sitl:px4 --enable-sitl` selects PX4. Loopback is an accidental-use guard, not a
   security boundary against another local process or a router forwarding to a physical vehicle.
