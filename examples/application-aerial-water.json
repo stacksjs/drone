@@ -1,0 +1,47 @@
+{
+  "version": 1,
+  "application": {
+    "version": 1,
+    "id": "aerial-inert-water",
+    "frame": "LOCAL_NED",
+    "origin": { "latitudeDeg": 0, "longitudeDeg": 0, "ellipsoidHeightM": 100 },
+    "boundary": [[1, -2], [8, -2], [8, 2], [1, 2]],
+    "exclusions": [[[4.8, -0.4], [5.4, -0.4], [5.4, 0.4], [4.8, 0.4]]],
+    "prescription": [{ "id": "declared-water-zone", "polygon": [[1.5, -1], [6.5, -1], [6.5, 1], [1.5, 1]], "ratePerHa": 200 }],
+    "routeM": [[2, 0], [6, 0]],
+    "gridResolutionM": 0.5,
+    "material": { "id": "inert-water", "batch": "synthetic-batch", "kind": "water", "unit": "L", "densityKgPerL": 1, "initialAmount": 0.2 },
+    "implement": { "type": "sprayer", "swathM": 0.8, "footprintLengthM": 0.4, "fallTimeS": 0.4, "minSpeedMps": 0.15, "maxSpeedMps": 1.25 },
+    "calibration": {
+      "id": "synthetic-aerial-water-meter",
+      "evidence": "synthetic",
+      "pulse": { "pulses": 4000, "litres": 2, "durationMs": 120000 },
+      "scale": { "tareRaw": 1000, "loadedRaw": 11000, "knownMassKg": 1 },
+      "minRatePerSecond": 0.001,
+      "maxRatePerSecond": 0.03,
+      "primaryCloseMs": 150,
+      "masterCloseMs": 100,
+      "energyTauMs": 80,
+      "noFlowTimeoutMs": 1000,
+      "closingAllowanceMs": 1100,
+      "encoderCounts": 1000
+    },
+    "weather": { "windMps": [0, 0], "temperatureC": 20, "humidityPercent": 60, "inversion": false },
+    "weatherLimits": { "maxWindMps": 2, "minTemperatureC": 5, "maxTemperatureC": 35, "minHumidityPercent": 30, "maxAgeMs": 500 },
+    "localRequirements": { "status": "unqualified", "jurisdiction": null, "operatorId": "declared-operator", "evidenceLinks": [] }
+  },
+  "aircraft": {
+    "evidence": "synthetic",
+    "mount": "centered",
+    "sensorMassKg": 0.02,
+    "tankMassKg": 0.025,
+    "pumpMassKg": 0.025,
+    "mountingMassKg": 0.02,
+    "tankCapacityL": 0.25,
+    "operatingHeightM": 1.2,
+    "availableWh": 45,
+    "propulsionMaxW": 600,
+    "pumpMaxW": 20,
+    "reservePercent": 30
+  }
+}

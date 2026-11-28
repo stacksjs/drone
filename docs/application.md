@@ -22,6 +22,23 @@ status. The default is a dry test with no implement grant. Selecting apply mode 
 authority while remaining in test mode emits no material. Every run remains physically inhibited.
 The compiled standalone CLI exposes the same commands outside the checkout.
 
+## Aerial water planning
+
+Run the quad-X planner with an explicit synthetic setup.
+
+```sh
+./buddy application:plan examples/application-aerial-water.json --vehicle quadcopter
+```
+
+The declaration adds centered sensor, tank, pump and mounting masses to the water inventory and
+the fictional airframe mass. The planner checks the tank capacity and loaded hover margin. It then
+budgets peak propulsion and pump consumption over the full flight path, including return and landing,
+before checking the energy reserve. The plan retains treatment polygons, exclusions, loading
+calculations and the return path. The mount assumption is an idealized centered mass.
+
+This command produces a plan. Follow [the aerial simulation issue](https://github.com/stacksjs/drone/issues/113)
+for the moving load, metering, reserve, independent-closure and deposition evidence.
+
 ## Planning and calibration
 
 Configuration v1 declares a fixed LOCAL_NED origin at 0,0,100 WGS84 ellipsoid metres. Ground down

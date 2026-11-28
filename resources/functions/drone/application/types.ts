@@ -51,6 +51,39 @@ export interface ApplicationPlan {
   requiredWh: number
   physicalTrialEligible: false
 }
+export interface AerialApplicationAircraft {
+  evidence: 'synthetic'
+  mount: 'centered'
+  sensorMassKg: number
+  tankMassKg: number
+  pumpMassKg: number
+  mountingMassKg: number
+  tankCapacityL: number
+  operatingHeightM: number
+  availableWh: number
+  propulsionMaxW: number
+  pumpMaxW: number
+  reservePercent: number
+}
+export interface AerialApplicationPlan extends ApplicationPlan {
+  aircraft: AerialApplicationAircraft
+  load: {
+    evidence: 'synthetic-centered-mass-budget'
+    aircraftMassKg: number
+    installedMassKg: number
+    initialWaterMassKg: number
+    takeoffMassKg: number
+    emptySystemMassKg: number
+    maximumCollectiveN: number
+    initialHoverFraction: number
+  }
+  powerBudget: {
+    propulsionWh: number
+    pumpWh: number
+    reserveWh: number
+    marginWh: number
+  }
+}
 export type ApplicationScenario = 'nominal' | 'empty' | 'stuck-valve' | 'master-stuck' | 'blocked-flow' | 'meter-loss' | 'meter-replay' | 'weather' | 'manual' | 'host-loss' | 'emergency' | 'localization-loss' | 'guard-open' | 'lease-expiry'
 export interface ApplicationOptions {
   config?: unknown

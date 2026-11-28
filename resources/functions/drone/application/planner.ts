@@ -1,8 +1,9 @@
-import type { ApplicationConfig, ApplicationPlan } from './types'
+import type { AerialApplicationAircraft, AerialApplicationPlan, ApplicationConfig, ApplicationPlan } from './types'
 import type { VolumeXY } from '../volumes/types'
 import type { VehicleMissionPlan, VehicleMissionTask } from '../vehicles/types'
 import { volumeBounds, volumeIntersectConvex, volumeOnSegment, volumeSegmentsTouch, volumeSignedArea, volumeTriangulateRing } from '../volumes/geometry'
 import { validateVehicleMission } from '../missions/vehicle'
+import { multirotorModel } from '../controls/model'
 import { applicationPulseFactor, applicationRatePerSecond, applicationScaleFactor } from './calibration'
 
 function fail(reason: string): never { throw new TypeError(`Invalid application configuration: ${reason}`) }
@@ -93,7 +94,7 @@ export function validateApplicationConfig(input: unknown): ApplicationConfig {
   const c = input as unknown as ApplicationConfig
   if (c.version !== 1 || c.frame !== 'LOCAL_NED') fail('version or frame'); id(c.id)
   fields(c.origin, ['latitudeDeg', 'longitudeDeg', 'ellipsoidHeightM'])
-  if (c.origin.latitudeDeg !== 0 || c.origin.longitudeDeg !== 0 || c.origin.ellipsoidHeightM !== 100) fail('owned ground fixture requires origin 0,0,100')
+  if (c.origin.latitudeDeg !== 0 || c.origin.longitudeDeg !== 0 || c.origin.ellipsoidHeightM !== 100) fail('owned application fixture requires origin 0,0,100')
   polygon(c.boundary)
   if (!Array.isArray(c.exclusions) || c.exclusions.length > 8 || !Array.isArray(c.prescription) || c.prescription.length > 8) fail('zone or exclusion count')
   for (const ring of c.exclusions) polygon(ring)
@@ -155,9 +156,8 @@ export function validateApplicationConfig(input: unknown): ApplicationConfig {
   return structuredClone(c)
 }
 
-/** Exact prescribed polygon support plus a real bounded owned ground mission. Route completion is not coverage proof. */
-export function planApplication(input: unknown): ApplicationPlan {
-  const config = validateApplicationConfig(input), intersect = intersectionEngine()
+function planSupport(config: ApplicationConfig, mission: VehicleMissionPlan): ApplicationPlan {
+  const intersect = intersectionEngine()
   const fieldAreaM2 = Math.abs(volumeSignedArea(config.boundary)), excludedAreaM2 = config.exclusions.reduce((sum, ring) => sum + intersect(config.boundary, ring), 0)
   const treatableAreaM2 = Math.max(0, fieldAreaM2 - excludedAreaM2)
   let prescribedAmount = 0
@@ -165,6 +165,14 @@ export function planApplication(input: unknown): ApplicationPlan {
     const support = intersect(config.boundary, zone.polygon) - config.exclusions.reduce((sum, exclusion) => sum + intersect(config.boundary, zone.polygon, exclusion), 0)
     prescribedAmount += Math.max(0, support) * zone.ratePerHa / 10000
   }
+  const validated = validateVehicleMission(mission)
+  if (validated.worstCaseMs > 120000) fail('120 second application mission budget')
+  return { config, mission: validated.plan, fieldAreaM2, excludedAreaM2, treatableAreaM2, prescribedAmount, availableAmount: config.material.initialAmount, inventorySufficient: config.material.initialAmount + 1e-12 >= prescribedAmount, worstCaseMs: validated.worstCaseMs, requiredWh: validated.requiredWh, physicalTrialEligible: false }
+}
+
+/** Exact prescribed polygon support plus a bounded owned ground mission. */
+export function planApplication(input: unknown): ApplicationPlan {
+  const config = validateApplicationConfig(input)
   const timeout = (from: VolumeXY, to: VolumeXY) => Math.max(5000, Math.ceil((Math.hypot(to[0] - from[0], to[1] - from[1]) / .3 + 6) * 1000))
   const tasks: VehicleMissionTask[] = [{ id: 'start', kind: 'start', next: 'approach' }]
   let previous: VolumeXY = [0, 0]
@@ -174,7 +182,72 @@ export function planApplication(input: unknown): ApplicationPlan {
   }
   tasks.push({ id: 'home', kind: 'return', acceptanceM: .22, maxArrivalSpeedMps: .08, settleMs: 300, timeoutMs: timeout(previous, [0, 0]), next: 'stop' }, { id: 'stop', kind: 'stop', positionM: [0, 0, 0], acceptanceM: .25, maxArrivalSpeedMps: .1, settleMs: 300, timeoutMs: 3000 })
   const mission: VehicleMissionPlan = { version: 2, vehicle: 'ground', id: config.id, frame: 'LOCAL_NED', altitude: 'ORIGIN_RELATIVE_DOWN', terrain: 'DECLARED_MODEL_SURFACE', origin: { ...config.origin }, fence: { radiusM: 12, minDownM: -.3, maxDownM: .3 }, rallyM: [0, 0, 0], power: { availableWh: 100, maxW: 250, reservePercent: 30 }, start: 'start', tasks }
-  const validated = validateVehicleMission(mission)
-  if (validated.worstCaseMs > 120000) fail('120 second application mission budget')
-  return { config, mission: validated.plan, fieldAreaM2, excludedAreaM2, treatableAreaM2, prescribedAmount, availableAmount: config.material.initialAmount, inventorySufficient: config.material.initialAmount + 1e-12 >= prescribedAmount, worstCaseMs: validated.worstCaseMs, requiredWh: validated.requiredWh, physicalTrialEligible: false }
+  return planSupport(config, mission)
+}
+
+/** Plan on the fictional quad-X model using explicitly declared water, mounted mass and power. */
+export function planAerialApplication(input: unknown): AerialApplicationPlan {
+  bounded(input)
+  fields(input, ['version', 'application', 'aircraft'])
+  if (input.version !== 1) fail('aerial version')
+  const config = validateApplicationConfig(input.application)
+  if (config.material.kind !== 'water' || config.implement.type !== 'sprayer') fail('aerial implement requires inert water')
+  const payload = input.aircraft
+  fields(payload, ['evidence', 'mount', 'sensorMassKg', 'tankMassKg', 'pumpMassKg', 'mountingMassKg', 'tankCapacityL', 'operatingHeightM', 'availableWh', 'propulsionMaxW', 'pumpMaxW', 'reservePercent'])
+  if (payload.evidence !== 'synthetic' || payload.mount !== 'centered') fail('aerial model requires declared synthetic centered mounting')
+  for (const key of ['sensorMassKg', 'tankMassKg', 'pumpMassKg', 'mountingMassKg'] as const) number(payload[key], .001, 1, key)
+  number(payload.tankCapacityL, .001, 1, 'tank capacity')
+  number(payload.operatingHeightM, .8, 3, 'modeled application height')
+  number(payload.availableWh, .01, 250, 'aerial energy capacity')
+  number(payload.propulsionMaxW, 1, 2000, 'aerial propulsion power')
+  number(payload.pumpMaxW, 1, 100, 'aerial pump power')
+  number(payload.reservePercent, 30, 80, 'aerial energy reserve')
+  const aircraft = structuredClone(payload) as unknown as AerialApplicationAircraft
+  if (config.material.initialAmount > aircraft.tankCapacityL) fail('water level exceeds declared capacity')
+
+  const aircraftMassKg = multirotorModel.massKg
+  const initialWaterMassKg = config.material.initialAmount * config.material.densityKgPerL!
+  const installedMassKg = aircraft.sensorMassKg + aircraft.tankMassKg + aircraft.pumpMassKg + aircraft.mountingMassKg
+  const emptySystemMassKg = aircraftMassKg + installedMassKg
+  const takeoffMassKg = emptySystemMassKg + initialWaterMassKg
+  const maximumCollectiveN = 4 * multirotorModel.maxMotorThrustN
+  const initialHoverFraction = takeoffMassKg * multirotorModel.gravityMps2 / maximumCollectiveN
+  if (initialHoverFraction > .7) fail('fully loaded model cannot preserve collective thrust margin')
+
+  const rally: [number, number, number] = [0, 0, -aircraft.operatingHeightM]
+  const spatial = { acceptanceM: .22, maxArrivalSpeedMps: .18, settleMs: 200 }
+  const tasks: VehicleMissionTask[] = [
+    { id: 'start', kind: 'start', next: 'takeoff' },
+    { id: 'takeoff', kind: 'takeoff', positionM: rally, ...spatial, timeoutMs: 14000, next: 'approach' },
+  ]
+  let previous: VolumeXY = [0, 0]
+  const legTimeout = (from: VolumeXY, to: VolumeXY) => Math.ceil(7000 + 1000 * Math.hypot(to[0] - from[0], to[1] - from[1]) / .6)
+  for (const [i, point] of config.routeM.entries()) {
+    tasks.push({
+      id: i === 0 ? 'approach' : `apply-${i}`, kind: 'waypoint', positionM: [point[0], point[1], rally[2]], ...spatial,
+      timeoutMs: legTimeout(previous, point), next: i === config.routeM.length - 1 ? 'home' : `apply-${i + 1}`,
+    })
+    previous = point
+  }
+  tasks.push(
+    { id: 'home', kind: 'return', ...spatial, timeoutMs: legTimeout(previous, [0, 0]), next: 'land' },
+    { id: 'land', kind: 'land', positionM: [0, 0, 0], ...spatial, timeoutMs: 14000 },
+  )
+  const plan = planSupport(config, {
+    version: 2, vehicle: 'quadcopter', id: config.id, frame: 'LOCAL_NED', altitude: 'ORIGIN_RELATIVE_DOWN', terrain: 'DECLARED_MODEL_SURFACE',
+    origin: { ...config.origin }, fence: { radiusM: 12, minDownM: -5, maxDownM: 0 }, rallyM: rally,
+    power: { availableWh: aircraft.availableWh, maxW: aircraft.propulsionMaxW + aircraft.pumpMaxW, reservePercent: aircraft.reservePercent }, start: 'start', tasks,
+  })
+  const reserveWh = aircraft.availableWh * aircraft.reservePercent / 100
+  return {
+    ...plan,
+    aircraft,
+    load: { evidence: 'synthetic-centered-mass-budget', aircraftMassKg, installedMassKg, initialWaterMassKg, takeoffMassKg, emptySystemMassKg, maximumCollectiveN, initialHoverFraction },
+    powerBudget: {
+      propulsionWh: aircraft.propulsionMaxW * plan.worstCaseMs / 3600000,
+      pumpWh: aircraft.pumpMaxW * plan.worstCaseMs / 3600000,
+      reserveWh,
+      marginWh: Math.max(0, aircraft.availableWh - reserveWh - plan.requiredWh),
+    },
+  }
 }

@@ -1,7 +1,7 @@
 import { expect, test } from 'bun:test'
 import { command } from '@stacksjs/testing'
 import { mkdtemp, readFile, rm, stat, writeFile } from 'node:fs/promises'
-import { join } from 'node:path'
+import { join, resolve } from 'node:path'
 import { tmpdir } from 'node:os'
 import { exampleApplicationConfig } from '../../resources/functions/drone/application/fixtures'
 
@@ -66,3 +66,40 @@ test('native commands plan, meter both inert materials, reprocess exact cells an
   }
   finally { await rm(root, { recursive: true, force: true }) }
 }, 240000)
+
+test('native aerial planning preserves exclusions, budgets return and rejects an inadmissible load', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'drone-aerial-plan-'))
+  try {
+    const fixture = resolve('examples/application-aerial-water.json')
+    const invoke = (path: string) => command(['application:plan', path, '--vehicle', 'quadcopter']).withTimeout(30000)
+    const planned = await invoke(fixture)
+    expect(planned.exitCode).toBe(0)
+    const plan = JSON.parse(planned.stdout)
+    expect(plan.mission.vehicle).toBe('quadcopter')
+    expect(plan.mission.tasks.map((task: { id: string }) => task.id)).toEqual(['start', 'takeoff', 'approach', 'apply-1', 'home', 'land'])
+    expect(plan.mission.tasks.find((task: { id: string }) => task.id === 'apply-1').positionM).toEqual([6, 0, -1.2])
+    expect(plan.excludedAreaM2).toBeCloseTo(.48, 12)
+    expect(plan.prescribedAmount).toBeCloseTo(.1904, 12)
+    expect(plan.inventorySufficient).toBe(true)
+    expect(plan.load.emptySystemMassKg).toBeCloseTo(1.59, 12)
+    expect(plan.load.takeoffMassKg).toBeCloseTo(1.79, 12)
+    expect(plan.powerBudget.pumpWh).toBeGreaterThan(0)
+    expect(plan.powerBudget.marginWh).toBeGreaterThan(0)
+    expect(plan.physicalTrialEligible).toBe(false)
+
+    const original = JSON.parse(await readFile(fixture, 'utf8'))
+    const invalid = join(root, 'invalid.json')
+    for (const [overrides, error] of [
+      [{ tankCapacityL: .1 }, 'water level exceeds declared capacity'],
+      [{ tankMassKg: .8, mountingMassKg: .8 }, 'cannot preserve collective thrust margin'],
+      [{ availableWh: 5 }, 'cannot preserve energy reserve'],
+      [{ evidence: 'measured' }, 'requires declared synthetic centered mounting'],
+    ] as const) {
+      await writeFile(invalid, JSON.stringify({ ...original, aircraft: { ...original.aircraft, ...overrides } }))
+      const refused = await invoke(invalid)
+      expect(refused.exitCode).toBe(1)
+      expect(refused.stderr).toContain(error)
+    }
+  }
+  finally { await rm(root, { recursive: true, force: true }) }
+}, 90000)
