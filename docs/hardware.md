@@ -48,7 +48,7 @@ from the basic bench subtotal and the existing aircraft estimate.
 
 ## Recommended base: Holybro X500 v2 development kit
 
-Choose **Pixhawk 6C + M10 GPS**, not the frame-only or ARF option.
+Choose the **Pixhawk 6C + M10 GPS** bundle when available.
 The [manufacturer listing](https://holybro.com/products/px4-development-kit-x500-v2) showed **$609**
 for that variant when researched. It includes frame, landing gear, four 2216 KV920 motors, four
 20 A ESCs, power distribution, power module, GPS and telemetry radios. Avoid buying those parts twice.
@@ -61,8 +61,8 @@ The separate [owned board runtime](runtime.md) uses a Pico 2 for bench developme
 firmware, physical control and measured aircraft validation remain separate roadmap work. Keep the
 Pi 5 for Stacks mission and camera logic.
 
-The X500 is the recommended first **development** aircraft for this repository. The full Drone
-application runs on the Raspberry Pi companion, while the Pixhawk runs its own supported
+The X500 is the recommended first **development** aircraft for this repository. The Drone
+application targets Raspberry Pi OS Lite on the companion, while the Pixhawk runs its own supported
 flight-controller firmware and has the independent RC link. Use the [Pi bring-up guide](raspberry-pi.md)
 for software installation and receive-only telemetry. The [PX4 airframe guide](https://docs.px4.io/v1.17/en/frames_multicopter/holybro_x500v2_pixhawk6c)
 documents the development kit and companion mounting space. Assembly, loaded endurance, on-device
@@ -197,10 +197,17 @@ determine the regional kit and delivered cost.
 
 | Equipment | Listed price | Role |
 | --- | --- | --- |
-| [Holybro X500 v2, Pixhawk 6C/M10](https://holybro.com/products/px4-development-kit-x500-v2) | $609 kit | Pi companion development and receive-only aircraft integration. The manufacturer still listed the standard kit price during Black Friday checks. |
+| [Holybro X500 v2, Pixhawk 6C/M10](https://holybro.com/products/px4-development-kit-x500-v2) | $609 kit | First choice for Pi companion development. Holybro listed both Pixhawk 6C radio variants as sold out during the Black Friday check. |
+| [Holybro X500 v2 ARF, SKU 30125](https://holybro.com/products/x500-v2-kits) | $329 airframe | Listed in stock with motors, ESCs, propellers and power distribution. A complete build also needs a Pixhawk 6C, PM02 power module, M10 GPS and regional telemetry radios. Price the complete cart to compare with the development bundle. |
+| [Holybro X650, Pixhawk 6C/M10](https://holybro.com/products/x650-development-kit?variant=43004805415101) | $1,139 kit | Larger payload development candidate. The 6C kit was listed in stock. The simulated water trial requires no aircraft. |
 | [DJI Mini 4K](https://www.bhphotovideo.com/c/product/1852395-REG/dji_cp_ma_00000787_02_mini_4k_drone_gl.html) | $299 | Low-cost RGB visual scouting with DJI flight software. Drone has no driver for this model. |
 | [DJI Mini 3 with DJI RC](https://www.bestbuy.com/product/dji-mini-3-dji-rc-gl-gray/6524511/instore) | $465.99 Black Friday listing | RGB visual scouting with a screen-equipped remote. Drone has no driver for this model. |
 | [DJI Mavic 3M](https://www.bhphotovideo.com/c/product/1818346-REG/dji_cp_en_00000444_01_mavic_3m_multispectral_drone.html) | $5,729 | Candidate for collecting RGB and red/NIR reference data with [DJI's camera system](https://ag.dji.com/mavic-3-m). The Drone application still needs a qualified import path for these real captures. |
+
+No in-stock X500 development bundle at the manufacturer's price was verified in the US checks.
+[Kilitronic](https://kilitronic.com/products/holybro-drone-development-kit-x500-v2) listed the
+915 MHz X500 with Pixhawk 6C at $1,299. For the first development purchase, wait for the complete
+kit or price the exact ARF components and regional equivalents before ordering.
 
 For the first multispectral benchmark, compare a shared aircraft or a local operator quote with
 purchase. As a price reference, [one Minnesota rental supplier](https://www.maverickdrone.com/products/dji-mavic-3-multispectral-rental)
