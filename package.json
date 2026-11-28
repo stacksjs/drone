@@ -33,26 +33,26 @@
     "types:check": "bun run typecheck"
   },
   "dependencies": {
-    "@stacksjs/actions": "^0.75.633",
-    "@stacksjs/auth": "^0.75.633",
+    "@stacksjs/actions": "^0.75.716",
+    "@stacksjs/auth": "^0.75.716",
     "@stacksjs/cli": "^0.75.633",
-    "@stacksjs/cron": "0.75.633",
+    "@stacksjs/cron": "0.75.716",
     "@stacksjs/database": "^0.75.633",
     "@stacksjs/env": "^0.75.633",
     "@stacksjs/error-handling": "^0.75.633",
-    "@stacksjs/orm": "^0.75.633",
+    "@stacksjs/orm": "^0.75.716",
     "@stacksjs/path": "^0.75.633",
     "@stacksjs/queue": "^0.75.633",
-    "@stacksjs/realtime": "0.75.633",
+    "@stacksjs/realtime": "0.75.716",
     "@stacksjs/router": "^0.75.633",
-    "@stacksjs/security": "^0.75.633",
+    "@stacksjs/security": "^0.75.716",
     "@stacksjs/storage": "^0.75.633",
-    "@stacksjs/stx": "0.2.914",
-    "@stacksjs/testing": "^0.75.633",
+    "@stacksjs/stx": "0.2.960",
+    "@stacksjs/testing": "^0.75.716",
     "@stacksjs/validation": "^0.75.633",
     "@tufjs/canonical-json": "2.0.0",
     "stacks": "^0.75.633",
-    "ts-images": "0.2.31",
+    "ts-images": "0.2.35",
     "tuf-js": "https://github.com/stacksjs/tuf-js/releases/download/sdk-v6.0.1/stacksjs-tuf-js-6.0.1.tgz"
   },
   "workspaces": [
@@ -69,9 +69,9 @@
     "commit-msg": "bun x gitlint --edit \"$1\""
   },
   "devDependencies": {
-    "@stacksjs/query-builder": "0.75.633",
+    "@stacksjs/query-builder": "0.75.716",
     "better-dx": "^0.2.37",
-    "@tufjs/models": "5.0.0"
+    "@tufjs/models": "5.0.3"
   },
   "author": "Chris Breuer <chris@stacksjs.com>",
   "homepage": "https://github.com/stacksjs/drone",
